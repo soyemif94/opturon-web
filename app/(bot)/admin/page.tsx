@@ -1,4 +1,4 @@
-﻿import { ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 export default function AdminPlaceholderPage() {

@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bot, Layers, Megaphone, Palette, Sparkles, Globe, BrainCircuit } from "lucide-react";
 import { Button } from "@/components/ui/button";

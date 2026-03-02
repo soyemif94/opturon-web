@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getBuild, getDebugInbox, getDebugInboxHealth, getHealth } from "@/lib/api";
 
 export async function GET() {

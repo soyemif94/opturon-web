@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { clearDebugInbox } from "@/lib/api";
 
 export async function POST() {
