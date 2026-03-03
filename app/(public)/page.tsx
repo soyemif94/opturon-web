@@ -1,74 +1,108 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Bot, Layers, Megaphone, Palette, Sparkles, Globe, BrainCircuit } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { HomePageEvents } from "@/components/analytics/HomePageEvents";
+import { HomeFaq } from "@/components/sections/HomeFaq";
+import { HomeFinalCta } from "@/components/sections/HomeFinalCta";
+import { HomeHero } from "@/components/sections/HomeHero";
+import { HomePackages } from "@/components/sections/HomePackages";
+import { HomeProblems } from "@/components/sections/HomeProblems";
+import { HomeProcess } from "@/components/sections/HomeProcess";
+import { HomeResults } from "@/components/sections/HomeResults";
+import { HomeSolution } from "@/components/sections/HomeSolution";
+import { HomeStickyWhatsAppCta } from "@/components/sections/HomeStickyWhatsAppCta";
 
 export const metadata: Metadata = {
-  title: "Opturon | Inicio",
-  description: "Transformando Marcas en Experiencias Digitales"
+  metadataBase: new URL("https://opturon.com"),
+  title: {
+    default: "Opturon | Automatizacion Empresarial con IA",
+    template: "%s | Opturon"
+  },
+  description:
+    "Agencia de automatizacion empresarial con IA aplicada. Automatizamos WhatsApp Business, procesos internos e integraciones para escalar negocios de forma inteligente.",
+  keywords: [
+    "automatizacion empresarial",
+    "automatizacion WhatsApp Business",
+    "bots con IA para empresas",
+    "integracion CRM automatizacion",
+    "automatizacion de procesos",
+    "agencia de automatizacion digital",
+    "IA aplicada a negocios"
+  ],
+  openGraph: {
+    title: "Opturon | Automatizacion Empresarial con IA",
+    description:
+      "Sistemas inteligentes que automatizan WhatsApp, procesos y operaciones para escalar negocios.",
+    url: "https://opturon.com",
+    siteName: "Opturon",
+    type: "website",
+    locale: "es_AR",
+    images: [{ url: "/og", width: 1200, height: 630, alt: "Opturon - Automatizacion con IA" }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Opturon | Automatizacion con IA",
+    description: "Automatizamos WhatsApp, procesos y sistemas para empresas que quieren escalar.",
+    images: ["/og"]
+  },
+  robots: {
+    index: true,
+    follow: true
+  },
+  alternates: {
+    canonical: "/"
+  }
 };
 
-const services = [
-  { title: "Branding", subtitle: "Naming, logo & identity", icon: Palette },
-  { title: "Web Design", subtitle: "SEO Optimized", icon: Globe },
-  { title: "Digital Ads", subtitle: "Targeted campaigns", icon: Megaphone },
-  { title: "AR", subtitle: "Social and Apps", icon: Layers },
-  { title: "VR", subtitle: "VR experiences", icon: Sparkles },
-  { title: "AI Automation", subtitle: "Optimize tasks with AI", icon: BrainCircuit }
-];
-
 export default function HomePage() {
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://opturon.com/#organization",
+      name: "Opturon",
+      url: "https://opturon.com"
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://opturon.com/#website",
+      name: "Opturon",
+      url: "https://opturon.com",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: "https://opturon.com/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      name: "Automatizacion empresarial con IA",
+      provider: {
+        "@id": "https://opturon.com/#organization"
+      },
+      areaServed: "AR",
+      serviceType: "Automatizacion WhatsApp Business, Integraciones, Bots IA"
+    }
+  ];
+
   return (
-    <div>
-      <section className="container-opt py-20 lg:py-28">
-        <div className="max-w-3xl">
-          <p className="text-brandBright text-sm mb-3">Opturon Studio</p>
-          <h1 className="text-4xl lg:text-6xl font-semibold leading-tight">Transformando Marcas en Experiencias Digitales</h1>
-          <p className="mt-5 text-lg text-muted max-w-2xl">Traemos el futuro a tu negocio.</p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/servicios">Saber más <ArrowRight className="ml-2 h-4 w-4" /></Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/contacto">Agendar reunión</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="container-opt pb-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((service) => {
-            const Icon = service.icon;
-            return (
-              <Card key={service.title} className="p-6 hover:border-brand/40 transition">
-                <Icon className="h-5 w-5 text-brandBright mb-3" />
-                <h3 className="font-semibold text-lg">{service.title}</h3>
-                <p className="text-muted mt-1">{service.subtitle}</p>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="container-opt pb-20">
-        <Card className="p-8 lg:p-12 bg-brand-linear border-brand/20">
-          <h2 className="text-3xl font-semibold mb-3">Sobre Nosotros</h2>
-          <p className="text-muted max-w-3xl">
-            La única agencia de Marketing en el mercado que utiliza la última tecnología para impulsar tu marca a otro nivel.
-          </p>
-        </Card>
-      </section>
-
-      <section className="container-opt pb-24">
-        <Card className="p-8 lg:p-12 flex flex-col gap-5 items-start">
-          <h3 className="text-2xl font-semibold">Habla con nosotros para una estrategia personalizada.</h3>
-          <Button asChild>
-            <Link href="/contacto"><Bot className="mr-2 h-4 w-4" /> Agendar Reunión</Link>
-          </Button>
-        </Card>
-      </section>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <HomeHero />
+      <HomeProblems />
+      <HomeSolution />
+      <HomeProcess />
+      <HomePackages />
+      <HomeResults />
+      <HomeFaq />
+      <HomeFinalCta />
+      <HomePageEvents />
+      <div className="h-20 md:hidden" aria-hidden="true" />
+      <HomeStickyWhatsAppCta />
+    </>
   );
 }

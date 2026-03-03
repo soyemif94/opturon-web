@@ -1,59 +1,71 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { MessageCircle } from "lucide-react";
-import { GlowCard } from "@/components/ui/GlowCard";
+import { CaseCard } from "@/components/cases/CaseCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
+import { casesCatalog } from "@/lib/cases";
 import { getWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
-import { servicesCatalog } from "@/lib/services";
 
 export const metadata: Metadata = {
-  title: "Servicios | Opturon",
-  description:
-    "Servicios de automatizaci�n con IA para WhatsApp, CRM, bots y optimizaci�n continua orientada a resultados."
+  title: "Casos | Opturon",
+  description: "Casos tipo de automatizacion con IA para WhatsApp, integraciones y operacion. Benchmarks orientativos sin marcas.",
+  openGraph: {
+    title: "Casos | Opturon",
+    description: "Casos tipo y benchmarks orientativos de implementaciones de automatizacion.",
+    images: ["/og"]
+  }
 };
 
-export default function ServiciosPage() {
+export default function CasosPage() {
   const whatsAppLink = getWhatsAppLink();
   const isExternalWhatsApp = isWhatsAppExternalLink(whatsAppLink);
 
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Casos tipo de automatizacion",
+    url: "https://opturon.com/casos",
+    itemListElement: casesCatalog.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: `https://opturon.com/casos/${item.slug}`,
+      name: item.title
+    }))
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <Section className="pt-20 md:pt-24">
-        <div className="max-w-3xl space-y-4">
-          <h1 className="text-balance text-4xl font-semibold md:text-5xl">Servicios</h1>
+        <div className="max-w-4xl space-y-4">
+          <h1 className="text-balance text-4xl font-semibold md:text-5xl">Casos</h1>
           <p className="text-muted md:text-lg">
-            Dise�amos automatizaciones empresariales con IA para convertir m�s, operar mejor y escalar sin fricci�n.
+            Estos son casos tipo sin marcas ni clientes nombrados. Los resultados se presentan como benchmarks orientativos segun implementacion y contexto operativo.
           </p>
         </div>
       </Section>
 
       <Section>
         <div className="grid gap-4 md:grid-cols-2">
-          {servicesCatalog.map((service) => (
-            <GlowCard key={service.slug}>
-              <h2 className="text-2xl font-semibold">{service.title}</h2>
-              <p className="mt-2 text-sm text-muted">{service.shortDescription}</p>
-              <Link
-                href={`/servicios/${service.slug}`}
-                className="mt-5 inline-flex text-sm font-medium text-brandBright transition hover:text-brand"
-              >
-                Ver servicio ?
-              </Link>
-            </GlowCard>
+          {casesCatalog.map((item) => (
+            <CaseCard key={item.slug} item={item} />
           ))}
         </div>
       </Section>
 
       <Section className="pb-24">
         <div className="rounded-3xl border border-brand/40 bg-card p-8 md:p-12">
-          <h3 className="text-3xl font-semibold md:text-4xl">Empez� con un diagn�stico sin cargo</h3>
+          <h2 className="text-3xl font-semibold md:text-4xl">Diagnostico sin cargo</h2>
           <p className="mt-3 max-w-2xl text-muted">
-            Te mostramos prioridades, arquitectura y roadmap para implementar r�pido y con foco en impacto.
+            Si queres aplicar estos enfoques a tu negocio, armamos una hoja de ruta inicial con foco en impacto.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagn�stico sin cargo">
-              Diagn�stico sin cargo
+            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagnostico sin cargo">
+              Diagnostico sin cargo
             </PrimaryButton>
             <a
               href={whatsAppLink}
@@ -71,3 +83,4 @@ export default function ServiciosPage() {
     </>
   );
 }
+

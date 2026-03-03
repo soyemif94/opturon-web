@@ -1,0 +1,44 @@
+﻿[
+  {
+    "id": "welcome_intake",
+    "title": "Bienvenida + datos clave",
+    "body": "Hola, gracias por escribir a Opturon. Para que la auditoría estratégica inicial (15 min) sea útil, compartime por favor: rubro, tamaño de equipo comercial, consultas mensuales aproximadas, CRM actual (o sin CRM) y objetivo principal (ventas, soporte o ambos).",
+    "when_to_use": "Primer contacto de un lead nuevo que solicita información general"
+  },
+  {
+    "id": "pain_point_question",
+    "title": "Dolor principal",
+    "body": "Perfecto. Para priorizar bien: ¿cuál es hoy el mayor cuello de botella en WhatsApp comercial? (ej: respuesta tardía, falta de seguimiento, baja calificación, pérdida de contexto en CRM).",
+    "when_to_use": "Después de recibir datos básicos, para identificar problema central"
+  },
+  {
+    "id": "three_pillars_explanation",
+    "title": "Explicación 3 pilares",
+    "body": "Nuestro enfoque trabaja sobre 3 pilares: 1) automatización inteligente de conversaciones, 2) integración CRM para trazabilidad comercial, 3) optimización continua con métricas reales. Así convertimos WhatsApp en un sistema comercial, no solo un canal de mensajes.",
+    "when_to_use": "Cuando el lead pregunta cómo trabajan o qué incluye la implementación"
+  },
+  {
+    "id": "schedule_request_two_slots",
+    "title": "Cierre para agendar",
+    "body": "Si te parece, avanzamos con la auditoría estratégica inicial (15 min). Pasame 2 opciones de horario (día y hora) dentro de lunes a viernes para coordinar agenda.",
+    "when_to_use": "Cuando el lead ya mostró interés y está listo para siguiente paso"
+  },
+  {
+    "id": "decision_maker_check",
+    "title": "Validar decisor",
+    "body": "Para optimizar tiempos, ¿participa en la llamada quien define presupuesto/proyecto o la persona responsable final del área comercial/operativa?",
+    "when_to_use": "Antes de agendar o confirmar propuesta, para validar capacidad de decisión"
+  },
+  {
+    "id": "not_qualified_soft_redirect",
+    "title": "No califica (derivación suave)",
+    "body": "Gracias por la claridad. Por el contexto actual, hoy no sería eficiente implementar todo el sistema todavía. Si querés, te compartimos una guía breve de preparación para que, cuando tengas más volumen/proceso, podamos avanzar con mayor impacto.",
+    "when_to_use": "Cuando el lead no cumple criterios mínimos de volumen o madurez operativa"
+  },
+  {
+    "id": "post_audit_summary",
+    "title": "Resumen post auditoría",
+    "body": "Resumen de la auditoría: detectamos oportunidades en velocidad de respuesta, seguimiento y trazabilidad CRM. Recomendación inicial: implementar un flujo comercial estructurado con hitos y métricas. Siguiente paso: confirmar alcance, propuesta económica y fecha de kickoff.",
+    "when_to_use": "Después de la auditoría para cerrar próximos pasos por escrito"
+  }
+]
