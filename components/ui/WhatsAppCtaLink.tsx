@@ -2,7 +2,8 @@
 
 import type { MouseEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { setSessionEid, trackEvent, trackLeadIntent, trackWhatsAppClick } from "@/lib/analytics";
+import { setSessionEid, trackEvent, trackLeadIntent } from "@/lib/analytics";
+import { WhatsAppTrackedLink } from "@/components/analytics/WhatsAppTrackedLink";
 
 type WhatsAppCtaLinkProps = {
   href: string;
@@ -49,7 +50,6 @@ export function WhatsAppCtaLink({
         : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setSessionEid(event_id);
 
-    trackWhatsAppClick(origin, { event_id });
     if (intentEvent) {
       trackLeadIntent(origin, "whatsapp", { event_id });
     }
@@ -125,8 +125,9 @@ export function WhatsAppCtaLink({
   }
 
   return (
-    <a
+    <WhatsAppTrackedLink
       href={href}
+      origin={origin}
       aria-label={ariaLabel}
       target={shouldOpenInNewTab ? "_blank" : undefined}
       rel={shouldOpenInNewTab ? "noopener noreferrer" : undefined}
@@ -134,6 +135,6 @@ export function WhatsAppCtaLink({
       onClick={handleClick}
     >
       {children}
-    </a>
+    </WhatsAppTrackedLink>
   );
 }

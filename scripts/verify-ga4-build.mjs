@@ -4,6 +4,7 @@ import { join } from "node:path";
 const APP_BUILD_DIR = join(process.cwd(), ".next", "server", "app");
 const INDEX_HTML = join(APP_BUILD_DIR, "index.html");
 const GA_COMPONENT_FILE = join(process.cwd(), "components", "analytics", "GoogleAnalytics.tsx");
+const WA_TRACKED_LINK_FILE = join(process.cwd(), "components", "analytics", "WhatsAppTrackedLink.tsx");
 const GTAG_SRC = "googletagmanager.com/gtag/js?id=";
 const GA_INIT_ID = "ga-init";
 
@@ -45,11 +46,15 @@ if (indexHasGtagSrc && indexGtagRefs >= 1 && (indexHasGaInit || gaComponentHasIn
 const files = walkFiles(APP_BUILD_DIR).filter((file) => file.endsWith(".html") || file.endsWith(".js"));
 let foundGtag = false;
 let foundGaInit = false;
+let foundWhatsappSignals = false;
 
 for (const file of files) {
   const content = readFileSync(file, "utf8");
   if (!foundGtag && content.includes(GTAG_SRC)) foundGtag = true;
   if (!foundGaInit && content.includes(GA_INIT_ID)) foundGaInit = true;
+  if (!foundWhatsappSignals && (content.includes("whatsapp_click") || content.includes("generate_lead"))) {
+    foundWhatsappSignals = true;
+  }
   if (foundGtag && foundGaInit) break;
 }
 
@@ -65,6 +70,17 @@ if (!foundGtag || !foundGaInit) {
 if (indexGtagRefs < 1 || (!indexHasGaInit && !gaComponentHasInitId)) {
   console.error("[verify-ga4-build] ERROR: Missing gtag/js loader or ga-init configuration.");
   process.exit(1);
+}
+
+const hasTrackedLinkSource =
+  existsSync(WA_TRACKED_LINK_FILE) &&
+  (() => {
+    const src = readFileSync(WA_TRACKED_LINK_FILE, "utf8");
+    return src.includes("whatsapp_click") || src.includes("generate_lead");
+  })();
+
+if (!foundWhatsappSignals && !hasTrackedLinkSource) {
+  console.warn("[verify-ga4-build] WARN: Could not confirm WhatsApp conversion event signals in build output (best-effort).");
 }
 
 console.log("[verify-ga4-build] OK. GA4 markers found in build output.");
