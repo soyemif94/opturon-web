@@ -48,6 +48,8 @@ export default function ContactoPage() {
             <WhatsAppCtaLink
               href={directWhatsAppLink}
               origin="contact-direct"
+              postClickRedirectTo="/gracias"
+              openInNewTab
               ariaLabel="Prefiero escribir directo por WhatsApp"
               isExternal={isExternalWhatsApp}
               className="mt-3 inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/70 hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"

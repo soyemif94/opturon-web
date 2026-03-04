@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Card } from "@/components/ui/card";
 import { getDebugInbox } from "@/lib/api";
 
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Opturon Bot | Metrics",
-  description: "M�tricas b�sicas derivadas del inbox."
+  description: "Métricas básicas derivadas del inbox."
 };
 
 export default async function BotMetricsPage() {
@@ -32,7 +32,7 @@ export default async function BotMetricsPage() {
       <h1 className="text-2xl font-semibold">Bot Metrics</h1>
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5"><p className="text-sm text-muted">Total messages</p><p className="mt-1 text-2xl">{total}</p></Card>
-        <Card className="p-5"><p className="text-sm text-muted">�ltimos 7 d�as</p><p className="mt-1 text-2xl">{total}</p></Card>
+        <Card className="p-5"><p className="text-sm text-muted">Últimos 7 días</p><p className="mt-1 text-2xl">{total}</p></Card>
         <Card className="p-5"><p className="text-sm text-muted">Top senders</p><p className="mt-1 text-2xl">{topSenders.length}</p></Card>
       </div>
       <Card className="p-5">

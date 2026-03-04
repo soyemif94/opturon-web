@@ -1,26 +1,10 @@
 import Script from "next/script";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  const ga4Id = process.env.NEXT_PUBLIC_GA4_ID?.trim();
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim();
 
   return (
     <>
-      {ga4Id ? (
-        <>
-          <Script src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`} strategy="afterInteractive" />
-          <Script id="ga4-init" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              window.gtag = gtag;
-              gtag('js', new Date());
-              gtag('config', '${ga4Id}', { send_page_view: true });
-            `}
-          </Script>
-        </>
-      ) : null}
-
       {pixelId ? (
         <Script id="meta-pixel-init" strategy="afterInteractive">
           {`
@@ -39,4 +23,3 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     </>
   );
 }
-

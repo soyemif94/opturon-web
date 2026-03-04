@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { GlowCard } from "@/components/ui/GlowCard";
@@ -10,7 +10,7 @@ import { servicesCatalog } from "@/lib/services";
 export const metadata: Metadata = {
   title: "Servicios | Opturon",
   description:
-    "Servicios de automatizaci�n con IA para WhatsApp, CRM, bots y optimizaci�n continua orientada a resultados."
+    "Servicios de automatización con IA para WhatsApp, CRM, bots y optimización continua orientada a resultados."
 };
 
 export default function ServiciosPage() {
@@ -23,7 +23,7 @@ export default function ServiciosPage() {
         <div className="max-w-3xl space-y-4">
           <h1 className="text-balance text-4xl font-semibold md:text-5xl">Servicios</h1>
           <p className="text-muted md:text-lg">
-            Dise�amos automatizaciones empresariales con IA para convertir m�s, operar mejor y escalar sin fricci�n.
+            Diseñamos automatizaciones empresariales con IA para convertir más, operar mejor y escalar sin fricción.
           </p>
         </div>
       </Section>
@@ -38,7 +38,7 @@ export default function ServiciosPage() {
                 href={`/servicios/${service.slug}`}
                 className="mt-5 inline-flex text-sm font-medium text-brandBright transition hover:text-brand"
               >
-                Ver servicio ?
+                Ver servicio →
               </Link>
             </GlowCard>
           ))}
@@ -47,13 +47,13 @@ export default function ServiciosPage() {
 
       <Section className="pb-24">
         <div className="rounded-3xl border border-brand/40 bg-card p-8 md:p-12">
-          <h3 className="text-3xl font-semibold md:text-4xl">Empez� con un diagn�stico sin cargo</h3>
+          <h3 className="text-3xl font-semibold md:text-4xl">Empezá con un diagnóstico sin cargo</h3>
           <p className="mt-3 max-w-2xl text-muted">
-            Te mostramos prioridades, arquitectura y roadmap para implementar r�pido y con foco en impacto.
+            Te mostramos prioridades, arquitectura y roadmap para implementar rápido y con foco en impacto.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagn�stico sin cargo">
-              Diagn�stico sin cargo
+            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagnóstico sin cargo">
+              Diagnóstico sin cargo
             </PrimaryButton>
             <a
               href={whatsAppLink}

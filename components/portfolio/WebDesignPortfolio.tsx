@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 const TOTAL_ITEMS = 9;
+const GRID_IMAGE_URL = "/portfolio/web-mockups-grid.svg";
 
 export function WebDesignPortfolio() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -64,7 +65,7 @@ export function WebDesignPortfolio() {
                 <div
                   className="h-full w-full bg-cover transition-transform duration-300 group-hover:scale-[1.02]"
                   style={{
-                    backgroundImage: "url('/portfolio/web-mockups-grid.png')",
+                    backgroundImage: `url('${GRID_IMAGE_URL}')`,
                     backgroundSize: "300% 300%",
                     backgroundPosition: `${x}% ${y}%`
                   }}
@@ -98,7 +99,7 @@ export function WebDesignPortfolio() {
             <div
               className="aspect-[16/10] w-full rounded-xl border border-[color:var(--border)] bg-cover opacity-100 transition-all duration-300 ease-out"
               style={{
-                backgroundImage: "url('/portfolio/web-mockups-grid.png')",
+                backgroundImage: `url('${GRID_IMAGE_URL}')`,
                 backgroundSize: "300% 300%",
                 backgroundPosition: `${selectedPosition.x}% ${selectedPosition.y}%`
               }}

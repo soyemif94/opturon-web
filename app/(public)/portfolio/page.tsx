@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { WebDesignPortfolio } from "@/components/portfolio/WebDesignPortfolio";
@@ -82,7 +82,7 @@ export default function PortfolioPage() {
               </ul>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link href="/contacto" className="text-sm font-medium text-brandBright transition hover:text-brand">
-                  Quiero uno asi
+                  Quiero uno así
                 </Link>
                 <Link href="/servicios/diseno-web" className="text-sm text-muted transition hover:text-text">
                   Ver servicio
@@ -98,7 +98,7 @@ export default function PortfolioPage() {
           <h2 className="text-3xl font-semibold md:text-4xl">Diagnóstico inicial (sin cargo)</h2>
           <p className="mt-3 max-w-2xl text-muted">Te devolvemos un plan de acción claro en 24 hs hábiles.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagnostico sin cargo">
+            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagnóstico sin cargo">
               Diagnóstico sin cargo
             </PrimaryButton>
             <a
@@ -117,4 +117,3 @@ export default function PortfolioPage() {
     </>
   );
 }
-

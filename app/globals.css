@@ -24,6 +24,7 @@ body {
 }
 
 body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Noto Sans", Arial, sans-serif;
   background-image:
     radial-gradient(circle at 10% 0%, rgba(176, 80, 0, 0.18), transparent 38%),
     radial-gradient(circle at 90% 0%, rgba(144, 48, 0, 0.14), transparent 32%);

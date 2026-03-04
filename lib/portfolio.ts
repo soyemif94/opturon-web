@@ -1,4 +1,4 @@
-export type WebPortfolioModel = {
+﻿export type WebPortfolioModel = {
   id: number;
   title: string;
   idealFor: string;
@@ -11,56 +11,56 @@ export const webPortfolioModels: WebPortfolioModel[] = [
     id: 1,
     title: "Landing SaaS",
     idealFor: "Startups y productos digitales que necesitan captar demos o leads calificados.",
-    highlights: ["Hero con CTA fuerte", "Seccion servicios + prueba social", "Performance y SEO base"],
+    highlights: ["Hero con CTA fuerte", "Sección servicios + prueba social", "Performance y SEO base"],
     category: "web"
   },
   {
     id: 2,
     title: "Institucional Corporativa",
     idealFor: "Empresas que necesitan presencia premium y mensaje claro de propuesta de valor.",
-    highlights: ["Arquitectura de contenido clara", "Responsive premium", "Integraciones (WhatsApp / formulario / analitica)"],
+    highlights: ["Arquitectura de contenido clara", "Responsive premium", "Integraciones (WhatsApp / formulario / analítica)"],
     category: "web"
   },
   {
     id: 3,
     title: "Ecommerce Minimal",
-    idealFor: "Marcas que priorizan conversion, catalogo ordenado y experiencia de compra limpia.",
-    highlights: ["Home orientada a conversion", "Ficha de producto optimizada", "Performance y SEO base"],
+    idealFor: "Marcas que priorizan conversión, catálogo ordenado y experiencia de compra limpia.",
+    highlights: ["Home orientada a conversión", "Ficha de producto optimizada", "Performance y SEO base"],
     category: "web"
   },
   {
     id: 4,
-    title: "Resto / Gastronomia",
-    idealFor: "Negocios gastronomicos con foco en reservas, menu y pedidos directos.",
-    highlights: ["Hero con CTA fuerte", "Integraciones (WhatsApp / formulario / analitica)", "Responsive premium"],
+    title: "Restó / Gastronomía",
+    idealFor: "Negocios gastronómicos con foco en reservas, menú y pedidos directos.",
+    highlights: ["Hero con CTA fuerte", "Integraciones (WhatsApp / formulario / analítica)", "Responsive premium"],
     category: "web"
   },
   {
     id: 5,
     title: "Profesional (abogado/médico)",
-    idealFor: "Profesionales independientes que buscan confianza, autoridad y contacto rapido.",
-    highlights: ["Seccion servicios + prueba social", "Hero con CTA fuerte", "Performance y SEO base"],
+    idealFor: "Profesionales independientes que buscan confianza, autoridad y contacto rápido.",
+    highlights: ["Sección servicios + prueba social", "Hero con CTA fuerte", "Performance y SEO base"],
     category: "web"
   },
   {
     id: 6,
     title: "Inmobiliaria / Alquileres",
     idealFor: "Equipos que necesitan mostrar propiedades y acelerar consultas calificadas.",
-    highlights: ["Catalogo visual claro", "Integraciones (WhatsApp / formulario / analitica)", "Responsive premium"],
+    highlights: ["Catálogo visual claro", "Integraciones (WhatsApp / formulario / analítica)", "Responsive premium"],
     category: "web"
   },
   {
     id: 7,
     title: "Fitness / Wellness",
-    idealFor: "Estudios y marcas wellness que quieren convertir trafico en clases o sesiones.",
+    idealFor: "Estudios y marcas wellness que quieren convertir tráfico en clases o sesiones.",
     highlights: ["Hero con CTA fuerte", "Agenda y contacto visibles", "Performance y SEO base"],
     category: "web"
   },
   {
     id: 8,
-    title: "Educacion / Cursos",
-    idealFor: "Academias y creadores que venden programas, membresias o cohortes.",
-    highlights: ["Seccion servicios + prueba social", "Responsive premium", "Integraciones (WhatsApp / formulario / analitica)"],
+    title: "Educación / Cursos",
+    idealFor: "Academias y creadores que venden programas, membresías o cohortes.",
+    highlights: ["Sección servicios + prueba social", "Responsive premium", "Integraciones (WhatsApp / formulario / analítica)"],
     category: "web"
   },
   {
@@ -71,4 +71,3 @@ export const webPortfolioModels: WebPortfolioModel[] = [
     category: "web"
   }
 ];
-

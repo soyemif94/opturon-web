@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -40,9 +40,9 @@ export function ContactLeadForm() {
 
   function validate() {
     const nextErrors: Errors = {};
-    if (!form.name.trim()) nextErrors.name = "Ingres� tu nombre.";
-    if (!form.email.trim()) nextErrors.email = "Ingres� tu email.";
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) nextErrors.email = "Email inv�lido.";
+    if (!form.name.trim()) nextErrors.name = "Ingresá tu nombre.";
+    if (!form.email.trim()) nextErrors.email = "Ingresá tu email.";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) nextErrors.email = "Email inválido.";
     if (!form.message.trim()) nextErrors.message = "Contanos tu objetivo.";
     if (form.message.trim().length > 0 && form.message.trim().length < 10) {
       nextErrors.message = "El mensaje debe tener al menos 10 caracteres.";
@@ -55,7 +55,7 @@ export function ContactLeadForm() {
       `Nombre: ${form.name || "-"}`,
       `Empresa: ${form.company || "-"}`,
       `Email: ${form.email || "-"}`,
-      `WhatsApp/Tel�fono: ${form.phone || "-"}`,
+      `WhatsApp/Teléfono: ${form.phone || "-"}`,
       "",
       "Mensaje:",
       form.message || "-"
@@ -82,7 +82,7 @@ export function ContactLeadForm() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     setSuccess(
-      "Listo. Recibimos tu consulta y te respondemos a la brevedad. Si quer�s acelerar, escribinos por WhatsApp."
+      "Listo. Recibimos tu consulta y te respondemos a la brevedad. Si querés acelerar, escribinos por WhatsApp."
     );
     setLoading(false);
   }
@@ -130,7 +130,7 @@ export function ContactLeadForm() {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="phone" className="text-sm text-muted">WhatsApp / Tel�fono</label>
+          <label htmlFor="phone" className="text-sm text-muted">WhatsApp / Teléfono</label>
           <Input
             id="phone"
             value={form.phone}
@@ -146,7 +146,7 @@ export function ContactLeadForm() {
           id="message"
           value={form.message}
           onChange={(e) => updateField("message", e.target.value)}
-          placeholder="Contanos qu� quer�s automatizar y tu objetivo."
+          placeholder="Contanos qué querés automatizar y tu objetivo."
           aria-invalid={Boolean(errors.message)}
           required
         />

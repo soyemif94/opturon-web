@@ -57,7 +57,7 @@ export function AuditIntake() {
     ].join("\n");
   }, [state]);
 
-  const whatsAppLink = getTrackedWhatsAppLink({ origin: "booking", prefill });
+  const whatsAppLink = getTrackedWhatsAppLink({ origin: "audit-intake", prefill });
   const isExternal = isWhatsAppExternalLink(whatsAppLink);
 
   function updateField<K extends keyof IntakeState>(field: K, value: IntakeState[K]) {
@@ -130,8 +130,10 @@ export function AuditIntake() {
 
       <WhatsAppCtaLink
         href={whatsAppLink}
-        origin="booking"
+        origin="audit-intake"
         onClick={onClickSubmit}
+        postClickRedirectTo="/gracias"
+        openInNewTab
         ariaLabel="Abrir WhatsApp con la auditoría cargada"
         isExternal={isExternal}
         className="inline-flex h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-brandBright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"

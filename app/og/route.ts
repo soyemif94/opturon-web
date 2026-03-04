@@ -1,8 +1,8 @@
-import React from "react";
+﻿import React from "react";
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Opturon - Automatizaci�n con IA";
+export const alt = "Opturon - Automatización con IA";
 export const size = {
   width: 1200,
   height: 630
@@ -50,12 +50,12 @@ export async function GET() {
       React.createElement(
         "p",
         { style: { margin: 0, fontSize: 38, color: "#E7E7E7" } },
-        "Automatizaci�n empresarial con IA"
+        "Automatización empresarial con IA"
       ),
       React.createElement(
         "p",
         { style: { margin: 0, fontSize: 26, color: "#BDBDBD" } },
-        "WhatsApp � Procesos � Integraciones"
+        "WhatsApp • Procesos • Integraciones"
       )
     )
   );
