@@ -2,7 +2,6 @@ import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import { getAuthUserByEmail } from "@/lib/auth-store";
-import { findMembership, readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
 
 function isProduction() {
@@ -84,7 +83,6 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          const membership = findMembership(user.id);
           const globalRole = normalizeGlobalRole(user.globalRole);
           return {
             id: user.id,
@@ -92,8 +90,8 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             role: globalRole,
             globalRole,
-            tenantId: membership?.tenantId,
-            tenantRole: membership?.role
+            tenantId: undefined,
+            tenantRole: undefined
           };
         } catch (error) {
           console.error("AUTH_AUTHORIZE_FATAL", {
@@ -118,17 +116,6 @@ export const authOptions: NextAuthOptions = {
           token.tenantRole = (user as any).tenantRole;
         }
 
-        if (token.userId && token.userId !== "env-admin") {
-          const data = readSaasData();
-          const liveUser = data.users.find((item) => item.id === token.userId);
-          if (liveUser) {
-            token.globalRole = normalizeGlobalRole(liveUser.globalRole);
-            token.role = token.globalRole;
-            const membership = data.memberships.find((m) => m.userId === liveUser.id);
-            token.tenantId = membership?.tenantId;
-            token.tenantRole = membership?.role;
-          }
-        }
       } catch (error) {
         console.error("JWT_CALLBACK_ERROR", { msg: String(error) });
       }
