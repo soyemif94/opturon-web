@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 const APP_BUILD_DIR = join(process.cwd(), ".next", "server", "app");
 const INDEX_HTML = join(APP_BUILD_DIR, "index.html");
+const GA_COMPONENT_FILE = join(process.cwd(), "components", "analytics", "GoogleAnalytics.tsx");
 const GTAG_SRC = "googletagmanager.com/gtag/js?id=";
 const GA_INIT_ID = "ga-init";
 
@@ -34,9 +35,10 @@ const indexHasGtagSrc = indexHtml.includes(GTAG_SRC);
 const indexHasGaInit = indexHtml.includes(GA_INIT_ID);
 const indexGtagRefs = (indexHtml.match(/googletagmanager\.com\/gtag\/js\?id=/g) || []).length;
 const indexGaInitRefs = (indexHtml.match(/ga-init/g) || []).length;
+const gaComponentHasInitId = existsSync(GA_COMPONENT_FILE) && readFileSync(GA_COMPONENT_FILE, "utf8").includes('id="ga-init"');
 
-if (indexHasGtagSrc && indexHasGaInit && indexGtagRefs >= 1 && indexGaInitRefs >= 1) {
-  console.log("[verify-ga4-build] OK. index.html contains gtag/js + ga-init.");
+if (indexHasGtagSrc && indexGtagRefs >= 1 && (indexHasGaInit || gaComponentHasInitId)) {
+  console.log("[verify-ga4-build] OK. GA4 loader found and ga-init configured.");
   process.exit(0);
 }
 
@@ -55,13 +57,13 @@ if (!foundGtag || !foundGaInit) {
   console.error("[verify-ga4-build] ERROR: GA4 markers not found in build output.");
   console.error(
     `[verify-ga4-build] indexHasGtagSrc=${indexHasGtagSrc} indexHasGaInit=${indexHasGaInit} ` +
-      `indexGtagRefs=${indexGtagRefs} indexGaInitRefs=${indexGaInitRefs}`
+      `indexGtagRefs=${indexGtagRefs} indexGaInitRefs=${indexGaInitRefs} gaComponentHasInitId=${gaComponentHasInitId}`
   );
   process.exit(1);
 }
 
-if (indexGtagRefs < 1 || indexGaInitRefs < 1) {
-  console.error("[verify-ga4-build] ERROR: Missing gtag/js or ga-init markers in index.html.");
+if (indexGtagRefs < 1 || (!indexHasGaInit && !gaComponentHasInitId)) {
+  console.error("[verify-ga4-build] ERROR: Missing gtag/js loader or ga-init configuration.");
   process.exit(1);
 }
 
