@@ -1,0 +1,144 @@
+{
+  "tenants": [
+    {
+      "id": "tenant_1772601586508_w1e4fs",
+      "name": "Demo Tenant Opturon",
+      "industry": "telefonia / accesorios",
+      "status": "trial",
+      "createdAt": "2026-03-04T05:19:46.508Z",
+      "startAt": "2026-03-04T05:19:46.508Z",
+      "crmName": "HubSpot",
+      "crmEnabled": true,
+      "salesTeamSize": 4,
+      "website": "https://demo.opturon.com",
+      "city": "Buenos Aires",
+      "country": "AR"
+    }
+  ],
+  "users": [
+    {
+      "id": "usr_1772601586508_4uwrr9",
+      "email": "staff@opturon.com",
+      "name": "Opturon Staff",
+      "globalRole": "ops_admin",
+      "passwordHash": "$2a$10$613AzFcw0VHr5T8dmu4.COjsXLRNxNgqq1Lchj/COLoTU4QjfS1fW",
+      "createdAt": "2026-03-04T05:19:46.508Z"
+    },
+    {
+      "id": "usr_1772601586576_wj1kdk",
+      "email": "owner@demo-tenant.com",
+      "name": "Cliente Owner",
+      "globalRole": "client",
+      "passwordHash": "$2a$10$d1bjf439iYQdWheTz6EdVOddF/4GH/.DPWoU2CMsw6m9gV2vZu8ru",
+      "createdAt": "2026-03-04T05:19:46.508Z"
+    },
+    {
+      "id": "usr_1772605563327_0resyp",
+      "email": "admin@opturon.com",
+      "name": "Opturon Admin",
+      "globalRole": "superadmin",
+      "passwordHash": "$2a$10$oNeOBzp.8ZZUkL08HdZ2muPG9HGJNMDh8ytyZIeCq3wRZs0Kc.MrG",
+      "createdAt": "2026-03-04T06:26:03.260Z"
+    }
+  ],
+  "memberships": [
+    {
+      "id": "mbr_1772601586636_ij0rnp",
+      "userId": "usr_1772601586576_wj1kdk",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "role": "owner",
+      "createdAt": "2026-03-04T05:19:46.508Z"
+    },
+    {
+      "id": "mbr_1772605563327_603916",
+      "userId": "usr_1772605563327_0resyp",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "role": "owner",
+      "createdAt": "2026-03-04T06:26:03.327Z"
+    }
+  ],
+  "contacts": [
+    {
+      "id": "contact_1772602028213_azohng",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "name": "María Torres",
+      "phone": "+5492914000001",
+      "email": "maria@cliente-demo.com",
+      "industry": "telefonia / accesorios",
+      "tags": [
+        "lead",
+        "whatsapp"
+      ]
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv_1772602028213_xlre43",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "contactId": "contact_1772602028213_azohng",
+      "status": "open",
+      "assignedTo": "usr_1772601586508_4uwrr9",
+      "lastMessageAt": "2026-03-04T05:27:08.213Z",
+      "priority": "hot",
+      "botEnabled": true
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_1772602028213_fx5spx",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "conversationId": "conv_1772602028213_xlre43",
+      "direction": "inbound",
+      "text": "Hola! Quiero info del plan Sales System.",
+      "timestamp": "2026-03-04T05:02:08.213Z",
+      "status": "delivered"
+    },
+    {
+      "id": "msg_1772602028213_maw4l6",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "conversationId": "conv_1772602028213_xlre43",
+      "direction": "system",
+      "text": "🤖 IA clasificó: intención=precio, prioridad=alta",
+      "timestamp": "2026-03-04T05:07:08.213Z",
+      "status": "sent"
+    },
+    {
+      "id": "msg_1772602028213_w8he4a",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "conversationId": "conv_1772602028213_xlre43",
+      "direction": "outbound",
+      "text": "¡Hola María! Te cuento opciones y te comparto demo en vivo.",
+      "timestamp": "2026-03-04T05:17:08.213Z",
+      "status": "read"
+    }
+  ],
+  "deals": [
+    {
+      "id": "deal_1772602028213_1sl7qv",
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "contactId": "contact_1772602028213_azohng",
+      "stage": "qualified",
+      "value": 250000,
+      "probability": 65
+    }
+  ],
+  "tenantNotes": [],
+  "tenantTasks": [],
+  "catalogProducts": [],
+  "templates": [],
+  "commandActions": [],
+  "catalogCategories": [],
+  "faqs": [],
+  "businessSettings": [],
+  "auditLog": [],
+  "industryTemplates": [],
+  "tenantMetrics": [
+    {
+      "tenantId": "tenant_1772601586508_w1e4fs",
+      "lastActivityAt": "2026-03-04T05:19:46.508Z",
+      "messages7d": 12,
+      "webhookErrors7d": 1,
+      "activeConversations": 5
+    }
+  ]
+}

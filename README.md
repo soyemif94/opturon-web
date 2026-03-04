@@ -107,3 +107,61 @@ curl.exe -sS https://api.opturon.com/__build
      - `typeof window.gtag` should be `"function"`.
   4. In Network:
      - request to `googletagmanager.com/gtag/js?id=...` must exist.
+
+## SaaS mode (/ops + /app)
+
+### Rutas
+- `/ops`: backoffice interno Opturon (staff only)
+- `/app`: portal cliente (tenant membership)
+- Rutas existentes `/bot` y `/admin` se mantienen
+
+### Seed demo
+```bash
+npm run seed:saas
+```
+Crea tenant demo, usuario staff y usuario cliente owner.
+
+### Credenciales seed (defaults)
+- Staff: `staff@opturon.com` / `demo1234`
+- Owner: `owner@demo-tenant.com` / `demo1234`
+
+### Migraciones de referencia
+- `db/migrations/001_saas_core.sql`
+- `db/migrations/002_saas_templates.sql`
+
+### Verificación rápida
+1. Login con usuario staff y abrir `/ops`.
+2. Abrir ficha cliente en `/ops/tenants/[tenantId]`.
+3. Clic en `Ver portal cliente (modo demo)`.
+4. Login con owner y abrir `/app/catalog`, `/app/faqs`, `/app/business`, `/app/users`.
+
+## Auth smoke test
+Valida login por Credentials y sesion de NextAuth sin librerias extra.
+
+```bash
+AUTH_EMAIL=admin@opturon.com AUTH_PASSWORD=680774Ce npm run auth:smoke
+AUTH_BASE_URL=https://opturon.com AUTH_EMAIL=admin@opturon.com AUTH_PASSWORD=680774Ce npm run auth:smoke
+```
+
+### PowerShell (Windows)
+```powershell
+$env:AUTH_EMAIL="admin@opturon.com"
+$env:AUTH_PASSWORD="680774Ce"
+npm run auth:smoke
+```
+
+## Auth en produccion (Vercel)
+- No dependas de `data/saas.json` en serverless para login de admin.
+- Configura estas variables en Vercel:
+  - `AUTH_ADMIN_EMAIL`
+  - `AUTH_ADMIN_PASSWORD_HASH`
+  - `AUTH_ADMIN_GLOBAL_ROLE` (ej: `superadmin`)
+  - `AUTH_ADMIN_NAME` (opcional)
+- Mantener tambien `NEXTAUTH_URL` y `NEXTAUTH_SECRET` correctas.
+
+Generar hash bcrypt (cost 10):
+```bash
+node -e "const b=require('bcryptjs'); console.log(b.hashSync('TU_PASSWORD_SEGURA',10));"
+```
+
+En local podes seguir usando `scripts/create-admin.mjs` + `data/saas.json`.

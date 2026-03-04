@@ -7,11 +7,16 @@
     "build": "next build",
     "postbuild": "node scripts/verify-public-assets.mjs && node scripts/verify-ga4-build.mjs",
     "verify:ga": "node scripts/verify-ga-runtime.mjs",
+    "seed:saas": "node --experimental-strip-types scripts/seed-saas.ts",
+    "admin:create": "node scripts/create-admin.mjs",
+    "auth:smoke": "node scripts/auth-smoke.mjs",
     "start": "next start",
     "lint": "tsc --noEmit",
     "auth:hash": "node scripts/hash-admin-password.cjs"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.1.1",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",

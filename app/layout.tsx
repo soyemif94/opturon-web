@@ -4,6 +4,8 @@ import "./globals.css";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
+import GlobalWhatsAppTracker from "@/components/analytics/GlobalWhatsAppTracker";
+import { Toaster } from "@/components/ui/toast";
 
 const font = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -28,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
+        <Toaster />
         <GoogleAnalytics />
+        <GlobalWhatsAppTracker />
       </body>
     </html>
   );

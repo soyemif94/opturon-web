@@ -10,11 +10,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        background: "var(--bg)",
         bg: "var(--bg)",
         surface: "var(--surface)",
         card: "var(--card)",
+        popover: "var(--card)",
         text: "var(--text)",
         muted: "var(--text-muted)",
+        "muted-foreground": "var(--text-muted)",
         brand: "var(--brand)",
         brandDeep: "var(--brand-deep)",
         brandShade: "var(--brand-shade)",

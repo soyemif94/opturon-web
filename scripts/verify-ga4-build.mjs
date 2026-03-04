@@ -4,7 +4,7 @@ import { join } from "node:path";
 const APP_BUILD_DIR = join(process.cwd(), ".next", "server", "app");
 const INDEX_HTML = join(APP_BUILD_DIR, "index.html");
 const GA_COMPONENT_FILE = join(process.cwd(), "components", "analytics", "GoogleAnalytics.tsx");
-const WA_TRACKED_LINK_FILE = join(process.cwd(), "components", "analytics", "WhatsAppTrackedLink.tsx");
+const WA_TRACKER_FILE = join(process.cwd(), "components", "analytics", "GlobalWhatsAppTracker.tsx");
 const GTAG_SRC = "googletagmanager.com/gtag/js?id=";
 const GA_INIT_ID = "ga-init";
 
@@ -72,14 +72,14 @@ if (indexGtagRefs < 1 || (!indexHasGaInit && !gaComponentHasInitId)) {
   process.exit(1);
 }
 
-const hasTrackedLinkSource =
-  existsSync(WA_TRACKED_LINK_FILE) &&
+const hasTrackerSource =
+  existsSync(WA_TRACKER_FILE) &&
   (() => {
-    const src = readFileSync(WA_TRACKED_LINK_FILE, "utf8");
+    const src = readFileSync(WA_TRACKER_FILE, "utf8");
     return src.includes("whatsapp_click") || src.includes("generate_lead");
   })();
 
-if (!foundWhatsappSignals && !hasTrackedLinkSource) {
+if (!foundWhatsappSignals && !hasTrackerSource) {
   console.warn("[verify-ga4-build] WARN: Could not confirm WhatsApp conversion event signals in build output (best-effort).");
 }
 

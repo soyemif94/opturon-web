@@ -9,7 +9,11 @@ declare global {
 }
 
 export function track(eventName: string, params?: EventParams): void {
-  if (typeof window === "undefined") return;
-  if (typeof window.gtag !== "function") return;
-  window.gtag("event", eventName, params ?? {});
+  if (!isGtagReady()) return;
+  window.gtag?.("event", eventName, params ?? {});
+}
+
+export function isGtagReady(): boolean {
+  if (typeof window === "undefined") return false;
+  return typeof window.gtag === "function";
 }
