@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/verify-public-assets.mjs && node scripts/verify-ga4-build.mjs",
     "start": "next start",
     "lint": "tsc --noEmit",
     "auth:hash": "node scripts/hash-admin-password.cjs"

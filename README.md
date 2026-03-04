@@ -93,3 +93,17 @@ Requiere que backend tenga:
 curl.exe -sS https://api.opturon.com/health
 curl.exe -sS https://api.opturon.com/__build
 ```
+
+## GA4 deploy check
+- Root injection lives in `app/layout.tsx` and is verified at build time by `scripts/verify-ga4-build.mjs`.
+- Required env var:
+  - `NEXT_PUBLIC_GA4_MEASUREMENT_ID` (fallback code path uses `G-FL6RVZW90M`).
+- After every deploy, validate production is serving the latest artifact:
+  1. Hard refresh and open `view-source:https://opturon.com`.
+  2. Confirm source contains:
+     - `https://www.googletagmanager.com/gtag/js?id=...`
+     - `id="ga-init"`
+  3. In DevTools Console:
+     - `typeof window.gtag` should be `"function"`.
+  4. In Network:
+     - request to `googletagmanager.com/gtag/js?id=...` must exist.
