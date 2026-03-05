@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { getDebugInbox } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Opturon Bot | Metrics",

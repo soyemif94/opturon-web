@@ -4,6 +4,7 @@ import { BotInboxActions } from "@/components/bot-inbox-actions";
 import { getBuild, getDebugInbox, getDebugInboxHealth, getHealth } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Opturon Bot | Inbox",

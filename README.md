@@ -165,3 +165,21 @@ node -e "const b=require('bcryptjs'); console.log(b.hashSync('TU_PASSWORD_SEGURA
 ```
 
 En local podes seguir usando `scripts/create-admin.mjs` + `data/saas.json`.
+
+## API interna (sin api.opturon.com)
+- El panel usa endpoints internos en el mismo dominio (`/api/app/*` y `/api/bot/*`).
+- `BACKEND_BASE_URL` es opcional. Si no existe, el panel usa modo local y evita dependencia externa.
+- `API_DEBUG_KEY` es solo server-side. El frontend no envia `x-debug-key`.
+
+Variables sugeridas en Vercel:
+- `NEXT_PUBLIC_SITE_URL=https://www.opturon.com`
+- `BACKEND_BASE_URL=` (vacío para modo interno)
+- `API_DEBUG_KEY` (solo servidor)
+
+Pruebas rapidas:
+```bash
+curl -i https://www.opturon.com/api/app/health
+curl -i https://www.opturon.com/api/app/inbox
+curl -i https://www.opturon.com/api/app/logs
+curl -i https://www.opturon.com/api/app/metrics
+```

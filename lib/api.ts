@@ -1,5 +1,8 @@
-const API_BASE_URL = String(process.env.API_BASE_URL || "https://api.opturon.com").replace(/\/$/, "");
+import { readSaasData } from "@/lib/saas/store";
+
+const API_BASE = String(process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
+const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
 
 let lastApiError: { at: string; message: string; path: string } | null = null;
 
@@ -21,14 +24,18 @@ export function getLastApiError() {
   return lastApiError;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
+async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
+  if (!API_BASE) {
+    throw new Error("API base URL is not configured");
+  }
+
   const headers = new Headers(init?.headers || {});
   headers.set("Content-Type", "application/json");
 
   if (withDebugKey) {
     const debugKey = String(process.env.API_DEBUG_KEY || "").trim();
     if (!debugKey) {
-      const error = new Error("Missing API_DEBUG_KEY for debug endpoint access");
+      const error = new Error("missing_server_debug_key");
       registerApiError(path, error);
       throw error;
     }
@@ -39,7 +46,7 @@ async function apiFetch<T>(path: string, init?: RequestInit, withDebugKey = fals
   const timeout = setTimeout(() => controller.abort("timeout"), API_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers,
       cache: "no-store",
@@ -85,22 +92,89 @@ export type InboxItem = {
   payload?: Record<string, unknown>;
 };
 
+function localInboxItems(limit = 50): InboxItem[] {
+  const data = readSaasData();
+  const conversationsById = new Map(data.conversations.map((c) => [c.id, c]));
+  const contactsById = new Map(data.contacts.map((c) => [c.id, c]));
+
+  const items = [...data.messages]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, Math.max(1, Math.min(limit, DEBUG_INBOX_MAX_ITEMS)))
+    .map((msg) => {
+      const conversation = conversationsById.get(msg.conversationId);
+      const contact = conversation ? contactsById.get(conversation.contactId) : undefined;
+      return {
+        ts: msg.timestamp,
+        type: msg.direction,
+        from: contact?.phone || contact?.name || null,
+        messageId: msg.id,
+        text: msg.text || null,
+        payload: {
+          status: msg.status,
+          tenantId: msg.tenantId,
+          conversationId: msg.conversationId
+        }
+      } satisfies InboxItem;
+    });
+
+  return items;
+}
+
 export async function getHealth() {
-  return apiFetch<{ ok: boolean; service: string }>("/health", undefined, false);
+  if (API_BASE) {
+    return backendFetch<{ ok: boolean; service: string }>("/health", undefined, false);
+  }
+
+  return {
+    ok: true,
+    service: "opturon-web"
+  };
 }
 
 export async function getBuild() {
-  return apiFetch<{ ok: boolean; buildId?: string; pid?: number; cwd?: string; file?: string }>("/__build", undefined, false);
+  if (API_BASE) {
+    return backendFetch<{ ok: boolean; buildId?: string; pid?: number; cwd?: string; file?: string }>("/__build", undefined, false);
+  }
+
+  return {
+    ok: true,
+    buildId: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || "local",
+    pid: process.pid,
+    cwd: process.cwd(),
+    file: "opturon-web-local"
+  };
 }
 
 export async function getDebugInbox(limit = 50) {
-  return apiFetch<{ success: boolean; items: InboxItem[] }>(`/debug/inbox?limit=${limit}`, undefined, true);
+  if (API_BASE) {
+    return backendFetch<{ success: boolean; items: InboxItem[] }>(`/debug/inbox?limit=${limit}`, undefined, true);
+  }
+
+  return {
+    success: true,
+    items: localInboxItems(limit)
+  };
 }
 
 export async function getDebugInboxHealth() {
-  return apiFetch<{ ok: boolean; size: number; max: number }>("/debug/inbox/health", undefined, true);
+  if (API_BASE) {
+    return backendFetch<{ ok: boolean; size: number; max: number }>("/debug/inbox/health", undefined, true);
+  }
+
+  const size = readSaasData().messages.length;
+  return {
+    ok: true,
+    size,
+    max: DEBUG_INBOX_MAX_ITEMS
+  };
 }
 
 export async function clearDebugInbox() {
-  return apiFetch<{ success: boolean }>("/debug/inbox/clear", { method: "POST", body: "{}" }, true);
+  if (API_BASE) {
+    return backendFetch<{ success: boolean }>("/debug/inbox/clear", { method: "POST", body: "{}" }, true);
+  }
+
+  return {
+    success: true
+  };
 }
