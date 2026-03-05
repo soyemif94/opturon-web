@@ -7,6 +7,7 @@
     "build": "next build",
     "postbuild": "node scripts/verify-public-assets.mjs && node scripts/verify-ga4-build.mjs",
     "verify:ga": "node scripts/verify-ga-runtime.mjs",
+    "verify:prod": "node scripts/verify-prod.mjs",
     "seed:saas": "node --experimental-strip-types scripts/seed-saas.ts",
     "admin:create": "node scripts/create-admin.mjs",
     "auth:smoke": "node scripts/auth-smoke.mjs",
