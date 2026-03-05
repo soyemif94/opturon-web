@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
   const [appHealth, appBuild] = await Promise.all([
     safeFetchJson(`${origin}/api/app/health`),
-    safeFetchJson(`${origin}/api/__build`)
+    safeFetchJson(`${origin}/api/build`)
   ]);
 
   if (!appHealth.ok || !appBuild.ok) {

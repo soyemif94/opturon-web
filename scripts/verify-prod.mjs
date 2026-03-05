@@ -7,7 +7,7 @@ const RETRIES = Number(process.env.VERIFY_RETRIES || 2);
 const EXPECTED_SHA = String(process.env.VERIFY_EXPECTED_SHA || process.env.GITHUB_SHA || "").trim();
 
 const endpoints = [
-  { path: "/api/__build", validateBuild: true },
+  { path: "/api/build", validateBuild: true },
   { path: "/api/app/health" },
   { path: "/api/bot/health" },
   { path: "/api/bot/inbox" }
@@ -56,7 +56,7 @@ async function check(path, validateBuild = false) {
         lastError = `HTTP ${response.status} body: ${text.slice(0, 400)}`;
       } else if (validateBuild) {
         if (!json || json.ok !== true) {
-          lastError = `invalid __build payload: ${text.slice(0, 400)}`;
+          lastError = `invalid /api/build payload: ${text.slice(0, 400)}`;
         } else if (EXPECTED_SHA && json.sha && String(json.sha).trim() !== EXPECTED_SHA) {
           lastError = `sha mismatch expected=${EXPECTED_SHA} got=${json.sha}`;
         } else {

@@ -55,7 +55,7 @@ npm run lint
 ## Integración API
 Panel bot usa llamadas server-side (no desde cliente):
 - `GET /health`
-- `GET /__build`
+- `GET /build`
 - `GET /debug/inbox`
 - `GET /debug/inbox/health`
 - `POST /debug/inbox/clear`
@@ -91,7 +91,7 @@ Requiere que backend tenga:
 ## Verificación rápida
 ```powershell
 curl.exe -sS https://api.opturon.com/health
-curl.exe -sS https://api.opturon.com/__build
+curl.exe -sS https://api.opturon.com/build
 ```
 
 ## GA4 deploy check
@@ -183,3 +183,4 @@ curl -i https://www.opturon.com/api/app/inbox
 curl -i https://www.opturon.com/api/app/logs
 curl -i https://www.opturon.com/api/app/metrics
 ```
+

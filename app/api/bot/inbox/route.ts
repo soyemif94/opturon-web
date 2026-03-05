@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const [inboxRes, healthRes, buildRes] = await Promise.all([
     safeFetchJson(`${origin}/api/app/inbox`),
     safeFetchJson(`${origin}/api/app/health`),
-    safeFetchJson(`${origin}/api/__build`)
+    safeFetchJson(`${origin}/api/build`)
   ]);
 
   const items = Array.isArray(inboxRes.body?.conversations)

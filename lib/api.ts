@@ -133,7 +133,7 @@ export async function getHealth() {
 
 export async function getBuild() {
   if (API_BASE) {
-    return backendFetch<{ ok: boolean; buildId?: string; pid?: number; cwd?: string; file?: string }>("/__build", undefined, false);
+    return backendFetch<{ ok: boolean; buildId?: string; pid?: number; cwd?: string; file?: string }>("/build", undefined, false);
   }
 
   return {
