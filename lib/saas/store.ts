@@ -24,6 +24,8 @@ import type {
 
 const DATA_DIR = join(process.cwd(), "data");
 const DATA_FILE = join(DATA_DIR, "saas.json");
+let memoryStore: SaasData | null = null;
+let warnedAboutMemoryStore = false;
 
 const DEFAULT_TEMPLATES: IndustryTemplate[] = [
   {
@@ -144,18 +146,19 @@ function emptyData(): SaasData {
   };
 }
 
-function ensureDataFile() {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  if (!existsSync(DATA_FILE)) {
-    writeFileSync(DATA_FILE, JSON.stringify(emptyData(), null, 2), "utf8");
-  }
+function warnMemoryStore(reason: unknown) {
+  if (warnedAboutMemoryStore) return;
+  warnedAboutMemoryStore = true;
+  console.warn("[saas-store] Falling back to in-memory store.", reason);
 }
 
-export function readSaasData(): SaasData {
-  ensureDataFile();
-  const raw = readFileSync(DATA_FILE, "utf8");
-  const parsed = JSON.parse(raw) as Partial<SaasData>;
+function cloneData(data: SaasData): SaasData {
+  return JSON.parse(JSON.stringify(data)) as SaasData;
+}
+
+function normalizeData(parsed?: Partial<SaasData> | null): SaasData {
   const base = emptyData();
+  if (!parsed) return base;
   return {
     ...base,
     ...parsed,
@@ -169,9 +172,39 @@ export function readSaasData(): SaasData {
   };
 }
 
+export function readSaasData(): SaasData {
+  if (memoryStore) return cloneData(memoryStore);
+
+  try {
+    if (!existsSync(DATA_FILE)) {
+      const data = normalizeData();
+      memoryStore = cloneData(data);
+      return cloneData(data);
+    }
+
+    const raw = readFileSync(DATA_FILE, "utf8");
+    const parsed = JSON.parse(raw) as Partial<SaasData>;
+    const data = normalizeData(parsed);
+    memoryStore = cloneData(data);
+    return cloneData(data);
+  } catch (error) {
+    warnMemoryStore(error);
+    const data = normalizeData();
+    memoryStore = cloneData(data);
+    return cloneData(data);
+  }
+}
+
 export function writeSaasData(data: SaasData): void {
-  ensureDataFile();
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+  const normalized = normalizeData(data);
+  memoryStore = cloneData(normalized);
+
+  try {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(DATA_FILE, JSON.stringify(normalized, null, 2), "utf8");
+  } catch (error) {
+    warnMemoryStore(error);
+  }
 }
 
 export function newId(prefix: string): string {
@@ -328,6 +361,7 @@ export function listInboxConversations(tenantId: string): Array<
     contact?: Contact;
     unreadCount: number;
     slaMinutes: number;
+    lastMessagePreview?: string;
     deal?: Deal;
   }
 > {
@@ -344,9 +378,10 @@ export function listInboxConversations(tenantId: string): Array<
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       const unreadCount = messages.filter((message) => message.direction === "inbound" && message.status !== "read").length;
       const lastInbound = messages.find((message) => message.direction === "inbound");
+      const lastMessagePreview = messages[0]?.text;
       const baseTime = lastInbound ? new Date(lastInbound.timestamp).getTime() : new Date(conversation.lastMessageAt).getTime();
       const slaMinutes = Math.max(0, Math.floor((now - baseTime) / (1000 * 60)));
-      return { ...conversation, contact, unreadCount, slaMinutes, deal };
+      return { ...conversation, contact, unreadCount, slaMinutes, lastMessagePreview, deal };
     })
     .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 }

@@ -22,11 +22,13 @@ const DEFAULT_FILTER: FilterKey = "all";
 export function InboxWorkspace({
   initialConversationId,
   demo,
-  tenantId
+  tenantId,
+  currentUserId
 }: {
   initialConversationId?: string;
   demo?: boolean;
   tenantId?: string;
+  currentUserId?: string;
 }) {
   const inbox = useInboxContext();
   const [filter, setFilter] = useState<FilterKey>(DEFAULT_FILTER);
@@ -450,6 +452,13 @@ export function InboxWorkspace({
     if (!ok) toast.error("No se pudo guardar el cambio");
   }
 
+  async function takeConversation() {
+    if (!selectedId || !currentUserId || readOnly) return;
+    setAssignTo(currentUserId);
+    const ok = await mutateConversation(selectedId, "assign", { assignedTo: currentUserId });
+    if (!ok) toast.error("No se pudo tomar la conversacion");
+  }
+
   async function addNote() {
     const text = noteText.trim();
     if (!selectedId || !detail || !text || readOnly) return;
@@ -562,6 +571,9 @@ export function InboxWorkspace({
             onSelectSuggestion={applySuggestion}
             autoSuggestions={autoSuggestions}
             onRegenerateAutoSuggestions={() => buildAutoSuggestions(true)}
+            onToggleBot={() => void runAction("toggle_bot")}
+            onTakeConversation={() => void takeConversation()}
+            onArchive={() => void runAction("close")}
           />
         }
         right={
@@ -584,15 +596,10 @@ export function InboxWorkspace({
             taskTitle={taskTitle}
             onTaskTitleChange={setTaskTitle}
             onAddTask={() => void addTask()}
+            historyHref={conversationUrl}
           />
         }
       />
-
-      {conversationUrl ? (
-        <div className="text-xs text-muted">
-          <Link href={conversationUrl}>Abrir URL directa de esta conversacion</Link>
-        </div>
-      ) : null}
     </div>
   );
 }

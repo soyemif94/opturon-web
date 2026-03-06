@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
+import { toast } from "@/components/ui/toast";
 
 type Settings = {
   openingHours?: string;
@@ -12,22 +13,49 @@ type Settings = {
 
 export function BusinessSettingsForm({ initialSettings }: { initialSettings: Settings }) {
   const [form, setForm] = useState<Settings>(initialSettings || {});
-  const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
 
   async function save() {
-    setSaved(false);
-    const response = await fetch("/api/app/business", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    });
-    if (!response.ok) return;
-    setSaved(true);
+    const hasAnyValue = Object.values(form).some((value) => String(value || "").trim().length > 0);
+    if (!hasAnyValue) {
+      setFeedback({ tone: "error", text: "Completá al menos un dato del negocio antes de guardar." });
+      toast.error("No hay cambios útiles para guardar");
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback({ tone: null, text: "" });
+
+    try {
+      const response = await fetch("/api/app/business", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+
+      if (!response.ok) {
+        const json = await safeJson(response);
+        const message = json?.error?.formErrors?.[0] || json?.error || "No se pudieron guardar los datos del negocio.";
+        setFeedback({ tone: "error", text: String(message) });
+        toast.error("Error al guardar", String(message));
+        return;
+      }
+
+      setFeedback({ tone: "success", text: "Datos del negocio guardados correctamente." });
+      toast.success("Datos del negocio actualizados");
+    } catch {
+      setFeedback({ tone: "error", text: "Ocurrio un error de red. Reintentá en unos segundos." });
+      toast.error("Error de red", "No pudimos guardar los datos del negocio.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-card p-5">
       <h1 className="text-2xl font-semibold">Datos del negocio</h1>
+      <p className="mt-2 text-sm text-muted">Completá la informacion que el bot y el equipo necesitan para responder mejor.</p>
       <div className="mt-4 grid gap-3">
         <Field label="Horarios" value={form.openingHours || ""} onChange={(v) => setForm((p) => ({ ...p, openingHours: v }))} />
         <Field label="Dirección" value={form.address || ""} onChange={(v) => setForm((p) => ({ ...p, address: v }))} />
@@ -35,8 +63,18 @@ export function BusinessSettingsForm({ initialSettings }: { initialSettings: Set
         <Field label="Medios de pago" value={form.paymentMethods || ""} onChange={(v) => setForm((p) => ({ ...p, paymentMethods: v }))} />
         <Field label="Políticas" value={form.policies || ""} onChange={(v) => setForm((p) => ({ ...p, policies: v }))} multiline />
       </div>
-      <button onClick={save} className="mt-4 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white">Guardar</button>
-      {saved ? <p className="mt-2 text-xs text-green-400">Guardado</p> : null}
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={isSaving}
+          className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {isSaving ? "Guardando..." : "Guardar"}
+        </button>
+        {feedback.tone ? (
+          <p className={`text-xs ${feedback.tone === "success" ? "text-green-400" : "text-red-300"}`}>{feedback.text}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -54,3 +92,10 @@ function Field({ label, value, onChange, multiline }: { label: string; value: st
   );
 }
 
+async function safeJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}

@@ -10,10 +10,27 @@ function noStore(response: NextResponse) {
 }
 
 export async function GET(_req: Request) {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA ?? null;
+  const deploymentId = process.env.VERCEL_DEPLOYMENT_ID ?? null;
+  const buildMarker = process.env.NEXT_PUBLIC_APP_BUILD_MARKER ?? (sha ? sha.slice(0, 7) : deploymentId || "local-dev");
+  const environment =
+    process.env.VERCEL_ENV ||
+    (process.env.NODE_ENV === "production" ? "production" : process.env.NODE_ENV || "development");
+  const projectName = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_PROJECT_ID ?? null;
+  const branch = process.env.VERCEL_GIT_COMMIT_REF ?? null;
+  const hostname = process.env.VERCEL_URL ?? null;
+
   return noStore(
     NextResponse.json({
       ok: true,
-      sha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      sha,
+      deploymentId,
+      buildMarker,
+      environment,
+      branch,
+      projectName,
+      hostname,
+      runtime: "nodejs",
       ts: new Date().toISOString()
     })
   );

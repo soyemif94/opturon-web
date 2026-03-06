@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, newId, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
@@ -20,8 +20,14 @@ export async function GET() {
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
 
-  const data = readSaasData();
-  return NextResponse.json({ products: data.catalogProducts.filter((item) => item.tenantId === tenantId) });
+  try {
+    const data = readSaasData();
+    const catalogProducts = Array.isArray(data.catalogProducts) ? data.catalogProducts : [];
+    return NextResponse.json({ products: catalogProducts.filter((item) => item?.tenantId === tenantId) });
+  } catch (error) {
+    console.error("[api/app/catalog][GET] Failed to load catalog.", error);
+    return NextResponse.json({ error: "No se pudo cargar el catalogo." }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -29,31 +35,37 @@ export async function POST(request: NextRequest) {
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
 
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  try {
+    const body = await request.json().catch(() => null);
+    const parsed = createSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const now = new Date().toISOString();
-  const product = {
-    id: newId("prod"),
-    tenantId,
-    ...parsed.data,
-    createdAt: now,
-    updatedAt: now
-  };
+    const now = new Date().toISOString();
+    const product = {
+      id: newId("prod"),
+      tenantId,
+      ...parsed.data,
+      createdAt: now,
+      updatedAt: now
+    };
 
-  const data = readSaasData();
-  data.catalogProducts.unshift(product);
-  writeSaasData(data);
+    const data = readSaasData();
+    if (!Array.isArray(data.catalogProducts)) data.catalogProducts = [];
+    data.catalogProducts.unshift(product);
+    writeSaasData(data);
 
-  appendAuditLog({
-    tenantId,
-    userId: guard.ctx?.userId,
-    action: "product_created",
-    entity: "catalog_product",
-    entityId: product.id
-  });
-  touchTenantActivity(tenantId);
+    appendAuditLog({
+      tenantId,
+      userId: guard.ctx?.userId,
+      action: "product_created",
+      entity: "catalog_product",
+      entityId: product.id
+    });
+    touchTenantActivity(tenantId);
 
-  return NextResponse.json({ ok: true, product }, { status: 201 });
+    return NextResponse.json({ ok: true, product }, { status: 201 });
+  } catch (error) {
+    console.error("[api/app/catalog][POST] Failed to create product.", error);
+    return NextResponse.json({ error: "No se pudo crear el producto." }, { status: 500 });
+  }
 }
-
