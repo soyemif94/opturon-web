@@ -16,6 +16,19 @@ function normalizeRole(input?: string): GlobalRole {
   return "superadmin";
 }
 
+async function readJsonAuthStore() {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const dataPath = path.join(process.cwd(), "data", "saas.json");
+  if (!fs.existsSync(dataPath)) return null;
+  const raw = fs.readFileSync(dataPath, "utf8");
+  const db = JSON.parse(raw) as { users?: any[]; memberships?: any[] };
+  return {
+    users: Array.isArray(db.users) ? db.users : [],
+    memberships: Array.isArray(db.memberships) ? db.memberships : []
+  };
+}
+
 export async function getAuthUserByEmail(email: string): Promise<AuthUser | null> {
   const e = String(email || "").toLowerCase().trim();
   if (!e) return null;
@@ -24,6 +37,25 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
   const envEmail = String(process.env.AUTH_ADMIN_EMAIL || "").toLowerCase().trim();
   const envHash = String(process.env.AUTH_ADMIN_PASSWORD_HASH || "").trim();
   if (envEmail && envHash && e === envEmail) {
+    try {
+      const db = await readJsonAuthStore();
+      const matchedUser = db?.users.find((x: any) => String(x?.email || "").toLowerCase().trim() === e);
+      const membership = db?.memberships.find((item: any) => String(item?.userId || "") === String(matchedUser?.id || ""));
+      if (matchedUser) {
+        return {
+          id: String(matchedUser.id || "env-admin"),
+          email: String(matchedUser.email || process.env.AUTH_ADMIN_EMAIL || envEmail),
+          name: matchedUser.name ? String(matchedUser.name) : process.env.AUTH_ADMIN_NAME || "Admin",
+          passwordHash: envHash,
+          globalRole: normalizeRole(String(matchedUser.globalRole || matchedUser.role || process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin")),
+          tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
+          tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
+        };
+      }
+    } catch (err) {
+      console.warn("AUTH_JSON_LOOKUP_FOR_ENV_ADMIN_FAILED", String(err));
+    }
+
     return {
       id: "env-admin",
       email: String(process.env.AUTH_ADMIN_EMAIL || envEmail),
@@ -35,14 +67,10 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
 
   // 2) DEV fallback: JSON store (never throw in runtime).
   try {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const dataPath = path.join(process.cwd(), "data", "saas.json");
-    if (!fs.existsSync(dataPath)) return null;
-    const raw = fs.readFileSync(dataPath, "utf8");
-    const db = JSON.parse(raw) as { users?: any[]; memberships?: any[] };
-    const users = Array.isArray(db.users) ? db.users : [];
-    const memberships = Array.isArray(db.memberships) ? db.memberships : [];
+    const db = await readJsonAuthStore();
+    if (!db) return null;
+    const users = db.users;
+    const memberships = db.memberships;
     const u = users.find((x: any) => String(x?.email || "").toLowerCase().trim() === e);
     if (!u?.passwordHash) return null;
     const membership = memberships.find((item: any) => String(item?.userId || "") === String(u.id || ""));
