@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Bot,
   CalendarDays,
@@ -11,6 +12,7 @@ import {
   Headset,
   House,
   MessageSquareText,
+  LogOut,
   PhoneCall,
   PlugZap,
   Settings2,
@@ -204,6 +206,15 @@ export function AppShell({
                   Conectar WhatsApp
                 </Link>
               </div>
+
+              <button
+                type="button"
+                onClick={() => void signOut({ callbackUrl: "/login" })}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm font-medium text-muted transition-colors hover:text-text"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesion
+              </button>
             </div>
           </div>
         </aside>

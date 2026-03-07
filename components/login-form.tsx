@@ -117,6 +117,14 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Ingresando..." : "Ingresar"}
       </Button>
+      <div className="text-center text-sm text-muted-foreground">
+        <a href="mailto:soporte@opturon.com?subject=Restablecer%20contrasena%20Opturon" className="hover:text-foreground">
+          ¿Olvidaste tu contraseña?
+        </a>
+        <p className="mt-1 text-xs">
+          Escribinos a soporte y te ayudamos a restablecer el acceso.
+        </p>
+      </div>
       {isDev ? <p className="text-xs text-muted-foreground">Debug status: {debugStatus}</p> : null}
     </form>
   );

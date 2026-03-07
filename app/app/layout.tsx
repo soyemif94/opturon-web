@@ -7,7 +7,8 @@ export default async function ClientPortalLayout({ children }: { children: React
   const ctx = await requireAppPage();
   const data = readSaasData();
   const tenant = data.tenants.find((item) => item.id === ctx.tenantId) || data.tenants[0];
-  const tenantLabel = tenant ? tenant.name : `Tenant: ${ctx.tenantId || "workspace"}`;
+  const rawTenantLabel = tenant ? tenant.name : `Tenant: ${ctx.tenantId || "workspace"}`;
+  const tenantLabel = /demo tenant/i.test(rawTenantLabel) ? "Workspace del cliente" : rawTenantLabel;
   const buildMarker = process.env.NEXT_PUBLIC_APP_BUILD_MARKER || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || process.env.VERCEL_DEPLOYMENT_ID || "local-dev";
   const buildEnv =
     process.env.VERCEL_ENV ||
