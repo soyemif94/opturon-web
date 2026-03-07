@@ -9,14 +9,19 @@ export default async function ClientPortalLayout({ children }: { children: React
   const tenant = data.tenants.find((item) => item.id === ctx.tenantId) || data.tenants[0];
   const rawTenantLabel = tenant ? tenant.name : `Tenant: ${ctx.tenantId || "workspace"}`;
   const tenantLabel = /demo tenant/i.test(rawTenantLabel) ? "Workspace del cliente" : rawTenantLabel;
-  const buildMarker = process.env.NEXT_PUBLIC_APP_BUILD_MARKER || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || process.env.VERCEL_DEPLOYMENT_ID || "local-dev";
-  const buildEnv =
-    process.env.VERCEL_ENV ||
-    (process.env.NODE_ENV === "production" ? "production" : process.env.NODE_ENV || "development");
-  const deploymentId =
-    process.env.VERCEL_DEPLOYMENT_ID?.slice(0, 8) ||
-    process.env.VERCEL_URL?.replace(/\.vercel\.app$/i, "") ||
-    undefined;
+  const showDebugInfo = process.env.NEXT_PUBLIC_SHOW_DEBUG_INFO === "true";
+  const buildMarker = showDebugInfo
+    ? process.env.NEXT_PUBLIC_APP_BUILD_MARKER || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || process.env.VERCEL_DEPLOYMENT_ID || "local-dev"
+    : undefined;
+  const buildEnv = showDebugInfo
+    ? process.env.VERCEL_ENV ||
+      (process.env.NODE_ENV === "production" ? "production" : process.env.NODE_ENV || "development")
+    : undefined;
+  const deploymentId = showDebugInfo
+    ? process.env.VERCEL_DEPLOYMENT_ID?.slice(0, 8) ||
+      process.env.VERCEL_URL?.replace(/\.vercel\.app$/i, "") ||
+      undefined
+    : undefined;
 
   return (
     <CommandPaletteProvider
