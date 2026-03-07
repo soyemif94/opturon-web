@@ -54,6 +54,8 @@ export function InboxWorkspace({
   const [autoSuggestions, setAutoSuggestions] = useState<SuggestionItem[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Array<{ id: string; name: string; price: number; stock: number; tags: string[] }>>([]);
   const autoSuggestCacheRef = useRef<Map<string, SuggestionItem[]>>(new Map());
+  const rowsSnapshotRef = useRef("");
+  const detailSnapshotRef = useRef("");
 
   const querySuffix = useMemo(() => {
     const params = new URLSearchParams();
@@ -106,8 +108,8 @@ export function InboxWorkspace({
       .sort((a, b) => b.score - a.score);
   }
 
-  async function loadRows() {
-    setRowsLoading(true);
+  async function loadRows(options?: { silent?: boolean }) {
+    if (!options?.silent) setRowsLoading(true);
     try {
       const response = await fetch(
         appendQuery("/api/app/inbox", {
@@ -123,33 +125,54 @@ export function InboxWorkspace({
       if (!json || !Array.isArray(json.conversations)) {
         throw new Error("invalid_inbox_list_shape");
       }
-      setReadOnly(Boolean(json.readOnly));
       let nextRows = json.conversations || [];
       if (onlyUnread) nextRows = nextRows.filter((row) => row.unreadCount > 0);
-      setRows(nextRows);
+      const nextReadOnly = Boolean(json.readOnly);
+      const nextSnapshot = JSON.stringify({
+        readOnly: nextReadOnly,
+        selectedId,
+        rows: nextRows
+      });
+      const changed = rowsSnapshotRef.current !== nextSnapshot;
+
+      if (changed) {
+        rowsSnapshotRef.current = nextSnapshot;
+        setReadOnly(nextReadOnly);
+        setRows(nextRows);
+        if (!selectedId && nextRows.length) setSelectedId(nextRows[0].id);
+        if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
+      }
+
       setRowsError(null);
       setRowsLoaded(true);
-      if (!selectedId && nextRows.length) setSelectedId(nextRows[0].id);
-      if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
     } catch (error) {
-      setRowsError(error instanceof Error ? error.message : "No se pudo cargar el inbox");
+      if (!options?.silent) {
+        setRowsError(error instanceof Error ? error.message : "No se pudo cargar el inbox");
+      }
     } finally {
-      setRowsLoading(false);
+      if (!options?.silent) setRowsLoading(false);
     }
   }
 
-  async function loadDetail(conversationId: string) {
-    setDetailLoading(true);
+  async function loadDetail(conversationId: string, options?: { silent?: boolean }) {
+    if (!options?.silent) setDetailLoading(true);
     try {
       const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}`), { cache: "no-store" });
       if (!response.ok) return;
       const json = (await response.json()) as DetailPayload;
-      setDetail(json);
-      setReadOnly(Boolean(json.readOnly));
-      if (json.deal?.stage) setDealStage(json.deal.stage);
-      setAssignTo(json.conversation?.assignedTo || "");
+      const nextReadOnly = Boolean(json.readOnly);
+      const nextSnapshot = JSON.stringify(json);
+      const changed = detailSnapshotRef.current !== nextSnapshot;
+
+      if (changed) {
+        detailSnapshotRef.current = nextSnapshot;
+        setDetail(json);
+        setReadOnly(nextReadOnly);
+        if (json.deal?.stage) setDealStage(json.deal.stage);
+        setAssignTo(json.conversation?.assignedTo || "");
+      }
     } finally {
-      setDetailLoading(false);
+      if (!options?.silent) setDetailLoading(false);
     }
   }
 
@@ -179,9 +202,9 @@ export function InboxWorkspace({
     if (demo || readOnly) return;
 
     const interval = setInterval(() => {
-      void loadRows();
+      void loadRows({ silent: true });
       if (selectedId) {
-        void loadDetail(selectedId);
+        void loadDetail(selectedId, { silent: true });
       }
     }, 5000);
 

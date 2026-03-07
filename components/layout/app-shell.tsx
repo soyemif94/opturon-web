@@ -121,7 +121,7 @@ export function AppShell({
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
-                  <Badge variant="success">Demo ready</Badge>
+                  <Badge variant="success">Workspace activo</Badge>
                   {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
                 </div>
                 {buildLabel ? (
@@ -228,7 +228,7 @@ export function AppShell({
                     <Badge variant="success">Portal activo</Badge>
                     <Badge variant="outline" className="gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" />
-                      Demo comercial
+                      Operacion en vivo
                     </Badge>
                     {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
                   </div>
