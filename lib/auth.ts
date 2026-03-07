@@ -116,6 +116,17 @@ export const authOptions: NextAuthOptions = {
           token.tenantRole = (user as any).tenantRole;
         }
 
+        if ((!token.tenantId || !token.tenantRole) && token.email) {
+          const hydratedUser = await getAuthUserByEmail(String(token.email));
+          if (hydratedUser) {
+            token.userId = hydratedUser.id;
+            token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+            token.role = token.globalRole;
+            token.tenantId = hydratedUser.tenantId;
+            token.tenantRole = hydratedUser.tenantRole;
+          }
+        }
+
       } catch (error) {
         console.error("JWT_CALLBACK_ERROR", { msg: String(error) });
       }
