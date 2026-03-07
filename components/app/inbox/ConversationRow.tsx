@@ -65,7 +65,7 @@ export function ConversationRow({
         </div>
       </button>
 
-      <div className="mt-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="mt-2 flex gap-2 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto">
         <button
           type="button"
           onClick={onMarkHot}
