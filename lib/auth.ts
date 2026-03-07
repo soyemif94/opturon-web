@@ -90,8 +90,8 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             role: globalRole,
             globalRole,
-            tenantId: undefined,
-            tenantRole: undefined
+            tenantId: user.tenantId,
+            tenantRole: user.tenantRole
           };
         } catch (error) {
           console.error("AUTH_AUTHORIZE_FATAL", {
