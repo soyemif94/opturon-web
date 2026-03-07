@@ -31,6 +31,9 @@ export function InboxWorkspace({
   currentUserId?: string;
 }) {
   const inbox = useInboxContext();
+  const setInboxState = inbox.setState;
+  const setInboxControls = inbox.setControls;
+  const clearInboxControls = inbox.clearControls;
   const [filter, setFilter] = useState<FilterKey>(DEFAULT_FILTER);
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<ConversationRowData[]>([]);
@@ -193,7 +196,7 @@ export function InboxWorkspace({
     const sourceText = composer.trim() || latestInbound || intentText;
     if (!sourceText) {
       setSuggestions([]);
-      inbox.setState({ liveSuggestions: [] });
+      setInboxState({ liveSuggestions: [] });
       return;
     }
 
@@ -218,11 +221,11 @@ export function InboxWorkspace({
         actions
       });
       setSuggestions(next.slice(0, 5));
-      inbox.setState({ liveSuggestions: next.slice(0, 5) });
+      setInboxState({ liveSuggestions: next.slice(0, 5) });
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [catalogProducts, composer, detail, inbox, lastInboundMessage?.id, lastInboundMessage?.timestamp]);
+  }, [catalogProducts, composer, detail, lastInboundMessage?.id, lastInboundMessage?.timestamp, setInboxState]);
 
   function buildAutoSuggestions(force = false) {
     const conversationId = detail?.conversation.id || selectedId;
@@ -230,7 +233,7 @@ export function InboxWorkspace({
     const inboundText = lastInboundMessage?.text || "";
     if (!conversationId || !inboundId || !inboundText) {
       setAutoSuggestions([]);
-      inbox.setState({ autoSuggestions: [] });
+      setInboxState({ autoSuggestions: [] });
       return;
     }
 
@@ -238,7 +241,7 @@ export function InboxWorkspace({
     if (!force && autoSuggestCacheRef.current.has(cacheKey)) {
       const cached = autoSuggestCacheRef.current.get(cacheKey) || [];
       setAutoSuggestions(cached);
-      inbox.setState({ autoSuggestions: cached });
+      setInboxState({ autoSuggestions: cached });
       return;
     }
 
@@ -291,13 +294,13 @@ export function InboxWorkspace({
 
     autoSuggestCacheRef.current.set(cacheKey, finalList);
     setAutoSuggestions(finalList);
-    inbox.setState({ autoSuggestions: finalList });
+    setInboxState({ autoSuggestions: finalList });
   }
 
   useEffect(() => {
     if (!detail?.conversation?.id || !lastInboundMessage?.id) {
       setAutoSuggestions([]);
-      inbox.setState({ autoSuggestions: [] });
+      setInboxState({ autoSuggestions: [] });
       return;
     }
     const timer = setTimeout(() => {
@@ -305,11 +308,11 @@ export function InboxWorkspace({
     }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detail?.conversation?.id, lastInboundMessage?.id, lastInboundMessage?.timestamp, detail?.aiEvents?.[0]?.text, detail?.deal?.stage]);
+  }, [detail?.conversation?.id, lastInboundMessage?.id, lastInboundMessage?.timestamp, detail?.aiEvents?.[0]?.text, detail?.deal?.stage, setInboxState]);
 
   useEffect(() => {
     const selectedRow = selectedId ? rows.find((row) => row.id === selectedId) : undefined;
-    inbox.setState({
+    setInboxState({
       tenantId,
       conversationId: detail?.conversation.id || selectedId || null,
       contactId: detail?.contact?.id || null,
@@ -327,7 +330,7 @@ export function InboxWorkspace({
       liveSuggestions: suggestions,
       autoSuggestions
     });
-  }, [autoSuggestions, detail, inbox, rows, selectedId, suggestions, tenantId]);
+  }, [autoSuggestions, detail, rows, selectedId, setInboxState, suggestions, tenantId]);
 
   async function mutateConversation(conversationId: string, action: string, payload: Record<string, unknown> = {}) {
     if (readOnly) return false;
@@ -352,15 +355,15 @@ export function InboxWorkspace({
     if (action === "toggle_bot") {
       const next = Boolean(payload.botEnabled);
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, botEnabled: next } } : prev));
-      inbox.setState({ botEnabled: next });
+      setInboxState({ botEnabled: next });
     }
     if (action === "mark_hot") {
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, priority: "hot" } } : prev));
-      inbox.setState({ isHot: true });
+      setInboxState({ isHot: true });
     }
     if (action === "unmark_hot") {
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, priority: "normal" } } : prev));
-      inbox.setState({ isHot: false });
+      setInboxState({ isHot: false });
     }
     if (action === "close") {
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, status: "closed" } } : prev));
@@ -371,20 +374,20 @@ export function InboxWorkspace({
     if (action === "assign") {
       const nextAssign = typeof payload.assignedTo === "string" ? payload.assignedTo : null;
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, assignedTo: nextAssign || undefined } } : prev));
-      inbox.setState({ assignedTo: nextAssign });
+      setInboxState({ assignedTo: nextAssign });
     }
     if (action === "mark_read") {
-      inbox.setState({ unreadCount: 0 });
+      setInboxState({ unreadCount: 0 });
     }
     if (action === "mark_unread") {
-      inbox.setState({ unreadCount: Math.max(1, inbox.state.unreadCount) });
+      setInboxState({ unreadCount: Math.max(1, inbox.state.unreadCount) });
     }
 
     const ok = await mutateConversation(selectedId, action, payload);
     if (!ok) {
       setDetail(snapshotDetail);
       setRows(snapshotRows);
-      inbox.setState({
+      setInboxState({
         botEnabled: snapshotDetail.conversation.botEnabled,
         isHot: snapshotDetail.conversation.priority === "hot",
         assignedTo: snapshotDetail.conversation.assignedTo || null
@@ -394,7 +397,7 @@ export function InboxWorkspace({
   }
 
   useEffect(() => {
-    inbox.setControls({
+    setInboxControls({
       applyFilter: (nextFilter) => setFilter(nextFilter as FilterKey),
       toggleOnlyUnread: () => setOnlyUnread((prev) => !prev),
       setSearch: (query) => setSearch(query),
@@ -405,9 +408,9 @@ export function InboxWorkspace({
         return ok;
       }
     });
-    return () => inbox.clearControls();
+    return () => clearInboxControls();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inbox, detail, selectedId, rows]);
+  }, [clearInboxControls, detail, rows, selectedId, setInboxControls]);
 
   async function sendMessage(value: string) {
     const text = value.trim();
