@@ -12,7 +12,10 @@ export default async function ClientPortalLayout({ children }: { children: React
   const buildEnv =
     process.env.VERCEL_ENV ||
     (process.env.NODE_ENV === "production" ? "production" : process.env.NODE_ENV || "development");
-  const deploymentId = process.env.VERCEL_DEPLOYMENT_ID?.slice(0, 8) || process.env.VERCEL_URL || undefined;
+  const deploymentId =
+    process.env.VERCEL_DEPLOYMENT_ID?.slice(0, 8) ||
+    process.env.VERCEL_URL?.replace(/\.vercel\.app$/i, "") ||
+    undefined;
 
   return (
     <CommandPaletteProvider
@@ -21,9 +24,11 @@ export default async function ClientPortalLayout({ children }: { children: React
       isStaff={Boolean(ctx.globalRole && ctx.globalRole !== "client")}
       userId={ctx.userId}
     >
-      <AppShell tenantLabel={tenantLabel} buildMarker={buildMarker} buildEnv={buildEnv} deploymentId={deploymentId}>
-        {children}
-      </AppShell>
+      <div className="flex min-h-screen w-full">
+        <AppShell tenantLabel={tenantLabel} buildMarker={buildMarker} buildEnv={buildEnv} deploymentId={deploymentId}>
+          {children}
+        </AppShell>
+      </div>
     </CommandPaletteProvider>
   );
 }
