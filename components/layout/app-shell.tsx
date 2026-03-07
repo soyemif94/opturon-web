@@ -94,6 +94,7 @@ export function AppShell({
   deploymentId?: string;
 }) {
   const pathname = usePathname();
+  const isInboxRoute = pathname.startsWith("/app/inbox");
   const buildLabel = [
     buildMarker ? `Build ${buildMarker}` : null,
     buildEnv ? `Env ${buildEnv}` : null,
@@ -103,8 +104,8 @@ export function AppShell({
     .join(" | ");
 
   return (
-    <section className="container-opt py-5">
-      <div className="flex min-h-[calc(100vh-40px)] gap-5">
+    <section className="w-full px-5 py-5">
+      <div className="flex min-h-[calc(100vh-40px)] w-full gap-5">
         <aside className="hidden w-[304px] shrink-0 xl:block">
           <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
@@ -123,7 +124,11 @@ export function AppShell({
                   <Badge variant="success">Demo ready</Badge>
                   {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
                 </div>
-                {buildLabel ? <p className="mt-3 text-[11px] font-medium tracking-[0.12em] text-muted">{buildLabel}</p> : null}
+                {buildLabel ? (
+                  <p className="mt-3 font-mono text-[11px] font-medium tracking-[0.12em] text-muted" title={buildLabel}>
+                    {buildLabel}
+                  </p>
+                ) : null}
               </div>
 
               <nav className="mt-6 space-y-2">
@@ -204,7 +209,13 @@ export function AppShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]">
+          <div
+            className={cn(
+              isInboxRoute
+                ? "min-h-[calc(100vh-40px)]"
+                : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
+            )}
+          >
             <header className="border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
               {topbar || (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -226,7 +237,10 @@ export function AppShell({
             </header>
 
             {buildLabel ? (
-              <div className="border-b border-[color:var(--border)] bg-surface/55 px-5 py-2 text-[11px] font-medium tracking-[0.08em] text-muted xl:px-8">
+              <div
+                className="border-b border-[color:var(--border)] bg-surface/55 px-5 py-2 font-mono text-[11px] font-medium tracking-[0.08em] text-muted xl:px-8"
+                title={buildLabel}
+              >
                 {buildLabel}
               </div>
             ) : null}
@@ -254,7 +268,14 @@ export function AppShell({
               </div>
             </div>
 
-            <main className="min-h-[calc(100vh-140px)] bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8">
+            <main
+              className={cn(
+                "min-h-[calc(100vh-140px)]",
+                isInboxRoute
+                  ? "bg-transparent p-0"
+                  : "bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
+              )}
+            >
               {children}
             </main>
           </div>
