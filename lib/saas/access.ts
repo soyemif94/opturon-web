@@ -1,10 +1,16 @@
-﻿import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
+import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
 
 const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+
+function resolveDemoTenantId(requestedTenantId?: string) {
+  if (requestedTenantId) return requestedTenantId;
+  return readSaasData().tenants[0]?.id;
+}
 
 export async function getSessionContext() {
   const session = await getServerSession(authOptions);
@@ -71,6 +77,12 @@ export async function resolveAppTenant(options?: {
     return { ctx, tenantId: requested, readOnly: true };
   }
 
+  if (isStaff && !options?.requireWrite) {
+    const demoTenantId = resolveDemoTenantId(requested);
+    if (demoTenantId) {
+      return { ctx, tenantId: demoTenantId, readOnly: true };
+    }
+  }
+
   return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
 }
-
