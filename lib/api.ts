@@ -1,6 +1,5 @@
 import { readSaasData } from "@/lib/saas/store";
 
-const API_BASE = String(process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
 
@@ -24,12 +23,25 @@ export function getLastApiError() {
   return lastApiError;
 }
 
+function getApiBase() {
+  return String(
+    process.env.BACKEND_BASE_URL ||
+      process.env.API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+}
+
 export function isBackendConfigured() {
-  return Boolean(API_BASE);
+  return Boolean(getApiBase());
 }
 
 async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
-  if (!API_BASE) {
+  const apiBase = getApiBase();
+
+  if (!apiBase) {
     throw new Error("API base URL is not configured");
   }
 
@@ -50,7 +62,7 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   const timeout = setTimeout(() => controller.abort("timeout"), API_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(`${apiBase}${path}`, {
       ...init,
       headers,
       cache: "no-store",
@@ -125,7 +137,7 @@ function localInboxItems(limit = 50): InboxItem[] {
 }
 
 export async function getHealth() {
-  if (API_BASE) {
+  if (isBackendConfigured()) {
     return backendFetch<{ ok: boolean; service: string }>("/health", undefined, false);
   }
 
@@ -136,7 +148,7 @@ export async function getHealth() {
 }
 
 export async function getBuild() {
-  if (API_BASE) {
+  if (isBackendConfigured()) {
     return backendFetch<{ ok: boolean; buildId?: string; pid?: number; cwd?: string; file?: string }>("/build", undefined, false);
   }
 
@@ -216,7 +228,7 @@ export async function sendPortalMessage(
 }
 
 export async function getDebugInbox(limit = 50) {
-  if (API_BASE) {
+  if (isBackendConfigured()) {
     return backendFetch<{ success: boolean; items: InboxItem[] }>(`/debug/inbox?limit=${limit}`, undefined, true);
   }
 
@@ -227,7 +239,7 @@ export async function getDebugInbox(limit = 50) {
 }
 
 export async function getDebugInboxHealth() {
-  if (API_BASE) {
+  if (isBackendConfigured()) {
     return backendFetch<{ ok: boolean; size: number; max: number }>("/debug/inbox/health", undefined, true);
   }
 
@@ -240,7 +252,7 @@ export async function getDebugInboxHealth() {
 }
 
 export async function clearDebugInbox() {
-  if (API_BASE) {
+  if (isBackendConfigured()) {
     return backendFetch<{ success: boolean }>("/debug/inbox/clear", { method: "POST", body: "{}" }, true);
   }
 
