@@ -1,4 +1,4 @@
-import type { GlobalRole } from "@/lib/saas/types";
+import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
 export type AuthUser = {
   id: string;
@@ -6,6 +6,8 @@ export type AuthUser = {
   name?: string;
   passwordHash: string;
   globalRole?: string;
+  tenantId?: string;
+  tenantRole?: TenantRole;
 };
 
 function normalizeRole(input?: string): GlobalRole {
@@ -38,16 +40,20 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
     const dataPath = path.join(process.cwd(), "data", "saas.json");
     if (!fs.existsSync(dataPath)) return null;
     const raw = fs.readFileSync(dataPath, "utf8");
-    const db = JSON.parse(raw) as { users?: any[] };
+    const db = JSON.parse(raw) as { users?: any[]; memberships?: any[] };
     const users = Array.isArray(db.users) ? db.users : [];
+    const memberships = Array.isArray(db.memberships) ? db.memberships : [];
     const u = users.find((x: any) => String(x?.email || "").toLowerCase().trim() === e);
     if (!u?.passwordHash) return null;
+    const membership = memberships.find((item: any) => String(item?.userId || "") === String(u.id || ""));
     return {
       id: String(u.id || "json-admin"),
       email: String(u.email || e),
       name: u.name ? String(u.name) : undefined,
       passwordHash: String(u.passwordHash),
-      globalRole: normalizeRole(String(u.globalRole || u.role || "superadmin"))
+      globalRole: normalizeRole(String(u.globalRole || u.role || "superadmin")),
+      tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
+      tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
     };
   } catch (err) {
     console.warn("AUTH_JSON_STORE_UNAVAILABLE", String(err));

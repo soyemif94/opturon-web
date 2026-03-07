@@ -40,6 +40,14 @@ type IntegrationCard = {
   helper?: string;
 };
 
+type WhatsAppIntegrationStatus = {
+  state: IntegrationState;
+  connectedNumber: string | null;
+  channelStatus: string | null;
+  webhookActive: boolean | null;
+  lastActivity: string | null;
+};
+
 const integrations: IntegrationCard[] = [
   {
     id: "instagram",
@@ -93,14 +101,14 @@ const integrations: IntegrationCard[] = [
   }
 ];
 
-export function IntegrationsHub() {
-  const whatsappConnected = false;
+export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppIntegrationStatus }) {
+  const whatsappConnected = whatsapp.state === "connected";
 
   return (
     <div className="space-y-6">
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
         <Card className="overflow-hidden border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.20),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
-          <CardHeader action={<Badge variant={whatsappConnected ? "success" : "warning"}>{whatsappConnected ? "Conectado" : "No conectado"}</Badge>}>
+          <CardHeader action={<Badge variant={whatsappConnected ? "success" : whatsapp.state === "connecting" ? "warning" : whatsapp.state === "error" ? "danger" : "warning"}>{whatsappConnected ? "Conectado" : whatsapp.state === "connecting" ? "Conectando" : whatsapp.state === "error" ? "Error" : "No conectado"}</Badge>}>
             <div className="flex items-start gap-4">
               <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-brand/30 bg-brand/15 text-brandBright">
                 <PhoneCall className="h-6 w-6" />
@@ -116,9 +124,9 @@ export function IntegrationsHub() {
           <CardContent className="space-y-5 pt-0">
             {whatsappConnected ? (
               <div className="grid gap-3 md:grid-cols-3">
-                <StatusStat label="Numero conectado" value="+54 9 291 566 5793" />
-                <StatusStat label="Estado del canal" value="Activo" />
-                <StatusStat label="Ultima actividad" value="Hace 18 min" />
+                <StatusStat label="Numero conectado" value={whatsapp.connectedNumber || "Canal sin numero"} />
+                <StatusStat label="Estado del canal" value={whatsapp.channelStatus || "Sin estado"} />
+                <StatusStat label="Webhook" value={whatsapp.webhookActive ? "Activo" : "Pendiente"} />
               </div>
             ) : (
               <p className="max-w-3xl text-sm leading-7 text-muted">

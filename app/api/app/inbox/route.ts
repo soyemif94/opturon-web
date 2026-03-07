@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getPortalConversations, isBackendConfigured } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { listInboxConversations } from "@/lib/saas/store";
 
@@ -26,7 +27,10 @@ export async function GET(request: NextRequest) {
   const q = (params.q || "").toLowerCase().trim();
   const filter = params.filter || "all";
 
-  let conversations = listInboxConversations(tenantContext.tenantId);
+  let conversations =
+    !tenantContext.readOnly && isBackendConfigured()
+      ? (await getPortalConversations(tenantContext.tenantId)).data.conversations || []
+      : listInboxConversations(tenantContext.tenantId);
 
   if (q) {
     conversations = conversations.filter((item) => {
@@ -47,5 +51,9 @@ export async function GET(request: NextRequest) {
     readOnly: tenantContext.readOnly,
     tenantId: tenantContext.tenantId,
     conversations
+  }, {
+    headers: {
+      "Cache-Control": "no-store"
+    }
   });
 }

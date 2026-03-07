@@ -24,6 +24,10 @@ export function getLastApiError() {
   return lastApiError;
 }
 
+export function isBackendConfigured() {
+  return Boolean(API_BASE);
+}
+
 async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
   if (!API_BASE) {
     throw new Error("API base URL is not configured");
@@ -143,6 +147,72 @@ export async function getBuild() {
     cwd: process.cwd(),
     file: "opturon-web-local"
   };
+}
+
+export type PortalTenantContext = {
+  tenantId: string;
+  clinic: {
+    id: string;
+    name: string | null;
+    timezone: string | null;
+    externalTenantId: string | null;
+  } | null;
+  channel: {
+    id: string;
+    clinicId: string;
+    provider: string | null;
+    phoneNumberId: string | null;
+    wabaId: string | null;
+    status: string | null;
+  } | null;
+  reason: string;
+};
+
+export async function getPortalTenantContext(tenantId: string) {
+  return backendFetch<{ success: boolean; data: PortalTenantContext }>(`/portal/tenants/${tenantId}/context`, undefined, false);
+}
+
+export async function getPortalConversations(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      conversations: any[];
+    };
+  }>(`/portal/tenants/${tenantId}/conversations`, undefined, false);
+}
+
+export async function getPortalConversationDetail(tenantId: string, conversationId: string) {
+  return backendFetch<{ success: boolean; data: any }>(
+    `/portal/tenants/${tenantId}/conversations/${conversationId}`,
+    undefined,
+    false
+  );
+}
+
+export async function patchPortalConversation(tenantId: string, conversationId: string, payload: Record<string, unknown>) {
+  return backendFetch<{ success: boolean; data: any }>(
+    `/portal/tenants/${tenantId}/conversations/${conversationId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload || {})
+    },
+    false
+  );
+}
+
+export async function sendPortalMessage(
+  tenantId: string,
+  payload: { conversationId: string; text: string }
+) {
+  return backendFetch<{ success: boolean; data: { message: any } }>(
+    `/portal/tenants/${tenantId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
 }
 
 export async function getDebugInbox(limit = 50) {

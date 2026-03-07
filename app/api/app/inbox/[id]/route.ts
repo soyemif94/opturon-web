@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getPortalConversationDetail, isBackendConfigured, patchPortalConversation } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
@@ -23,6 +24,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   });
   if (tenantContext.error) return tenantContext.error;
 
+  if (!tenantContext.readOnly && isBackendConfigured()) {
+    const result = await getPortalConversationDetail(tenantContext.tenantId, id);
+    return NextResponse.json(result.data, {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
   const detail = getInboxConversationDetail(tenantContext.tenantId, id);
   if (!detail) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
@@ -31,6 +41,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ...detail,
     quickReplies: inboxQuickReplies(),
     aiEvents: inboxAiEvents(tenantContext.tenantId, id)
+  }, {
+    headers: {
+      "Cache-Control": "no-store"
+    }
   });
 }
 
@@ -47,6 +61,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const parsed = patchSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+  if (!tenantContext.readOnly && isBackendConfigured()) {
+    await patchPortalConversation(tenantContext.tenantId, id, parsed.data as Record<string, unknown>);
+    return NextResponse.json({ ok: true });
+  }
 
   const data = readSaasData();
   const conversation = data.conversations.find((item) => item.id === id && item.tenantId === tenantContext.tenantId);
