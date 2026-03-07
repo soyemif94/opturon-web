@@ -38,6 +38,8 @@ export function InboxWorkspace({
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<ConversationRowData[]>([]);
   const [rowsLoading, setRowsLoading] = useState(true);
+  const [rowsLoaded, setRowsLoaded] = useState(false);
+  const [rowsError, setRowsError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>(initialConversationId);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -111,16 +113,26 @@ export function InboxWorkspace({
         appendQuery("/api/app/inbox", {
           filter,
           q: search
-        })
+        }),
+        { cache: "no-store" }
       );
-      if (!response.ok) return;
+      if (!response.ok) {
+        throw new Error(`inbox_list_failed_${response.status}`);
+      }
       const json = (await response.json()) as InboxListResponse;
+      if (!json || !Array.isArray(json.conversations)) {
+        throw new Error("invalid_inbox_list_shape");
+      }
       setReadOnly(Boolean(json.readOnly));
       let nextRows = json.conversations || [];
       if (onlyUnread) nextRows = nextRows.filter((row) => row.unreadCount > 0);
       setRows(nextRows);
+      setRowsError(null);
+      setRowsLoaded(true);
       if (!selectedId && nextRows.length) setSelectedId(nextRows[0].id);
       if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
+    } catch (error) {
+      setRowsError(error instanceof Error ? error.message : "No se pudo cargar el inbox");
     } finally {
       setRowsLoading(false);
     }
@@ -129,7 +141,7 @@ export function InboxWorkspace({
   async function loadDetail(conversationId: string) {
     setDetailLoading(true);
     try {
-      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}`));
+      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}`), { cache: "no-store" });
       if (!response.ok) return;
       const json = (await response.json()) as DetailPayload;
       setDetail(json);
@@ -162,6 +174,20 @@ export function InboxWorkspace({
     void loadDetail(selectedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  useEffect(() => {
+    if (demo || readOnly) return;
+
+    const interval = setInterval(() => {
+      void loadRows();
+      if (selectedId) {
+        void loadDetail(selectedId);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo, readOnly, selectedId, tenantId]);
 
   const lastInboundMessage = useMemo(() => {
     return [...(detail?.messages || [])].reverse().find((message) => message.direction === "inbound");
@@ -545,6 +571,8 @@ export function InboxWorkspace({
           <ConversationList
             rows={rows}
             loading={rowsLoading}
+            hasLoaded={rowsLoaded}
+            errorMessage={rowsError}
             selectedId={selectedId}
             filter={filter}
             search={search}
@@ -559,6 +587,7 @@ export function InboxWorkspace({
               setSearch("");
               setOnlyUnread(false);
             }}
+            onRetry={() => void loadRows()}
           />
         }
         center={

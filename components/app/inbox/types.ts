@@ -5,6 +5,7 @@ export type ConversationRowData = {
   status: "open" | "closed" | "new";
   assignedTo?: string;
   lastMessageAt: string;
+  lastMessagePreview?: string;
   priority: "normal" | "hot";
   botEnabled: boolean;
   unreadCount: number;
