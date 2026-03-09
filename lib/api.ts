@@ -2,6 +2,7 @@ import { readSaasData } from "@/lib/saas/store";
 
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
+const PROD_BACKEND_FALLBACK = "https://opturon-api.onrender.com";
 
 let lastApiError: { at: string; message: string; path: string } | null = null;
 
@@ -24,14 +25,33 @@ export function getLastApiError() {
 }
 
 function getApiBase() {
-  return String(
-    process.env.BACKEND_BASE_URL ||
-      process.env.API_BASE_URL ||
-      process.env.NEXT_PUBLIC_API_BASE_URL ||
-      ""
-  )
-    .trim()
-    .replace(/\/$/, "");
+  const candidates = [
+    process.env.BACKEND_BASE_URL,
+    process.env.API_BASE_URL,
+    process.env.NEXT_PUBLIC_API_BASE_URL
+  ];
+
+  const resolved = candidates
+    .map((value) => String(value || "").trim().replace(/\/$/, ""))
+    .find(Boolean);
+
+  if (resolved) {
+    try {
+      const hostname = new URL(resolved).hostname.toLowerCase();
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
+      if (!(process.env.NODE_ENV === "production" && isLocalHost)) {
+        return resolved;
+      }
+    } catch {
+      return resolved;
+    }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return PROD_BACKEND_FALLBACK;
+  }
+
+  return "";
 }
 
 export function isBackendConfigured() {
