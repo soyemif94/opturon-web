@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isBackendConfigured, sendPortalMessage } from "@/lib/api";
+import { getBackendErrorStatus, isBackendConfigured, sendPortalMessage } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, newId, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 
@@ -22,8 +22,19 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
-    const result = await sendPortalMessage(tenantContext.tenantId, parsed.data);
-    return NextResponse.json({ ok: true, message: result.data.message }, { status: 201 });
+    try {
+      const result = await sendPortalMessage(tenantContext.tenantId, parsed.data);
+      return NextResponse.json({ ok: true, message: result.data.message }, { status: 201 });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "backend_fetch_failed"
+        },
+        {
+          status: getBackendErrorStatus(error) || 502
+        }
+      );
+    }
   }
 
   const data = readSaasData();

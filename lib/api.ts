@@ -6,6 +6,10 @@ const PROD_BACKEND_FALLBACK = "https://opturon-api.onrender.com";
 
 let lastApiError: { at: string; message: string; path: string } | null = null;
 
+type BackendError = Error & {
+  status?: number;
+};
+
 function registerApiError(path: string, error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown API error";
   lastApiError = {
@@ -58,6 +62,16 @@ export function isBackendConfigured() {
   return Boolean(getApiBase());
 }
 
+export function getBackendErrorStatus(error: unknown): number | undefined {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = Number((error as BackendError).status);
+    if (Number.isInteger(status) && status >= 400) {
+      return status;
+    }
+  }
+  return undefined;
+}
+
 async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
   const apiBase = getApiBase();
 
@@ -100,7 +114,8 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
     }
 
     if (!response.ok) {
-      const error = new Error(json?.error || `API request failed (${response.status})`);
+      const error = new Error(json?.error || `API request failed (${response.status})`) as BackendError;
+      error.status = response.status;
       registerApiError(path, error);
       throw error;
     }

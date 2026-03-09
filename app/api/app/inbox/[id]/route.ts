@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getPortalConversationDetail, isBackendConfigured, patchPortalConversation } from "@/lib/api";
+import { getBackendErrorStatus, getPortalConversationDetail, isBackendConfigured, patchPortalConversation } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
@@ -25,12 +25,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (tenantContext.error) return tenantContext.error;
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
-    const result = await getPortalConversationDetail(tenantContext.tenantId, id);
-    return NextResponse.json(result.data, {
-      headers: {
-        "Cache-Control": "no-store"
-      }
-    });
+    try {
+      const result = await getPortalConversationDetail(tenantContext.tenantId, id);
+      return NextResponse.json(result.data, {
+        headers: {
+          "Cache-Control": "no-store"
+        }
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "backend_fetch_failed"
+        },
+        {
+          status: getBackendErrorStatus(error) || 502,
+          headers: {
+            "Cache-Control": "no-store"
+          }
+        }
+      );
+    }
   }
 
   const detail = getInboxConversationDetail(tenantContext.tenantId, id);
@@ -63,8 +77,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
-    await patchPortalConversation(tenantContext.tenantId, id, parsed.data as Record<string, unknown>);
-    return NextResponse.json({ ok: true });
+    try {
+      await patchPortalConversation(tenantContext.tenantId, id, parsed.data as Record<string, unknown>);
+      return NextResponse.json({ ok: true });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "backend_fetch_failed"
+        },
+        {
+          status: getBackendErrorStatus(error) || 502
+        }
+      );
+    }
   }
 
   const data = readSaasData();
