@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getStockState } from "@/lib/stock-state";
 import { toast } from "@/components/ui/toast";
 
 type Product = {
@@ -371,6 +372,9 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
                         <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
                           {resolveStatus(product) === "active" ? "Activo" : "Inactivo"}
                         </Badge>
+                        <Badge variant={getStockState(resolveStock(product)).variant}>
+                          {getStockState(resolveStock(product)).label}
+                        </Badge>
                       </div>
                       <p className="mt-2 text-sm text-muted">
                         {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
@@ -548,12 +552,26 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
               ) : (
                 <>
                   <DetailStat label="Producto" value={selectedProduct.name} />
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>
+                      {resolveStatus(selectedProduct) === "active" ? "Activo" : "Inactivo"}
+                    </Badge>
+                    <Badge variant={getStockState(resolveStock(selectedProduct)).variant}>
+                      {getStockState(resolveStock(selectedProduct)).label}
+                    </Badge>
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <DetailStat label="Precio" value={formatCurrency(resolvePrice(selectedProduct), selectedProduct.currency || "ARS")} />
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>
+                  {getStockState(resolveStock(selectedProduct)).isLowStock ? (
+                    <p className="text-sm text-amber-300">Quedan pocas unidades disponibles de este producto.</p>
+                  ) : null}
+                  {getStockState(resolveStock(selectedProduct)).isOutOfStock ? (
+                    <p className="text-sm text-red-300">Este producto no tiene stock disponible en este momento.</p>
+                  ) : null}
                   <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
                     <p className="text-sm font-semibold">Descripcion</p>
                     <p className="mt-2 text-sm leading-7 text-muted">{selectedProduct.description || "Sin descripcion cargada."}</p>

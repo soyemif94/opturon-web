@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getStockState } from "@/lib/stock-state";
 
 const ORDER_STATUS_OPTIONS = [
   "new",
@@ -81,6 +82,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   }, [form.quantity, selectedProduct]);
   const requestedQuantity = Number.parseInt(form.quantity, 10);
   const selectedProductStock = selectedProduct ? resolveProductStock(selectedProduct) : 0;
+  const selectedStockState = getStockState(selectedProductStock);
   const hasInvalidQuantity = !Number.isInteger(requestedQuantity) || requestedQuantity <= 0;
   const hasNoStock = Boolean(selectedProduct) && selectedProductStock <= 0;
   const hasInsufficientStock =
@@ -446,6 +448,17 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                     <DetailStat label="Stock catalogo" value={selectedProduct ? String(resolveProductStock(selectedProduct)) : "Pendiente"} />
                     <DetailStat label="Total estimado" value={selectedProduct ? formatCurrency(visibleTotal, selectedProduct.currency || "ARS") : "Pendiente"} />
                   </div>
+                  {selectedProduct ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Badge variant={selectedStockState.variant}>{selectedStockState.label}</Badge>
+                      {selectedStockState.isLowStock ? (
+                        <span className="text-sm text-amber-300">Quedan pocas unidades disponibles.</span>
+                      ) : null}
+                      {selectedStockState.isOutOfStock ? (
+                        <span className="text-sm text-red-300">Este producto no tiene stock disponible.</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {selectedProduct && createBlockedByStock ? (
                     <p className="mt-3 text-sm text-amber-300">
                       {hasNoStock
