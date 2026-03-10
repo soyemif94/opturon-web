@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendErrorStatus, isBackendConfigured, patchPortalOrderStatus } from "@/lib/api";
+import { getBackendErrorBody, getBackendErrorStatus, isBackendConfigured, patchPortalOrderStatus } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
@@ -21,11 +21,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const result = await patchPortalOrderStatus(tenantContext.tenantId, params.id, payload || {});
     return noStore(NextResponse.json({ ok: true, order: result.data }));
   } catch (error) {
+    const backendBody = getBackendErrorBody(error);
     return noStore(
       NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "backend_update_failed"
-        },
+        backendBody && typeof backendBody === "object"
+          ? backendBody
+          : {
+              error: error instanceof Error ? error.message : "backend_update_failed"
+            },
         { status: getBackendErrorStatus(error) || 502 }
       )
     );

@@ -79,6 +79,16 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     if (!selectedProduct || !Number.isInteger(quantity) || quantity <= 0) return 0;
     return Number((resolveProductPrice(selectedProduct) * quantity).toFixed(2));
   }, [form.quantity, selectedProduct]);
+  const requestedQuantity = Number.parseInt(form.quantity, 10);
+  const selectedProductStock = selectedProduct ? resolveProductStock(selectedProduct) : 0;
+  const hasInvalidQuantity = !Number.isInteger(requestedQuantity) || requestedQuantity <= 0;
+  const hasNoStock = Boolean(selectedProduct) && selectedProductStock <= 0;
+  const hasInsufficientStock =
+    Boolean(selectedProduct) &&
+    Number.isInteger(requestedQuantity) &&
+    requestedQuantity > 0 &&
+    requestedQuantity > selectedProductStock;
+  const createBlockedByStock = hasNoStock || hasInsufficientStock;
 
   const stats = useMemo(() => {
     const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
@@ -93,37 +103,47 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     };
   }, [orders]);
 
+  async function reloadProducts(preferredProductId?: string) {
+    setProductsLoading(true);
+    try {
+      const response = await fetch("/api/app/catalog", { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.details || json?.error || "No se pudo cargar el catalogo.");
+      }
+
+      const nextProducts = Array.isArray(json?.products) ? json.products : [];
+      setProducts(nextProducts);
+      setForm((current) => {
+        const desiredId = preferredProductId || current.productId;
+        const currentStillAvailable =
+          desiredId && nextProducts.some((product: CatalogProduct) => resolveProductStatus(product) === "active" && product.id === desiredId);
+
+        if (currentStillAvailable) {
+          return { ...current, productId: desiredId };
+        }
+
+        const firstActive = nextProducts.find((product: CatalogProduct) => resolveProductStatus(product) === "active");
+        return { ...current, productId: firstActive ? firstActive.id : "" };
+      });
+      return nextProducts;
+    } finally {
+      setProductsLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadProducts() {
-      setProductsLoading(true);
       try {
-        const response = await fetch("/api/app/catalog", { cache: "no-store" });
-        const json = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(json?.error || "No se pudo cargar el catalogo.");
-        }
-
-        if (!cancelled) {
-          const nextProducts = Array.isArray(json?.products) ? json.products : [];
-          setProducts(nextProducts);
-          setForm((current) => {
-            if (current.productId) return current;
-            const firstActive = nextProducts.find((product: CatalogProduct) => resolveProductStatus(product) === "active");
-            return firstActive ? { ...current, productId: firstActive.id } : current;
-          });
-        }
+        await reloadProducts();
       } catch (error) {
         if (!cancelled) {
           setFeedback({
             tone: "danger",
             text: error instanceof Error ? error.message : "No se pudo cargar el catalogo para pedidos."
           });
-        }
-      } finally {
-        if (!cancelled) {
-          setProductsLoading(false);
         }
       }
     }
@@ -193,6 +213,17 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       setFeedback({ tone: "warning", text: "La cantidad del producto debe ser mayor a cero." });
       return;
     }
+    if (selectedProductStock <= 0) {
+      setFeedback({ tone: "warning", text: "El producto seleccionado no tiene stock disponible." });
+      return;
+    }
+    if (itemQuantity > selectedProductStock) {
+      setFeedback({
+        tone: "warning",
+        text: `No hay stock suficiente para ${selectedProduct.name}. Disponible: ${selectedProductStock}.`
+      });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -214,10 +245,11 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
 
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(json?.error || "No se pudo crear el pedido.");
+        throw new Error(humanizeOrderError(json) || "No se pudo crear el pedido.");
       }
 
       await reloadOrders(json?.order?.id);
+      await reloadProducts(form.productId);
       setForm((current) => ({
         ...initialForm,
         productId: current.productId
@@ -244,12 +276,13 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(json?.error || "No se pudo actualizar el estado del pedido.");
+        throw new Error(humanizeOrderError(json) || "No se pudo actualizar el estado del pedido.");
       }
 
       const updatedOrder = json.order as PortalOrder;
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder((current) => (current?.id === updatedOrder.id ? updatedOrder : current));
+      await reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined);
       setFeedback({ tone: "success", text: "Estado del pedido actualizado." });
     } catch (error) {
       setFeedback({
@@ -413,13 +446,23 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                     <DetailStat label="Stock catalogo" value={selectedProduct ? String(resolveProductStock(selectedProduct)) : "Pendiente"} />
                     <DetailStat label="Total estimado" value={selectedProduct ? formatCurrency(visibleTotal, selectedProduct.currency || "ARS") : "Pendiente"} />
                   </div>
+                  {selectedProduct && createBlockedByStock ? (
+                    <p className="mt-3 text-sm text-amber-300">
+                      {hasNoStock
+                        ? "Este producto no tiene stock disponible en este momento."
+                        : `La cantidad solicitada supera el stock disponible (${selectedProductStock}).`}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-muted">
-                    Fase 3: el pedido ya toma `productId`, `nameSnapshot` y `priceSnapshot` desde el catalogo real.
+                    Fase 4: el pedido valida stock real, descuenta inventario al crearse y lo repone solo si el pedido se cancela.
                   </p>
-                  <Button type="submit" disabled={readOnly || saving || !backendReady || !selectedProduct}>
+                  <Button
+                    type="submit"
+                    disabled={readOnly || saving || !backendReady || !selectedProduct || hasInvalidQuantity || createBlockedByStock}
+                  >
                     {saving ? "Guardando..." : "Crear pedido"}
                   </Button>
                 </div>
@@ -621,4 +664,22 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function humanizeOrderError(payload: any) {
+  if (!payload || typeof payload !== "object") return null;
+  if (typeof payload.details === "string" && payload.details.trim()) {
+    return payload.details;
+  }
+
+  switch (payload.error) {
+    case "order_item_insufficient_stock":
+      return "No hay stock suficiente para el producto seleccionado.";
+    case "order_item_product_inactive":
+      return "El producto seleccionado esta inactivo.";
+    case "order_item_product_not_found":
+      return "El producto seleccionado ya no existe.";
+    default:
+      return typeof payload.error === "string" ? payload.error : null;
+  }
 }
