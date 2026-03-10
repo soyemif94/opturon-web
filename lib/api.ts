@@ -266,7 +266,9 @@ export type PortalOrderItem = {
   id: string;
   productId: string | null;
   nameSnapshot: string;
+  skuSnapshot: string | null;
   priceSnapshot: number;
+  currencySnapshot: string | null;
   quantity: number;
   variant: string | null;
   createdAt: string;
