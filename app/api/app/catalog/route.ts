@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createPortalProduct,
+  getBackendErrorBody,
   getBackendErrorStatus,
   getPortalProducts,
   isBackendConfigured,
@@ -45,11 +46,14 @@ export async function GET(request: NextRequest) {
       })
     );
   } catch (error) {
+    const backendBody = getBackendErrorBody(error);
     return noStore(
       NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "backend_fetch_failed"
-        },
+        backendBody && typeof backendBody === "object"
+          ? backendBody
+          : {
+              error: error instanceof Error ? error.message : "backend_fetch_failed"
+            },
         { status: getBackendErrorStatus(error) || 502 }
       )
     );
@@ -80,11 +84,14 @@ export async function POST(request: NextRequest) {
 
     return noStore(NextResponse.json({ ok: true, product: serializeProduct(result.data) }, { status: 201 }));
   } catch (error) {
+    const backendBody = getBackendErrorBody(error);
     return noStore(
       NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "backend_create_failed"
-        },
+        backendBody && typeof backendBody === "object"
+          ? backendBody
+          : {
+              error: error instanceof Error ? error.message : "backend_create_failed"
+            },
         { status: getBackendErrorStatus(error) || 502 }
       )
     );
