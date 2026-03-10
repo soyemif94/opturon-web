@@ -16,6 +16,7 @@ import {
   Package,
   PhoneCall,
   PlugZap,
+  Receipt,
   Settings2,
   Sparkles
 } from "lucide-react";
@@ -55,7 +56,7 @@ const navItems = [
     href: "/app/orders",
     label: "Pedidos",
     description: "Pedidos internos, estados y preparacion desde el panel",
-    icon: Package,
+    icon: Receipt,
     match: (pathname: string) => pathname.startsWith("/app/orders")
   },
   {
