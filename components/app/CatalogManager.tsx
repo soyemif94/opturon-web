@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { getStockState } from "@/lib/stock-state";
+import { getInventoryAlerts, getStockState } from "@/lib/stock-state";
 import { toast } from "@/components/ui/toast";
 
 type Product = {
@@ -107,6 +107,14 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
     const stockValue = products.reduce((sum, product) => sum + resolvePrice(product) * resolveStock(product), 0);
     return { total: products.length, active, inactive, stockValue };
   }, [products]);
+  const inventoryAlerts = useMemo(
+    () =>
+      getInventoryAlerts(products, {
+        isActive: (product) => resolveStatus(product) === "active",
+        getStock: (product) => resolveStock(product)
+      }),
+    [products]
+  );
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
 
@@ -343,6 +351,55 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
           </Badge>
         </div>
       ) : null}
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">Inventario</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Resumen operativo</CardTitle>
+              <CardDescription>Prioriza reposicion y seguimiento usando solo productos activos del catalogo.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0 md:grid-cols-3">
+            <DetailStat label="Sin stock" value={String(inventoryAlerts.outOfStockCount)} />
+            <DetailStat label="Stock bajo" value={String(inventoryAlerts.lowStockCount)} />
+            <DetailStat label="Activos" value={String(inventoryAlerts.activeCount)} />
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant={inventoryAlerts.attentionProducts.length > 0 ? "warning" : "success"}>
+            {inventoryAlerts.attentionProducts.length > 0 ? "Requiere atencion" : "Saludable"}
+          </Badge>}>
+            <div>
+              <CardTitle className="text-xl">Requieren atencion</CardTitle>
+              <CardDescription>Productos activos con inventario agotado o en umbral bajo.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {inventoryAlerts.attentionProducts.length === 0 ? (
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+                No hay productos activos con alertas de inventario.
+              </div>
+            ) : (
+              inventoryAlerts.attentionProducts.slice(0, 5).map(({ product, stock, state }) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{product.name}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {product.sku || "Sin SKU"} · Stock {stock}
+                    </p>
+                  </div>
+                  <Badge variant={state.variant}>{state.label}</Badge>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <Card className="border-white/6 bg-card/90">
