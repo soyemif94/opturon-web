@@ -446,6 +446,42 @@ export async function patchPortalProductStatus(
   );
 }
 
+export async function createPortalProductsBulk(
+  tenantId: string,
+  payload: {
+    items: Array<{
+      name: string;
+      sku?: string | null;
+      price: number;
+      stock: number;
+      description?: string | null;
+      currency?: string;
+    }>;
+  }
+) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      created: number;
+      failed: number;
+      results: Array<{
+        row: number;
+        status: "created" | "failed";
+        productId?: string;
+        code?: string;
+      }>;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/products/bulk`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
 export async function getDebugInbox(limit = 50) {
   if (isBackendConfigured()) {
     return backendFetch<{ success: boolean; items: InboxItem[] }>(`/debug/inbox?limit=${limit}`, undefined, true);
