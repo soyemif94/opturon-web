@@ -8,6 +8,7 @@ let lastApiError: { at: string; message: string; path: string } | null = null;
 
 type BackendError = Error & {
   status?: number;
+  body?: unknown;
 };
 
 function registerApiError(path: string, error: unknown) {
@@ -72,6 +73,13 @@ export function getBackendErrorStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+export function getBackendErrorBody(error: unknown): unknown {
+  if (error && typeof error === "object" && "body" in error) {
+    return (error as BackendError).body;
+  }
+  return undefined;
+}
+
 async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
   const apiBase = getApiBase();
 
@@ -116,6 +124,7 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
     if (!response.ok) {
       const error = new Error(json?.error || `API request failed (${response.status})`) as BackendError;
       error.status = response.status;
+      error.body = json;
       registerApiError(path, error);
       throw error;
     }
