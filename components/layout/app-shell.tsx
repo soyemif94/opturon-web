@@ -13,6 +13,7 @@ import {
   House,
   MessageSquareText,
   LogOut,
+  Package,
   PhoneCall,
   PlugZap,
   Settings2,
@@ -42,6 +43,20 @@ const navItems = [
     description: "Base CRM simple con ultimas interacciones",
     icon: ContactRound,
     match: (pathname: string) => pathname.startsWith("/app/contacts")
+  },
+  {
+    href: "/app/catalog",
+    label: "Catalogo",
+    description: "Productos, precios y stock base para operar pedidos",
+    icon: Package,
+    match: (pathname: string) => pathname.startsWith("/app/catalog")
+  },
+  {
+    href: "/app/orders",
+    label: "Pedidos",
+    description: "Pedidos internos, estados y preparacion desde el panel",
+    icon: Package,
+    match: (pathname: string) => pathname.startsWith("/app/orders")
   },
   {
     href: "/app/automations",

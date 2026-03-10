@@ -1,71 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { requireAppApi } from "@/lib/saas/access";
-import { appendAuditLog, newId, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
+import {
+  createPortalProduct,
+  getBackendErrorStatus,
+  getPortalProducts,
+  isBackendConfigured,
+  type PortalProduct
+} from "@/lib/api";
+import { resolveAppTenant } from "@/lib/saas/access";
 
-const createSchema = z.object({
-  name: z.string().min(2),
-  category: z.string().optional(),
-  sku: z.string().optional(),
-  price: z.number().min(0),
-  promoPrice: z.number().min(0).optional(),
-  stockQty: z.number().int().min(0),
-  tags: z.array(z.string()).optional(),
-  description: z.string().optional(),
-  active: z.boolean().default(true)
-});
+function noStore(response: NextResponse) {
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
 
-export async function GET() {
-  const guard = await requireAppApi();
-  if (guard.error) return guard.error;
-  const tenantId = guard.ctx?.tenantId as string;
+function serializeProduct(product: PortalProduct) {
+  return {
+    ...product,
+    stockQty: product.stock,
+    active: product.status === "active"
+  };
+}
+
+function backendUnavailable() {
+  return noStore(NextResponse.json({ error: "catalog_backend_unavailable" }, { status: 503 }));
+}
+
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const tenantContext = await resolveAppTenant({
+    requestedTenantId: url.searchParams.get("tenantId") || undefined,
+    demo: url.searchParams.get("demo") === "1"
+  });
+  if (tenantContext.error) return tenantContext.error;
+  if (!isBackendConfigured()) return backendUnavailable();
 
   try {
-    const data = readSaasData();
-    const catalogProducts = Array.isArray(data.catalogProducts) ? data.catalogProducts : [];
-    return NextResponse.json({ products: catalogProducts.filter((item) => item?.tenantId === tenantId) });
+    const result = await getPortalProducts(tenantContext.tenantId);
+    const products = Array.isArray(result.data?.products) ? result.data.products.map(serializeProduct) : [];
+    return noStore(
+      NextResponse.json({
+        readOnly: tenantContext.readOnly,
+        tenantId: tenantContext.tenantId,
+        products
+      })
+    );
   } catch (error) {
-    console.error("[api/app/catalog][GET] Failed to load catalog.", error);
-    return NextResponse.json({ error: "No se pudo cargar el catalogo." }, { status: 500 });
+    return noStore(
+      NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "backend_fetch_failed"
+        },
+        { status: getBackendErrorStatus(error) || 502 }
+      )
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAppApi();
-  if (guard.error) return guard.error;
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantContext = await resolveAppTenant({ requireWrite: true });
+  if (tenantContext.error) return tenantContext.error;
+  if (!isBackendConfigured()) return backendUnavailable();
 
   try {
     const body = await request.json().catch(() => null);
-    const parsed = createSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-
-    const now = new Date().toISOString();
-    const product = {
-      id: newId("prod"),
-      tenantId,
-      ...parsed.data,
-      createdAt: now,
-      updatedAt: now
-    };
-
-    const data = readSaasData();
-    if (!Array.isArray(data.catalogProducts)) data.catalogProducts = [];
-    data.catalogProducts.unshift(product);
-    writeSaasData(data);
-
-    appendAuditLog({
-      tenantId,
-      userId: guard.ctx?.userId,
-      action: "product_created",
-      entity: "catalog_product",
-      entityId: product.id
+    const result = await createPortalProduct(tenantContext.tenantId, {
+      name: String(body?.name || "").trim(),
+      description: body?.description || null,
+      price: Number(body?.price || 0),
+      currency: String(body?.currency || "ARS"),
+      stock: Number(body?.stock ?? body?.stockQty ?? 0),
+      sku: body?.sku || null,
+      status:
+        typeof body?.status === "string"
+          ? body.status
+          : body?.active === false
+            ? "inactive"
+            : "active"
     });
-    touchTenantActivity(tenantId);
 
-    return NextResponse.json({ ok: true, product }, { status: 201 });
+    return noStore(NextResponse.json({ ok: true, product: serializeProduct(result.data) }, { status: 201 }));
   } catch (error) {
-    console.error("[api/app/catalog][POST] Failed to create product.", error);
-    return NextResponse.json({ error: "No se pudo crear el producto." }, { status: 500 });
+    return noStore(
+      NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "backend_create_failed"
+        },
+        { status: getBackendErrorStatus(error) || 502 }
+      )
+    );
   }
 }

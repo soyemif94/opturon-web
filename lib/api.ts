@@ -262,6 +262,190 @@ export async function sendPortalMessage(
   );
 }
 
+export type PortalOrderItem = {
+  id: string;
+  productId: string | null;
+  nameSnapshot: string;
+  priceSnapshot: number;
+  quantity: number;
+  variant: string | null;
+  createdAt: string;
+};
+
+export type PortalOrder = {
+  id: string;
+  clinicId: string;
+  contactId: string | null;
+  customerName: string;
+  customerPhone: string;
+  notes: string | null;
+  subtotal: number;
+  total: number;
+  currency: string;
+  paymentStatus: string;
+  orderStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  contact: {
+    id: string;
+    name: string | null;
+    phone: string | null;
+  } | null;
+  items: PortalOrderItem[];
+};
+
+export type PortalProduct = {
+  id: string;
+  clinicId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  stock: number;
+  status: string;
+  sku: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function getPortalOrders(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      orders: PortalOrder[];
+    };
+  }>(`/portal/tenants/${tenantId}/orders`, undefined, false);
+}
+
+export async function getPortalOrderDetail(tenantId: string, orderId: string) {
+  return backendFetch<{ success: boolean; data: PortalOrder }>(
+    `/portal/tenants/${tenantId}/orders/${orderId}`,
+    undefined,
+    false
+  );
+}
+
+export async function createPortalOrder(
+  tenantId: string,
+  payload: {
+    customerName: string;
+    customerPhone: string;
+    notes?: string;
+    currency?: string;
+    orderStatus?: string;
+    items: Array<{
+      productId?: string | null;
+      nameSnapshot: string;
+      priceSnapshot: number;
+      quantity: number;
+      variant?: string | null;
+    }>;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalOrder }>(
+    `/portal/tenants/${tenantId}/orders`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function patchPortalOrderStatus(
+  tenantId: string,
+  orderId: string,
+  payload: { orderStatus: string; paymentStatus?: string }
+) {
+  return backendFetch<{ success: boolean; data: PortalOrder }>(
+    `/portal/tenants/${tenantId}/orders/${orderId}/status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function getPortalProducts(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      products: PortalProduct[];
+    };
+  }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+}
+
+export async function getPortalProductDetail(tenantId: string, productId: string) {
+  return backendFetch<{ success: boolean; data: PortalProduct }>(
+    `/portal/tenants/${tenantId}/products/${productId}`,
+    undefined,
+    false
+  );
+}
+
+export async function createPortalProduct(
+  tenantId: string,
+  payload: {
+    name: string;
+    description?: string | null;
+    price: number;
+    currency?: string;
+    stock?: number;
+    sku?: string | null;
+    status?: string;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalProduct }>(
+    `/portal/tenants/${tenantId}/products`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function patchPortalProduct(
+  tenantId: string,
+  productId: string,
+  payload: {
+    name?: string;
+    description?: string | null;
+    price?: number;
+    currency?: string;
+    stock?: number;
+    sku?: string | null;
+    status?: string;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalProduct }>(
+    `/portal/tenants/${tenantId}/products/${productId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function patchPortalProductStatus(
+  tenantId: string,
+  productId: string,
+  payload: { status: string }
+) {
+  return backendFetch<{ success: boolean; data: PortalProduct }>(
+    `/portal/tenants/${tenantId}/products/${productId}/status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
 export async function getDebugInbox(limit = 50) {
   if (isBackendConfigured()) {
     return backendFetch<{ success: boolean; items: InboxItem[] }>(`/debug/inbox?limit=${limit}`, undefined, true);
