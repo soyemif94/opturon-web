@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatPanel } from "@/components/app/inbox/ChatPanel";
+import { InboxConnectionEmptyState } from "@/components/app/inbox/InboxConnectionEmptyState";
 import { ConversationList } from "@/components/app/inbox/ConversationList";
 import { InboxLayout } from "@/components/app/inbox/InboxLayout";
 import { ProfilePanel } from "@/components/app/inbox/ProfilePanel";
@@ -11,10 +12,13 @@ import { useInboxContext } from "@/components/inbox/inbox-context";
 import { getSuggestions, type SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { normalizeText } from "@/lib/search/normalize";
 import { toast } from "@/components/ui/toast";
+import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
+import { shouldShowInboxChannelEmptyState } from "@/lib/whatsapp-channel-state";
 
 type InboxListResponse = {
   readOnly: boolean;
   conversations: ConversationRowData[];
+  channelState?: WhatsAppConnectionStatus;
 };
 
 const DEFAULT_FILTER: FilterKey = "all";
@@ -44,6 +48,7 @@ export function InboxWorkspace({
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
+  const [channelState, setChannelState] = useState<WhatsAppConnectionStatus | null>(null);
   const [composer, setComposer] = useState("");
   const [noteText, setNoteText] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -132,6 +137,7 @@ export function InboxWorkspace({
       const nextReadOnly = Boolean(json.readOnly);
       const nextSnapshot = JSON.stringify({
         readOnly: nextReadOnly,
+        channelState: json.channelState || null,
         selectedId,
         rows: nextRows
       });
@@ -141,6 +147,7 @@ export function InboxWorkspace({
         rowsSnapshotRef.current = nextSnapshot;
         setReadOnly(nextReadOnly);
         setRows(nextRows);
+        setChannelState(json.channelState || null);
         if (!selectedId && nextRows.length) setSelectedId(nextRows[0].id);
         if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
       }
@@ -577,6 +584,7 @@ export function InboxWorkspace({
   const conversationUrl = selectedId
     ? `/app/inbox/${selectedId}${demo && tenantId ? `?demo=1&tenantId=${tenantId}` : ""}`
     : undefined;
+  const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
 
   return (
     <div className="space-y-4 text-sm">
@@ -591,72 +599,76 @@ export function InboxWorkspace({
         </div>
       ) : null}
 
-      <InboxLayout
-        left={
-          <ConversationList
-            rows={rows}
-            loading={rowsLoading}
-            hasLoaded={rowsLoaded}
-            errorMessage={rowsError}
-            selectedId={selectedId}
-            filter={filter}
-            search={search}
-            onFilterChange={setFilter}
-            onSearchChange={setSearch}
-            onSelect={setSelectedId}
-            onMarkHot={(id) => void rowAction(id, "mark_hot")}
-            onClose={(id) => void rowAction(id, "close")}
-            readOnly={readOnly}
-            onClearFilters={() => {
-              setFilter(DEFAULT_FILTER);
-              setSearch("");
-              setOnlyUnread(false);
-            }}
-            onRetry={() => void loadRows()}
-          />
-        }
-        center={
-          <ChatPanel
-            detail={detail}
-            loading={detailLoading}
-            composer={composer}
-            onComposerChange={setComposer}
-            onSend={() => void sendMessage(composer)}
-            readOnly={readOnly}
-            onSelectTemplate={(text) => setComposer(text)}
-            suggestions={suggestions}
-            onSelectSuggestion={applySuggestion}
-            autoSuggestions={autoSuggestions}
-            onRegenerateAutoSuggestions={() => buildAutoSuggestions(true)}
-            onToggleBot={() => void runAction("toggle_bot")}
-            onTakeConversation={() => void takeConversation()}
-            onArchive={() => void runAction("close")}
-          />
-        }
-        right={
-          <ProfilePanel
-            detail={detail}
-            loading={detailLoading}
-            readOnly={readOnly}
-            dealStage={dealStage}
-            onDealStageChange={setDealStage}
-            onSaveDealStage={() => void runAction("change_stage")}
-            assignTo={assignTo}
-            onAssignToChange={setAssignTo}
-            onAssign={() => void runAction("assign")}
-            onToggleBot={() => void runAction("toggle_bot")}
-            onMarkHot={() => void runAction("mark_hot")}
-            onClose={() => void runAction("close")}
-            noteText={noteText}
-            onNoteTextChange={setNoteText}
-            onAddNote={() => void addNote()}
-            taskTitle={taskTitle}
-            onTaskTitleChange={setTaskTitle}
-            onAddTask={() => void addTask()}
-            historyHref={conversationUrl}
-          />
-        }
-      />
+      {shouldRenderChannelEmptyState && channelState ? (
+        <InboxConnectionEmptyState status={channelState} />
+      ) : (
+        <InboxLayout
+          left={
+            <ConversationList
+              rows={rows}
+              loading={rowsLoading}
+              hasLoaded={rowsLoaded}
+              errorMessage={rowsError}
+              selectedId={selectedId}
+              filter={filter}
+              search={search}
+              onFilterChange={setFilter}
+              onSearchChange={setSearch}
+              onSelect={setSelectedId}
+              onMarkHot={(id) => void rowAction(id, "mark_hot")}
+              onClose={(id) => void rowAction(id, "close")}
+              readOnly={readOnly}
+              onClearFilters={() => {
+                setFilter(DEFAULT_FILTER);
+                setSearch("");
+                setOnlyUnread(false);
+              }}
+              onRetry={() => void loadRows()}
+            />
+          }
+          center={
+            <ChatPanel
+              detail={detail}
+              loading={detailLoading}
+              composer={composer}
+              onComposerChange={setComposer}
+              onSend={() => void sendMessage(composer)}
+              readOnly={readOnly}
+              onSelectTemplate={(text) => setComposer(text)}
+              suggestions={suggestions}
+              onSelectSuggestion={applySuggestion}
+              autoSuggestions={autoSuggestions}
+              onRegenerateAutoSuggestions={() => buildAutoSuggestions(true)}
+              onToggleBot={() => void runAction("toggle_bot")}
+              onTakeConversation={() => void takeConversation()}
+              onArchive={() => void runAction("close")}
+            />
+          }
+          right={
+            <ProfilePanel
+              detail={detail}
+              loading={detailLoading}
+              readOnly={readOnly}
+              dealStage={dealStage}
+              onDealStageChange={setDealStage}
+              onSaveDealStage={() => void runAction("change_stage")}
+              assignTo={assignTo}
+              onAssignToChange={setAssignTo}
+              onAssign={() => void runAction("assign")}
+              onToggleBot={() => void runAction("toggle_bot")}
+              onMarkHot={() => void runAction("mark_hot")}
+              onClose={() => void runAction("close")}
+              noteText={noteText}
+              onNoteTextChange={setNoteText}
+              onAddNote={() => void addNote()}
+              taskTitle={taskTitle}
+              onTaskTitleChange={setTaskTitle}
+              onAddTask={() => void addTask()}
+              historyHref={conversationUrl}
+            />
+          }
+        />
+      )}
     </div>
   );
 }

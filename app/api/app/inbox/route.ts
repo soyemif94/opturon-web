@@ -1,8 +1,14 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getBackendErrorStatus, getPortalConversations, isBackendConfigured } from "@/lib/api";
+import {
+  getBackendErrorStatus,
+  getPortalConversations,
+  getPortalTenantContext,
+  isBackendConfigured
+} from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { listInboxConversations } from "@/lib/saas/store";
+import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 const filtersSchema = z.object({
   filter: z.enum(["all", "hot", "sin_responder", "nuevas", "asignadas"]).optional(),
@@ -28,22 +34,36 @@ export async function GET(request: NextRequest) {
   const filter = params.filter || "all";
 
   let conversations = listInboxConversations(tenantContext.tenantId);
+  let channelState = buildWhatsAppConnectionStatus({ fallbackReason: tenantContext.readOnly ? "demo_workspace" : null });
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
-      conversations = (await getPortalConversations(tenantContext.tenantId)).data.conversations || [];
+      const [contextResult, conversationsResult] = await Promise.all([
+        getPortalTenantContext(tenantContext.tenantId),
+        getPortalConversations(tenantContext.tenantId)
+      ]);
+
+      channelState = buildWhatsAppConnectionStatus({ context: contextResult.data });
+      conversations = conversationsResult.data.conversations || [];
     } catch (error) {
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "backend_fetch_failed"
-        },
-        {
-          status: getBackendErrorStatus(error) || 502,
-          headers: {
-            "Cache-Control": "no-store"
+      const reason = error instanceof Error ? error.message : "backend_fetch_failed";
+
+      if (reason === "mapped_clinic_without_whatsapp_channel" || reason === "multiple_whatsapp_channels_configured") {
+        channelState = buildWhatsAppConnectionStatus({ fallbackReason: reason });
+        conversations = [];
+      } else {
+        return NextResponse.json(
+          {
+            error: reason
+          },
+          {
+            status: getBackendErrorStatus(error) || 502,
+            headers: {
+              "Cache-Control": "no-store"
+            }
           }
-        }
-      );
+        );
+      }
     }
   }
 
@@ -62,13 +82,17 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
-  return NextResponse.json({
-    readOnly: tenantContext.readOnly,
-    tenantId: tenantContext.tenantId,
-    conversations
-  }, {
-    headers: {
-      "Cache-Control": "no-store"
+  return NextResponse.json(
+    {
+      readOnly: tenantContext.readOnly,
+      tenantId: tenantContext.tenantId,
+      channelState,
+      conversations
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store"
+      }
     }
-  });
+  );
 }

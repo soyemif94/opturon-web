@@ -4,6 +4,7 @@ import { canManageWorkspace } from "@/lib/app-permissions";
 import { getPortalConversations, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { getInboxConversationDetail, listInboxConversations, readSaasData } from "@/lib/saas/store";
+import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
 
 export default async function ClientPortalHome({ searchParams }: { searchParams: Promise<{ demo?: string; tenantId?: string }> }) {
   const ctx = await requireAppPage();
@@ -19,7 +20,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
     ? data.businessSettings.find((item) => item?.tenantId === tenantId) || null
     : null;
   const isBackendReady = Boolean(ctx.tenantId) && isBackendConfigured();
-  let hasWhatsAppChannel = false;
+  let whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "workspace_without_backend" });
   let conversations = listInboxConversations(tenantId);
 
   if (ctx.tenantId && isBackendReady) {
@@ -29,8 +30,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         getPortalConversations(ctx.tenantId)
       ]);
 
-      const channel = contextResult.data.channel;
-      hasWhatsAppChannel = String(channel?.status || "").trim().toLowerCase() === "active";
+      whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data });
       const portalConversations = Array.isArray(conversationsResult.data?.conversations)
         ? conversationsResult.data.conversations
         : [];
@@ -39,10 +39,11 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         conversations = portalConversations;
       }
     } catch {
-      hasWhatsAppChannel = false;
+      whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
     }
   }
 
+  const hasWhatsAppChannel = hasOperationalWhatsAppChannel(whatsapp);
   const messages = data.messages.filter((item) => item.tenantId === tenantId);
   const outboundMessages = messages.filter((item) => item.direction !== "inbound");
   const avgResponseMinutes = conversations.length > 0 ? Math.round(conversations.reduce((acc, item) => acc + item.slaMinutes, 0) / conversations.length) : 0;
@@ -61,17 +62,26 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       title: "Conectar WhatsApp",
       description: "Activa tu canal principal para recibir y responder mensajes desde Opturon.",
       href: "/app/integrations",
-      ctaLabel: hasWhatsAppChannel ? "Revisar canal" : "Conectar WhatsApp",
+      ctaLabel:
+        whatsapp.state === "connected"
+          ? "Abrir inbox"
+          : whatsapp.state === "ambiguous_configuration"
+            ? "Revisar conexion"
+            : "Conectar WhatsApp",
       status: hasWhatsAppChannel ? ("complete" as const) : ("pending" as const)
     },
-    ...(canManage ? [{
-      id: "business",
-      title: "Completar perfil del negocio",
-      description: "Carga datos basicos para que el portal y el equipo trabajen con mejor contexto.",
-      href: "/app/business",
-      ctaLabel: hasBusinessProfile ? "Editar perfil" : "Completar perfil",
-      status: hasBusinessProfile ? ("complete" as const) : ("pending" as const)
-    }] : []),
+    ...(canManage
+      ? [
+          {
+            id: "business",
+            title: "Completar perfil del negocio",
+            description: "Carga datos basicos para que el portal y el equipo trabajen con mejor contexto.",
+            href: "/app/business",
+            ctaLabel: hasBusinessProfile ? "Editar perfil" : "Completar perfil",
+            status: hasBusinessProfile ? ("complete" as const) : ("pending" as const)
+          }
+        ]
+      : []),
     {
       id: "inbox",
       title: "Probar conversaciones",
@@ -80,14 +90,18 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       ctaLabel: hasTriedInbox ? "Abrir inbox" : "Probar inbox",
       status: hasTriedInbox ? ("complete" as const) : ("pending" as const)
     },
-    ...(canManage ? [{
-      id: "automations",
-      title: "Configurar automatizaciones",
-      description: "Deja listas las respuestas y reglas basicas para empezar a automatizar tu atencion.",
-      href: "/app/automations",
-      ctaLabel: "Configurar",
-      status: "pending" as const
-    }] : [])
+    ...(canManage
+      ? [
+          {
+            id: "automations",
+            title: "Configurar automatizaciones",
+            description: "Deja listas las respuestas y reglas basicas para empezar a automatizar tu atencion.",
+            href: "/app/automations",
+            ctaLabel: "Configurar",
+            status: "pending" as const
+          }
+        ]
+      : [])
   ];
   const completedCount = onboardingSteps.filter((step) => step.status === "complete").length;
 
@@ -103,14 +117,20 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           hasWhatsAppChannel
             ? {
                 label: "Canal conectado",
-                detail: "El canal principal de WhatsApp esta listo para operar desde el portal.",
+                detail: whatsapp.description,
                 tone: "success"
               }
-            : {
-                label: "WhatsApp pendiente",
-                detail: "El siguiente paso es conectar tu canal para activar conversaciones reales.",
-                tone: "warning"
-              }
+            : whatsapp.state === "ambiguous_configuration"
+              ? {
+                  label: "Conexion en revision",
+                  detail: whatsapp.description,
+                  tone: "danger"
+                }
+              : {
+                  label: "WhatsApp pendiente",
+                  detail: whatsapp.description,
+                  tone: "warning"
+                }
         }
         stats={[
           {
@@ -155,10 +175,12 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           },
           {
             id: "activity-channel",
-            title: hasWhatsAppChannel ? "Canal WhatsApp operativo" : "Canal WhatsApp pendiente de conexion",
+            title: hasWhatsAppChannel ? "Canal WhatsApp operativo" : "WhatsApp pendiente de activacion",
             detail: hasWhatsAppChannel
               ? "La cuenta ya puede usar inbox y automatizaciones sobre el canal conectado."
-              : "Conectar WhatsApp habilitara conversaciones reales y la activacion del canal desde el portal.",
+              : whatsapp.state === "ambiguous_configuration"
+                ? "Detectamos una configuracion pendiente antes de activar el canal del workspace."
+                : "Conectar WhatsApp habilitara conversaciones reales y la activacion del canal desde el portal.",
             timeLabel: "Hoy",
             tone: hasWhatsAppChannel ? "success" : "warning"
           }
@@ -174,7 +196,15 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           { label: "Abrir inbox", href: "/app/inbox", helper: "Ir a la vista completa de conversaciones y chat." },
           { label: "Gestionar contactos", href: "/app/contacts", helper: "Ver CRM simple con tags y ultima interaccion." },
           { label: "Ver metricas", href: "/app/metrics", helper: "Revisar conversaciones, prospectos y respuesta del bot." },
-          ...(canManage ? [{ label: "Conectar WhatsApp", href: "/app/integrations", helper: "Activar el canal principal del negocio." }] : [])
+          ...(canManage
+            ? [
+                {
+                  label: whatsapp.state === "ambiguous_configuration" ? "Revisar conexion" : "Conectar WhatsApp",
+                  href: "/app/integrations",
+                  helper: "Activar el canal principal del negocio."
+                }
+              ]
+            : [])
         ]}
       />
     </div>

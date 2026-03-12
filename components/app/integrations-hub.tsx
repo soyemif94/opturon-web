@@ -1,29 +1,29 @@
 "use client";
 
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   ArrowRight,
+  BadgeCheck,
+  Cable,
   CalendarDays,
-  CheckCircle2,
   Instagram,
+  LifeBuoy,
+  LoaderCircle,
   MessageCircle,
   MessageSquareText,
   PhoneCall,
   PlugZap,
+  ShieldAlert,
   Webhook
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
+import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
+import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
+import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
 type IntegrationState = "not_connected" | "connecting" | "connected" | "error";
 
@@ -38,13 +38,10 @@ type IntegrationCard = {
   helper?: string;
 };
 
-type WhatsAppIntegrationStatus = {
-  state: IntegrationState;
-  connectedNumber: string | null;
-  channelStatus: string | null;
-  webhookActive: boolean | null;
-  lastActivity: string | null;
-};
+const SUPPORT_LINK = getTrackedWhatsAppLink({
+  origin: "audit-intake",
+  prefill: "Hola Opturon. Necesito ayuda para conectar WhatsApp Business en mi workspace."
+});
 
 const integrations: IntegrationCard[] = [
   {
@@ -55,12 +52,12 @@ const integrations: IntegrationCard[] = [
     availability: "en preparacion",
     cta: "Preparar canal",
     icon: Instagram,
-    helper: "Ideal para negocios que atienden consultas por redes y campañas."
+    helper: "Ideal para negocios que atienden consultas por redes y campanas."
   },
   {
     id: "messenger",
     name: "Facebook Messenger",
-    description: "Unifica conversaciones de Facebook con el resto de tu operación comercial.",
+    description: "Unifica conversaciones de Facebook con el resto de tu operacion comercial.",
     state: "not_connected",
     availability: "proximamente",
     cta: "Ver roadmap",
@@ -70,17 +67,17 @@ const integrations: IntegrationCard[] = [
   {
     id: "webchat",
     name: "Webchat",
-    description: "Recibe prospectos desde tu sitio web y canalízalos al inbox del equipo.",
+    description: "Recibe prospectos desde tu sitio web y canalizalos al inbox del equipo.",
     state: "connected",
     availability: "disponible",
     cta: "Gestionar widget",
     icon: Webhook,
-    helper: "Muy útil para captar consultas sin depender solo de WhatsApp."
+    helper: "Muy util para captar consultas sin depender solo de WhatsApp."
   },
   {
     id: "calendar",
     name: "Google Calendar",
-    description: "Coordina turnos, reuniones o seguimientos directamente desde la conversación.",
+    description: "Coordina turnos, reuniones o seguimientos directamente desde la conversacion.",
     state: "not_connected",
     availability: "en preparacion",
     cta: "Explorar integracion",
@@ -99,21 +96,56 @@ const integrations: IntegrationCard[] = [
   }
 ];
 
-export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppIntegrationStatus }) {
-  const whatsappMeta = whatsappStateMeta(whatsapp);
+export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStatus }) {
+  const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
+  const [launchMessage, setLaunchMessage] = useState<string | null>(null);
+
+  const effectiveState =
+    launchState === "launching"
+      ? "launching"
+      : launchState === "pending_meta" && whatsapp.state !== "connected"
+        ? "pending_meta"
+        : whatsapp.state;
+
+  const meta = useMemo(() => whatsappHubMeta(whatsapp, effectiveState, launchMessage), [effectiveState, launchMessage, whatsapp]);
+
+  async function handleMetaConnect() {
+    setLaunchState("launching");
+    setLaunchMessage(null);
+
+    try {
+      const bootstrap = await beginMetaWhatsAppConnection();
+      if (!bootstrap.ready) {
+        setLaunchState("pending_meta");
+        setLaunchMessage(bootstrap.message);
+        toast.success("Conexion preparada", bootstrap.message);
+        return;
+      }
+
+      setLaunchState(bootstrap.state === "connected" ? "idle" : "pending_meta");
+      setLaunchMessage(bootstrap.message);
+      toast.success("Base de conexion lista", bootstrap.message);
+    } catch (error) {
+      setLaunchState("idle");
+      const message = error instanceof Error ? error.message : "No pudimos preparar la conexion con Meta.";
+      setLaunchMessage(message);
+      toast.error("No pudimos iniciar la conexion", message);
+    }
+  }
+
   const readinessItems = [
     {
-      label: "Canal WhatsApp",
-      value: whatsapp.state === "connected" ? "Conectado" : whatsapp.state === "connecting" ? "En activacion" : "No conectado",
-      tone: whatsapp.state === "connected" ? "success" : whatsapp.state === "error" ? "danger" : "warning"
+      label: "Canal del workspace",
+      value: meta.channelValue,
+      tone: meta.variant
     },
     {
       label: "Webhook",
-      value: whatsappMeta.webhookValue,
-      tone: whatsapp.webhookActive ? "success" : whatsapp.state === "error" ? "danger" : "warning"
+      value: meta.webhookValue,
+      tone: meta.webhookTone
     },
     {
-      label: "Numero vinculado",
+      label: "Numero conectado",
       value: whatsapp.connectedNumber || "Pendiente",
       tone: whatsapp.connectedNumber ? "muted" : "warning"
     }
@@ -122,15 +154,15 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppIntegrationSta
   return (
     <div className="space-y-6">
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <Card className="overflow-hidden border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.20),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
-          <CardHeader action={<Badge variant={whatsappMeta.variant}>{whatsappMeta.label}</Badge>}>
+        <Card className="overflow-hidden border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
+          <CardHeader action={<Badge variant={meta.variant}>{meta.label}</Badge>}>
             <div className="flex items-start gap-4">
               <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-brand/30 bg-brand/15 text-brandBright">
-                <PhoneCall className="h-6 w-6" />
+                {meta.state === "ambiguous_configuration" ? <ShieldAlert className="h-6 w-6" /> : <PhoneCall className="h-6 w-6" />}
               </span>
               <div>
-                <CardTitle className="text-2xl">{whatsappMeta.title}</CardTitle>
-                <CardDescription>{whatsappMeta.description}</CardDescription>
+                <CardTitle className="text-2xl">{meta.title}</CardTitle>
+                <CardDescription>{meta.description}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -140,111 +172,97 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppIntegrationSta
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">Estado del canal</p>
                   <div className="mt-2 flex items-center gap-3">
-                    <span
-                      className={`inline-flex h-3 w-3 rounded-full ${
-                        whatsapp.state === "connected"
-                          ? "bg-emerald-400"
-                          : whatsapp.state === "error"
-                            ? "bg-rose-400"
-                            : "bg-amber-300"
-                      }`}
-                    />
-                    <p className="text-lg font-semibold text-white">{whatsappMeta.label}</p>
+                    <span className={`inline-flex h-3 w-3 rounded-full ${meta.dotClass}`} />
+                    <p className="text-lg font-semibold text-white">{meta.label}</p>
                   </div>
-                  <p className="mt-2 max-w-2xl text-sm leading-7 text-white/70">
-                    {whatsapp.state === "connected"
-                      ? "Tu canal principal ya esta listo para recibir mensajes reales y operar desde el inbox."
-                      : "Esta conexion habilita conversaciones reales, automatizaciones y trabajo operativo desde un solo lugar."}
-                  </p>
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-white/70">{meta.helper}</p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-white/55">Siguiente paso</p>
-                  <p className="mt-2 font-medium">{whatsappMeta.nextStep}</p>
+                  <p className="mt-2 font-medium">{meta.nextStep}</p>
                 </div>
               </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
-              <StatusStat label="Numero del canal" value={whatsapp.connectedNumber || "Aun no conectado"} />
-              <StatusStat label="Estado del canal" value={whatsappMeta.channelValue} />
-              <StatusStat label="Webhook" value={whatsappMeta.webhookValue} />
+              {readinessItems.map((item) => (
+                <StatusStat key={item.label} label={item.label} value={item.value} tone={item.tone} />
+              ))}
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
-              {readinessItems.map((item) => (
-                <div key={item.label} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{item.label}</p>
-                    <Badge variant={item.tone}>{item.value}</Badge>
-                  </div>
+              {meta.benefits.map((item) => (
+                <div key={item.title} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted">{item.detail}</p>
                 </div>
               ))}
             </div>
 
-            <p className="max-w-3xl text-sm leading-7 text-muted">{whatsappMeta.helper}</p>
+            {launchMessage ? (
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
+                {launchMessage}
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-3">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="rounded-2xl px-5">{whatsappMeta.primaryCta}</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl rounded-[28px]">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl">Activar WhatsApp en Opturon</DialogTitle>
-                    <DialogDescription className="text-sm leading-7 text-muted">
-                      Sigue estos pasos para conectar tu cuenta de Meta, validar el numero correcto y dejar el canal listo para responder desde el inbox.
-                    </DialogDescription>
-                  </DialogHeader>
+              {meta.primaryAction === "connect_meta" ? (
+                <Button className="rounded-2xl px-5" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
+                  {launchState === "launching" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Conectar con Meta
+                </Button>
+              ) : meta.primaryHref ? (
+                <Button asChild className="rounded-2xl px-5">
+                  <Link href={meta.primaryHref}>{meta.primaryLabel}</Link>
+                </Button>
+              ) : (
+                <Button className="rounded-2xl px-5" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
+                  {launchState === "launching" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {meta.primaryLabel}
+                </Button>
+              )}
 
-                  <div className="grid gap-3 py-4">
-                    {[
-                      "1. Inicias sesion en tu cuenta de Meta Business",
-                      "2. Seleccionas el numero que quieres operar en Opturon",
-                      "3. Validamos canal, webhook y estado de activacion",
-                      "4. Empiezas a responder desde el inbox"
-                    ].map((step) => (
-                      <div key={step} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm text-muted">
-                        {step}
-                      </div>
-                    ))}
-                  </div>
-
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="secondary">Cerrar</Button>
-                    </DialogClose>
-                    <Button>{whatsappMeta.primaryCta}</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Button asChild variant="secondary" className="rounded-2xl px-5">
-                <a href="/app/inbox">Abrir inbox</a>
-              </Button>
-
-              {whatsapp.state === "connected" ? (
-                <Button variant="ghost" className="rounded-2xl px-5">
-                  Gestionar canal
+              {meta.secondaryHref ? (
+                <Button asChild variant="secondary" className="rounded-2xl px-5">
+                  <Link href={meta.secondaryHref}>{meta.secondaryLabel}</Link>
                 </Button>
               ) : null}
+
+              <Button asChild variant="ghost" className="rounded-2xl px-5">
+                <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
+                  <LifeBuoy className="mr-2 h-4 w-4" />
+                  {meta.supportLabel}
+                </a>
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">Paso a paso</Badge>}>
+          <CardHeader action={<Badge variant="muted">Onboarding</Badge>}>
             <div>
-              <CardTitle className="text-xl">Que sucede cuando conectas el canal</CardTitle>
-              <CardDescription>Un recorrido simple para entender el valor de la conexion y que esperar en cada etapa.</CardDescription>
+              <CardTitle className="text-xl">Como se activa este canal</CardTitle>
+              <CardDescription>Una experiencia pensada para conectar WhatsApp sin pedirle al cliente datos tecnicos innecesarios.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             {[
-              { icon: CheckCircle2, title: "Conectas tu cuenta", detail: "Das acceso a tu cuenta de Meta sin configuraciones tecnicas complejas." },
-              { icon: MessageSquareText, title: "Seleccionas tu numero", detail: "Eliges el numero que quieres usar para responder desde Opturon." },
-              { icon: PlugZap, title: "Activamos el canal", detail: "Comprobamos conexion, webhook y estado operativo del numero." },
-              { icon: ArrowRight, title: "Empiezas a responder", detail: "Tu equipo y el bot trabajan desde un mismo inbox." }
+              {
+                icon: Cable,
+                title: "Conectas con Meta",
+                detail: "El cliente inicia el flujo desde Opturon y selecciona el negocio o numero que quiere usar."
+              },
+              {
+                icon: BadgeCheck,
+                title: "Validamos la configuracion",
+                detail: "Confirmamos que el numero y el canal queden asociados al workspace correcto antes de operar."
+              },
+              {
+                icon: MessageSquareText,
+                title: "Empiezas a responder",
+                detail: "Cuando el canal queda resuelto, el inbox, el checklist y las automatizaciones se habilitan sobre esa conexion."
+              }
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -312,68 +330,188 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppIntegrationSta
   );
 }
 
-function StatusStat({ label, value }: { label: string; value: string }) {
+function StatusStat({
+  label,
+  value,
+  tone
+}: {
+  label: string;
+  value: string;
+  tone: "muted" | "warning" | "success" | "danger";
+}) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-2 text-sm font-medium">{value}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
+        <Badge variant={tone}>{value}</Badge>
+      </div>
     </div>
   );
 }
 
-function whatsappStateMeta(whatsapp: WhatsAppIntegrationStatus) {
-  if (whatsapp.state === "connected") {
+function whatsappHubMeta(
+  whatsapp: WhatsAppConnectionStatus,
+  effectiveState: WhatsAppConnectionStatus["state"],
+  launchMessage: string | null
+) {
+  if (effectiveState === "connected") {
     return {
+      state: effectiveState,
       label: "Conectado",
       variant: "success" as const,
-      title: "Tu canal de WhatsApp ya esta activo",
+      dotClass: "bg-emerald-400",
+      title: "Tu WhatsApp Business ya esta activo",
       description: "Tu numero principal ya esta conectado a Opturon y listo para responder desde el inbox.",
-      helper: "El canal ya puede recibir mensajes, centralizar conversaciones y operar desde tu workspace.",
-      primaryCta: "Canal activo",
+      helper: launchMessage || whatsapp.helper,
       nextStep: "Abre el inbox y valida una conversacion real.",
       channelValue: whatsapp.channelStatus || "Activo",
-      webhookValue: whatsapp.webhookActive ? "Activo" : "Pendiente"
+      webhookValue: whatsapp.webhookActive ? "Activo" : "Pendiente",
+      webhookTone: whatsapp.webhookActive ? ("success" as const) : ("warning" as const),
+      primaryAction: "open_link" as const,
+      primaryHref: "/app/inbox",
+      primaryLabel: "Abrir inbox",
+      secondaryHref: "/app/integrations",
+      secondaryLabel: "Gestionar conexion",
+      supportLabel: "Necesito ayuda",
+      benefits: [
+        { title: "Inbox listo", detail: "Tus conversaciones reales ya pueden entrar directo al portal." },
+        { title: "Equipo alineado", detail: "Todo el workspace opera sobre el mismo canal correcto." },
+        { title: "Automatizaciones", detail: "Las reglas y respuestas van a quedar apoyadas sobre esta conexion." }
+      ]
     };
   }
 
-  if (whatsapp.state === "connecting") {
+  if (effectiveState === "launching") {
     return {
-      label: "Conectando",
+      state: effectiveState,
+      label: "Preparando conexion",
       variant: "warning" as const,
-      title: "Tu canal esta en proceso de activacion",
-      description: "La conexion ya fue iniciada. Solo falta completar la activacion del numero para empezar a operar.",
-      helper: "Revisa la activacion del numero y completa los pasos pendientes para dejar el canal listo.",
-      primaryCta: "Revisar conexion",
-      nextStep: "Completa la activacion del numero en Meta y vuelve a revisar el estado.",
-      channelValue: whatsapp.channelStatus || "Pendiente",
-      webhookValue: "Pendiente"
+      dotClass: "bg-amber-300",
+      title: "Estamos preparando tu conexion con Meta",
+      description: "Validamos el workspace y dejamos listo el contexto para iniciar WhatsApp Business sin exponer configuracion tecnica innecesaria.",
+      helper: "Este paso deja lista la base para que el Embedded Signup use el tenant correcto y no mezcle canales entre negocios.",
+      nextStep: "En unos segundos te mostramos como continuar la activacion.",
+      channelValue: "Preparando",
+      webhookValue: "Pendiente",
+      webhookTone: "warning" as const,
+      primaryAction: "connect_meta" as const,
+      primaryHref: null,
+      primaryLabel: "Conectar con Meta",
+      secondaryHref: "/app/integrations",
+      secondaryLabel: "Quedarme aca",
+      supportLabel: "Hablar con soporte",
+      benefits: [
+        { title: "Tenant correcto", detail: "La conexion se prepara con el workspace y la clinica correctos." },
+        { title: "Sin datos tecnicos", detail: "No le pedimos al cliente WABA, tokens ni IDs manuales." },
+        { title: "Base escalable", detail: "La siguiente etapa puede recibir el resultado real de Meta sin rehacer la UX." }
+      ]
     };
   }
 
-  if (whatsapp.state === "error") {
+  if (effectiveState === "pending_meta") {
     return {
+      state: effectiveState,
+      label: "Pendiente de Meta",
+      variant: "warning" as const,
+      dotClass: "bg-amber-300",
+      title: "La conexion ya tiene base tecnica lista",
+      description: "Estamos preparando la ultima parte del flujo de Meta para este workspace. No hace falta que cargues IDs ni configuraciones manuales.",
+      helper: launchMessage || "El siguiente paso es completar el flujo real de Embedded Signup con las credenciales finales del workspace.",
+      nextStep: "Cuando habilitemos la conexion automatica, vas a poder terminarla desde este mismo boton.",
+      channelValue: whatsapp.channelStatus || "Pendiente",
+      webhookValue: "Pendiente",
+      webhookTone: "warning" as const,
+      primaryAction: "connect_meta" as const,
+      primaryHref: null,
+      primaryLabel: "Continuar conexion",
+      secondaryHref: "/app/inbox",
+      secondaryLabel: "Ver inbox",
+      supportLabel: "Necesito ayuda",
+      benefits: [
+        { title: "Base ya preparada", detail: "El workspace, el clinicId y el callback futuro ya quedaron definidos." },
+        { title: "UX sin friccion", detail: "El cliente no se enfrenta a errores ni a una modal tecnica confusa." },
+        { title: "Escalable", detail: "La misma base sirve para otros tenants sin acoplarse al demo." }
+      ]
+    };
+  }
+
+  if (effectiveState === "ambiguous_configuration") {
+    return {
+      state: effectiveState,
       label: "Requiere revision",
       variant: "danger" as const,
-      title: "Necesitamos revisar la conexion del canal",
-      description: "Detectamos una inconsistencia en la conexion actual. Puedes revisarla y retomar la activacion.",
-      helper: "Este estado suele resolverse revisando el numero conectado y confirmando la configuracion del canal.",
-      primaryCta: "Revisar conexion",
-      nextStep: "Revisa el numero vinculado y confirma que el canal siga activo.",
+      dotClass: "bg-rose-400",
+      title: "Necesitamos revisar la configuracion del canal",
+      description: "Detectamos una configuracion pendiente antes de activar tu WhatsApp y preferimos no mostrar un numero incorrecto en el portal.",
+      helper: whatsapp.helper,
+      nextStep: "Revisemos la conexion para dejar un unico canal correcto en este workspace.",
+      channelValue: "Configuracion ambigua",
+      webhookValue: "Pendiente",
+      webhookTone: "danger" as const,
+      primaryAction: "open_link" as const,
+      primaryHref: "/app/integrations",
+      primaryLabel: "Revisar conexion",
+      secondaryHref: null,
+      secondaryLabel: "",
+      supportLabel: "Contactar soporte",
+      benefits: [
+        { title: "UI segura", detail: "No mostramos un numero ambiguo ni contaminamos el inbox con un canal equivocado." },
+        { title: "Tenant aislado", detail: "La activacion se destraba solo cuando el canal correcto queda resuelto para este negocio." },
+        { title: "Siguiente paso claro", detail: "El owner sabe que necesita revisar la conexion, no adivinar IDs tecnicos." }
+      ]
+    };
+  }
+
+  if (effectiveState === "error") {
+    return {
+      state: effectiveState,
+      label: "Error",
+      variant: "danger" as const,
+      dotClass: "bg-rose-400",
+      title: "No pudimos validar tu canal",
+      description: "Hay una falla real distinta a un workspace sin conectar y conviene revisarla antes de seguir.",
+      helper: whatsapp.helper,
+      nextStep: "Revisa la conexion o contacta soporte para destrabar la activacion.",
       channelValue: whatsapp.channelStatus || "Error",
-      webhookValue: whatsapp.webhookActive ? "Parcial" : "Pendiente"
+      webhookValue: whatsapp.webhookActive ? "Parcial" : "Pendiente",
+      webhookTone: "danger" as const,
+      primaryAction: "open_link" as const,
+      primaryHref: "/app/integrations",
+      primaryLabel: "Revisar conexion",
+      secondaryHref: null,
+      secondaryLabel: "",
+      supportLabel: "Contactar soporte",
+      benefits: [
+        { title: "Diagnostico claro", detail: "Separamos errores reales de un simple workspace sin canal conectado." },
+        { title: "Fuente unica", detail: "La pantalla sigue leyendo el mismo estado tenant-scoped que el home y el inbox." },
+        { title: "Sin datos falsos", detail: "Nunca mostramos el canal global ni un numero ajeno por error." }
+      ]
     };
   }
 
   return {
-    label: "No conectado",
+    state: effectiveState,
+    label: "Sin conectar",
     variant: "warning" as const,
-    title: "Conecta tu WhatsApp en pocos minutos",
-    description: "Activa tu canal principal para empezar a recibir mensajes reales y responder desde Opturon.",
-    helper: "Una vez conectado, tu equipo podra ver conversaciones reales, automatizar respuestas y trabajar desde un solo inbox.",
-    primaryCta: "Conectar WhatsApp",
-    nextStep: "Conecta tu numero principal para empezar a recibir conversaciones reales.",
+    dotClass: "bg-amber-300",
+    title: "Conecta tu WhatsApp Business",
+    description: "Activa tu canal principal para recibir mensajes reales, responder desde Opturon y automatizar conversaciones sin configuracion tecnica compleja.",
+    helper: whatsapp.helper,
+    nextStep: "Conecta tu numero principal para empezar a ver conversaciones reales en el inbox.",
     channelValue: "Sin conectar",
-    webhookValue: "Pendiente"
+    webhookValue: "Pendiente",
+    webhookTone: "warning" as const,
+    primaryAction: "connect_meta" as const,
+    primaryHref: null,
+    primaryLabel: "Conectar con Meta",
+    secondaryHref: "/app/inbox",
+    secondaryLabel: "Ver inbox",
+    supportLabel: "Necesito ayuda",
+    benefits: [
+      { title: "Recibir mensajes", detail: "Tus conversaciones van a entrar directo al inbox del workspace." },
+      { title: "Responder desde Opturon", detail: "El equipo atiende desde un solo lugar, sin cambiar de herramienta." },
+      { title: "Automatizar", detail: "El canal conectado habilita respuestas, handoff y seguimiento comercial." }
+    ]
   };
 }
 

@@ -152,11 +152,13 @@ export function AppDashboard({
                   </span>
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-muted">WhatsApp channel</p>
-                    <h3 className="mt-1 text-2xl font-semibold">Conecta tu WhatsApp en 2 minutos</h3>
+                    <h3 className="mt-1 text-2xl font-semibold">
+                      {channelStatus.tone === "danger" ? "Revisa la conexion de tu WhatsApp" : "Conecta tu WhatsApp en 2 minutos"}
+                    </h3>
                   </div>
                 </div>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
-                  Este sera el punto de entrada para Embedded Signup. Cuando el canal este conectado, vas a poder recibir y responder conversaciones desde el portal.
+                  {channelStatus.detail}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -164,14 +166,14 @@ export function AppDashboard({
                   href="/app/integrations"
                   className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
                 >
-                  Conectar WhatsApp
+                  {channelStatus.tone === "danger" ? "Revisar conexion" : "Conectar WhatsApp"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href="/app/inbox"
+                  href="/app/integrations"
                   className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-white/5 px-5 py-3 text-sm font-medium text-text hover:bg-white/10"
                 >
-                  Ver inbox demo
+                  Ir a integraciones
                 </Link>
               </div>
             </CardContent>
