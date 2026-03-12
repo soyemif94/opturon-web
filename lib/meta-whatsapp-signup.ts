@@ -16,6 +16,7 @@ export type MetaEmbeddedSignupBootstrap = {
   ready: boolean;
   appId: string | null;
   configId: string | null;
+  missingConfig?: string[];
   graphVersion: string;
   redirectUri: string;
   callbackPath: string;
@@ -68,6 +69,17 @@ const META_CALLBACK_MESSAGE = "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK";
 const CALLBACK_WAIT_MS = 90_000;
 
 let sdkPromise: Promise<void> | null = null;
+
+function debugLog(stage: string, payload?: Record<string, unknown>) {
+  console.info("[meta-embedded-signup]", stage, payload || {});
+}
+
+function debugError(stage: string, error: unknown, payload?: Record<string, unknown>) {
+  console.error("[meta-embedded-signup]", stage, {
+    ...(payload || {}),
+    error: error instanceof Error ? error.message : String(error || "unknown_error")
+  });
+}
 
 function normalizeMetaPayload(rawPayload: unknown): MetaEmbeddedEvent | null {
   if (!rawPayload) return null;
@@ -173,6 +185,7 @@ function loadFacebookSdk(appId: string, graphVersion: string) {
 }
 
 async function bootstrapEmbeddedSignup(): Promise<MetaEmbeddedSignupBootstrap> {
+  debugLog("bootstrap_start");
   const response = await fetch("/api/app/integrations/whatsapp/embedded-signup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -185,9 +198,20 @@ async function bootstrapEmbeddedSignup(): Promise<MetaEmbeddedSignupBootstrap> {
 
   if (!response.ok || !json?.data) {
     const message = json?.detail || json?.error || `embedded_signup_bootstrap_failed_${response.status}`;
+    debugError("bootstrap_fail", message, { status: response.status, body: json || null });
     throw new Error(message);
   }
 
+  debugLog("bootstrap_success", {
+    ready: json.data.ready,
+    tenantId: json.data.tenantId,
+    clinicId: json.data.clinicId,
+    appIdPresent: Boolean(json.data.appId),
+    configIdPresent: Boolean(json.data.configId),
+    redirectUri: json.data.redirectUri,
+    stateTokenPresent: Boolean(json.data.stateToken),
+    missingConfig: json.data.missingConfig || []
+  });
   return json.data;
 }
 
@@ -217,6 +241,11 @@ function waitForMetaCompletion(stateToken: string) {
       if (event.origin === window.location.origin) {
         const payload = event.data as MetaCallbackPayload | null;
         if (payload && payload.type === META_CALLBACK_MESSAGE) {
+          debugLog("callback_message_received", {
+            stateTokenPresent: Boolean(payload.stateToken),
+            codePresent: Boolean(payload.code),
+            error: payload.error || null
+          });
           if (payload.stateToken && payload.stateToken !== stateToken) {
             return;
           }
@@ -228,6 +257,13 @@ function waitForMetaCompletion(stateToken: string) {
 
       const normalized = normalizeMetaPayload(event.data);
       if (!normalized) return;
+      debugLog("meta_postmessage_received", {
+        eventName: normalized.eventName,
+        businessId: normalized.businessId,
+        wabaId: normalized.wabaId,
+        phoneNumberId: normalized.phoneNumberId,
+        errorCode: normalized.errorCode
+      });
       metaEventPayload = normalized;
     };
 
@@ -249,6 +285,14 @@ async function finalizeEmbeddedSignup(input: {
   errorDescription?: string | null;
 }) {
   const requestId = `meta-esu-${Date.now()}`;
+  debugLog("finalize_start", {
+    requestId,
+    stateTokenPresent: Boolean(input.stateToken),
+    codePresent: Boolean(input.code),
+    redirectUri: input.redirectUri,
+    hasMetaPayload: Boolean(input.metaPayload),
+    error: input.error || null
+  });
   const response = await fetch("/api/app/integrations/whatsapp/embedded-signup/callback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -272,50 +316,91 @@ async function finalizeEmbeddedSignup(input: {
 
   if (!response.ok || !json?.data) {
     const detail = json?.detail || json?.error || `embedded_signup_finalize_failed_${response.status}`;
+    debugError("finalize_fail", detail, { status: response.status, body: json || null, requestId });
     throw new Error(detail);
   }
 
+  debugLog("finalize_success", {
+    requestId,
+    status: json.data.status,
+    channelId: json.data.channel?.id || null,
+    phoneNumberId: json.data.channel?.phoneNumberId || null
+  });
   return json.data;
 }
 
 export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupLaunchResult> {
+  debugLog("click_received");
   const bootstrap = await bootstrapEmbeddedSignup();
 
   if (!bootstrap.ready || !bootstrap.appId || !bootstrap.configId || !bootstrap.stateToken) {
-    return {
-      state: "pending_meta",
-      message: bootstrap.message,
-      channelId: null,
-      phoneNumberId: null,
-      displayPhoneNumber: null
-    };
+    const missingConfig = Array.isArray(bootstrap.missingConfig) ? bootstrap.missingConfig.join(", ") : "";
+    const message =
+      missingConfig || !bootstrap.stateToken
+        ? `Embedded Signup no listo. Falta configurar: ${[
+            ...(missingConfig ? [missingConfig] : []),
+            ...(!bootstrap.stateToken ? ["STATE_TOKEN"] : [])
+          ].join(", ")}.`
+        : bootstrap.message;
+    debugError("launch_blocked_before_sdk", message, {
+      ready: bootstrap.ready,
+      appIdPresent: Boolean(bootstrap.appId),
+      configIdPresent: Boolean(bootstrap.configId),
+      stateTokenPresent: Boolean(bootstrap.stateToken),
+      missingConfig: bootstrap.missingConfig || []
+    });
+    throw new Error(message);
   }
 
+  debugLog("sdk_load_start", {
+    appIdPresent: Boolean(bootstrap.appId),
+    configIdPresent: Boolean(bootstrap.configId),
+    graphVersion: bootstrap.graphVersion
+  });
   await loadFacebookSdk(bootstrap.appId, bootstrap.graphVersion);
+  debugLog("sdk_loaded", { fbAvailable: Boolean(window.FB) });
 
   if (!window.FB) {
+    debugError("sdk_missing_fb", "meta_sdk_unavailable");
     throw new Error("meta_sdk_unavailable");
   }
 
   const completionPromise = waitForMetaCompletion(bootstrap.stateToken);
   let immediateCode: string | null = null;
 
-  window.FB.login(
-    (response) => {
-      immediateCode = response?.authResponse?.code || null;
-    },
-    {
-      config_id: bootstrap.configId,
-      response_type: "code",
-      override_default_response_type: true,
-      extras: {
-        feature: "whatsapp_embedded_signup",
-        sessionInfoVersion: 3,
-        redirect_uri: bootstrap.redirectUri
+  try {
+    debugLog("launch_start", {
+      redirectUri: bootstrap.redirectUri,
+      stateTokenPresent: Boolean(bootstrap.stateToken),
+      configIdPresent: Boolean(bootstrap.configId)
+    });
+    window.FB.login(
+      (response) => {
+        immediateCode = response?.authResponse?.code || null;
+        debugLog("fb_login_callback", {
+          status: response?.status || null,
+          codePresent: Boolean(immediateCode)
+        });
       },
-      state: bootstrap.stateToken
-    }
-  );
+      {
+        config_id: bootstrap.configId,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          feature: "whatsapp_embedded_signup",
+          sessionInfoVersion: 3,
+          redirect_uri: bootstrap.redirectUri
+        },
+        state: bootstrap.stateToken
+      }
+    );
+  } catch (error) {
+    debugError("launch_fail", error, {
+      redirectUri: bootstrap.redirectUri,
+      configIdPresent: Boolean(bootstrap.configId)
+    });
+    throw error instanceof Error ? error : new Error("meta_embedded_signup_launch_failed");
+  }
 
   const { callback, metaEvent } = await completionPromise;
   const callbackCode = callback.code || immediateCode || null;

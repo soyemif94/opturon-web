@@ -126,6 +126,9 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStat
   }
 
   async function handleMetaConnect() {
+    console.info("[meta-embedded-signup-ui] click_received", {
+      currentState: liveWhatsApp.state
+    });
     setLaunchState("launching");
     setLaunchMessage(null);
 
@@ -149,6 +152,9 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStat
     } catch (error) {
       setLaunchState("idle");
       const message = error instanceof Error ? error.message : "No pudimos preparar la conexion con Meta.";
+      console.error("[meta-embedded-signup-ui] launch_failed", {
+        error: message
+      });
       setLaunchMessage(message);
       toast.error("No pudimos iniciar la conexion", message);
     }

@@ -20,11 +20,16 @@ function resolveMetaEmbeddedSignupConfig() {
       process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID ||
       ""
   ).trim();
+  const missingConfig = [
+    ...(appId ? [] : ["META_APP_ID"]),
+    ...(configId ? [] : ["META_EMBEDDED_SIGNUP_CONFIG_ID"])
+  ];
 
   return {
     ready: Boolean(appId && configId),
     appId: appId || null,
     configId: configId || null,
+    missingConfig,
     graphVersion: String(process.env.NEXT_PUBLIC_WHATSAPP_GRAPH_VERSION || process.env.WHATSAPP_GRAPH_VERSION || "v25.0").trim(),
     callbackPath: "/api/app/integrations/whatsapp/embedded-signup/callback"
   };
@@ -63,6 +68,7 @@ export async function POST(request: NextRequest) {
           ready: false,
           appId: embeddedSignup.appId,
           configId: embeddedSignup.configId,
+          missingConfig: embeddedSignup.missingConfig,
           graphVersion: embeddedSignup.graphVersion,
           redirectUri,
           callbackPath: embeddedSignup.callbackPath,
@@ -98,6 +104,7 @@ export async function POST(request: NextRequest) {
           ready: bootstrap.data.ready,
           appId: embeddedSignup.appId,
           configId: embeddedSignup.configId,
+          missingConfig: embeddedSignup.missingConfig,
           graphVersion: embeddedSignup.graphVersion,
           redirectUri,
           callbackPath: embeddedSignup.callbackPath,
