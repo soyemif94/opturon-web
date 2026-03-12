@@ -11,19 +11,19 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   const canManage = canManageWorkspace(ctx);
   const sp = await searchParams;
   const isDemo = sp.demo === "1";
-  const useLocalDemoData = !ctx.tenantId || !isBackendConfigured();
+  const useLocalDemoData = !ctx.tenantId;
 
-  const data = readSaasData();
-  const tenantId = ctx.tenantId || sp.tenantId || data.tenants[0]?.id || "";
-  const tenant = useLocalDemoData ? data.tenants.find((item) => item.id === tenantId) : null;
-  const businessSettings = useLocalDemoData && Array.isArray(data.businessSettings)
-    ? data.businessSettings.find((item) => item?.tenantId === tenantId) || null
+  const localData = useLocalDemoData ? readSaasData() : null;
+  const tenantId = ctx.tenantId || sp.tenantId || localData?.tenants[0]?.id || "";
+  const tenant = useLocalDemoData ? localData?.tenants.find((item) => item.id === tenantId) || null : null;
+  const businessSettings = useLocalDemoData && Array.isArray(localData?.businessSettings)
+    ? localData.businessSettings.find((item) => item?.tenantId === tenantId) || null
     : null;
   const isBackendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "workspace_without_backend" });
   let conversations = useLocalDemoData ? listInboxConversations(tenantId) : [];
   let contacts: Array<{ id: string; name: string; phone?: string | null; tags?: string[]; lastInteractionAt?: string | null }> = useLocalDemoData
-    ? data.contacts
+    ? (localData?.contacts || [])
         .filter((item) => item.tenantId === tenantId)
         .map((item) => ({
           id: item.id,
@@ -35,8 +35,8 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
     : [];
   let tenantName = tenant?.name || "Tu empresa";
   let tenantIndustry = tenant?.industry || "Negocio digital";
-  let botResponses = useLocalDemoData ? data.messages.filter((item) => item.tenantId === tenantId && item.direction === "system").length : 0;
-  let humanResponses = useLocalDemoData ? data.messages.filter((item) => item.tenantId === tenantId && item.direction === "outbound").length : 0;
+  let botResponses = useLocalDemoData ? (localData?.messages || []).filter((item) => item.tenantId === tenantId && item.direction === "system").length : 0;
+  let humanResponses = useLocalDemoData ? (localData?.messages || []).filter((item) => item.tenantId === tenantId && item.direction === "outbound").length : 0;
 
   if (ctx.tenantId && isBackendReady) {
     try {

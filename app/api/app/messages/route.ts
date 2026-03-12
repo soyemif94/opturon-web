@@ -18,6 +18,15 @@ export async function POST(request: NextRequest) {
   });
   if (tenantContext.error) return tenantContext.error;
 
+  if (!tenantContext.readOnly && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_messages_backend_unavailable"
+      },
+      { status: 503 }
+    );
+  }
+
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 

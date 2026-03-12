@@ -114,6 +114,16 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   const tenantId = guard.ctx?.tenantId as string;
+  if (tenantId && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        users: [],
+        source: "empty_real_tenant"
+      },
+      { status: 200 }
+    );
+  }
+
   if (isBackendConfigured()) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
@@ -144,6 +154,15 @@ export async function POST(request: NextRequest) {
 
   const tenantId = guard.ctx?.tenantId as string;
   const email = parsed.data.email.toLowerCase();
+  if (tenantId && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_users_backend_unavailable",
+        detail: "La gestion de usuarios para workspaces reales requiere backend persistente tenant-scoped."
+      },
+      { status: 503 }
+    );
+  }
 
   if (isBackendConfigured()) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
@@ -244,6 +263,16 @@ export async function PATCH(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const tenantId = guard.ctx?.tenantId as string;
+  if (tenantId && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_users_backend_unavailable",
+        detail: "La gestion de usuarios para workspaces reales requiere backend persistente tenant-scoped."
+      },
+      { status: 503 }
+    );
+  }
+
   if (isBackendConfigured()) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
@@ -291,6 +320,15 @@ export async function DELETE(request: NextRequest) {
 
   const tenantId = guard.ctx?.tenantId as string;
   const currentUserId = guard.ctx?.userId as string;
+  if (tenantId && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_users_backend_unavailable",
+        detail: "La gestion de usuarios para workspaces reales requiere backend persistente tenant-scoped."
+      },
+      { status: 503 }
+    );
+  }
 
   if (isBackendConfigured()) {
     const backendRequirement = requirePortalUsersBackend(tenantId);

@@ -8,6 +8,7 @@ import { listInboxConversations, readSaasData } from "@/lib/saas/store";
 export default async function AppContactsPage() {
   const ctx = await requireAppPage();
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
+  const useLocalDemoData = !ctx.tenantId;
   let contacts: Array<PortalContact & { email?: string | null; industry?: string | null; tags?: string[] }> = [];
 
   if (ctx.tenantId && backendReady) {
@@ -17,9 +18,9 @@ export default async function AppContactsPage() {
     } catch {
       contacts = [];
     }
-  } else {
+  } else if (useLocalDemoData) {
     const data = readSaasData();
-    const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
+    const tenantId = data.tenants[0]?.id || "";
     const conversations = listInboxConversations(tenantId);
     contacts = data.contacts
       .filter((item) => item.tenantId === tenantId)
@@ -37,6 +38,8 @@ export default async function AppContactsPage() {
         tags: item.tags || []
       }));
     contacts.sort((a, b) => new Date(b.lastInteractionAt || 0).getTime() - new Date(a.lastInteractionAt || 0).getTime());
+  } else {
+    contacts = [];
   }
 
   return (

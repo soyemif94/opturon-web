@@ -33,8 +33,10 @@ export async function GET(request: NextRequest) {
   const q = (params.q || "").toLowerCase().trim();
   const filter = params.filter || "all";
 
-  let conversations = listInboxConversations(tenantContext.tenantId);
-  let channelState = buildWhatsAppConnectionStatus({ fallbackReason: tenantContext.readOnly ? "demo_workspace" : null });
+  let conversations = tenantContext.readOnly ? listInboxConversations(tenantContext.tenantId) : [];
+  let channelState = buildWhatsAppConnectionStatus({
+    fallbackReason: tenantContext.readOnly ? "demo_workspace" : "workspace_without_backend"
+  });
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {

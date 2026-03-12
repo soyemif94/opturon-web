@@ -14,12 +14,37 @@ const EMPTY_SETTINGS = {
 
 export default async function BusinessPage() {
   const ctx = await requireAppPage({ permission: "manage_workspace" });
+  const isRealTenant = Boolean(ctx.tenantId);
 
   try {
+    if (isRealTenant) {
+      return (
+        <ClientPageShell
+          title="Perfil del negocio"
+          description="Configura la informacion principal de tu negocio para que el equipo, el canal y las automatizaciones respondan con mejor contexto."
+          badge="Ficha operativa"
+        >
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_320px]">
+            <BusinessSettingsForm initialSettings={{ ...EMPTY_SETTINGS, tenantId: ctx.tenantId || "" }} tenantName="Workspace del cliente" tenantIndustry="Configuracion pendiente" />
+
+            <div className="space-y-4">
+              <div className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado del workspace</p>
+                <p className="mt-3 text-xl font-semibold">Base de perfil aun no persistida en backend</p>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Para tenants reales dejamos este modulo en estado seguro hasta migrar la persistencia del perfil del negocio al backend tenant-scoped.
+                </p>
+              </div>
+            </div>
+          </div>
+        </ClientPageShell>
+      );
+    }
+
     const data = readSaasData();
     const tenants = Array.isArray(data.tenants) ? data.tenants : [];
     const businessSettings = Array.isArray(data.businessSettings) ? data.businessSettings : [];
-    const tenantId = ctx.tenantId || tenants[0]?.id || "";
+    const tenantId = tenants[0]?.id || "";
     const tenant = tenants.find((item) => item.id === tenantId) || null;
     const settings =
       businessSettings.find((item) => item?.tenantId === tenantId) || {

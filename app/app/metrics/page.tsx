@@ -8,8 +8,9 @@ import { readSaasData } from "@/lib/saas/store";
 export default async function AppMetricsPage() {
   const ctx = await requireAppPage();
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
-  const data = readSaasData();
-  const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
+  const useLocalDemoData = !ctx.tenantId;
+  const localData = useLocalDemoData ? readSaasData() : null;
+  const tenantId = ctx.tenantId || localData?.tenants[0]?.id || "";
 
   let activeConversations = 0;
   let prospects = 0;
@@ -38,14 +39,20 @@ export default async function AppMetricsPage() {
       botResponses = 0;
       humanResponses = 0;
     }
-  } else {
-    const metrics = data.tenantMetrics.find((item) => item.tenantId === tenantId);
-    const tenantMessages = data.messages.filter((item) => item.tenantId === tenantId);
+  } else if (useLocalDemoData) {
+    const metrics = localData?.tenantMetrics.find((item) => item.tenantId === tenantId);
+    const tenantMessages = (localData?.messages || []).filter((item) => item.tenantId === tenantId);
     botResponses = tenantMessages.filter((item) => item.direction === "system").length;
     humanResponses = tenantMessages.filter((item) => item.direction === "outbound").length;
     totalInteractions = tenantMessages.length;
     activeConversations = Number(metrics?.activeConversations || 0);
-    prospects = data.deals.filter((item) => item.tenantId === tenantId).length;
+    prospects = (localData?.deals || []).filter((item) => item.tenantId === tenantId).length;
+  } else {
+    activeConversations = 0;
+    prospects = 0;
+    totalInteractions = 0;
+    botResponses = 0;
+    humanResponses = 0;
   }
 
   const botCoverage = totalInteractions > 0 ? Math.round((botResponses / totalInteractions) * 100) : 0;

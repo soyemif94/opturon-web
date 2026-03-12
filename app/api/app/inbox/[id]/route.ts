@@ -24,6 +24,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   });
   if (tenantContext.error) return tenantContext.error;
 
+  if (!tenantContext.readOnly && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_inbox_backend_unavailable"
+      },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store"
+        }
+      }
+    );
+  }
+
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
       const result = await getPortalConversationDetail(tenantContext.tenantId, id);
@@ -72,6 +86,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     requireWrite: true
   });
   if (tenantContext.error) return tenantContext.error;
+
+  if (!tenantContext.readOnly && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_inbox_backend_unavailable"
+      },
+      {
+        status: 503
+      }
+    );
+  }
 
   const parsed = patchSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

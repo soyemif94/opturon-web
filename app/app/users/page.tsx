@@ -5,19 +5,20 @@ import { listTenantMembers, readSaasData } from "@/lib/saas/store";
 
 export default async function AppUsersPage() {
   const ctx = await requireAppPage({ permission: "manage_users" });
-  const data = readSaasData();
-  const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
+  const data = !ctx.tenantId ? readSaasData() : null;
+  const tenantId = ctx.tenantId || data?.tenants[0]?.id || "";
   const canManage = ctx.tenantRole === "owner" || ctx.globalRole === "superadmin";
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 
-  let users: Array<{ id: string; email: string; name: string; tenantRole: string }> = backendUsersReady
-    ? []
-    : listTenantMembers(tenantId).map((user) => ({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        tenantRole: user.tenantRole
-      }));
+  let users: Array<{ id: string; email: string; name: string; tenantRole: string }> =
+    !ctx.tenantId && !backendUsersReady
+      ? listTenantMembers(tenantId).map((user) => ({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          tenantRole: user.tenantRole
+        }))
+      : [];
 
   if (backendUsersReady) {
     try {

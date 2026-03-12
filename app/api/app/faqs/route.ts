@@ -11,10 +11,24 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.extend({ id: z.string().min(1) }).partial({ question: true, answer: true, active: true });
 
+function faqsBackendUnavailable() {
+  return NextResponse.json(
+    {
+      error: "faqs_backend_unavailable_for_real_tenant",
+      detail: "Las FAQs del workspace real todavia no estan conectadas a persistencia tenant-scoped."
+    },
+    { status: 503 }
+  );
+}
+
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_workspace" });
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
+
+  if (tenantId) {
+    return NextResponse.json({ faqs: [], source: "empty_real_tenant" });
+  }
 
   const data = readSaasData();
   return NextResponse.json({ faqs: data.faqs.filter((item) => item.tenantId === tenantId) });
@@ -24,6 +38,10 @@ export async function POST(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_workspace" });
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
+
+  if (tenantId) {
+    return faqsBackendUnavailable();
+  }
 
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -44,6 +62,10 @@ export async function PATCH(request: NextRequest) {
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
 
+  if (tenantId) {
+    return faqsBackendUnavailable();
+  }
+
   const parsed = updateSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const { id, ...rest } = parsed.data;
@@ -63,6 +85,11 @@ export async function DELETE(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_workspace" });
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
+
+  if (tenantId) {
+    return faqsBackendUnavailable();
+  }
+
   const id = new URL(request.url).searchParams.get("id") || "";
 
   const data = readSaasData();

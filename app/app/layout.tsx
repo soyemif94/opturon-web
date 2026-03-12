@@ -5,9 +5,13 @@ import { readSaasData } from "@/lib/saas/store";
 
 export default async function ClientPortalLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireAppPage();
-  const data = readSaasData();
-  const tenant = data.tenants.find((item) => item.id === ctx.tenantId) || data.tenants[0];
-  const rawTenantLabel = tenant ? tenant.name : `Tenant: ${ctx.tenantId || "workspace"}`;
+  const rawTenantLabel = ctx.tenantId
+    ? "Workspace del cliente"
+    : (() => {
+        const data = readSaasData();
+        const tenant = data.tenants.find((item) => item.id === ctx.tenantId) || data.tenants[0];
+        return tenant ? tenant.name : `Tenant: ${ctx.tenantId || "workspace"}`;
+      })();
   const tenantLabel = /demo tenant/i.test(rawTenantLabel) ? "Workspace del cliente" : rawTenantLabel;
   const showDebugInfo = process.env.NEXT_PUBLIC_SHOW_DEBUG_INFO === "true";
   const buildMarker = showDebugInfo

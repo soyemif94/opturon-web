@@ -27,10 +27,26 @@ function noStore(response: NextResponse) {
   return response;
 }
 
+function businessBackendUnavailable() {
+  return noStore(
+    NextResponse.json(
+      {
+        error: "business_backend_unavailable_for_real_tenant",
+        detail: "Los datos del negocio todavia no estan conectados a persistencia tenant-scoped para workspaces reales."
+      },
+      { status: 503 }
+    )
+  );
+}
+
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_workspace" });
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
+
+  if (tenantId) {
+    return noStore(NextResponse.json({ settings: emptySettings(tenantId), source: "empty_real_tenant" }));
+  }
 
   try {
     const data = readSaasData();
@@ -48,6 +64,10 @@ export async function PATCH(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_workspace" });
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
+
+  if (tenantId) {
+    return businessBackendUnavailable();
+  }
 
   try {
     const body = await request.json().catch(() => null);
