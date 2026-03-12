@@ -16,6 +16,10 @@ function normalizeGlobalRole(role?: string): GlobalRole {
   return "client";
 }
 
+function isStaffGlobalRole(role?: string) {
+  return ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(role || ""));
+}
+
 export const authOptions: NextAuthOptions = {
   debug: String(process.env.NEXTAUTH_DEBUG || "").toLowerCase() === "true",
   logger: {
@@ -72,7 +76,8 @@ export const authOptions: NextAuthOptions = {
                 role: globalRole,
                 globalRole,
                 tenantId: backendUser.tenantId,
-                tenantRole: normalizeTenantRole(backendUser.tenantRole)
+                tenantRole: normalizeTenantRole(backendUser.tenantRole),
+                authSource: "backend"
               };
             } catch (error) {
               const status = error && typeof error === "object" && "status" in error ? Number((error as any).status) : 0;
@@ -115,7 +120,8 @@ export const authOptions: NextAuthOptions = {
             role: globalRole,
             globalRole,
             tenantId: user.tenantId,
-            tenantRole: user.tenantRole
+            tenantRole: user.tenantRole,
+            authSource: "local"
           };
         } catch (error) {
           console.error("AUTH_AUTHORIZE_FATAL", {
@@ -139,6 +145,7 @@ export const authOptions: NextAuthOptions = {
           token.role = token.globalRole;
           token.tenantId = (user as any).tenantId;
           token.tenantRole = (user as any).tenantRole;
+          token.authSource = (user as any).authSource || token.authSource || "local";
         }
 
         if (token.email) {
@@ -152,12 +159,16 @@ export const authOptions: NextAuthOptions = {
                 token.role = token.globalRole;
                 token.tenantId = hydratedUser.tenantId;
                 token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+                token.authSource = "backend";
               } else {
-                token.userId = undefined;
-                token.tenantId = undefined;
-                token.tenantRole = undefined;
-                token.globalRole = "client";
-                token.role = "client";
+                const shouldInvalidateBackendSession = token.authSource === "backend" && !isStaffGlobalRole(String(token.globalRole || token.role || ""));
+                if (shouldInvalidateBackendSession) {
+                  token.userId = undefined;
+                  token.tenantId = undefined;
+                  token.tenantRole = undefined;
+                  token.globalRole = "client";
+                  token.role = "client";
+                }
               }
             } catch (error) {
               console.error("JWT_BACKEND_HYDRATE_ERROR", { msg: String(error) });
@@ -193,12 +204,16 @@ export const authOptions: NextAuthOptions = {
                 token.role = token.globalRole;
                 token.tenantId = hydratedUser.tenantId;
                 token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+                token.authSource = "backend";
               } else {
-                token.userId = undefined;
-                token.tenantId = undefined;
-                token.tenantRole = undefined;
-                token.globalRole = "client";
-                token.role = "client";
+                const shouldInvalidateBackendSession = token.authSource === "backend" && !isStaffGlobalRole(String(token.globalRole || token.role || ""));
+                if (shouldInvalidateBackendSession) {
+                  token.userId = undefined;
+                  token.tenantId = undefined;
+                  token.tenantRole = undefined;
+                  token.globalRole = "client";
+                  token.role = "client";
+                }
               }
             } catch (error) {
               console.error("SESSION_BACKEND_HYDRATE_ERROR", { msg: String(error) });
