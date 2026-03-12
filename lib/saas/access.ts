@@ -15,6 +15,8 @@ function resolveDemoTenantId(requestedTenantId?: string) {
 
 export async function getSessionContext() {
   const session = await getServerSession(authOptions);
+  // /app must trust the already-resolved session identity only.
+  // Client portal users should reach this point from the persistent backend auth flow.
   return {
     session,
     userId: session?.user?.id,

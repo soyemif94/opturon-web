@@ -1,6 +1,6 @@
 import { compareSync } from "bcryptjs";
 import { NextResponse } from "next/server";
-import { getAuthUserByEmail } from "@/lib/auth-store";
+import { getLocalBootstrapAuthUserByEmail } from "@/lib/auth-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const password = String(searchParams.get("password") || "");
 
   try {
-    const user = await getAuthUserByEmail(email);
+    const user = await getLocalBootstrapAuthUserByEmail(email);
     if (!user) {
       return noStore(NextResponse.json({ found: false }));
     }

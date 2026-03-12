@@ -65,6 +65,12 @@ export function isBackendConfigured() {
   return Boolean(getApiBase());
 }
 
+// Portal client identities must come from the persistent backend whenever it is configured.
+// Local JSON data is allowed only for staff/demo compatibility outside the client auth path.
+export function isPersistentPortalIdentityEnabled() {
+  return isBackendConfigured();
+}
+
 function getPortalInternalKey() {
   return String(process.env.PORTAL_INTERNAL_KEY || "").trim();
 }

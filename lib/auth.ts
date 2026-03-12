@@ -1,9 +1,9 @@
 import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
-import { getPortalAuthUserByEmail, isBackendConfigured, loginPortalUser } from "@/lib/api";
+import { getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPortalUser } from "@/lib/api";
 import { normalizeTenantRole } from "@/lib/app-permissions";
-import { getAuthUserByEmail } from "@/lib/auth-store";
+import { getLocalBootstrapAuthUserByEmail } from "@/lib/auth-store";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
 function isProduction() {
@@ -18,6 +18,10 @@ function normalizeGlobalRole(role?: string): GlobalRole {
 
 function isStaffGlobalRole(role?: string) {
   return ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(role || ""));
+}
+
+function canUseLocalBootstrapAuth(globalRole: GlobalRole) {
+  return !isPersistentPortalIdentityEnabled() || isStaffGlobalRole(globalRole);
 }
 
 export const authOptions: NextAuthOptions = {
@@ -64,7 +68,7 @@ export const authOptions: NextAuthOptions = {
           const password = String(credentials?.password || "");
           if (!email || !password) return null;
 
-          if (isBackendConfigured()) {
+          if (isPersistentPortalIdentityEnabled()) {
             try {
               const response = await loginPortalUser(email, password);
               const backendUser = response.data;
@@ -87,7 +91,7 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          const user = await getAuthUserByEmail(email);
+          const user = await getLocalBootstrapAuthUserByEmail(email);
           if (!user) {
             console.warn("AUTH_NO_USER", { email });
             return null;
@@ -113,7 +117,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           const globalRole = normalizeGlobalRole(user.globalRole);
-          const allowLocalPortalFallback = !isBackendConfigured() || isStaffGlobalRole(globalRole);
+          const allowLocalPortalFallback = canUseLocalBootstrapAuth(globalRole);
           if (!allowLocalPortalFallback) {
             console.warn("AUTH_LOCAL_CLIENT_FALLBACK_BLOCKED", { email });
             return null;
@@ -154,7 +158,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (token.email) {
-          if (isBackendConfigured() && token.authSource === "backend") {
+          if (isPersistentPortalIdentityEnabled() && token.authSource === "backend") {
             try {
               const response = await getPortalAuthUserByEmail(String(token.email));
               const hydratedUser = response.data;
@@ -178,8 +182,8 @@ export const authOptions: NextAuthOptions = {
             } catch (error) {
               console.error("JWT_BACKEND_HYDRATE_ERROR", { msg: String(error) });
             }
-          } else if (!isBackendConfigured() && (!token.tenantId || !token.tenantRole)) {
-            const hydratedUser = await getAuthUserByEmail(String(token.email));
+          } else if (!isPersistentPortalIdentityEnabled() && (!token.tenantId || !token.tenantRole)) {
+            const hydratedUser = await getLocalBootstrapAuthUserByEmail(String(token.email));
             if (hydratedUser) {
               token.userId = hydratedUser.id;
               token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
@@ -198,8 +202,8 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       try {
-        if ((token.email || session.user?.email) && !isBackendConfigured() && (!token.tenantId || !token.tenantRole)) {
-          const hydratedUser = await getAuthUserByEmail(String(token.email || session.user?.email || ""));
+        if ((token.email || session.user?.email) && !isPersistentPortalIdentityEnabled() && (!token.tenantId || !token.tenantRole)) {
+          const hydratedUser = await getLocalBootstrapAuthUserByEmail(String(token.email || session.user?.email || ""));
           if (hydratedUser) {
             token.userId = hydratedUser.id;
             token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));

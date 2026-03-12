@@ -12,6 +12,9 @@ export type AuthUser = {
   tenantRole?: TenantRole;
 };
 
+// Local auth data is for staff/demo compatibility only.
+// Client portal identities must come from the persistent backend when available.
+
 function normalizeRole(input?: string): GlobalRole {
   const allowed: GlobalRole[] = ["superadmin", "ops_admin", "sales_rep", "support_agent", "client"];
   if (input && allowed.includes(input as GlobalRole)) return input as GlobalRole;
@@ -30,7 +33,7 @@ async function readJsonAuthStore() {
   };
 }
 
-export async function getAuthUserByEmail(email: string): Promise<AuthUser | null> {
+export async function getLocalBootstrapAuthUserByEmail(email: string): Promise<AuthUser | null> {
   const e = String(email || "").toLowerCase().trim();
   if (!e) return null;
   const passwordOverride = getPasswordOverride(e);
@@ -89,4 +92,8 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
     console.warn("AUTH_JSON_STORE_UNAVAILABLE", String(err));
     return null;
   }
+}
+
+export async function getAuthUserByEmail(email: string): Promise<AuthUser | null> {
+  return getLocalBootstrapAuthUserByEmail(email);
 }
