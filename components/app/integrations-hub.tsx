@@ -25,6 +25,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { PortalWhatsAppTemplate, PortalWhatsAppTemplateBlueprint } from "@/lib/api";
@@ -125,6 +134,7 @@ export function IntegrationsHub({
     channelName: ""
   });
   const [manualBusy, setManualBusy] = useState(false);
+  const [manualHelpOpen, setManualHelpOpen] = useState(false);
 
   const effectiveState =
     launchState === "launching"
@@ -521,7 +531,9 @@ export function IntegrationsHub({
                 <Input
                   value={manualForm.wabaId}
                   onChange={(event) => setManualForm((current) => ({ ...current, wabaId: event.target.value }))}
-                  placeholder="Ej. 123456789012345"
+                  placeholder="Ej. 178912345678901"
+                  autoComplete="off"
+                  inputMode="numeric"
                   disabled={manualBusy}
                 />
               </label>
@@ -531,6 +543,8 @@ export function IntegrationsHub({
                   value={manualForm.phoneNumberId}
                   onChange={(event) => setManualForm((current) => ({ ...current, phoneNumberId: event.target.value }))}
                   placeholder="Ej. 109876543210987"
+                  autoComplete="off"
+                  inputMode="numeric"
                   disabled={manualBusy}
                 />
               </label>
@@ -543,7 +557,8 @@ export function IntegrationsHub({
                   type="password"
                   value={manualForm.accessToken}
                   onChange={(event) => setManualForm((current) => ({ ...current, accessToken: event.target.value }))}
-                  placeholder="Pega aca el token temporal o permanente"
+                  placeholder="Pega aqui tu token de Meta"
+                  autoComplete="off"
                   disabled={manualBusy}
                 />
               </label>
@@ -553,6 +568,7 @@ export function IntegrationsHub({
                   value={manualForm.channelName}
                   onChange={(event) => setManualForm((current) => ({ ...current, channelName: event.target.value }))}
                   placeholder="Sucursal Palermo"
+                  autoComplete="off"
                   disabled={manualBusy}
                 />
               </label>
@@ -563,11 +579,93 @@ export function IntegrationsHub({
                 {manualBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                 Conectar manualmente
               </Button>
-              <Button asChild variant="ghost" className="rounded-2xl">
-                <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
-                  Necesito ayuda con mis datos
-                </a>
-              </Button>
+              <Dialog open={manualHelpOpen} onOpenChange={setManualHelpOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" className="rounded-2xl">
+                    Necesito ayuda con mis datos
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Dónde encontrar estos datos en Meta</DialogTitle>
+                    <DialogDescription>
+                      Te mostramos exactamente qué copiar para conectar tu canal sin configuraciones raras.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4">
+                    <HelperBlock
+                      title="WABA ID"
+                      description="Es el identificador de tu cuenta de WhatsApp Business."
+                      bullets={[
+                        "No es tu email",
+                        "No es tu numero de telefono",
+                        "Es un numero largo"
+                      ]}
+                      example="178912345678901"
+                    />
+                    <HelperBlock
+                      title="Phone Number ID"
+                      description="Es el identificador interno del numero conectado en WhatsApp Cloud API."
+                      bullets={[
+                        "No es el numero visible de WhatsApp",
+                        "Tambien es un numero largo"
+                      ]}
+                      example="109876543210987"
+                    />
+                    <HelperBlock
+                      title="Access Token"
+                      description="Es el token de acceso que autoriza a Meta a validar y usar ese canal."
+                      bullets={[
+                        "Debe ser el token con acceso a esa cuenta y ese numero"
+                      ]}
+                      example="EAAJ..."
+                    />
+
+                    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                      <p className="text-sm font-medium">Paso a paso</p>
+                      <div className="mt-3 space-y-2 text-sm text-muted">
+                        <p>1. Entra a Meta for Developers</p>
+                        <p>2. Abre tu app de WhatsApp</p>
+                        <p>3. Ve a WhatsApp &gt; Configuracion de la API</p>
+                        <p>4. Copia estos datos:</p>
+                        <p>WhatsApp Business Account ID</p>
+                        <p>Phone Number ID</p>
+                        <p>Access Token</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                      <p className="text-sm font-medium">Importante</p>
+                      <div className="mt-3 space-y-2 text-sm text-muted">
+                        <p>No pegues tu email en WABA ID</p>
+                        <p>No pegues tu numero de telefono en Phone Number ID</p>
+                        <p>Si el token no tiene permisos, la conexion fallara</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <DialogFooter className="justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="secondary" className="rounded-2xl">
+                        <a href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">
+                          Abrir Meta for Developers
+                        </a>
+                      </Button>
+                      <Button asChild variant="ghost" className="rounded-2xl">
+                        <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noreferrer">
+                          Abrir documentacion de WhatsApp
+                        </a>
+                      </Button>
+                    </div>
+                    <Button asChild variant="ghost" className="rounded-2xl">
+                      <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
+                        Hablar con soporte
+                      </a>
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
@@ -701,6 +799,33 @@ function templateStatusMeta(status: string): {
     detail: "Todavia no existe una version de esta plantilla dentro del WhatsApp Business del tenant.",
     variant: "muted"
   };
+}
+
+function HelperBlock({
+  title,
+  description,
+  bullets,
+  example
+}: {
+  title: string;
+  description: string;
+  bullets: string[];
+  example: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-2 text-sm text-muted">{description}</p>
+      <div className="mt-3 space-y-2 text-sm text-muted">
+        {bullets.map((item) => (
+          <p key={item}>{item}</p>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl border border-[color:var(--border)] bg-bg/80 px-3 py-2 text-sm text-text">
+        {title}: {example}
+      </div>
+    </div>
+  );
 }
 
 function StatusStat({
