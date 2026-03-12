@@ -29,7 +29,7 @@ export function LoginForm() {
     let didTimeout = false;
 
     try {
-      const callbackUrl = params.get("callbackUrl") || "/bot/inbox";
+      const callbackUrl = params.get("callbackUrl") || "/app";
       timeoutId = setTimeout(() => {
         didTimeout = true;
         setLoading(false);
@@ -74,7 +74,7 @@ export function LoginForm() {
       }
 
       setDebugStatus("ok");
-      router.push(result.url || "/bot/inbox");
+      router.push(result.url || "/app");
       router.refresh();
     } catch (err) {
       if (err instanceof Error && err.message === "timeout") {
@@ -118,11 +118,11 @@ export function LoginForm() {
         {loading ? "Ingresando..." : "Ingresar"}
       </Button>
       <div className="text-center text-sm text-muted-foreground">
-        <a href="mailto:soporte@opturon.com?subject=Restablecer%20contrasena%20Opturon" className="hover:text-foreground">
+        <a href="/forgot-password" className="hover:text-foreground">
           ¿Olvidaste tu contraseña?
         </a>
         <p className="mt-1 text-xs">
-          Escribinos a soporte y te ayudamos a restablecer el acceso.
+          Te enviaremos un enlace temporal para crear una nueva contraseña.
         </p>
       </div>
       {isDev ? <p className="text-xs text-muted-foreground">Debug status: {debugStatus}</p> : null}

@@ -9,7 +9,7 @@ const links = [
   { href: "/blog", label: "Blog" },
   { href: "/quienes-somos", label: "Quienes Somos" },
   { href: "/contacto", label: "Contacto" },
-  { href: "/bot/inbox", label: "Bot" }
+  { href: "/app", label: "Ingresar" }
 ];
 
 export function Navbar() {
