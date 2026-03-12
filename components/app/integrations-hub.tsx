@@ -8,6 +8,8 @@ import {
   BadgeCheck,
   Cable,
   CalendarDays,
+  CheckCircle2,
+  CopyPlus,
   Instagram,
   LifeBuoy,
   LoaderCircle,
@@ -16,12 +18,14 @@ import {
   PhoneCall,
   PlugZap,
   ShieldAlert,
+  RefreshCw,
   Webhook
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
+import type { PortalWhatsAppTemplate, PortalWhatsAppTemplateBlueprint } from "@/lib/api";
 import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
@@ -97,11 +101,21 @@ const integrations: IntegrationCard[] = [
   }
 ];
 
-export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStatus }) {
+export function IntegrationsHub({
+  whatsapp,
+  templateBlueprints,
+  templates
+}: {
+  whatsapp: WhatsAppConnectionStatus;
+  templateBlueprints: PortalWhatsAppTemplateBlueprint[];
+  templates: PortalWhatsAppTemplate[];
+}) {
   const router = useRouter();
   const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
+  const [liveTemplates, setLiveTemplates] = useState(templates);
   const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
+  const [templatesBusy, setTemplatesBusy] = useState<string | null>(null);
 
   const effectiveState =
     launchState === "launching"
@@ -123,6 +137,13 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStat
       setLiveWhatsApp(json.data);
       router.refresh();
     }
+  }
+
+  async function refreshTemplates() {
+    const response = await fetch("/api/app/integrations/whatsapp/templates", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = (await response.json().catch(() => null)) as { data?: { templates?: PortalWhatsAppTemplate[] } } | null;
+    setLiveTemplates(json?.data?.templates || []);
   }
 
   async function handleMetaConnect() {
@@ -159,6 +180,78 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStat
       toast.error("No pudimos iniciar la conexion", message);
     }
   }
+
+  async function handleCreateTemplate(templateKey: string, language: string) {
+    setTemplatesBusy(templateKey);
+    try {
+      const response = await fetch("/api/app/integrations/whatsapp/templates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ templateKey, language })
+      });
+      const json = (await response.json().catch(() => null)) as
+        | { data?: { template?: PortalWhatsAppTemplate; created?: boolean }; error?: string; detail?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "No pudimos crear la plantilla en Meta.");
+      }
+
+      await refreshTemplates();
+      toast.success(
+        json?.data?.created === false ? "Plantilla ya disponible" : "Plantilla creada",
+        json?.data?.created === false
+          ? "La plantilla ya existia para este workspace y quedo reutilizada."
+          : "La plantilla se envio a Meta y quedo asociada a tu WhatsApp."
+      );
+    } catch (error) {
+      toast.error("No pudimos crear la plantilla", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setTemplatesBusy(null);
+    }
+  }
+
+  async function handleSyncTemplates() {
+    setTemplatesBusy("sync");
+    try {
+      const response = await fetch("/api/app/integrations/whatsapp/templates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "sync" })
+      });
+      const json = (await response.json().catch(() => null)) as
+        | { data?: { syncedCount?: number; templates?: PortalWhatsAppTemplate[] }; error?: string; detail?: string }
+        | null;
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "No pudimos sincronizar estados de templates.");
+      }
+      setLiveTemplates(json?.data?.templates || []);
+      toast.success("Templates sincronizados", `Actualizamos ${json?.data?.syncedCount || 0} templates desde Meta.`);
+    } catch (error) {
+      toast.error("No pudimos sincronizar templates", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setTemplatesBusy(null);
+    }
+  }
+
+  const templatesByKey = useMemo(() => {
+    const map = new Map<string, PortalWhatsAppTemplate>();
+    for (const item of liveTemplates) {
+      const current = map.get(item.templateKey);
+      if (!current) {
+        map.set(item.templateKey, item);
+        continue;
+      }
+      if (new Date(item.updatedAt || 0).getTime() > new Date(current.updatedAt || 0).getTime()) {
+        map.set(item.templateKey, item);
+      }
+    }
+    return map;
+  }, [liveTemplates]);
 
   const readinessItems = [
     {
@@ -353,8 +446,113 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStat
           })}
         </div>
       </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">Plantillas de WhatsApp</h2>
+            <p className="text-sm text-muted">
+              Blueprints base de Opturon para crear templates aprobables por cada WABA sin pedir configuracion manual.
+            </p>
+          </div>
+          <Button variant="secondary" className="rounded-2xl" onClick={() => void handleSyncTemplates()} disabled={templatesBusy === "sync"}>
+            {templatesBusy === "sync" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Sincronizar estados
+          </Button>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {templateBlueprints.map((blueprint) => {
+            const current = templatesByKey.get(blueprint.key) || null;
+            const statusMeta = templateStatusMeta(current?.status || "not_created");
+            const isBusy = templatesBusy === blueprint.key;
+            return (
+              <Card key={blueprint.key} className="border-white/6 bg-card/90">
+                <CardHeader action={<Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>}>
+                  <div>
+                    <CardTitle className="text-lg">{blueprint.title}</CardTitle>
+                    <CardDescription>{blueprint.description}</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-0">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{blueprint.category}</Badge>
+                    <Badge variant="muted">{blueprint.defaultLanguage}</Badge>
+                    {current?.metaTemplateName ? <Badge variant="muted">{current.metaTemplateName}</Badge> : null}
+                  </div>
+
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
+                    {statusMeta.detail}
+                    {current?.rejectionReason ? (
+                      <p className="mt-2 text-sm text-danger">Motivo reportado por Meta: {current.rejectionReason}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      className="rounded-2xl"
+                      onClick={() => void handleCreateTemplate(blueprint.key, blueprint.defaultLanguage)}
+                      disabled={isBusy || liveWhatsApp.state !== "connected"}
+                    >
+                      {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <CopyPlus className="mr-2 h-4 w-4" />}
+                      Crear en mi WhatsApp
+                    </Button>
+                    {current?.status ? (
+                      <div className="inline-flex items-center rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-2 text-sm text-muted">
+                        <CheckCircle2 className="mr-2 h-4 w-4 text-brandBright" />
+                        Estado actual: {statusMeta.label}
+                      </div>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
+}
+
+function templateStatusMeta(status: string): {
+  label: string;
+  detail: string;
+  variant: "muted" | "warning" | "success" | "danger";
+} {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "approved") {
+    return {
+      label: "Aprobada",
+      detail: "La plantilla ya esta aprobada en tu WABA y lista para usarse en automatizaciones futuras.",
+      variant: "success"
+    };
+  }
+  if (normalized === "pending" || normalized === "in_review") {
+    return {
+      label: "En revision",
+      detail: "Meta recibio la plantilla y todavia no termino la aprobacion.",
+      variant: "warning"
+    };
+  }
+  if (normalized === "rejected" || normalized === "paused" || normalized === "disabled") {
+    return {
+      label: "Requiere revision",
+      detail: "Meta no dejo la plantilla operativa. Conviene revisar el copy o crear una variante nueva.",
+      variant: "danger"
+    };
+  }
+  if (normalized === "draft") {
+    return {
+      label: "Borrador",
+      detail: "La plantilla existe en Opturon, pero todavia no fue enviada a Meta para este workspace.",
+      variant: "muted"
+    };
+  }
+  return {
+    label: "Sin crear",
+    detail: "Todavia no existe una version de esta plantilla dentro del WhatsApp Business del tenant.",
+    variant: "muted"
+  };
 }
 
 function StatusStat({

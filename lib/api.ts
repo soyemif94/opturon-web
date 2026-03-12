@@ -280,6 +280,40 @@ export type PortalWhatsAppEmbeddedSignupStatus = {
   onboardingState: "idle" | "pending_meta" | "connected" | "error";
 };
 
+export type PortalWhatsAppTemplateBlueprint = {
+  key: string;
+  title: string;
+  description: string;
+  category: string;
+  defaultLanguage: string;
+  version: number;
+  components: Array<{
+    type: string;
+    text: string;
+    example?: Record<string, unknown>;
+  }>;
+};
+
+export type PortalWhatsAppTemplate = {
+  id: string;
+  clinicId: string;
+  externalTenantId: string;
+  channelId: string | null;
+  wabaId: string;
+  templateKey: string;
+  metaTemplateId: string | null;
+  metaTemplateName: string;
+  language: string;
+  category: string;
+  status: string;
+  rejectionReason: string | null;
+  definition: Record<string, unknown> | null;
+  lastSyncedAt: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export async function getPortalTenantContext(tenantId: string) {
   return backendFetch<{ success: boolean; data: PortalTenantContext }>(`/portal/tenants/${tenantId}/context`, undefined, false);
 }
@@ -335,6 +369,57 @@ export async function finalizePortalWhatsAppEmbeddedSignup(
   }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/finalize`, {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalWhatsAppTemplateBlueprints(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      blueprints: PortalWhatsAppTemplateBlueprint[];
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/templates/blueprints`);
+}
+
+export async function getPortalWhatsAppTemplates(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      templates: PortalWhatsAppTemplate[];
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/templates`);
+}
+
+export async function createPortalWhatsAppTemplateFromBlueprint(
+  tenantId: string,
+  payload: { templateKey: string; language?: string }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      template: PortalWhatsAppTemplate;
+      created: boolean;
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/templates/create-from-blueprint`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function syncPortalWhatsAppTemplates(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      templates: PortalWhatsAppTemplate[];
+      syncedCount: number;
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/templates/sync`, {
+    method: "POST",
+    body: JSON.stringify({})
   });
 }
 
