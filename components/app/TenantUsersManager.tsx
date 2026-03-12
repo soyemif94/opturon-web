@@ -10,6 +10,17 @@ type Props = {
   canManage: boolean;
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  owner: "propietario",
+  manager: "gerente",
+  editor: "editor",
+  viewer: "visualizador"
+};
+
+function roleLabel(role: string) {
+  return ROLE_LABELS[role] || role;
+}
+
 export function TenantUsersManager({ initialUsers, canManage }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
@@ -88,10 +99,10 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Nombre" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
             <select className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
-              <option value="owner">owner</option>
-              <option value="manager">manager</option>
+              <option value="owner">propietario</option>
+              <option value="manager">gerente</option>
               <option value="editor">editor</option>
-              <option value="viewer">viewer</option>
+              <option value="viewer">visualizador</option>
             </select>
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Password temporal" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
           </div>
@@ -103,7 +114,7 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
           </div>
         </form>
       ) : (
-        <p className="text-sm text-muted">Solo owner o manager pueden invitar usuarios.</p>
+        <p className="text-sm text-muted">Solo propietario o gerente pueden invitar usuarios.</p>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
@@ -120,7 +131,7 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
               <tr key={user.id} className="border-t border-[color:var(--border)]">
                 <td className="px-4 py-3">{user.name}</td>
                 <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3">{user.tenantRole}</td>
+                <td className="px-4 py-3 capitalize">{roleLabel(user.tenantRole)}</td>
               </tr>
             ))}
           </tbody>

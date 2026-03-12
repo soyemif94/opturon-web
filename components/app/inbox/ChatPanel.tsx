@@ -9,7 +9,7 @@ import type { DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
 
 function stageLabel(value?: string) {
-  if (!value) return "Sin stage";
+  if (!value) return "Sin etapa";
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
@@ -95,7 +95,7 @@ export function ChatPanel({
                   {responseMode(detail)}
                 </InboxBadge>
                 <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
-                {detail.conversation.priority === "hot" ? <InboxBadge className="text-brandBright">lead caliente</InboxBadge> : null}
+                {detail.conversation.priority === "hot" ? <InboxBadge className="text-brandBright">prospecto caliente</InboxBadge> : null}
                 {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
               </div>
             </div>
@@ -163,7 +163,7 @@ export function ChatPanel({
             <div className="rounded-[24px] border border-[color:var(--border)] bg-card/60 p-4">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                 <Sparkles className="h-3.5 w-3.5 text-brandBright" />
-                <span>Quick actions disponibles para responder, pausar bot o derivar la conversacion.</span>
+                <span>Acciones rapidas disponibles para responder, pausar el bot o derivar la conversacion.</span>
               </div>
             </div>
             {timeline.map((item) =>

@@ -6,12 +6,47 @@ import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
 import type { DetailPayload } from "@/components/app/inbox/types";
 
 const DEAL_STAGES = [
-  ["lead", "Lead"],
-  ["qualified", "Qualified"],
-  ["proposal", "Proposal"],
-  ["won", "Won"],
-  ["lost", "Lost"]
+  ["lead", "Prospecto"],
+  ["qualified", "Calificado"],
+  ["proposal", "Propuesta"],
+  ["won", "Ganado"],
+  ["lost", "Perdido"]
 ] as const;
+
+const DEAL_STAGE_LABELS = new Map<string, string>(DEAL_STAGES);
+
+function conversationStatusLabel(value?: string) {
+  if (!value) return "Sin estado";
+  if (value === "new") return "Nueva";
+  if (value === "closed") return "Cerrada";
+  return value;
+}
+
+function taskStatusLabel(value?: string) {
+  if (!value) return "Sin estado";
+  if (value === "todo") return "Pendiente";
+  if (value === "done") return "Hecha";
+  return value;
+}
+
+function initials(name?: string) {
+  const value = (name || "").trim();
+  if (!value) return "CT";
+  const parts = value.split(/\s+/).slice(0, 2);
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
+}
+
+function stageTone(stage?: string) {
+  if (stage === "won") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+  if (stage === "proposal" || stage === "qualified") return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  if (stage === "lost") return "border-white/10 bg-white/5 text-muted";
+  return "";
+}
+
+function stageLabel(value?: string) {
+  if (!value) return "Sin etapa";
+  return DEAL_STAGE_LABELS.get(value) || value;
+}
 
 type ProfilePanelProps = {
   detail: DetailPayload | null;
@@ -80,16 +115,26 @@ export function ProfilePanel({
     <div className="h-full space-y-4 overflow-y-auto pr-1">
       <CardSection title="Contacto" subtitle="Perfil rapido para contexto y seguimiento">
         <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
-          <p className="text-base font-semibold">{detail.contact?.name || "Sin nombre"}</p>
-          <div className="mt-2 space-y-2 text-sm text-muted">
-            <p className="flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5" />
-              {detail.contact?.phone || "Sin telefono"}
-            </p>
-            <p className="flex items-center gap-2">
-              <UserRound className="h-3.5 w-3.5" />
-              {detail.contact?.email || "Sin email"}
-            </p>
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-brand/20 bg-brand/10 text-sm font-semibold text-brandBright">
+              {initials(detail.contact?.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-lg font-semibold">{detail.contact?.name || "Sin nombre"}</p>
+                <InboxBadge>WhatsApp</InboxBadge>
+              </div>
+              <div className="mt-2 space-y-2 text-sm text-muted">
+                <p className="flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5" />
+                  {detail.contact?.phone || "Sin telefono"}
+                </p>
+                <p className="flex items-center gap-2">
+                  <UserRound className="h-3.5 w-3.5" />
+                  {detail.contact?.email || "Sin email"}
+                </p>
+              </div>
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {(detail.contact?.tags || []).length > 0 ? (
@@ -106,11 +151,24 @@ export function ProfilePanel({
         </div>
       </CardSection>
 
-      <CardSection title="Lead y estado" subtitle="Estado comercial de la conversacion">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <InboxBadge>Prob. {detail.deal?.probability || 0}%</InboxBadge>
-          <InboxBadge>${detail.deal?.value || 0}</InboxBadge>
-          <InboxBadge className="capitalize">{detail.conversation.status}</InboxBadge>
+      <CardSection title="Prospecto y estado" subtitle="Estado comercial de la conversacion">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Estado comercial</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <InboxBadge className="capitalize" active>
+                {stageLabel(detail.deal?.stage)}
+              </InboxBadge>
+              <InboxBadge className="capitalize">{conversationStatusLabel(detail.conversation.status)}</InboxBadge>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Oportunidad</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <InboxBadge className={stageTone(detail.deal?.stage)}>Prob. {detail.deal?.probability || 0}%</InboxBadge>
+              <InboxBadge>${detail.deal?.value || 0}</InboxBadge>
+            </div>
+          </div>
         </div>
         <div className="flex gap-2">
           <select
@@ -145,7 +203,7 @@ export function ProfilePanel({
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
           >
             <UserRound className="h-3.5 w-3.5" />
-            Asignar
+            Asignar responsable
           </button>
           <button
             type="button"
@@ -163,7 +221,7 @@ export function ProfilePanel({
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
           >
             <Archive className="h-3.5 w-3.5" />
-            Archivar
+            Archivar conversacion
           </button>
           {historyHref ? (
             <Link
@@ -214,12 +272,14 @@ export function ProfilePanel({
             <p className="mt-2 leading-6">{new Date(detail.conversation.lastMessageAt).toLocaleString()}</p>
           </div>
           <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 p-3 leading-6">
-            Contacto asociado a una conversacion {detail.conversation.priority === "hot" ? "de alta prioridad" : "activa"} dentro del inbox del cliente.
+            {detail.conversation.priority === "hot"
+              ? "Contacto con prioridad alta. Conviene dar seguimiento comercial rapido para no perder la oportunidad."
+              : "Conversacion activa dentro del inbox, lista para seguimiento comercial y respuesta desde el equipo."}
           </div>
         </div>
       </CardSection>
 
-      <CardSection title="Notas" subtitle="Contexto rapido para el equipo">
+      <CardSection title="Notas" subtitle="Contexto rapido para el equipo comercial">
         <div className="flex gap-2">
           <input
             value={noteText}
@@ -247,13 +307,13 @@ export function ProfilePanel({
         </ul>
       </CardSection>
 
-      <CardSection title="Seguimiento" subtitle="Tareas para continuar la gestion">
+      <CardSection title="Seguimiento" subtitle="Tareas para continuar la gestion del contacto">
         <div className="flex gap-2">
           <input
             value={taskTitle}
             onChange={(event) => onTaskTitleChange(event.target.value)}
             className="w-full rounded-xl border border-[color:var(--border)] bg-bg px-2.5 py-2 text-sm"
-            placeholder="Crear tarea"
+            placeholder="Agendar seguimiento o proximo paso"
             disabled={readOnly}
           />
           <button
@@ -269,7 +329,7 @@ export function ProfilePanel({
           {detail.tasks.slice(0, 6).map((task) => (
             <li key={task.id} className="rounded-xl border border-[color:var(--border)] bg-bg px-3 py-2 text-xs">
               <p className="font-medium">{task.title}</p>
-              <p className="mt-1 text-muted">{task.status}</p>
+              <p className="mt-1 text-muted">{taskStatusLabel(task.status)}</p>
             </li>
           ))}
         </ul>

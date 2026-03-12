@@ -6,7 +6,7 @@ import type { ConversationRowData, FilterKey } from "@/components/app/inbox/type
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "Todas" },
-  { key: "hot", label: "Lead caliente" },
+  { key: "hot", label: "Prospecto caliente" },
   { key: "sin_responder", label: "Esperando respuesta" },
   { key: "nuevas", label: "Nuevas" },
   { key: "asignadas", label: "Asignadas" }
@@ -54,7 +54,7 @@ export function ConversationList({
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-muted">Inbox</p>
             <h2 className="mt-1 text-lg font-semibold">Conversaciones</h2>
-            <p className="mt-1 text-xs text-muted">Busqueda, filtros y atajos para priorizar atencion.</p>
+            <p className="mt-1 text-xs text-muted">WhatsApp en tiempo real, ordenado por ultima actividad y prioridad.</p>
           </div>
           <InboxBadge active={readOnly}>Demo</InboxBadge>
         </div>
@@ -115,8 +115,10 @@ export function ConversationList({
         {!loading && hasLoaded && !errorMessage && rows.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-card/40 px-5 text-center">
             <MessageSquareText className="h-8 w-8 text-muted" />
-            <p className="mt-3 text-base font-semibold">No hay conversaciones para este filtro</p>
-            <p className="mt-1 text-xs leading-6 text-muted">Ajusta la busqueda o limpia filtros para ver todo el inbox.</p>
+            <p className="mt-3 text-base font-semibold">Todavia no hay conversaciones visibles</p>
+            <p className="mt-1 text-xs leading-6 text-muted">
+              Cuando entren mensajes por WhatsApp o limpies los filtros actuales, las conversaciones van a aparecer aqui para gestionarlas desde el portal.
+            </p>
             <button
               type="button"
               onClick={onClearFilters}

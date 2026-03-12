@@ -14,6 +14,10 @@
   --text: #F5F5F5;
   --text-muted: #BDBDBD;
   --border: rgba(255, 255, 255, 0.08);
+  --inbox-system-bubble-bg: rgba(245, 247, 250, 0.94);
+  --inbox-system-bubble-text: #10233f;
+  --inbox-system-bubble-muted: #4e6585;
+  --inbox-system-bubble-border: rgba(245, 247, 250, 0.22);
 }
 
 [data-app-theme="light"] {
@@ -28,6 +32,10 @@
   --text: #10233f;
   --text-muted: #526581;
   --border: rgba(37, 99, 235, 0.12);
+  --inbox-system-bubble-bg: rgba(16, 35, 63, 0.94);
+  --inbox-system-bubble-text: #f4f8ff;
+  --inbox-system-bubble-muted: #b7c6e0;
+  --inbox-system-bubble-border: rgba(16, 35, 63, 0.24);
 }
 
 [data-app-theme="light"] {

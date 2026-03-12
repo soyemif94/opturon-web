@@ -9,21 +9,57 @@ export default async function AppMetricsPage() {
   const data = readSaasData();
   const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
   const metrics = data.tenantMetrics.find((item) => item.tenantId === tenantId);
+  const tenantMessages = data.messages.filter((item) => item.tenantId === tenantId);
+  const botResponses = tenantMessages.filter((item) => item.direction === "system").length;
+  const humanResponses = tenantMessages.filter((item) => item.direction === "outbound").length;
+  const totalInteractions = tenantMessages.length;
+  const botCoverage = totalInteractions > 0 ? Math.round((botResponses / totalInteractions) * 100) : 0;
+  const periodLabel = "Ultimos 30 dias";
 
   const cards = [
-    { label: "Conversaciones", value: String(metrics?.activeConversations || 0), helper: "Conversaciones activas para el cliente." },
-    { label: "Leads", value: String(data.deals.filter((item) => item.tenantId === tenantId).length), helper: "Oportunidades visibles en el pipeline actual." },
-    { label: "Respuestas del bot", value: String(data.messages.filter((item) => item.tenantId === tenantId && item.direction === "system").length), helper: "Intervenciones o eventos asistidos por automatizacion." },
-    { label: "Respuestas humanas", value: String(data.messages.filter((item) => item.tenantId === tenantId && item.direction === "outbound").length), helper: "Mensajes enviados desde el equipo o el workspace." }
+    { label: "Conversaciones", value: String(metrics?.activeConversations || 0), helper: "Conversaciones activas que el equipo puede seguir desde el portal." },
+    { label: "Prospectos", value: String(data.deals.filter((item) => item.tenantId === tenantId).length), helper: "Oportunidades visibles hoy dentro del pipeline comercial." },
+    { label: "Respuestas del bot", value: String(botResponses), helper: "Mensajes automatizados que ayudaron a responder mas rapido." },
+    { label: "Respuestas humanas", value: String(humanResponses), helper: "Mensajes enviados por el equipo desde el workspace." },
+    { label: "Interacciones totales", value: String(totalInteractions), helper: "Volumen total de mensajes trabajados en el periodo visible." },
+    { label: "Cobertura del bot", value: `${botCoverage}%`, helper: "Porcentaje de interacciones donde el bot ya intervino." }
   ];
 
   return (
     <ClientPageShell
       title="Metricas"
-      description="Resumen visual de conversaciones, leads y rendimiento del bot para hacer la propuesta mas clara en demos."
+      description="Entiende rapidamente el impacto del canal, el trabajo del equipo y cuanto valor ya esta aportando la automatizacion en tus conversaciones."
       badge="Analytics"
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <Card className="border-white/6 bg-card/90">
+        <CardHeader action={<Badge variant="outline">{periodLabel}</Badge>}>
+          <div>
+            <CardTitle className="text-xl">Visibilidad comercial del canal</CardTitle>
+            <CardDescription>
+              Estas metricas te ayudan a ver actividad, volumen de conversaciones y cuanto esta aportando el sistema para responder mas rapido.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 pt-0 md:grid-cols-3">
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Periodo</p>
+            <p className="mt-2 text-lg font-semibold">{periodLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Referencia simple para leer el rendimiento del canal sin entrar en reportes tecnicos.</p>
+          </div>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Automatizacion</p>
+            <p className="mt-2 text-lg font-semibold">{botCoverage}% de cobertura</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Mide cuanto de la conversacion ya esta siendo asistida por el bot.</p>
+          </div>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Actividad</p>
+            <p className="mt-2 text-lg font-semibold">{totalInteractions} interacciones</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Volumen total para entender uso real del canal y ritmo de atencion.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <Card key={card.label} className="border-white/6 bg-card/90">
             <CardHeader className="pb-3">
@@ -38,10 +74,10 @@ export default async function AppMetricsPage() {
       </div>
 
       <Card className="border-white/6 bg-card/90">
-        <CardHeader action={<Badge variant="muted">Vista demo</Badge>}>
+        <CardHeader action={<Badge variant="muted">{periodLabel}</Badge>}>
           <div>
             <CardTitle className="text-xl">Comparativa operativa</CardTitle>
-            <CardDescription>Base para sumar graficos reales cuando el backend exponga series temporales.</CardDescription>
+            <CardDescription>Lectura simple para comparar actividad, conversion y participacion del bot sin depender de graficos complejos.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 pt-0 md:grid-cols-2">
