@@ -22,6 +22,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={font.variable}>
+      <head>
+        <meta name="facebook-domain-verification" content="746g3s3mo0hlrfsf1fzvoefep9rrbh" />
+      </head>
       <body className="font-sans bg-bg text-text antialiased">
         {children}
         <Toaster />
