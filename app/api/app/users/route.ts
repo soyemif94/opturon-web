@@ -27,33 +27,73 @@ const updateRoleSchema = z.object({
   role: z.enum(["owner", "manager", "seller", "viewer"])
 });
 
-function mapBackendUserError(error: unknown) {
-  const status = getBackendErrorStatus(error) || 502;
-  const body = getBackendErrorBody(error) as Record<string, unknown> | undefined;
-  const upstreamError = String(body?.error || "portal_user_request_failed");
-  const errorMap: Record<string, string> = {
-    invalid_name: "Ingresa un nombre valido.",
-    invalid_email: "Ingresa un email valido.",
-    invalid_role: "Selecciona un rol valido.",
-    invalid_password: "La password temporal debe tener al menos 6 caracteres.",
-    duplicate_user_email: "Ya existe un usuario con ese email.",
-    cannot_delete_last_owner: "Debe quedar al menos un owner en el workspace.",
-    cannot_delete_current_user: "No puedes eliminar tu propio usuario activo.",
-    portal_internal_key_missing: "Falta configurar PORTAL_INTERNAL_KEY en el portal web."
-  };
-
-  return {
-    status,
-    message: errorMap[upstreamError] || upstreamError
-  };
+function resolveBackendBaseUrl() {
+  return (
+    String(process.env.BACKEND_BASE_URL || "").trim() ||
+    String(process.env.API_BASE_URL || "").trim() ||
+    String(process.env.NEXT_PUBLIC_API_BASE_URL || "").trim() ||
+    (process.env.NODE_ENV === "production" ? "https://opturon-api.onrender.com" : "")
+  );
 }
 
-function requirePortalUsersBackend() {
+function requirePortalUsersBackend(tenantId?: string) {
   if (!isBackendConfigured()) return null;
   if (!isPortalInternalAuthConfigured()) {
-    return NextResponse.json({ error: "portal_internal_key_missing" }, { status: 503 });
+    console.error("[users-route] Missing portal internal key for backend users proxy.", {
+      tenantId,
+      backendBaseUrl: resolveBackendBaseUrl(),
+      hasBackendBaseUrl: Boolean(resolveBackendBaseUrl()),
+      hasPortalInternalKey: false
+    });
+    return NextResponse.json(
+      {
+        error: "portal_internal_key_missing",
+        detail: "PORTAL_INTERNAL_KEY is not configured in opturon-web.",
+        debug: {
+          tenantId: tenantId || null,
+          backendBaseUrl: resolveBackendBaseUrl() || null,
+          hasBackendBaseUrl: Boolean(resolveBackendBaseUrl()),
+          hasPortalInternalKey: false
+        }
+      },
+      { status: 503 }
+    );
   }
   return null;
+}
+
+function proxyUsersBackendError(action: string, tenantId: string, error: unknown, metadata?: Record<string, unknown>) {
+  const status = getBackendErrorStatus(error) || 502;
+  const body = getBackendErrorBody(error);
+  const detail = error instanceof Error ? error.message : String(error);
+  const debug = {
+    action,
+    tenantId,
+    backendBaseUrl: resolveBackendBaseUrl() || null,
+    hasBackendBaseUrl: Boolean(resolveBackendBaseUrl()),
+    hasPortalInternalKey: isPortalInternalAuthConfigured(),
+    ...metadata
+  };
+
+  console.error("[users-route] Backend users proxy failed.", {
+    status,
+    detail,
+    body,
+    ...debug
+  });
+
+  if (body && typeof body === "object") {
+    return NextResponse.json(body, { status });
+  }
+
+  return NextResponse.json(
+    {
+      error: "portal_user_request_failed",
+      detail,
+      debug
+    },
+    { status }
+  );
 }
 
 export async function GET() {
@@ -62,7 +102,7 @@ export async function GET() {
 
   const tenantId = guard.ctx?.tenantId as string;
   if (isBackendConfigured()) {
-    const backendRequirement = requirePortalUsersBackend();
+    const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
       const response = await getPortalUsers(tenantId);
@@ -75,9 +115,7 @@ export async function GET() {
         }))
       });
     } catch (error) {
-      const status = getBackendErrorStatus(error) || 502;
-      const body = getBackendErrorBody(error) as Record<string, unknown> | undefined;
-      return NextResponse.json({ error: String(body?.error || "portal_users_unavailable") }, { status });
+      return proxyUsersBackendError("list_users", tenantId, error);
     }
   }
 
@@ -95,7 +133,7 @@ export async function POST(request: NextRequest) {
   const email = parsed.data.email.toLowerCase();
 
   if (isBackendConfigured()) {
-    const backendRequirement = requirePortalUsersBackend();
+    const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
       const response = await createPortalUser(tenantId, {
@@ -120,8 +158,10 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ ok: true, userId: response.data.user.id }, { status: 201 });
     } catch (error) {
-      const mapped = mapBackendUserError(error);
-      return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+      return proxyUsersBackendError("create_user", tenantId, error, {
+        email,
+        requestedRole: parsed.data.role
+      });
     }
   }
 
@@ -196,7 +236,7 @@ export async function PATCH(request: NextRequest) {
 
   const tenantId = guard.ctx?.tenantId as string;
   if (isBackendConfigured()) {
-    const backendRequirement = requirePortalUsersBackend();
+    const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
       const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role);
@@ -210,8 +250,10 @@ export async function PATCH(request: NextRequest) {
       });
       return NextResponse.json({ ok: true, user: response.data.user });
     } catch (error) {
-      const mapped = mapBackendUserError(error);
-      return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+      return proxyUsersBackendError("update_user_role", tenantId, error, {
+        targetUserId: parsed.data.userId,
+        requestedRole: parsed.data.role
+      });
     }
   }
 
@@ -242,7 +284,7 @@ export async function DELETE(request: NextRequest) {
   const currentUserId = guard.ctx?.userId as string;
 
   if (isBackendConfigured()) {
-    const backendRequirement = requirePortalUsersBackend();
+    const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
       const response = await deletePortalUser(tenantId, userId, currentUserId);
@@ -255,8 +297,10 @@ export async function DELETE(request: NextRequest) {
       });
       return NextResponse.json({ ok: true, userId: response.data.userId });
     } catch (error) {
-      const mapped = mapBackendUserError(error);
-      return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+      return proxyUsersBackendError("delete_user", tenantId, error, {
+        targetUserId: userId,
+        currentUserId
+      });
     }
   }
 
