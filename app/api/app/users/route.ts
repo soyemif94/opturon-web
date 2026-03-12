@@ -8,6 +8,7 @@ import {
   getBackendErrorStatus,
   getPortalUsers,
   isBackendConfigured,
+  isPortalInternalAuthConfigured,
   patchPortalUserRole
 } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
@@ -37,7 +38,8 @@ function mapBackendUserError(error: unknown) {
     invalid_password: "La password temporal debe tener al menos 6 caracteres.",
     duplicate_user_email: "Ya existe un usuario con ese email.",
     cannot_delete_last_owner: "Debe quedar al menos un owner en el workspace.",
-    cannot_delete_current_user: "No puedes eliminar tu propio usuario activo."
+    cannot_delete_current_user: "No puedes eliminar tu propio usuario activo.",
+    portal_internal_key_missing: "Falta configurar PORTAL_INTERNAL_KEY en el portal web."
   };
 
   return {
@@ -46,12 +48,22 @@ function mapBackendUserError(error: unknown) {
   };
 }
 
+function requirePortalUsersBackend() {
+  if (!isBackendConfigured()) return null;
+  if (!isPortalInternalAuthConfigured()) {
+    return NextResponse.json({ error: "portal_internal_key_missing" }, { status: 503 });
+  }
+  return null;
+}
+
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
 
   const tenantId = guard.ctx?.tenantId as string;
   if (isBackendConfigured()) {
+    const backendRequirement = requirePortalUsersBackend();
+    if (backendRequirement) return backendRequirement;
     try {
       const response = await getPortalUsers(tenantId);
       return NextResponse.json({
@@ -83,6 +95,8 @@ export async function POST(request: NextRequest) {
   const email = parsed.data.email.toLowerCase();
 
   if (isBackendConfigured()) {
+    const backendRequirement = requirePortalUsersBackend();
+    if (backendRequirement) return backendRequirement;
     try {
       const response = await createPortalUser(tenantId, {
         email,
@@ -182,6 +196,8 @@ export async function PATCH(request: NextRequest) {
 
   const tenantId = guard.ctx?.tenantId as string;
   if (isBackendConfigured()) {
+    const backendRequirement = requirePortalUsersBackend();
+    if (backendRequirement) return backendRequirement;
     try {
       const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role);
       appendAuditLog({
@@ -226,6 +242,8 @@ export async function DELETE(request: NextRequest) {
   const currentUserId = guard.ctx?.userId as string;
 
   if (isBackendConfigured()) {
+    const backendRequirement = requirePortalUsersBackend();
+    if (backendRequirement) return backendRequirement;
     try {
       const response = await deletePortalUser(tenantId, userId, currentUserId);
       appendAuditLog({

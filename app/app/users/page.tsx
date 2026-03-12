@@ -1,5 +1,5 @@
 import { TenantUsersManager } from "@/components/app/TenantUsersManager";
-import { getPortalUsers, isBackendConfigured } from "@/lib/api";
+import { getPortalUsers, isBackendConfigured, isPortalInternalAuthConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
 
@@ -16,7 +16,7 @@ export default async function AppUsersPage() {
     tenantRole: user.tenantRole
   }));
 
-  if (tenantId && isBackendConfigured()) {
+  if (tenantId && isBackendConfigured() && isPortalInternalAuthConfigured()) {
     try {
       const response = await getPortalUsers(tenantId);
       users = (response.data.users || []).map((user) => ({

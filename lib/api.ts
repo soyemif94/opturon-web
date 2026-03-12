@@ -69,6 +69,10 @@ function getPortalInternalKey() {
   return String(process.env.PORTAL_INTERNAL_KEY || "").trim();
 }
 
+export function isPortalInternalAuthConfigured() {
+  return Boolean(getPortalInternalKey());
+}
+
 export function getBackendErrorStatus(error: unknown): number | undefined {
   if (error && typeof error === "object" && "status" in error) {
     const status = Number((error as BackendError).status);
