@@ -105,7 +105,10 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
         toast.error("Error al actualizar rol", String(message));
         return;
       }
-      setUsers((current) => current.map((user) => (user.id === userId ? { ...user, tenantRole: role } : user)));
+      const json = await safeJson(response);
+      const nextRole = json?.user?.role || role;
+      setUsers((current) => current.map((user) => (user.id === userId ? { ...user, tenantRole: nextRole } : user)));
+      await reloadUsers();
       setFeedback({ tone: "success", text: "Rol actualizado correctamente." });
       toast.success("Rol actualizado");
     } catch {
@@ -129,6 +132,7 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
         return;
       }
       setUsers((current) => current.filter((user) => user.id !== userId));
+      await reloadUsers();
       setFeedback({ tone: "success", text: "Usuario eliminado correctamente." });
       toast.success("Usuario eliminado");
     } catch {

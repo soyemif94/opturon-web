@@ -96,6 +96,19 @@ function proxyUsersBackendError(action: string, tenantId: string, error: unknown
   );
 }
 
+function safeAppendUsersAuditLog(entry: Parameters<typeof appendAuditLog>[0]) {
+  try {
+    appendAuditLog(entry);
+  } catch (error) {
+    console.warn("[users-route] Audit log append failed.", {
+      action: entry.action,
+      entityId: entry.entityId,
+      tenantId: entry.tenantId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
@@ -143,18 +156,14 @@ export async function POST(request: NextRequest) {
         password: parsed.data.password || "demo1234"
       });
 
-      try {
-        appendAuditLog({
-          tenantId,
-          userId: guard.ctx?.userId,
-          action: "tenant_user_invited",
-          entity: "membership",
-          entityId: response.data.user.id,
-          metadata: { role: parsed.data.role, email }
-        });
-      } catch (error) {
-        console.warn("[users-route] Audit log append failed after backend user persistence.", error);
-      }
+      safeAppendUsersAuditLog({
+        tenantId,
+        userId: guard.ctx?.userId,
+        action: "tenant_user_invited",
+        entity: "membership",
+        entityId: response.data.user.id,
+        metadata: { role: parsed.data.role, email }
+      });
 
       return NextResponse.json({ ok: true, userId: response.data.user.id }, { status: 201 });
     } catch (error) {
@@ -240,7 +249,7 @@ export async function PATCH(request: NextRequest) {
     if (backendRequirement) return backendRequirement;
     try {
       const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role);
-      appendAuditLog({
+      safeAppendUsersAuditLog({
         tenantId,
         userId: guard.ctx?.userId,
         action: "tenant_user_role_updated",
@@ -288,7 +297,7 @@ export async function DELETE(request: NextRequest) {
     if (backendRequirement) return backendRequirement;
     try {
       const response = await deletePortalUser(tenantId, userId, currentUserId);
-      appendAuditLog({
+      safeAppendUsersAuditLog({
         tenantId,
         userId: currentUserId,
         action: "tenant_user_deleted",
