@@ -5,6 +5,10 @@ function normalizePath(value?: string) {
   return normalized ? normalized : null;
 }
 
+export function hasExplicitRuntimeDataDir() {
+  return Boolean(normalizePath(process.env.OPTURON_RUNTIME_DATA_DIR) || normalizePath(process.env.OPTURON_DATA_DIR));
+}
+
 export function resolveRuntimeDataDir() {
   return (
     normalizePath(process.env.OPTURON_RUNTIME_DATA_DIR) ||

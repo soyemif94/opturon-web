@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, listTenantMembers, newId, readSaasData, writeSaasData } from "@/lib/saas/store";
+import { hasExplicitRuntimeDataDir, resolveRuntimeDataDir } from "@/lib/runtime-data";
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -27,12 +28,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const isVercelRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
-  if (isVercelRuntime) {
+  const isServerlessRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+  const hasDurableRuntimeStorage = hasExplicitRuntimeDataDir();
+  if (isServerlessRuntime && !hasDurableRuntimeStorage) {
     return NextResponse.json(
       {
         error: "User creation is temporarily unavailable in production",
-        detail: "Local SaaS store is not durable on Vercel runtime"
+        detail: "Tenant users need durable runtime storage. Configure OPTURON_RUNTIME_DATA_DIR or OPTURON_DATA_DIR to a persistent path."
       },
       { status: 503 }
     );
@@ -75,7 +77,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "User was not persisted",
-        detail: error instanceof Error ? error.message : String(error)
+        detail: error instanceof Error ? error.message : String(error),
+        storagePath: resolveRuntimeDataDir()
       },
       { status: 500 }
     );
