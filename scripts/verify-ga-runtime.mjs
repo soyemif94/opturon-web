@@ -1,6 +1,6 @@
 const GA_ID = "G-FL6RVZW90M";
 const REQUIRED_MARKERS = [`googletagmanager.com/gtag/js?id=${GA_ID}`, 'id="ga-init"'];
-const URLS = ["https://www.opturon.com/", "https://www.opturon.com/bot"];
+const URLS = ["https://www.opturon.com/", "https://www.opturon.com/app"];
 
 async function verifyUrl(url) {
   const response = await fetch(url, { redirect: "follow" });

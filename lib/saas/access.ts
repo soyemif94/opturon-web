@@ -33,8 +33,6 @@ export async function requireOpsPage() {
 export async function requireAppPage() {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
-  const isStaff = Boolean(ctx.globalRole && STAFF_ROLES.has(ctx.globalRole));
-  if (!ctx.tenantId && !isStaff) redirect("/bot");
   return ctx;
 }
 

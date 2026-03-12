@@ -9,6 +9,10 @@ export async function middleware(request: NextRequest) {
   const isApp = path.startsWith("/app");
   const isBot = path.startsWith("/bot");
 
+  if (isBot) {
+    return NextResponse.redirect(new URL("/app", request.url));
+  }
+
   if (!isOps && !isApp && !isBot) {
     return NextResponse.next();
   }
@@ -24,10 +28,6 @@ export async function middleware(request: NextRequest) {
 
   if (isOps && !STAFF_ROLES.has(globalRole)) {
     return NextResponse.redirect(new URL("/app", request.url));
-  }
-
-  if (isApp && !token.tenantId && !STAFF_ROLES.has(globalRole)) {
-    return NextResponse.redirect(new URL("/bot", request.url));
   }
 
   return NextResponse.next();

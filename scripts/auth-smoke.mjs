@@ -104,7 +104,7 @@ async function run() {
     csrfToken,
     email: authEmail,
     password: authPassword,
-    callbackUrl: "/bot/inbox",
+    callbackUrl: "/app",
     json: "true"
   });
 
