@@ -42,7 +42,7 @@ export default async function AppContactsPage() {
                   </div>
                   <div className="flex items-center text-sm text-muted">{contact.phone || "-"}</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {(contact.tags.length ? contact.tags : ["lead"]).slice(0, 2).map((tag) => (
+                    {(contact.tags.length ? contact.tags : ["prospecto"]).slice(0, 2).map((tag) => (
                       <Badge key={tag} variant="muted">
                         {tag}
                       </Badge>

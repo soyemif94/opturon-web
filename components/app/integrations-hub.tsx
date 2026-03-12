@@ -70,7 +70,7 @@ const integrations: IntegrationCard[] = [
   {
     id: "webchat",
     name: "Webchat",
-    description: "Recibe leads desde tu sitio web y canalízalos al inbox del equipo.",
+    description: "Recibe prospectos desde tu sitio web y canalízalos al inbox del equipo.",
     state: "connected",
     availability: "disponible",
     cta: "Gestionar widget",
@@ -269,7 +269,7 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppIntegrationSta
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold">Canales e integraciones</h2>
-            <p className="text-sm text-muted">Conexiones disponibles para centralizar atencion, leads y agenda desde un solo workspace.</p>
+            <p className="text-sm text-muted">Conexiones disponibles para centralizar atencion, prospectos y agenda desde un solo workspace.</p>
           </div>
           <Badge variant="muted">Centro de integraciones</Badge>
         </div>

@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ClientPageShell } from "@/components/app/client-page-shell";
 
 const tasks = [
-  { id: "task-1", title: "Responder leads calientes", time: "Hoy · 10:30", status: "Urgente" },
-  { id: "task-2", title: "Confirmar demo comercial", time: "Hoy · 16:00", status: "Pendiente" },
-  { id: "task-3", title: "Revisar consultas sin leer", time: "Mañana · 09:00", status: "Seguimiento" }
+  { id: "task-1", title: "Responder prospectos calientes", time: "Hoy - 10:30", status: "Urgente" },
+  { id: "task-2", title: "Confirmar demo comercial", time: "Hoy - 16:00", status: "Pendiente" },
+  { id: "task-3", title: "Revisar consultas sin leer", time: "Manana - 09:00", status: "Seguimiento" }
 ];
 
 export default function AppAgendaPage() {

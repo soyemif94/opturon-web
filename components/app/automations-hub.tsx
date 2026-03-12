@@ -51,7 +51,7 @@ const modules: AutomationModule[] = [
   },
   {
     id: "lead-capture",
-    name: "Captura de leads",
+    name: "Captura de prospectos",
     description: "Pide datos basicos y ordena el primer contacto comercial.",
     state: "requiere configuracion",
     summary: "Falta definir que datos del prospecto quieres capturar primero.",
