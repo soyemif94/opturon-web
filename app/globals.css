@@ -16,6 +16,32 @@
   --border: rgba(255, 255, 255, 0.08);
 }
 
+[data-app-theme="light"] {
+  --brand: #2563eb;
+  --brand-deep: #1d4ed8;
+  --brand-shade: #1e40af;
+  --brand-bright: #3b82f6;
+
+  --bg: #f4f8ff;
+  --surface: #ffffff;
+  --card: #eef4ff;
+  --text: #10233f;
+  --text-muted: #526581;
+  --border: rgba(37, 99, 235, 0.12);
+}
+
+[data-app-theme="light"] {
+  color-scheme: light;
+}
+
+[data-app-theme="light"] .shadow-brand {
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+}
+
+[data-app-theme="light"] .glow-brand {
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2), 0 16px 40px rgba(37, 99, 235, 0.14);
+}
+
 html,
 body {
   background: var(--bg);
