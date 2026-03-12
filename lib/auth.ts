@@ -1,8 +1,9 @@
 import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
+import { isBackendConfigured, loginPortalUser } from "@/lib/api";
 import { getAuthUserByEmail } from "@/lib/auth-store";
-import type { GlobalRole } from "@/lib/saas/types";
+import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
 function isProduction() {
   return String(process.env.NODE_ENV || "").toLowerCase() === "production";
@@ -12,6 +13,12 @@ function normalizeGlobalRole(role?: string): GlobalRole {
   const allowed: GlobalRole[] = ["superadmin", "ops_admin", "sales_rep", "support_agent", "client"];
   if (role && allowed.includes(role as GlobalRole)) return role as GlobalRole;
   return "client";
+}
+
+function normalizeTenantRole(role?: string): TenantRole | undefined {
+  const allowed: TenantRole[] = ["owner", "manager", "editor", "viewer"];
+  if (role && allowed.includes(role as TenantRole)) return role as TenantRole;
+  return undefined;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -57,6 +64,28 @@ export const authOptions: NextAuthOptions = {
           const email = String(credentials?.email || "").trim().toLowerCase();
           const password = String(credentials?.password || "");
           if (!email || !password) return null;
+
+          if (isBackendConfigured()) {
+            try {
+              const response = await loginPortalUser(email, password);
+              const backendUser = response.data;
+              const globalRole = normalizeGlobalRole(backendUser.globalRole);
+              return {
+                id: backendUser.id,
+                email: backendUser.email,
+                name: backendUser.name,
+                role: globalRole,
+                globalRole,
+                tenantId: backendUser.tenantId,
+                tenantRole: normalizeTenantRole(backendUser.tenantRole)
+              };
+            } catch (error) {
+              const status = error && typeof error === "object" && "status" in error ? Number((error as any).status) : 0;
+              if (status !== 401) {
+                console.error("AUTH_BACKEND_LOGIN_ERROR", { email, status, message: String(error) });
+              }
+            }
+          }
 
           const user = await getAuthUserByEmail(email);
           if (!user) {

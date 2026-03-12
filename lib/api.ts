@@ -1,4 +1,5 @@
 import { readSaasData } from "@/lib/saas/store";
+import type { TenantRole } from "@/lib/saas/types";
 
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
@@ -61,6 +62,10 @@ function getApiBase() {
 
 export function isBackendConfigured() {
   return Boolean(getApiBase());
+}
+
+function getPortalInternalKey() {
+  return String(process.env.PORTAL_INTERNAL_KEY || "").trim();
 }
 
 export function getBackendErrorStatus(error: unknown): number | undefined {
@@ -141,6 +146,18 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function backendPortalFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers || {});
+  const portalKey = getPortalInternalKey();
+
+  if (!portalKey) {
+    throw new Error("PORTAL_INTERNAL_KEY is not configured");
+  }
+
+  headers.set("x-portal-key", portalKey);
+  return backendFetch<T>(path, { ...init, headers }, false);
 }
 
 export type InboxItem = {
@@ -226,6 +243,64 @@ export type PortalTenantContext = {
 
 export async function getPortalTenantContext(tenantId: string) {
   return backendFetch<{ success: boolean; data: PortalTenantContext }>(`/portal/tenants/${tenantId}/context`, undefined, false);
+}
+
+export type PortalUser = {
+  id: string;
+  clinicId: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function getPortalUsers(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      users: PortalUser[];
+    };
+  }>(`/portal/tenants/${tenantId}/users`);
+}
+
+export async function createPortalUser(
+  tenantId: string,
+  payload: { email: string; name: string; role: string; password: string }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      user: PortalUser;
+    };
+  }>(`/portal/tenants/${tenantId}/users`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function loginPortalUser(email: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      email: string;
+      name: string;
+      tenantId: string;
+      tenantRole: TenantRole;
+      globalRole: string;
+    };
+  }>(
+    "/portal/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    },
+    false
+  );
 }
 
 export async function getPortalConversations(tenantId: string) {

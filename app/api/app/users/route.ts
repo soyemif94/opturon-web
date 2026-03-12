@@ -1,6 +1,7 @@
-﻿import { hashSync } from "bcryptjs";
+import { hashSync } from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { createPortalUser, getBackendErrorBody, getBackendErrorStatus, getPortalUsers, isBackendConfigured } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, listTenantMembers, newId, readSaasData, writeSaasData } from "@/lib/saas/store";
 import { hasExplicitRuntimeDataDir, resolveRuntimeDataDir } from "@/lib/runtime-data";
@@ -12,11 +13,47 @@ const createSchema = z.object({
   password: z.string().min(6).optional()
 });
 
+function mapBackendUserError(error: unknown) {
+  const status = getBackendErrorStatus(error) || 502;
+  const body = getBackendErrorBody(error) as Record<string, unknown> | undefined;
+  const upstreamError = String(body?.error || "portal_user_create_failed");
+  const errorMap: Record<string, string> = {
+    invalid_name: "Ingresa un nombre valido.",
+    invalid_email: "Ingresa un email valido.",
+    invalid_role: "Selecciona un rol valido.",
+    invalid_password: "La password temporal debe tener al menos 6 caracteres.",
+    duplicate_user_email: "Ya existe un usuario con ese email."
+  };
+
+  return {
+    status,
+    message: errorMap[upstreamError] || upstreamError
+  };
+}
+
 export async function GET() {
   const guard = await requireAppApi();
   if (guard.error) return guard.error;
 
   const tenantId = guard.ctx?.tenantId as string;
+  if (isBackendConfigured()) {
+    try {
+      const response = await getPortalUsers(tenantId);
+      return NextResponse.json({
+        users: (response.data.users || []).map((user) => ({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          tenantRole: user.role
+        }))
+      });
+    } catch (error) {
+      const status = getBackendErrorStatus(error) || 502;
+      const body = getBackendErrorBody(error) as Record<string, unknown> | undefined;
+      return NextResponse.json({ error: String(body?.error || "portal_users_unavailable") }, { status });
+    }
+  }
+
   return NextResponse.json({ users: listTenantMembers(tenantId) });
 }
 
@@ -26,6 +63,41 @@ export async function POST(request: NextRequest) {
   const tenantRole = guard.ctx?.tenantRole;
   if (tenantRole !== "owner" && tenantRole !== "manager") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const parsed = createSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+  const tenantId = guard.ctx?.tenantId as string;
+  const email = parsed.data.email.toLowerCase();
+
+  if (isBackendConfigured()) {
+    try {
+      const response = await createPortalUser(tenantId, {
+        email,
+        name: parsed.data.name,
+        role: parsed.data.role,
+        password: parsed.data.password || "demo1234"
+      });
+
+      try {
+        appendAuditLog({
+          tenantId,
+          userId: guard.ctx?.userId,
+          action: "tenant_user_invited",
+          entity: "membership",
+          entityId: response.data.user.id,
+          metadata: { role: parsed.data.role, email }
+        });
+      } catch (error) {
+        console.warn("[users-route] Audit log append failed after backend user persistence.", error);
+      }
+
+      return NextResponse.json({ ok: true, userId: response.data.user.id }, { status: 201 });
+    } catch (error) {
+      const mapped = mapBackendUserError(error);
+      return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    }
   }
 
   const isServerlessRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
@@ -40,13 +112,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-
-  const tenantId = guard.ctx?.tenantId as string;
   const data = readSaasData();
-  const email = parsed.data.email.toLowerCase();
-
   let user = data.users.find((item) => item.email.toLowerCase() === email);
   if (!user) {
     user = {
@@ -99,4 +165,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });
 }
-
