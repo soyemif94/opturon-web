@@ -372,6 +372,35 @@ export async function finalizePortalWhatsAppEmbeddedSignup(
   });
 }
 
+export async function connectPortalWhatsAppManual(
+  tenantId: string,
+  payload: {
+    wabaId: string;
+    phoneNumberId: string;
+    accessToken: string;
+    channelName?: string | null;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      status: "connected" | "pending_meta";
+      channel: PortalTenantContext["channel"] | null;
+      validation: {
+        wabaName: string | null;
+        displayPhoneNumber: string | null;
+        verifiedName: string | null;
+        subscriptionOk: boolean;
+      };
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/manual-connect`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getPortalWhatsAppTemplateBlueprints(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;

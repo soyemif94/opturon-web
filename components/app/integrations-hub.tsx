@@ -19,11 +19,13 @@ import {
   PlugZap,
   ShieldAlert,
   RefreshCw,
+  KeyRound,
   Webhook
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { PortalWhatsAppTemplate, PortalWhatsAppTemplateBlueprint } from "@/lib/api";
 import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
@@ -116,6 +118,13 @@ export function IntegrationsHub({
   const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
   const [templatesBusy, setTemplatesBusy] = useState<string | null>(null);
+  const [manualForm, setManualForm] = useState({
+    wabaId: "",
+    phoneNumberId: "",
+    accessToken: "",
+    channelName: ""
+  });
+  const [manualBusy, setManualBusy] = useState(false);
 
   const effectiveState =
     launchState === "launching"
@@ -178,6 +187,50 @@ export function IntegrationsHub({
       });
       setLaunchMessage(message);
       toast.error("No pudimos iniciar la conexion", message);
+    }
+  }
+
+  async function handleManualConnect() {
+    setManualBusy(true);
+    try {
+      const response = await fetch("/api/app/integrations/whatsapp/manual-connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(manualForm)
+      });
+      const json = (await response.json().catch(() => null)) as
+        | {
+            data?: {
+              status?: "connected" | "pending_meta";
+              validation?: {
+                displayPhoneNumber?: string | null;
+                verifiedName?: string | null;
+                wabaName?: string | null;
+              };
+            };
+            error?: string;
+            detail?: string;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "No pudimos validar el canal en Meta.");
+      }
+
+      await refreshWhatsAppStatus();
+      router.refresh();
+      toast.success(
+        json?.data?.status === "connected" ? "WhatsApp conectado" : "Conexion validada",
+        json?.data?.status === "connected"
+          ? `El canal ${json?.data?.validation?.displayPhoneNumber || manualForm.phoneNumberId} ya quedo asociado a tu workspace.`
+          : "La validacion salio bien, pero falta terminar la suscripcion de la app en Meta."
+      );
+    } catch (error) {
+      toast.error("No pudimos conectar el canal", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setManualBusy(false);
     }
   }
 
@@ -445,6 +498,101 @@ export function IntegrationsHub({
             );
           })}
         </div>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="warning">Alternativa manual</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Conexion manual asistida</CardTitle>
+              <CardDescription>
+                Mientras Meta habilita Embedded Signup para Tech Providers, puedes vincular tu canal validando los datos reales contra Graph.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
+              No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el token del canal para asociarlo al workspace correcto.
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm">
+                <span className="font-medium">WABA ID</span>
+                <Input
+                  value={manualForm.wabaId}
+                  onChange={(event) => setManualForm((current) => ({ ...current, wabaId: event.target.value }))}
+                  placeholder="Ej. 123456789012345"
+                  disabled={manualBusy}
+                />
+              </label>
+              <label className="space-y-2 text-sm">
+                <span className="font-medium">Phone Number ID</span>
+                <Input
+                  value={manualForm.phoneNumberId}
+                  onChange={(event) => setManualForm((current) => ({ ...current, phoneNumberId: event.target.value }))}
+                  placeholder="Ej. 109876543210987"
+                  disabled={manualBusy}
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+              <label className="space-y-2 text-sm">
+                <span className="font-medium">Access Token</span>
+                <Input
+                  type="password"
+                  value={manualForm.accessToken}
+                  onChange={(event) => setManualForm((current) => ({ ...current, accessToken: event.target.value }))}
+                  placeholder="Pega aca el token temporal o permanente"
+                  disabled={manualBusy}
+                />
+              </label>
+              <label className="space-y-2 text-sm">
+                <span className="font-medium">Nombre del canal (opcional)</span>
+                <Input
+                  value={manualForm.channelName}
+                  onChange={(event) => setManualForm((current) => ({ ...current, channelName: event.target.value }))}
+                  placeholder="Sucursal Palermo"
+                  disabled={manualBusy}
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button className="rounded-2xl" onClick={() => void handleManualConnect()} disabled={manualBusy}>
+                {manualBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                Conectar manualmente
+              </Button>
+              <Button asChild variant="ghost" className="rounded-2xl">
+                <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
+                  Necesito ayuda con mis datos
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">Checklist</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Que valida Opturon</CardTitle>
+              <CardDescription>Antes de asociar el canal al tenant, validamos acceso real en Meta para evitar cruces entre workspaces.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {[
+              "El token permite leer la WABA indicada.",
+              "El Phone Number ID existe y es accesible con ese token.",
+              "El numero realmente pertenece a esa WABA.",
+              "El canal no esta ya asociado a otro workspace.",
+              "Si la suscripcion de la app falla, el canal queda pendiente y no se pierde la validacion."
+            ].map((item) => (
+              <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
+                {item}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </section>
 
       <section className="space-y-4">
