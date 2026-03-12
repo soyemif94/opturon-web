@@ -366,6 +366,27 @@ export async function getPortalConversations(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/conversations`, undefined, false);
 }
 
+export type PortalContact = {
+  id: string;
+  clinicId: string;
+  waId: string | null;
+  phone: string | null;
+  name: string;
+  optedOut: boolean;
+  lastInteractionAt: string | null;
+  conversationCount: number;
+};
+
+export async function getPortalContacts(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      contacts: PortalContact[];
+    };
+  }>(`/portal/tenants/${tenantId}/contacts`, undefined, false);
+}
+
 export async function getPortalConversationDetail(tenantId: string, conversationId: string) {
   return backendFetch<{ success: boolean; data: any }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}`,

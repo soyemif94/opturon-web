@@ -1,7 +1,7 @@
 import { ClientOnboardingChecklist } from "@/components/app/client-onboarding-checklist";
 import { AppDashboard } from "@/components/app/app-dashboard";
 import { canManageWorkspace } from "@/lib/app-permissions";
-import { getPortalConversations, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { getPortalContacts, getPortalConversations, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { getInboxConversationDetail, listInboxConversations, readSaasData } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
@@ -11,44 +11,69 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   const canManage = canManageWorkspace(ctx);
   const sp = await searchParams;
   const isDemo = sp.demo === "1";
+  const useLocalDemoData = !ctx.tenantId || !isBackendConfigured();
 
   const data = readSaasData();
   const tenantId = ctx.tenantId || sp.tenantId || data.tenants[0]?.id || "";
-  const tenant = data.tenants.find((item) => item.id === tenantId);
-  const contacts = data.contacts.filter((item) => item.tenantId === tenantId);
-  const businessSettings = Array.isArray(data.businessSettings)
+  const tenant = useLocalDemoData ? data.tenants.find((item) => item.id === tenantId) : null;
+  const businessSettings = useLocalDemoData && Array.isArray(data.businessSettings)
     ? data.businessSettings.find((item) => item?.tenantId === tenantId) || null
     : null;
   const isBackendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "workspace_without_backend" });
-  let conversations = listInboxConversations(tenantId);
+  let conversations = useLocalDemoData ? listInboxConversations(tenantId) : [];
+  let contacts: Array<{ id: string; name: string; phone?: string | null; tags?: string[]; lastInteractionAt?: string | null }> = useLocalDemoData
+    ? data.contacts
+        .filter((item) => item.tenantId === tenantId)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          phone: item.phone || null,
+          tags: item.tags || [],
+          lastInteractionAt: null
+        }))
+    : [];
+  let tenantName = tenant?.name || "Tu empresa";
+  let tenantIndustry = tenant?.industry || "Negocio digital";
+  let botResponses = useLocalDemoData ? data.messages.filter((item) => item.tenantId === tenantId && item.direction === "system").length : 0;
+  let humanResponses = useLocalDemoData ? data.messages.filter((item) => item.tenantId === tenantId && item.direction === "outbound").length : 0;
 
   if (ctx.tenantId && isBackendReady) {
     try {
-      const [contextResult, conversationsResult] = await Promise.all([
+      const [contextResult, conversationsResult, contactsResult] = await Promise.all([
         getPortalTenantContext(ctx.tenantId),
-        getPortalConversations(ctx.tenantId)
+        getPortalConversations(ctx.tenantId),
+        getPortalContacts(ctx.tenantId)
       ]);
 
       whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data });
+      tenantName = contextResult.data.clinic?.name || tenantName;
+      tenantIndustry = "Workspace conectado";
       const portalConversations = Array.isArray(conversationsResult.data?.conversations)
         ? conversationsResult.data.conversations
         : [];
+      const portalContacts = Array.isArray(contactsResult.data?.contacts) ? contactsResult.data.contacts : [];
 
-      if (portalConversations.length > 0) {
-        conversations = portalConversations;
-      }
+      conversations = portalConversations;
+      contacts = portalContacts.map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        phone: contact.phone || "",
+        tags: contact.optedOut ? ["sin contacto"] : ["prospecto"],
+        lastInteractionAt: contact.lastInteractionAt
+      }));
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
+      conversations = [];
+      contacts = [];
     }
   }
 
   const hasWhatsAppChannel = hasOperationalWhatsAppChannel(whatsapp);
-  const messages = data.messages.filter((item) => item.tenantId === tenantId);
-  const outboundMessages = messages.filter((item) => item.direction !== "inbound");
+  const outboundMessages = humanResponses + botResponses;
   const avgResponseMinutes = conversations.length > 0 ? Math.round(conversations.reduce((acc, item) => acc + item.slaMinutes, 0) / conversations.length) : 0;
   const latestConversation = conversations[0];
-  const latestDetail = latestConversation ? getInboxConversationDetail(tenantId, latestConversation.id) : null;
+  const latestDetail = useLocalDemoData && latestConversation ? getInboxConversationDetail(tenantId, latestConversation.id) : null;
   const hasBusinessProfile =
     Boolean(businessSettings?.openingHours?.trim()) ||
     Boolean(businessSettings?.address?.trim()) ||
@@ -104,13 +129,25 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       : [])
   ];
   const completedCount = onboardingSteps.filter((step) => step.status === "complete").length;
+  const dashboardContacts = contacts.slice(0, 5).map((contact) => ({
+    id: contact.id,
+    name: contact.name,
+    phone: contact.phone || "-",
+    tags: "tags" in contact && Array.isArray(contact.tags) && contact.tags.length > 0 ? contact.tags : ["prospecto"],
+    lastInteraction:
+      "lastInteractionAt" in contact && contact.lastInteractionAt
+        ? relativeLabel(String(contact.lastInteractionAt))
+        : latestConversation
+          ? relativeLabel(latestConversation.lastMessageAt)
+          : "Sin actividad"
+  }));
 
   return (
     <div className="space-y-8">
       <ClientOnboardingChecklist steps={onboardingSteps} completedCount={completedCount} />
       <AppDashboard
-        tenantName={tenant?.name || "Tu empresa"}
-        tenantIndustry={tenant?.industry || "Negocio digital"}
+        tenantName={tenantName}
+        tenantIndustry={tenantIndustry}
         demoMode={isDemo}
         hasWhatsAppChannel={hasWhatsAppChannel}
         channelStatus={
@@ -147,8 +184,8 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           },
           {
             label: "Mensajes automatizados",
-            value: String(outboundMessages.length),
-            helper: "Mensajes salientes o eventos del bot detectados en el dataset actual.",
+            value: String(botResponses),
+            helper: "Mensajes automatizados visibles para este workspace.",
             icon: "bot"
           },
           {
@@ -162,8 +199,12 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           {
             id: "activity-conversation",
             title: latestDetail?.contact?.name ? `Nueva actividad con ${latestDetail.contact.name}` : "Conversacion reciente",
-            detail: latestDetail?.messages?.at(-1)?.text || "La actividad del inbox aparecera aqui.",
-            timeLabel: latestDetail?.conversation?.lastMessageAt ? relativeLabel(latestDetail.conversation.lastMessageAt) : "Sin actividad",
+            detail: latestDetail?.messages?.at(-1)?.text || latestConversation?.lastMessagePreview || "La actividad del inbox aparecera aqui.",
+            timeLabel: latestDetail?.conversation?.lastMessageAt
+              ? relativeLabel(latestDetail.conversation.lastMessageAt)
+              : latestConversation?.lastMessageAt
+                ? relativeLabel(latestConversation.lastMessageAt)
+                : "Sin actividad",
             tone: "neutral"
           },
           {
@@ -185,13 +226,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
             tone: hasWhatsAppChannel ? "success" : "warning"
           }
         ]}
-        contacts={contacts.slice(0, 5).map((contact) => ({
-          id: contact.id,
-          name: contact.name,
-          phone: contact.phone || "-",
-          tags: contact.tags.length > 0 ? contact.tags : ["prospecto"],
-          lastInteraction: latestConversation ? relativeLabel(latestConversation.lastMessageAt) : "Sin actividad"
-        }))}
+        contacts={dashboardContacts}
         quickLinks={[
           { label: "Abrir inbox", href: "/app/inbox", helper: "Ir a la vista completa de conversaciones y chat." },
           { label: "Gestionar contactos", href: "/app/contacts", helper: "Ver CRM simple con tags y ultima interaccion." },

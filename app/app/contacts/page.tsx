@@ -1,15 +1,43 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import { getPortalContacts, isBackendConfigured, type PortalContact } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { listInboxConversations, readSaasData } from "@/lib/saas/store";
 
 export default async function AppContactsPage() {
   const ctx = await requireAppPage();
-  const data = readSaasData();
-  const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
-  const contacts = data.contacts.filter((item) => item.tenantId === tenantId);
-  const conversations = listInboxConversations(tenantId);
+  const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
+  let contacts: Array<PortalContact & { email?: string | null; industry?: string | null; tags?: string[] }> = [];
+
+  if (ctx.tenantId && backendReady) {
+    try {
+      const result = await getPortalContacts(ctx.tenantId);
+      contacts = Array.isArray(result.data?.contacts) ? result.data.contacts : [];
+    } catch {
+      contacts = [];
+    }
+  } else {
+    const data = readSaasData();
+    const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
+    const conversations = listInboxConversations(tenantId);
+    contacts = data.contacts
+      .filter((item) => item.tenantId === tenantId)
+      .map((item) => ({
+        id: item.id,
+        clinicId: tenantId,
+        waId: item.phone || null,
+        phone: item.phone || null,
+        name: item.name,
+        optedOut: false,
+        lastInteractionAt: conversations.find((row) => row.contact?.id === item.id)?.lastMessageAt || null,
+        conversationCount: conversations.filter((row) => row.contact?.id === item.id).length,
+        email: item.email || null,
+        industry: item.industry || null,
+        tags: item.tags || []
+      }));
+    contacts.sort((a, b) => new Date(b.lastInteractionAt || 0).getTime() - new Date(a.lastInteractionAt || 0).getTime());
+  }
 
   return (
     <ClientPageShell
@@ -32,28 +60,25 @@ export default async function AppContactsPage() {
               <span>Etiqueta</span>
               <span>Ultima interaccion</span>
             </div>
-            {contacts.map((contact) => {
-              const conversation = conversations.find((item) => item.contact?.id === contact.id);
-              return (
-                <div key={contact.id} className="grid grid-cols-[minmax(0,1.1fr)_180px_180px_160px] gap-4 border-b border-[color:var(--border)] px-4 py-4 last:border-b-0">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{contact.name}</p>
-                    <p className="mt-1 truncate text-sm text-muted">{contact.email || contact.industry || "Sin email"}</p>
-                  </div>
-                  <div className="flex items-center text-sm text-muted">{contact.phone || "-"}</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(contact.tags.length ? contact.tags : ["prospecto"]).slice(0, 2).map((tag) => (
-                      <Badge key={tag} variant="muted">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex items-center text-sm text-muted">
-                    {conversation ? relativeLabel(conversation.lastMessageAt) : "Sin interaccion"}
-                  </div>
+            {contacts.map((contact) => (
+              <div key={contact.id} className="grid grid-cols-[minmax(0,1.1fr)_180px_180px_160px] gap-4 border-b border-[color:var(--border)] px-4 py-4 last:border-b-0">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{contact.name}</p>
+                  <p className="mt-1 truncate text-sm text-muted">{contact.email || contact.industry || contact.waId || "Sin contexto"}</p>
                 </div>
-              );
-            })}
+                <div className="flex items-center text-sm text-muted">{contact.phone || "-"}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {((contact.tags && contact.tags.length > 0 ? contact.tags : ["prospecto"]).slice(0, 2)).map((tag) => (
+                    <Badge key={tag} variant="muted">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex items-center text-sm text-muted">
+                  {contact.lastInteractionAt ? relativeLabel(contact.lastInteractionAt) : "Sin interaccion"}
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
