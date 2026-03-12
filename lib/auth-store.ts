@@ -1,5 +1,6 @@
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { getPasswordOverride } from "@/lib/password-reset-store";
+import { resolveSaasDataFile } from "@/lib/runtime-data";
 
 export type AuthUser = {
   id: string;
@@ -19,8 +20,7 @@ function normalizeRole(input?: string): GlobalRole {
 
 async function readJsonAuthStore() {
   const fs = await import("node:fs");
-  const path = await import("node:path");
-  const dataPath = path.join(process.cwd(), "data", "saas.json");
+  const dataPath = resolveSaasDataFile();
   if (!fs.existsSync(dataPath)) return null;
   const raw = fs.readFileSync(dataPath, "utf8");
   const db = JSON.parse(raw) as { users?: any[]; memberships?: any[] };

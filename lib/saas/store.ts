@@ -1,5 +1,5 @@
 ﻿import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { statSync } from "node:fs";
 import type {
   AuditLog,
   BusinessSettings,
@@ -21,10 +21,12 @@ import type {
   Template,
   User
 } from "@/lib/saas/types";
+import { resolveRuntimeDataDir, resolveSaasDataFile } from "@/lib/runtime-data";
 
-const DATA_DIR = join(process.cwd(), "data");
-const DATA_FILE = join(DATA_DIR, "saas.json");
+const DATA_DIR = resolveRuntimeDataDir();
+const DATA_FILE = resolveSaasDataFile();
 let memoryStore: SaasData | null = null;
+let memoryStoreVersion: number | null = null;
 let warnedAboutMemoryStore = false;
 
 const DEFAULT_TEMPLATES: IndustryTemplate[] = [
@@ -160,6 +162,15 @@ function ensureArray<T>(value: T[] | undefined | null): T[] {
   return Array.isArray(value) ? value : [];
 }
 
+function currentStoreVersion() {
+  try {
+    if (!existsSync(DATA_FILE)) return null;
+    return statSync(DATA_FILE).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeData(parsed?: Partial<SaasData> | null): SaasData {
   const base = emptyData();
   if (!parsed) return base;
@@ -188,12 +199,14 @@ function normalizeData(parsed?: Partial<SaasData> | null): SaasData {
 }
 
 export function readSaasData(): SaasData {
-  if (memoryStore) return cloneData(memoryStore);
+  const version = currentStoreVersion();
+  if (memoryStore && memoryStoreVersion === version) return cloneData(memoryStore);
 
   try {
     if (!existsSync(DATA_FILE)) {
       const data = normalizeData();
       memoryStore = cloneData(data);
+      memoryStoreVersion = null;
       return cloneData(data);
     }
 
@@ -201,11 +214,13 @@ export function readSaasData(): SaasData {
     const parsed = JSON.parse(raw) as Partial<SaasData>;
     const data = normalizeData(parsed);
     memoryStore = cloneData(data);
+    memoryStoreVersion = version;
     return cloneData(data);
   } catch (error) {
     warnMemoryStore(error);
     const data = normalizeData();
     memoryStore = cloneData(data);
+    memoryStoreVersion = version;
     return cloneData(data);
   }
 }
@@ -217,6 +232,7 @@ export function writeSaasData(data: SaasData): void {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
     writeFileSync(DATA_FILE, JSON.stringify(normalized, null, 2), "utf8");
     memoryStore = cloneData(normalized);
+    memoryStoreVersion = currentStoreVersion();
   } catch (error) {
     throw new Error(
       `[saas-store] Persist failed for ${DATA_FILE}: ${error instanceof Error ? error.message : String(error)}`
