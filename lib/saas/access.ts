@@ -35,7 +35,10 @@ export async function requireAppPage(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
   const permission = options?.permission || "view_workspace";
-  if (!hasAppPermission(ctx, permission)) redirect("/app");
+  if (!hasAppPermission(ctx, permission)) {
+    if (!hasAppPermission(ctx, "view_workspace")) redirect("/login?callbackUrl=/app");
+    redirect("/app");
+  }
   return ctx;
 }
 

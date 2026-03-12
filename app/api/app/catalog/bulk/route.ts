@@ -8,7 +8,7 @@ function noStore(response: NextResponse) {
 }
 
 export async function POST(request: NextRequest) {
-  const tenantContext = await resolveAppTenant({ requireWrite: true });
+  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) {
     return noStore(NextResponse.json({ error: "catalog_backend_unavailable" }, { status: 503 }));

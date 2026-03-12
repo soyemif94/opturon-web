@@ -10,7 +10,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
-import { canEditWorkspace, canManageUsers, canManageWorkspace } from "@/lib/app-permissions";
+import { canAccessAppModule, canEditWorkspace, canManageUsers, canManageWorkspace } from "@/lib/app-permissions";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 import { timeAgo } from "@/lib/ui/format";
@@ -364,37 +364,37 @@ export function CommandPalette({
 
   const rootItems = useMemo<PaletteItem[]>(() => {
     const items: PaletteItem[] = [
-      {
+      ...(canAccessAppModule(runtime, "inbox") ? [{
         id: "nav-inbox",
-        group: mode === "inbox" || mode === "conversation" ? "inbox" : "navigation",
+        group: (mode === "inbox" || mode === "conversation" ? "inbox" : "navigation") as CommandGroup,
         label: "Ir a Inbox",
         description: "/app/inbox",
         icon: <MessageSquare className="h-4 w-4" />,
         shortcut: "G I",
         preview: () => ({ title: "Ir a Inbox", description: "Vista principal de conversaciones." }),
         run: async () => router.push("/app/inbox")
-      },
-      {
+      }] : []),
+      ...(canAccessAppModule(runtime, "catalog") ? [{
         id: "nav-catalog",
-        group: "navigation",
+        group: "navigation" as const,
         label: "Ir a Catalogo",
         description: "/app/catalog",
         icon: <Package className="h-4 w-4" />,
         shortcut: "G C",
         preview: () => ({ title: "Ir a Catalogo", description: "Gestion de productos." }),
         run: async () => router.push("/app/catalog")
-      },
-      {
+      }] : []),
+      ...(canAccessAppModule(runtime, "orders") ? [{
         id: "nav-orders",
-        group: "navigation",
+        group: "navigation" as const,
         label: "Ir a Pedidos",
         description: "/app/orders",
         icon: <Package className="h-4 w-4" />,
         preview: () => ({ title: "Ir a Pedidos", description: "Listado operativo de pedidos del portal." }),
         run: async () => router.push("/app/orders")
-      },
-      ...(canManage ? [{ id: "nav-faq", group: "navigation" as const, label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") }] : []),
-      ...(canManage ? [{ id: "nav-business", group: "navigation" as const, label: "Ir a Negocio", description: "/app/business", run: async () => router.push("/app/business") }] : []),
+      }] : []),
+      ...(canAccessAppModule(runtime, "faqs") ? [{ id: "nav-faq", group: "navigation" as const, label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") }] : []),
+      ...(canAccessAppModule(runtime, "business") ? [{ id: "nav-business", group: "navigation" as const, label: "Ir a Negocio", description: "/app/business", run: async () => router.push("/app/business") }] : []),
       ...(canManageTeam ? [{
         id: "nav-users",
         group: "navigation" as const,
@@ -405,7 +405,7 @@ export function CommandPalette({
       }] : []),
       {
         id: "ops-tenants",
-        group: "navigation",
+        group: "navigation" as const,
         label: "Ir a Clientes",
         description: "/ops/tenants",
         icon: <Building2 className="h-4 w-4" />,
@@ -414,7 +414,7 @@ export function CommandPalette({
       },
       {
         id: "ops-dashboard",
-        group: "navigation",
+        group: "navigation" as const,
         label: "Ir a Dashboard Ops",
         description: "/ops",
         icon: <Shield className="h-4 w-4" />,

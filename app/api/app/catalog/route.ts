@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const tenantContext = await resolveAppTenant({ requireWrite: true });
+  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return backendUnavailable();
 

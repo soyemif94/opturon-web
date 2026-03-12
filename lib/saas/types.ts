@@ -1,5 +1,5 @@
 ﻿export type GlobalRole = "superadmin" | "ops_admin" | "sales_rep" | "support_agent" | "client";
-export type TenantRole = "owner" | "manager" | "editor" | "viewer";
+export type TenantRole = "owner" | "manager" | "seller" | "viewer";
 
 export type TenantStatus = "active" | "trial" | "at_risk" | "cancelled";
 export type TaskStatus = "todo" | "in_progress" | "done";

@@ -1,6 +1,25 @@
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
-export type AppPermission = "view_workspace" | "edit_workspace" | "manage_workspace" | "manage_users";
+export type AppPermission =
+  | "view_workspace"
+  | "edit_workspace"
+  | "manage_workspace"
+  | "manage_users"
+  | "manage_catalog";
+export type AppModule =
+  | "home"
+  | "inbox"
+  | "contacts"
+  | "catalog"
+  | "orders"
+  | "agenda"
+  | "metrics"
+  | "integrations"
+  | "settings"
+  | "automations"
+  | "faqs"
+  | "business"
+  | "users";
 
 type AccessContext = {
   globalRole?: GlobalRole;
@@ -14,27 +33,46 @@ const TENANT_ROLE_PERMISSIONS: Record<TenantRole, Record<AppPermission, boolean>
     view_workspace: true,
     edit_workspace: true,
     manage_workspace: true,
-    manage_users: true
+    manage_users: true,
+    manage_catalog: true
   },
   manager: {
     view_workspace: true,
     edit_workspace: true,
     manage_workspace: true,
-    manage_users: true
+    manage_users: false,
+    manage_catalog: true
   },
-  editor: {
+  seller: {
     view_workspace: true,
     edit_workspace: true,
     manage_workspace: false,
-    manage_users: false
+    manage_users: false,
+    manage_catalog: false
   },
   viewer: {
     view_workspace: true,
     edit_workspace: false,
     manage_workspace: false,
-    manage_users: false
+    manage_users: false,
+    manage_catalog: false
   }
 };
+
+const TENANT_ROLE_MODULES: Record<TenantRole, AppModule[]> = {
+  owner: ["home", "inbox", "contacts", "catalog", "orders", "agenda", "metrics", "integrations", "settings", "automations", "faqs", "business", "users"],
+  manager: ["home", "inbox", "contacts", "catalog", "orders", "agenda", "metrics", "integrations", "settings", "automations", "faqs", "business"],
+  seller: ["home", "inbox", "contacts", "agenda", "orders", "catalog"],
+  viewer: ["home", "inbox", "orders", "catalog", "metrics"]
+};
+
+export function normalizeTenantRole(role?: string): TenantRole | undefined {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "editor") return "seller";
+  const allowed: TenantRole[] = ["owner", "manager", "seller", "viewer"];
+  if (allowed.includes(normalized as TenantRole)) return normalized as TenantRole;
+  return undefined;
+}
 
 export function isStaffRole(role?: GlobalRole) {
   return Boolean(role && STAFF_ROLES.has(role));
@@ -42,8 +80,16 @@ export function isStaffRole(role?: GlobalRole) {
 
 export function hasAppPermission(context: AccessContext, permission: AppPermission) {
   if (isStaffRole(context.globalRole)) return true;
-  if (!context.tenantRole) return false;
-  return TENANT_ROLE_PERMISSIONS[context.tenantRole]?.[permission] === true;
+  const tenantRole = normalizeTenantRole(context.tenantRole);
+  if (!tenantRole) return false;
+  return TENANT_ROLE_PERMISSIONS[tenantRole]?.[permission] === true;
+}
+
+export function canAccessAppModule(context: AccessContext, module: AppModule) {
+  if (isStaffRole(context.globalRole)) return true;
+  const tenantRole = normalizeTenantRole(context.tenantRole);
+  if (!tenantRole) return false;
+  return TENANT_ROLE_MODULES[tenantRole].includes(module);
 }
 
 export function canViewWorkspace(context: AccessContext) {
@@ -60,4 +106,8 @@ export function canManageWorkspace(context: AccessContext) {
 
 export function canManageUsers(context: AccessContext) {
   return hasAppPermission(context, "manage_users");
+}
+
+export function canManageCatalog(context: AccessContext) {
+  return hasAppPermission(context, "manage_catalog");
 }

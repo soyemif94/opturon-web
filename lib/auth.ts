@@ -1,7 +1,8 @@
 import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
-import { isBackendConfigured, loginPortalUser } from "@/lib/api";
+import { getPortalAuthUserByEmail, isBackendConfigured, loginPortalUser } from "@/lib/api";
+import { normalizeTenantRole } from "@/lib/app-permissions";
 import { getAuthUserByEmail } from "@/lib/auth-store";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
@@ -13,12 +14,6 @@ function normalizeGlobalRole(role?: string): GlobalRole {
   const allowed: GlobalRole[] = ["superadmin", "ops_admin", "sales_rep", "support_agent", "client"];
   if (role && allowed.includes(role as GlobalRole)) return role as GlobalRole;
   return "client";
-}
-
-function normalizeTenantRole(role?: string): TenantRole | undefined {
-  const allowed: TenantRole[] = ["owner", "manager", "editor", "viewer"];
-  if (role && allowed.includes(role as TenantRole)) return role as TenantRole;
-  return undefined;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -146,14 +141,36 @@ export const authOptions: NextAuthOptions = {
           token.tenantRole = (user as any).tenantRole;
         }
 
-        if ((!token.tenantId || !token.tenantRole) && token.email) {
-          const hydratedUser = await getAuthUserByEmail(String(token.email));
-          if (hydratedUser) {
-            token.userId = hydratedUser.id;
-            token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
-            token.role = token.globalRole;
-            token.tenantId = hydratedUser.tenantId;
-            token.tenantRole = hydratedUser.tenantRole;
+        if (token.email) {
+          if (isBackendConfigured()) {
+            try {
+              const response = await getPortalAuthUserByEmail(String(token.email));
+              const hydratedUser = response.data;
+              if (hydratedUser) {
+                token.userId = hydratedUser.id;
+                token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+                token.role = token.globalRole;
+                token.tenantId = hydratedUser.tenantId;
+                token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+              } else {
+                token.userId = undefined;
+                token.tenantId = undefined;
+                token.tenantRole = undefined;
+                token.globalRole = "client";
+                token.role = "client";
+              }
+            } catch (error) {
+              console.error("JWT_BACKEND_HYDRATE_ERROR", { msg: String(error) });
+            }
+          } else if (!token.tenantId || !token.tenantRole) {
+            const hydratedUser = await getAuthUserByEmail(String(token.email));
+            if (hydratedUser) {
+              token.userId = hydratedUser.id;
+              token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+              token.role = token.globalRole;
+              token.tenantId = hydratedUser.tenantId;
+              token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+            }
           }
         }
 
@@ -165,14 +182,36 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       try {
-        if ((!token.tenantId || !token.tenantRole) && (token.email || session.user?.email)) {
-          const hydratedUser = await getAuthUserByEmail(String(token.email || session.user?.email || ""));
-          if (hydratedUser) {
-            token.userId = hydratedUser.id;
-            token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
-            token.role = token.globalRole;
-            token.tenantId = hydratedUser.tenantId;
-            token.tenantRole = hydratedUser.tenantRole;
+        if (token.email || session.user?.email) {
+          if (isBackendConfigured()) {
+            try {
+              const response = await getPortalAuthUserByEmail(String(token.email || session.user?.email || ""));
+              const hydratedUser = response.data;
+              if (hydratedUser) {
+                token.userId = hydratedUser.id;
+                token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+                token.role = token.globalRole;
+                token.tenantId = hydratedUser.tenantId;
+                token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+              } else {
+                token.userId = undefined;
+                token.tenantId = undefined;
+                token.tenantRole = undefined;
+                token.globalRole = "client";
+                token.role = "client";
+              }
+            } catch (error) {
+              console.error("SESSION_BACKEND_HYDRATE_ERROR", { msg: String(error) });
+            }
+          } else if (!token.tenantId || !token.tenantRole) {
+            const hydratedUser = await getAuthUserByEmail(String(token.email || session.user?.email || ""));
+            if (hydratedUser) {
+              token.userId = hydratedUser.id;
+              token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+              token.role = token.globalRole;
+              token.tenantId = hydratedUser.tenantId;
+              token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+            }
           }
         }
 

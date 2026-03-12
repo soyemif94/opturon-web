@@ -8,12 +8,13 @@ type UserRow = { id: string; email: string; name: string; tenantRole: string };
 type Props = {
   initialUsers: UserRow[];
   canManage: boolean;
+  currentUserId?: string;
 };
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "propietario",
   manager: "gerente",
-  editor: "editor",
+  seller: "vendedor",
   viewer: "visualizador"
 };
 
@@ -21,10 +22,12 @@ function roleLabel(role: string) {
   return ROLE_LABELS[role] || role;
 }
 
-export function TenantUsersManager({ initialUsers, canManage }: Props) {
+export function TenantUsersManager({ initialUsers, canManage, currentUserId }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
 
   async function invite(event?: FormEvent<HTMLFormElement>) {
@@ -34,12 +37,12 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
     const password = form.password.trim();
 
     if (!name || name.length < 2) {
-      setFeedback({ tone: "error", text: "Ingresá un nombre valido." });
+      setFeedback({ tone: "error", text: "Ingresa un nombre valido." });
       toast.error("Nombre invalido");
       return;
     }
     if (!email || !email.includes("@")) {
-      setFeedback({ tone: "error", text: "Ingresá un email valido." });
+      setFeedback({ tone: "error", text: "Ingresa un email valido." });
       toast.error("Email invalido");
       return;
     }
@@ -67,15 +70,7 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
         return;
       }
 
-      const reload = await fetch("/api/app/users");
-      if (!reload.ok) {
-        setFeedback({ tone: "success", text: "Usuario invitado. Recargá para ver cambios actualizados." });
-        toast.success("Usuario invitado");
-        return;
-      }
-
-      const json = await reload.json();
-      setUsers(json.users || []);
+      await reloadUsers();
       setForm({ email: "", name: "", role: "viewer", password: "" });
       setFeedback({ tone: "success", text: "Usuario invitado correctamente." });
       toast.success("Invitacion enviada");
@@ -87,6 +82,63 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
     }
   }
 
+  async function reloadUsers() {
+    const response = await fetch("/api/app/users", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = await response.json();
+    setUsers((json.users || []).map((user: UserRow) => ({ ...user, tenantRole: user.tenantRole === "editor" ? "seller" : user.tenantRole })));
+  }
+
+  async function updateRole(userId: string, role: string) {
+    setPendingRoleUserId(userId);
+    setFeedback({ tone: null, text: "" });
+    try {
+      const response = await fetch("/api/app/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role })
+      });
+      if (!response.ok) {
+        const json = await safeJson(response);
+        const message = json?.error || "No se pudo actualizar el rol.";
+        setFeedback({ tone: "error", text: String(message) });
+        toast.error("Error al actualizar rol", String(message));
+        return;
+      }
+      setUsers((current) => current.map((user) => (user.id === userId ? { ...user, tenantRole: role } : user)));
+      setFeedback({ tone: "success", text: "Rol actualizado correctamente." });
+      toast.success("Rol actualizado");
+    } catch {
+      setFeedback({ tone: "error", text: "Ocurrio un error de red al actualizar el rol." });
+      toast.error("Error de red", "No pudimos actualizar el rol.");
+    } finally {
+      setPendingRoleUserId(null);
+    }
+  }
+
+  async function removeUser(userId: string) {
+    setRemovingUserId(userId);
+    setFeedback({ tone: null, text: "" });
+    try {
+      const response = await fetch(`/api/app/users?id=${encodeURIComponent(userId)}`, { method: "DELETE" });
+      if (!response.ok) {
+        const json = await safeJson(response);
+        const message = json?.error || "No se pudo eliminar el usuario.";
+        setFeedback({ tone: "error", text: String(message) });
+        toast.error("Error al eliminar usuario", String(message));
+        return;
+      }
+      setUsers((current) => current.filter((user) => user.id !== userId));
+      setFeedback({ tone: "success", text: "Usuario eliminado correctamente." });
+      toast.success("Usuario eliminado");
+    } catch {
+      setFeedback({ tone: "error", text: "Ocurrio un error de red al eliminar el usuario." });
+      toast.error("Error de red", "No pudimos eliminar el usuario.");
+    } finally {
+      setRemovingUserId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Usuarios cliente</h1>
@@ -94,14 +146,14 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
       {canManage ? (
         <form className="rounded-2xl border border-[color:var(--border)] bg-card p-4" onSubmit={invite}>
           <h3 className="font-semibold">Invitar usuario</h3>
-          <p className="mt-1 text-sm text-muted">Creá un acceso con rol y password temporal para el portal.</p>
+          <p className="mt-1 text-sm text-muted">Crea un acceso con rol y password temporal para el portal.</p>
           <div className="mt-3 grid gap-2 md:grid-cols-4">
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Nombre" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
             <select className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
               <option value="owner">propietario</option>
               <option value="manager">gerente</option>
-              <option value="editor">editor</option>
+              <option value="seller">vendedor</option>
               <option value="viewer">visualizador</option>
             </select>
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Password temporal" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
@@ -114,7 +166,7 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
           </div>
         </form>
       ) : (
-        <p className="text-sm text-muted">Solo propietario o gerente pueden invitar usuarios.</p>
+        <p className="text-sm text-muted">Solo propietario puede gestionar usuarios y permisos.</p>
       )}
 
       <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
@@ -124,16 +176,49 @@ export function TenantUsersManager({ initialUsers, canManage }: Props) {
               <th className="px-4 py-3">Nombre</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Rol</th>
+              {canManage ? <th className="px-4 py-3 text-right">Acciones</th> : null}
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-t border-[color:var(--border)]">
-                <td className="px-4 py-3">{user.name}</td>
-                <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3 capitalize">{roleLabel(user.tenantRole)}</td>
-              </tr>
-            ))}
+            {users.map((user) => {
+              const isCurrentUser = user.id === currentUserId;
+              return (
+                <tr key={user.id} className="border-t border-[color:var(--border)]">
+                  <td className="px-4 py-3">{user.name}</td>
+                  <td className="px-4 py-3">{user.email}</td>
+                  <td className="px-4 py-3 capitalize">
+                    {canManage ? (
+                      <select
+                        className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm"
+                        value={user.tenantRole}
+                        disabled={pendingRoleUserId === user.id}
+                        onChange={(event) => void updateRole(user.id, event.target.value)}
+                      >
+                        <option value="owner">propietario</option>
+                        <option value="manager">gerente</option>
+                        <option value="seller">vendedor</option>
+                        <option value="viewer">visualizador</option>
+                      </select>
+                    ) : (
+                      roleLabel(user.tenantRole)
+                    )}
+                  </td>
+                  {canManage ? (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void removeUser(user.id)}
+                        disabled={removingUserId === user.id || isCurrentUser}
+                        className="text-xs text-red-300 hover:underline disabled:opacity-50"
+                        title={isCurrentUser ? "No puedes eliminar tu propio usuario activo." : "Eliminar usuario"}
+                      >
+                        {removingUserId === user.id ? "Eliminando..." : "Eliminar usuario"}
+                      </button>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -24,7 +24,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { canManageUsers, canManageWorkspace, hasAppPermission, type AppPermission } from "@/lib/app-permissions";
+import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 
@@ -33,7 +33,7 @@ const navItems: Array<{
   label: string;
   description: string;
   icon: any;
-  permission: AppPermission;
+  module: AppModule;
   match: (pathname: string) => boolean;
 }> = [
   {
@@ -41,7 +41,7 @@ const navItems: Array<{
     label: "Inicio",
     description: "Resumen de actividad, canal y accesos rapidos",
     icon: House,
-    permission: "view_workspace",
+    module: "home",
     match: (pathname: string) => pathname === "/app"
   },
   {
@@ -49,7 +49,7 @@ const navItems: Array<{
     label: "Inbox",
     description: "Conversaciones, chat y contexto del contacto",
     icon: MessageSquareText,
-    permission: "view_workspace",
+    module: "inbox",
     match: (pathname: string) => pathname.startsWith("/app/inbox")
   },
   {
@@ -57,7 +57,7 @@ const navItems: Array<{
     label: "Contactos",
     description: "Base CRM simple con ultimas interacciones",
     icon: ContactRound,
-    permission: "view_workspace",
+    module: "contacts",
     match: (pathname: string) => pathname.startsWith("/app/contacts")
   },
   {
@@ -65,7 +65,7 @@ const navItems: Array<{
     label: "Catalogo",
     description: "Productos, precios y stock base para operar pedidos",
     icon: Package,
-    permission: "view_workspace",
+    module: "catalog",
     match: (pathname: string) => pathname.startsWith("/app/catalog")
   },
   {
@@ -73,7 +73,7 @@ const navItems: Array<{
     label: "Pedidos",
     description: "Pedidos internos, estados y preparacion desde el panel",
     icon: Receipt,
-    permission: "view_workspace",
+    module: "orders",
     match: (pathname: string) => pathname.startsWith("/app/orders")
   },
   {
@@ -81,7 +81,7 @@ const navItems: Array<{
     label: "Automatizaciones",
     description: "Flujos del bot, respuestas y reglas",
     icon: Bot,
-    permission: "manage_workspace",
+    module: "automations",
     match: (pathname: string) => pathname.startsWith("/app/automations")
   },
   {
@@ -89,7 +89,7 @@ const navItems: Array<{
     label: "Agenda",
     description: "Pendientes, seguimientos y proxima atencion",
     icon: CalendarDays,
-    permission: "view_workspace",
+    module: "agenda",
     match: (pathname: string) => pathname.startsWith("/app/agenda")
   },
   {
@@ -97,7 +97,7 @@ const navItems: Array<{
     label: "Metricas",
     description: "Conversaciones, leads y performance",
     icon: ChartColumn,
-    permission: "view_workspace",
+    module: "metrics",
     match: (pathname: string) => pathname.startsWith("/app/metrics")
   },
   {
@@ -105,7 +105,7 @@ const navItems: Array<{
     label: "Integraciones",
     description: "WhatsApp, CRM y proximas conexiones",
     icon: PlugZap,
-    permission: "manage_workspace",
+    module: "integrations",
     match: (pathname: string) => pathname.startsWith("/app/integrations")
   },
   {
@@ -113,7 +113,7 @@ const navItems: Array<{
     label: "Configuracion",
     description: "Cuenta, negocio y preferencias del portal",
     icon: Settings2,
-    permission: "manage_workspace",
+    module: "settings",
     match: (pathname: string) => pathname.startsWith("/app/settings")
   }
 ];
@@ -143,7 +143,7 @@ export function AppShell({
   const isInboxRoute = pathname.startsWith("/app/inbox");
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const accessContext = { globalRole, tenantRole };
-  const visibleNavItems = navItems.filter((item) => hasAppPermission(accessContext, item.permission));
+  const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module));
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
   const buildLabel = [

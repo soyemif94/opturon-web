@@ -1,5 +1,5 @@
 import { readSaasData } from "@/lib/saas/store";
-import type { TenantRole } from "@/lib/saas/types";
+import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
@@ -301,6 +301,47 @@ export async function loginPortalUser(email: string, password: string) {
     },
     false
   );
+}
+
+export async function getPortalAuthUserByEmail(email: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      email: string;
+      name: string;
+      tenantId: string;
+      tenantRole: TenantRole;
+      globalRole: GlobalRole;
+    } | null;
+  }>(`/portal/auth/users/by-email?email=${encodeURIComponent(email)}`);
+}
+
+export async function patchPortalUserRole(tenantId: string, userId: string, role: TenantRole) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      user: PortalUser;
+    };
+  }>(`/portal/tenants/${tenantId}/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role })
+  });
+}
+
+export async function deletePortalUser(tenantId: string, userId: string, currentUserId?: string) {
+  const headers = currentUserId ? { "x-portal-actor-id": currentUserId } : undefined;
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      userId: string;
+    };
+  }>(`/portal/tenants/${tenantId}/users/${userId}`, {
+    method: "DELETE",
+    headers
+  });
 }
 
 export async function getPortalConversations(tenantId: string) {

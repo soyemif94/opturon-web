@@ -1,7 +1,15 @@
 import { hashSync } from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createPortalUser, getBackendErrorBody, getBackendErrorStatus, getPortalUsers, isBackendConfigured } from "@/lib/api";
+import {
+  createPortalUser,
+  deletePortalUser,
+  getBackendErrorBody,
+  getBackendErrorStatus,
+  getPortalUsers,
+  isBackendConfigured,
+  patchPortalUserRole
+} from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, listTenantMembers, newId, readSaasData, writeSaasData } from "@/lib/saas/store";
 import { hasExplicitRuntimeDataDir, resolveRuntimeDataDir } from "@/lib/runtime-data";
@@ -9,20 +17,27 @@ import { hasExplicitRuntimeDataDir, resolveRuntimeDataDir } from "@/lib/runtime-
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
-  role: z.enum(["owner", "manager", "editor", "viewer"]),
+  role: z.enum(["owner", "manager", "seller", "viewer"]),
   password: z.string().min(6).optional()
+});
+
+const updateRoleSchema = z.object({
+  userId: z.string().min(1),
+  role: z.enum(["owner", "manager", "seller", "viewer"])
 });
 
 function mapBackendUserError(error: unknown) {
   const status = getBackendErrorStatus(error) || 502;
   const body = getBackendErrorBody(error) as Record<string, unknown> | undefined;
-  const upstreamError = String(body?.error || "portal_user_create_failed");
+  const upstreamError = String(body?.error || "portal_user_request_failed");
   const errorMap: Record<string, string> = {
     invalid_name: "Ingresa un nombre valido.",
     invalid_email: "Ingresa un email valido.",
     invalid_role: "Selecciona un rol valido.",
     invalid_password: "La password temporal debe tener al menos 6 caracteres.",
-    duplicate_user_email: "Ya existe un usuario con ese email."
+    duplicate_user_email: "Ya existe un usuario con ese email.",
+    cannot_delete_last_owner: "Debe quedar al menos un owner en el workspace.",
+    cannot_delete_current_user: "No puedes eliminar tu propio usuario activo."
   };
 
   return {
@@ -54,16 +69,12 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ users: listTenantMembers(tenantId) });
+  return NextResponse.json({ users: listTenantMembers(tenantId).map((user) => ({ ...user, tenantRole: user.tenantRole })) });
 }
 
 export async function POST(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
-  const tenantRole = guard.ctx?.tenantRole;
-  if (tenantRole !== "owner" && tenantRole !== "manager") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -150,18 +161,108 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  try {
-    appendAuditLog({
-      tenantId,
-      userId: guard.ctx?.userId,
-      action: "tenant_user_invited",
-      entity: "membership",
-      entityId: user.id,
-      metadata: { role: parsed.data.role, email }
-    });
-  } catch (error) {
-    console.warn("[users-route] Audit log append failed after user persistence.", error);
-  }
+  appendAuditLog({
+    tenantId,
+    userId: guard.ctx?.userId,
+    action: "tenant_user_invited",
+    entity: "membership",
+    entityId: user.id,
+    metadata: { role: parsed.data.role, email }
+  });
 
   return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });
+}
+
+export async function PATCH(request: NextRequest) {
+  const guard = await requireAppApi({ permission: "manage_users" });
+  if (guard.error) return guard.error;
+
+  const parsed = updateRoleSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+  const tenantId = guard.ctx?.tenantId as string;
+  if (isBackendConfigured()) {
+    try {
+      const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role);
+      appendAuditLog({
+        tenantId,
+        userId: guard.ctx?.userId,
+        action: "tenant_user_role_updated",
+        entity: "membership",
+        entityId: parsed.data.userId,
+        metadata: { role: parsed.data.role }
+      });
+      return NextResponse.json({ ok: true, user: response.data.user });
+    } catch (error) {
+      const mapped = mapBackendUserError(error);
+      return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    }
+  }
+
+  const data = readSaasData();
+  const membership = data.memberships.find((item) => item.userId === parsed.data.userId && item.tenantId === tenantId);
+  if (!membership) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  membership.role = parsed.data.role;
+  writeSaasData(data);
+  appendAuditLog({
+    tenantId,
+    userId: guard.ctx?.userId,
+    action: "tenant_user_role_updated",
+    entity: "membership",
+    entityId: parsed.data.userId,
+    metadata: { role: parsed.data.role }
+  });
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: NextRequest) {
+  const guard = await requireAppApi({ permission: "manage_users" });
+  if (guard.error) return guard.error;
+
+  const userId = new URL(request.url).searchParams.get("id") || "";
+  if (!userId) return NextResponse.json({ error: "Missing user id" }, { status: 400 });
+
+  const tenantId = guard.ctx?.tenantId as string;
+  const currentUserId = guard.ctx?.userId as string;
+
+  if (isBackendConfigured()) {
+    try {
+      const response = await deletePortalUser(tenantId, userId, currentUserId);
+      appendAuditLog({
+        tenantId,
+        userId: currentUserId,
+        action: "tenant_user_deleted",
+        entity: "membership",
+        entityId: userId
+      });
+      return NextResponse.json({ ok: true, userId: response.data.userId });
+    } catch (error) {
+      const mapped = mapBackendUserError(error);
+      return NextResponse.json({ error: mapped.message }, { status: mapped.status });
+    }
+  }
+
+  const data = readSaasData();
+  if (userId === currentUserId) {
+    return NextResponse.json({ error: "No puedes eliminar tu propio usuario activo." }, { status: 400 });
+  }
+
+  const ownerCount = data.memberships.filter((item) => item.tenantId === tenantId && (item.role === "owner")).length;
+  const membership = data.memberships.find((item) => item.userId === userId && item.tenantId === tenantId);
+  if (!membership) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (membership.role === "owner" && ownerCount <= 1) {
+    return NextResponse.json({ error: "Debe quedar al menos un owner en el workspace." }, { status: 400 });
+  }
+
+  data.memberships = data.memberships.filter((item) => !(item.userId === userId && item.tenantId === tenantId));
+  data.users = data.users.filter((item) => item.id !== userId);
+  writeSaasData(data);
+  appendAuditLog({
+    tenantId,
+    userId: currentUserId,
+    action: "tenant_user_deleted",
+    entity: "membership",
+    entityId: userId
+  });
+  return NextResponse.json({ ok: true, userId });
 }

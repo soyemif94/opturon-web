@@ -1,12 +1,12 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { CatalogManager } from "@/components/app/CatalogManager";
-import { canEditWorkspace } from "@/lib/app-permissions";
+import { canManageCatalog } from "@/lib/app-permissions";
 import { getPortalProducts, isBackendConfigured, type PortalProduct } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function CatalogPage() {
   const ctx = await requireAppPage();
-  const readOnly = !canEditWorkspace(ctx);
+  const readOnly = !canManageCatalog(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: Array<PortalProduct & { stockQty: number; active: boolean }> = [];
 
