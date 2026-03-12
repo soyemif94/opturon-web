@@ -113,6 +113,11 @@ export const authOptions: NextAuthOptions = {
           }
 
           const globalRole = normalizeGlobalRole(user.globalRole);
+          const allowLocalPortalFallback = !isBackendConfigured() || isStaffGlobalRole(globalRole);
+          if (!allowLocalPortalFallback) {
+            console.warn("AUTH_LOCAL_CLIENT_FALLBACK_BLOCKED", { email });
+            return null;
+          }
           return {
             id: user.id,
             email: user.email,
