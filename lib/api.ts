@@ -2,6 +2,7 @@ import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
+const AUTH_API_TIMEOUT_MS = Number(process.env.AUTH_API_TIMEOUT_MS || 2500);
 const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
 const PROD_BACKEND_FALLBACK = "https://opturon-api.onrender.com";
 
@@ -85,7 +86,7 @@ export function getBackendErrorBody(error: unknown): unknown {
   return undefined;
 }
 
-async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false): Promise<T> {
+async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = false, timeoutMs = API_TIMEOUT_MS): Promise<T> {
   const apiBase = getApiBase();
 
   if (!apiBase) {
@@ -106,7 +107,7 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort("timeout"), API_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
   try {
     const response = await fetch(`${apiBase}${path}`, {
@@ -139,7 +140,7 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   } catch (error) {
     const normalizedError =
       error instanceof Error && error.name === "AbortError"
-        ? new Error(`API request timeout (${API_TIMEOUT_MS}ms)`)
+        ? new Error(`API request timeout (${timeoutMs}ms)`)
         : error;
     registerApiError(path, normalizedError);
     throw normalizedError;
@@ -148,7 +149,7 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   }
 }
 
-async function backendPortalFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function backendPortalFetch<T>(path: string, init?: RequestInit, timeoutMs?: number): Promise<T> {
   const headers = new Headers(init?.headers || {});
   const portalKey = getPortalInternalKey();
 
@@ -157,7 +158,7 @@ async function backendPortalFetch<T>(path: string, init?: RequestInit): Promise<
   }
 
   headers.set("x-portal-key", portalKey);
-  return backendFetch<T>(path, { ...init, headers }, false);
+  return backendFetch<T>(path, { ...init, headers }, false, timeoutMs);
 }
 
 export type InboxItem = {
@@ -299,7 +300,8 @@ export async function loginPortalUser(email: string, password: string) {
       method: "POST",
       body: JSON.stringify({ email, password })
     },
-    false
+    false,
+    AUTH_API_TIMEOUT_MS
   );
 }
 
@@ -314,7 +316,7 @@ export async function getPortalAuthUserByEmail(email: string) {
       tenantRole: TenantRole;
       globalRole: GlobalRole;
     } | null;
-  }>(`/portal/auth/users/by-email?email=${encodeURIComponent(email)}`);
+  }>(`/portal/auth/users/by-email?email=${encodeURIComponent(email)}`, undefined, AUTH_API_TIMEOUT_MS);
 }
 
 export async function patchPortalUserRole(tenantId: string, userId: string, role: TenantRole) {

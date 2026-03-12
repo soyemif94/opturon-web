@@ -149,7 +149,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (token.email) {
-          if (isBackendConfigured()) {
+          if (isBackendConfigured() && token.authSource === "backend") {
             try {
               const response = await getPortalAuthUserByEmail(String(token.email));
               const hydratedUser = response.data;
@@ -173,7 +173,7 @@ export const authOptions: NextAuthOptions = {
             } catch (error) {
               console.error("JWT_BACKEND_HYDRATE_ERROR", { msg: String(error) });
             }
-          } else if (!token.tenantId || !token.tenantRole) {
+          } else if (!isBackendConfigured() && (!token.tenantId || !token.tenantRole)) {
             const hydratedUser = await getAuthUserByEmail(String(token.email));
             if (hydratedUser) {
               token.userId = hydratedUser.id;
@@ -193,40 +193,14 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       try {
-        if (token.email || session.user?.email) {
-          if (isBackendConfigured()) {
-            try {
-              const response = await getPortalAuthUserByEmail(String(token.email || session.user?.email || ""));
-              const hydratedUser = response.data;
-              if (hydratedUser) {
-                token.userId = hydratedUser.id;
-                token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
-                token.role = token.globalRole;
-                token.tenantId = hydratedUser.tenantId;
-                token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
-                token.authSource = "backend";
-              } else {
-                const shouldInvalidateBackendSession = token.authSource === "backend" && !isStaffGlobalRole(String(token.globalRole || token.role || ""));
-                if (shouldInvalidateBackendSession) {
-                  token.userId = undefined;
-                  token.tenantId = undefined;
-                  token.tenantRole = undefined;
-                  token.globalRole = "client";
-                  token.role = "client";
-                }
-              }
-            } catch (error) {
-              console.error("SESSION_BACKEND_HYDRATE_ERROR", { msg: String(error) });
-            }
-          } else if (!token.tenantId || !token.tenantRole) {
-            const hydratedUser = await getAuthUserByEmail(String(token.email || session.user?.email || ""));
-            if (hydratedUser) {
-              token.userId = hydratedUser.id;
-              token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
-              token.role = token.globalRole;
-              token.tenantId = hydratedUser.tenantId;
-              token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
-            }
+        if ((token.email || session.user?.email) && !isBackendConfigured() && (!token.tenantId || !token.tenantRole)) {
+          const hydratedUser = await getAuthUserByEmail(String(token.email || session.user?.email || ""));
+          if (hydratedUser) {
+            token.userId = hydratedUser.id;
+            token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+            token.role = token.globalRole;
+            token.tenantId = hydratedUser.tenantId;
+            token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
           }
         }
 
