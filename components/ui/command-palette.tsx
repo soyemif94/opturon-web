@@ -10,6 +10,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
+import { canEditWorkspace, canManageUsers, canManageWorkspace } from "@/lib/app-permissions";
+import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 import { timeAgo } from "@/lib/ui/format";
 import { toast } from "@/components/ui/toast";
@@ -27,7 +29,13 @@ type PaletteMode = "global" | "inbox" | "conversation";
 type Subview = "root" | "templates" | "products" | "stages";
 type CommandGroup = "conversation" | "messaging" | "contact" | "deal" | "navigation" | "search" | "inbox" | "suggested";
 
-type RuntimeContext = CommandPaletteContextValue & { scope: PaletteScope; isStaff: boolean; userId?: string };
+type RuntimeContext = CommandPaletteContextValue & {
+  scope: PaletteScope;
+  isStaff: boolean;
+  userId?: string;
+  globalRole?: GlobalRole;
+  tenantRole?: TenantRole;
+};
 
 type PreviewData = {
   title: string;
@@ -131,13 +139,17 @@ export function CommandPaletteProvider({
   scope,
   tenantId,
   isStaff,
-  userId
+  userId,
+  globalRole,
+  tenantRole
 }: {
   children: ReactNode;
   scope: PaletteScope;
   tenantId?: string;
   isStaff?: boolean;
   userId?: string;
+  globalRole?: GlobalRole;
+  tenantRole?: TenantRole;
 }) {
   const [open, setOpen] = useState(false);
   const [context, setContextState] = useState<CommandPaletteContextValue>({ tenantId });
@@ -165,7 +177,7 @@ export function CommandPaletteProvider({
   return (
     <ProviderCtx.Provider value={{ open, setOpen, context, setContext }}>
       {children}
-      <CommandPalette scope={scope} isStaff={Boolean(isStaff)} userId={userId} />
+      <CommandPalette scope={scope} isStaff={Boolean(isStaff)} userId={userId} globalRole={globalRole} tenantRole={tenantRole} />
     </ProviderCtx.Provider>
   );
 }
@@ -189,7 +201,19 @@ export function CommandPaletteContextSetter({ value }: { value: CommandPaletteCo
   return null;
 }
 
-export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope; isStaff: boolean; userId?: string }) {
+export function CommandPalette({
+  scope,
+  isStaff,
+  userId,
+  globalRole,
+  tenantRole
+}: {
+  scope: PaletteScope;
+  isStaff: boolean;
+  userId?: string;
+  globalRole?: GlobalRole;
+  tenantRole?: TenantRole;
+}) {
   const { open, setOpen, context } = useProviderCtx();
   const inbox = useInboxContextOptional();
   const router = useRouter();
@@ -212,10 +236,15 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
       dealId: inbox?.state.dealId || context.dealId,
       scope,
       isStaff,
-      userId
+      userId,
+      globalRole,
+      tenantRole
     }),
-    [context, inbox?.state.contactId, inbox?.state.conversationId, inbox?.state.dealId, isStaff, scope, userId]
+    [context, globalRole, inbox?.state.contactId, inbox?.state.conversationId, inbox?.state.dealId, isStaff, scope, tenantRole, userId]
   );
+  const canEdit = canEditWorkspace(runtime);
+  const canManage = canManageWorkspace(runtime);
+  const canManageTeam = canManageUsers(runtime);
 
   const mode: PaletteMode = useMemo(() => {
     if (!pathname.startsWith("/app/inbox") && !context.forceInboxMode) return "global";
@@ -364,16 +393,16 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         preview: () => ({ title: "Ir a Pedidos", description: "Listado operativo de pedidos del portal." }),
         run: async () => router.push("/app/orders")
       },
-      { id: "nav-faq", group: "navigation", label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") },
-      { id: "nav-business", group: "navigation", label: "Ir a Negocio", description: "/app/business", run: async () => router.push("/app/business") },
-      {
+      ...(canManage ? [{ id: "nav-faq", group: "navigation" as const, label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") }] : []),
+      ...(canManage ? [{ id: "nav-business", group: "navigation" as const, label: "Ir a Negocio", description: "/app/business", run: async () => router.push("/app/business") }] : []),
+      ...(canManageTeam ? [{
         id: "nav-users",
-        group: "navigation",
+        group: "navigation" as const,
         label: "Ir a Usuarios",
         description: "/app/users",
         icon: <Users className="h-4 w-4" />,
         run: async () => router.push("/app/users")
-      },
+      }] : []),
       {
         id: "ops-tenants",
         group: "navigation",
@@ -442,6 +471,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           group: "conversation",
           label: inbox?.state.botEnabled ? "Desactivar bot" : "Activar bot",
           description: "Alternar bot automatico",
+          disabled: !canEdit,
           preview: () => ({
             title: inbox?.state.botEnabled ? "Apagar bot" : "Encender bot",
             description: "Control de automatizacion en esta conversacion.",
@@ -459,6 +489,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           group: "conversation",
           label: "Handoff a humano",
           description: "Bot OFF y asignar a usuario actual",
+          disabled: !canEdit,
           preview: () => ({
             title: "Derivar a humano",
             impact: "Apagara el bot y asignara la conversacion al agente actual."
@@ -477,6 +508,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           group: "conversation",
           label: "Asignarme",
           description: "Asignar conversacion al usuario actual",
+          disabled: !canEdit,
           preview: () => ({ title: "Asignar a mi usuario", impact: "La conversacion quedara bajo tu responsabilidad." }),
           run: async (ctx) => {
             if (!ctx.userId) throw new Error("missing_user");
@@ -489,6 +521,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           group: "conversation",
           label: "Reassign...",
           description: "Asignar por ID de usuario",
+          disabled: !canEdit,
           preview: () => ({ title: "Reasignar conversacion", description: "Solicitara un ID de usuario destino." }),
           run: async () => {
             const value = window.prompt("User ID destino:");
@@ -501,6 +534,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "conv-hot-toggle",
           group: "conversation",
           label: inbox?.state.isHot ? "Unmark Hot" : "Mark Hot",
+          disabled: !canEdit,
           preview: () => ({
             title: inbox?.state.isHot ? "Quitar prioridad Hot" : "Marcar prioridad Hot",
             impact: "Actualiza la prioridad de la conversacion en la bandeja."
@@ -517,6 +551,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "conv-close-toggle",
           group: "conversation",
           label: "Cerrar conversacion",
+          disabled: !canEdit,
           preview: () => ({ title: "Cerrar conversacion", impact: "La conversacion pasara a estado cerrado." }),
           run: async () => {
             const ok = await runInboxAction("close");
@@ -527,6 +562,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "conv-reopen",
           group: "conversation",
           label: "Reabrir conversacion",
+          disabled: !canEdit,
           preview: () => ({ title: "Reabrir conversacion", impact: "La conversacion volvera a estado abierto." }),
           run: async () => {
             const ok = await runInboxAction("reopen");
@@ -537,6 +573,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "conv-unread-toggle",
           group: "conversation",
           label: (inbox?.state.unreadCount ?? 0) > 0 ? "Mark as read" : "Mark as unread",
+          disabled: !canEdit,
           preview: () => ({
             title: (inbox?.state.unreadCount ?? 0) > 0 ? "Marcar como leida" : "Marcar como no leida",
             impact: "Actualiza el estado de lectura para priorizacion."
@@ -550,6 +587,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "msg-templates",
           group: "messaging",
           label: "Enviar plantilla...",
+          disabled: !canEdit,
           preview: () => ({ title: "Enviar plantilla", description: "Abrira una lista de respuestas rapidas." }),
           run: async () => setSubview("templates")
         },
@@ -557,6 +595,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "msg-products",
           group: "messaging",
           label: "Insert product...",
+          disabled: !canEdit,
           preview: () => ({ title: "Insertar producto", description: "Abrira el catalogo para seleccionar producto." }),
           run: async () => setSubview("products")
         },
@@ -564,6 +603,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "msg-request-email",
           group: "messaging",
           label: "Request email",
+          disabled: !canEdit,
           preview: () => ({ title: "Solicitar email", body: "Para avanzar, compartime un email de contacto." }),
           run: async () => {}
         },
@@ -571,6 +611,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "msg-request-address",
           group: "messaging",
           label: "Request address",
+          disabled: !canEdit,
           preview: () => ({ title: "Solicitar direccion", body: "Podrias compartir direccion completa para validar envio?" }),
           run: async () => {}
         },
@@ -578,6 +619,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "msg-request-budget",
           group: "messaging",
           label: "Request budget",
+          disabled: !canEdit,
           preview: () => ({ title: "Solicitar presupuesto", body: "Que presupuesto estimado tenes para esta compra?" }),
           run: async () => {}
         },
@@ -585,6 +627,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "contact-note",
           group: "contact",
           label: "Add note...",
+          disabled: !canEdit,
           preview: () => ({ title: "Agregar nota", description: "Abrira un input rapido para nota interna." }),
           run: async () => {
             const text = window.prompt("Texto de nota:");
@@ -597,6 +640,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "contact-task",
           group: "contact",
           label: "Create task...",
+          disabled: !canEdit,
           preview: () => ({ title: "Crear tarea", description: "Abrira input rapido de tarea." }),
           run: async () => {
             const title = window.prompt("Titulo de tarea:");
@@ -609,7 +653,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "deal-stage",
           group: "deal",
           label: "Mover etapa...",
-          disabled: !runtime.dealId,
+          disabled: !runtime.dealId || !canEdit,
           preview: () => ({ title: "Mover etapa", description: "Abrira el selector de etapa del deal actual." }),
           run: async () => setSubview("stages")
         },
@@ -617,7 +661,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "deal-won",
           group: "deal",
           label: "Marcar como ganado",
-          disabled: !runtime.dealId,
+          disabled: !runtime.dealId || !canEdit,
           preview: () => ({ title: "Marcar como ganado", impact: "El deal quedara cerrado como ganado." }),
           run: async () => {
             const ok = await runInboxAction("change_stage", { stage: "won" });
@@ -628,7 +672,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           id: "deal-lost",
           group: "deal",
           label: "Marcar como perdido",
-          disabled: !runtime.dealId,
+          disabled: !runtime.dealId || !canEdit,
           preview: () => ({ title: "Marcar como perdido", impact: "El deal quedara cerrado como perdido." }),
           run: async () => {
             const ok = await runInboxAction("change_stage", { stage: "lost" });
@@ -678,6 +722,9 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
     inbox?.state.botEnabled,
     inbox?.state.isHot,
     inbox?.state.unreadCount,
+    canEdit,
+    canManage,
+    canManageTeam,
     isStaff,
     mode,
     router,

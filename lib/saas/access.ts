@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
+import { hasAppPermission, isStaffRole, type AppPermission } from "@/lib/app-permissions";
 import { authOptions } from "@/lib/auth";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
@@ -30,9 +31,11 @@ export async function requireOpsPage() {
   return ctx;
 }
 
-export async function requireAppPage() {
+export async function requireAppPage(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
+  const permission = options?.permission || "view_workspace";
+  if (!hasAppPermission(ctx, permission)) redirect("/app");
   return ctx;
 }
 
@@ -45,10 +48,16 @@ export async function requireOpsApi() {
   return { ctx };
 }
 
-export async function requireAppApi() {
+export async function requireAppApi(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!ctx.tenantId) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  if (!ctx.tenantId && !isStaffRole(ctx.globalRole)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  const permission = options?.permission || "view_workspace";
+  if (!hasAppPermission(ctx, permission)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
   return { ctx };
 }
 
@@ -56,6 +65,7 @@ export async function resolveAppTenant(options?: {
   requestedTenantId?: string;
   demo?: boolean;
   requireWrite?: boolean;
+  permission?: AppPermission;
 }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
@@ -63,9 +73,14 @@ export async function resolveAppTenant(options?: {
   const isStaff = Boolean(ctx.globalRole && STAFF_ROLES.has(ctx.globalRole));
   const requested = options?.requestedTenantId;
   const isDemo = Boolean(options?.demo);
+  const requiredPermission = options?.permission || (options?.requireWrite ? "edit_workspace" : "view_workspace");
+  const canWrite = hasAppPermission(ctx, "edit_workspace");
 
   if (ctx.tenantId) {
-    return { ctx, tenantId: ctx.tenantId, readOnly: false };
+    if (!hasAppPermission(ctx, requiredPermission)) {
+      return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+    }
+    return { ctx, tenantId: ctx.tenantId, readOnly: !canWrite };
   }
 
   if (isStaff && requested && isDemo) {

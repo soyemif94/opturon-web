@@ -24,14 +24,24 @@ import {
   Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { canManageUsers, canManageWorkspace, hasAppPermission, type AppPermission } from "@/lib/app-permissions";
+import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 
-const navItems = [
+const navItems: Array<{
+  href: string;
+  label: string;
+  description: string;
+  icon: any;
+  permission: AppPermission;
+  match: (pathname: string) => boolean;
+}> = [
   {
     href: "/app",
     label: "Inicio",
     description: "Resumen de actividad, canal y accesos rapidos",
     icon: House,
+    permission: "view_workspace",
     match: (pathname: string) => pathname === "/app"
   },
   {
@@ -39,6 +49,7 @@ const navItems = [
     label: "Inbox",
     description: "Conversaciones, chat y contexto del contacto",
     icon: MessageSquareText,
+    permission: "view_workspace",
     match: (pathname: string) => pathname.startsWith("/app/inbox")
   },
   {
@@ -46,6 +57,7 @@ const navItems = [
     label: "Contactos",
     description: "Base CRM simple con ultimas interacciones",
     icon: ContactRound,
+    permission: "view_workspace",
     match: (pathname: string) => pathname.startsWith("/app/contacts")
   },
   {
@@ -53,6 +65,7 @@ const navItems = [
     label: "Catalogo",
     description: "Productos, precios y stock base para operar pedidos",
     icon: Package,
+    permission: "view_workspace",
     match: (pathname: string) => pathname.startsWith("/app/catalog")
   },
   {
@@ -60,6 +73,7 @@ const navItems = [
     label: "Pedidos",
     description: "Pedidos internos, estados y preparacion desde el panel",
     icon: Receipt,
+    permission: "view_workspace",
     match: (pathname: string) => pathname.startsWith("/app/orders")
   },
   {
@@ -67,6 +81,7 @@ const navItems = [
     label: "Automatizaciones",
     description: "Flujos del bot, respuestas y reglas",
     icon: Bot,
+    permission: "manage_workspace",
     match: (pathname: string) => pathname.startsWith("/app/automations")
   },
   {
@@ -74,6 +89,7 @@ const navItems = [
     label: "Agenda",
     description: "Pendientes, seguimientos y proxima atencion",
     icon: CalendarDays,
+    permission: "view_workspace",
     match: (pathname: string) => pathname.startsWith("/app/agenda")
   },
   {
@@ -81,6 +97,7 @@ const navItems = [
     label: "Metricas",
     description: "Conversaciones, leads y performance",
     icon: ChartColumn,
+    permission: "view_workspace",
     match: (pathname: string) => pathname.startsWith("/app/metrics")
   },
   {
@@ -88,6 +105,7 @@ const navItems = [
     label: "Integraciones",
     description: "WhatsApp, CRM y proximas conexiones",
     icon: PlugZap,
+    permission: "manage_workspace",
     match: (pathname: string) => pathname.startsWith("/app/integrations")
   },
   {
@@ -95,6 +113,7 @@ const navItems = [
     label: "Configuracion",
     description: "Cuenta, negocio y preferencias del portal",
     icon: Settings2,
+    permission: "manage_workspace",
     match: (pathname: string) => pathname.startsWith("/app/settings")
   }
 ];
@@ -107,7 +126,9 @@ export function AppShell({
   topbar,
   buildMarker,
   buildEnv,
-  deploymentId
+  deploymentId,
+  globalRole,
+  tenantRole
 }: {
   children: React.ReactNode;
   tenantLabel?: string;
@@ -115,10 +136,16 @@ export function AppShell({
   buildMarker?: string;
   buildEnv?: string;
   deploymentId?: string;
+  globalRole?: GlobalRole;
+  tenantRole?: TenantRole;
 }) {
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const accessContext = { globalRole, tenantRole };
+  const visibleNavItems = navItems.filter((item) => hasAppPermission(accessContext, item.permission));
+  const showManageShortcut = canManageWorkspace(accessContext);
+  const showUsersShortcut = canManageUsers(accessContext);
   const buildLabel = [
     buildMarker ? `Build ${buildMarker}` : null,
     buildEnv ? `Env ${buildEnv}` : null,
@@ -175,7 +202,7 @@ export function AppShell({
               </div>
 
               <nav className="mt-6 space-y-2">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const active = item.match(pathname);
                   const Icon = item.icon;
 
@@ -239,13 +266,24 @@ export function AppShell({
                     <span className="text-amber-300">Proximo paso</span>
                   </div>
                 </div>
-                <Link
-                  href="/app/integrations"
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
-                >
-                  <PhoneCall className="h-4 w-4" />
-                  Conectar WhatsApp
-                </Link>
+                {showManageShortcut ? (
+                  <Link
+                    href="/app/integrations"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    Conectar WhatsApp
+                  </Link>
+                ) : null}
+                {!showManageShortcut && showUsersShortcut ? (
+                  <Link
+                    href="/app/users"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    Gestionar usuarios
+                  </Link>
+                ) : null}
               </div>
 
               <button
@@ -309,7 +347,7 @@ export function AppShell({
 
             <div className="border-b border-[color:var(--border)] bg-card/50 px-4 py-3 xl:hidden">
               <div className="flex gap-2 overflow-x-auto pb-1">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const active = item.match(pathname);
 
                   return (

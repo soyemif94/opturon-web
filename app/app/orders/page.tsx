@@ -1,10 +1,12 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { OrdersHub } from "@/components/app/orders-hub";
+import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalOrders, isBackendConfigured, type PortalOrder } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppOrdersPage() {
   const ctx = await requireAppPage();
+  const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let initialOrders: PortalOrder[] = [];
 
@@ -23,7 +25,7 @@ export default async function AppOrdersPage() {
       description="Registra pedidos internos, revisa su estado y prepara la operacion diaria desde un modulo simple pero listo para crecer hacia pagos y facturacion."
       badge="Operacion comercial"
     >
-      <OrdersHub initialOrders={initialOrders} backendReady={backendReady} readOnly={!ctx.tenantId} />
+      <OrdersHub initialOrders={initialOrders} backendReady={backendReady} readOnly={!ctx.tenantId || readOnly} />
     </ClientPageShell>
   );
 }

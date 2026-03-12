@@ -1,7 +1,9 @@
 import { AutomationsHub } from "@/components/app/automations-hub";
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import { requireAppPage } from "@/lib/saas/access";
 
-export default function AppAutomationsPage() {
+export default async function AppAutomationsPage() {
+  await requireAppPage({ permission: "manage_workspace" });
   return (
     <ClientPageShell
       title="Automatizaciones"

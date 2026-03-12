@@ -3,7 +3,7 @@ import { readSaasData } from "@/lib/saas/store";
 import { FaqManager } from "@/components/app/FaqManager";
 
 export default async function FaqPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppPage({ permission: "manage_workspace" });
   const data = readSaasData();
   const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
   const faqs = data.faqs.filter((item) => item.tenantId === tenantId);

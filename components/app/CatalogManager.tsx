@@ -82,7 +82,7 @@ const BULK_EXAMPLE = [
   "Agua 500ml | AGUA-01 | 1500 | 200 | Botella individual"
 ].join("\n");
 
-export function CatalogManager({ initialProducts }: { initialProducts: Product[] }) {
+export function CatalogManager({ initialProducts, readOnly = false }: { initialProducts: Product[]; readOnly?: boolean }) {
   const [products, setProducts] = useState(Array.isArray(initialProducts) ? initialProducts : []);
   const [selectedId, setSelectedId] = useState<string | null>(initialProducts[0]?.id || null);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -151,6 +151,7 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (readOnly) return;
     setFeedback(null);
     setBulkResult(null);
 
@@ -249,6 +250,7 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
   }
 
   async function importBulkProducts() {
+    if (readOnly) return;
     if (!validBulkRows.length) {
       setFeedback({ tone: "warning", text: "No hay filas validas para importar." });
       return;
@@ -309,6 +311,7 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
   }
 
   async function toggleStatus(product: Product) {
+    if (readOnly) return;
     const nextStatus = resolveStatus(product) === "active" ? "inactive" : "active";
     setStatusUpdatingId(product.id);
     setFeedback(null);
@@ -349,6 +352,12 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
           <Badge variant={feedback.tone === "success" ? "success" : feedback.tone === "warning" ? "warning" : "danger"}>
             {feedback.text}
           </Badge>
+        </div>
+      ) : null}
+
+      {readOnly ? (
+        <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-200">
+          Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear ni editar.
         </div>
       ) : null}
 
@@ -441,11 +450,11 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
 
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
-                      <Button type="button" variant="secondary" size="sm" onClick={() => startEdit(product)}>
+                      <Button type="button" variant="secondary" size="sm" onClick={() => startEdit(product)} disabled={readOnly}>
                         <PencilLine className="mr-1 h-4 w-4" />
                         Editar
                       </Button>
-                      <Button type="button" variant="secondary" size="sm" disabled={statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
+                      <Button type="button" variant="secondary" size="sm" disabled={readOnly || statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
                         {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Desactivar" : "Activar"}
                       </Button>
                       <Button asChild variant="ghost" size="sm">
@@ -472,10 +481,10 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant={mode === "single" ? "primary" : "secondary"} size="sm" onClick={() => setMode("single")}>
+                <Button type="button" variant={mode === "single" ? "primary" : "secondary"} size="sm" onClick={() => setMode("single")} disabled={readOnly}>
                   Alta rapida
                 </Button>
-                <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={() => setMode("bulk")}>
+                <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={() => setMode("bulk")} disabled={readOnly}>
                   Carga masiva
                 </Button>
               </div>
@@ -484,37 +493,37 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
                 <form className="space-y-4" onSubmit={saveProduct}>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Nombre</label>
-                    <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Combo mediodia" />
+                    <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Combo mediodia" disabled={readOnly} />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">SKU</label>
-                      <Input value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} placeholder="Ej. COMBO-MED-01" />
+                      <Input value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} placeholder="Ej. COMBO-MED-01" disabled={readOnly} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Moneda</label>
-                      <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="ARS" maxLength={3} />
+                      <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="ARS" maxLength={3} disabled={readOnly} />
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Precio</label>
-                      <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="0" inputMode="decimal" />
+                      <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Stock basico</label>
-                      <Input value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="0" inputMode="numeric" />
+                      <Input value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="0" inputMode="numeric" disabled={readOnly} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Descripcion</label>
-                    <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." />
+                    <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Button type="button" variant="ghost" onClick={startCreate}>
+                    <Button type="button" variant="ghost" onClick={startCreate} disabled={readOnly}>
                       Limpiar
                     </Button>
-                    <Button type="submit" disabled={saving}>
+                    <Button type="submit" disabled={readOnly || saving}>
                       {saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear producto"}
                     </Button>
                   </div>
@@ -523,20 +532,20 @@ export function CatalogManager({ initialProducts }: { initialProducts: Product[]
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Pega varias lineas</label>
-                    <Textarea className="min-h-[180px]" value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={BULK_EXAMPLE} />
+                    <Textarea className="min-h-[180px]" value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={BULK_EXAMPLE} disabled={readOnly} />
                     <p className="text-xs leading-6 text-muted">
                       Formato por linea: <span className="font-mono">nombre | sku | precio | stock | descripcion</span>. SKU y descripcion pueden quedar vacios. Moneda se guarda como ARS y estado como activo.
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="secondary" onClick={() => buildBulkPreview(bulkText)}>
+                    <Button type="button" variant="secondary" onClick={() => buildBulkPreview(bulkText)} disabled={readOnly}>
                       Previsualizar
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => setBulkText(BULK_EXAMPLE)}>
+                    <Button type="button" variant="ghost" onClick={() => setBulkText(BULK_EXAMPLE)} disabled={readOnly}>
                       Cargar ejemplo
                     </Button>
-                    <Button type="button" disabled={bulkImporting || validBulkRows.length === 0} onClick={() => void importBulkProducts()}>
+                    <Button type="button" disabled={readOnly || bulkImporting || validBulkRows.length === 0} onClick={() => void importBulkProducts()}>
                       <Upload className="mr-2 h-4 w-4" />
                       {bulkImporting ? "Importando..." : "Importar productos"}
                     </Button>

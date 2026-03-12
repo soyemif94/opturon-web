@@ -28,10 +28,19 @@ export default async function ClientPortalLayout({ children }: { children: React
       scope="app"
       tenantId={ctx.tenantId}
       isStaff={Boolean(ctx.globalRole && ctx.globalRole !== "client")}
+      globalRole={ctx.globalRole}
+      tenantRole={ctx.tenantRole}
       userId={ctx.userId}
     >
       <div className="flex min-h-screen w-full">
-        <AppShell tenantLabel={tenantLabel} buildMarker={buildMarker} buildEnv={buildEnv} deploymentId={deploymentId}>
+        <AppShell
+          tenantLabel={tenantLabel}
+          buildMarker={buildMarker}
+          buildEnv={buildEnv}
+          deploymentId={deploymentId}
+          globalRole={ctx.globalRole}
+          tenantRole={ctx.tenantRole}
+        >
           {children}
         </AppShell>
       </div>

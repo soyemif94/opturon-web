@@ -3,8 +3,10 @@ import { Bell, Building2, Shield, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import { requireAppPage } from "@/lib/saas/access";
 
-export default function AppSettingsPage() {
+export default async function AppSettingsPage() {
+  await requireAppPage({ permission: "manage_workspace" });
   return (
     <ClientPageShell
       title="Configuracion"

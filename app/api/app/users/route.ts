@@ -32,7 +32,7 @@ function mapBackendUserError(error: unknown) {
 }
 
 export async function GET() {
-  const guard = await requireAppApi();
+  const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
 
   const tenantId = guard.ctx?.tenantId as string;
@@ -58,7 +58,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAppApi();
+  const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
   const tenantRole = guard.ctx?.tenantRole;
   if (tenantRole !== "owner" && tenantRole !== "manager") {

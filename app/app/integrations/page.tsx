@@ -4,7 +4,7 @@ import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppIntegrationsPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppPage({ permission: "manage_workspace" });
   let whatsapp = {
     state: "not_connected" as "not_connected" | "connecting" | "connected" | "error",
     connectedNumber: null as string | null,

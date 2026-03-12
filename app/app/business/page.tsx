@@ -13,7 +13,7 @@ const EMPTY_SETTINGS = {
 };
 
 export default async function BusinessPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppPage({ permission: "manage_workspace" });
 
   try {
     const data = readSaasData();

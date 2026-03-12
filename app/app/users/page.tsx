@@ -4,7 +4,7 @@ import { requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
 
 export default async function AppUsersPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppPage({ permission: "manage_users" });
   const data = readSaasData();
   const tenantId = ctx.tenantId || data.tenants[0]?.id || "";
   const canManage = ctx.tenantRole === "owner" || ctx.tenantRole === "manager" || ctx.globalRole === "superadmin";

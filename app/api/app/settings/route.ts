@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAppApi } from "@/lib/saas/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,8 @@ function noStore(response: NextResponse) {
 }
 
 export async function GET(_req: Request) {
+  const guard = await requireAppApi({ permission: "manage_workspace" });
+  if (guard.error) return guard.error;
   const hasDebugKey = Boolean(String(process.env.API_DEBUG_KEY || "").trim());
   const backendBaseUrl = String(process.env.BACKEND_BASE_URL || "").trim();
 

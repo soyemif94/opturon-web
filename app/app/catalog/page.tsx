@@ -1,10 +1,12 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { CatalogManager } from "@/components/app/CatalogManager";
+import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalProducts, isBackendConfigured, type PortalProduct } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function CatalogPage() {
   const ctx = await requireAppPage();
+  const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: Array<PortalProduct & { stockQty: number; active: boolean }> = [];
 
@@ -29,7 +31,7 @@ export default async function CatalogPage() {
       description="Registra productos, mantiene precios basicos actualizados y deja lista la base comercial para pedidos y futuras automatizaciones."
       badge="Productos del negocio"
     >
-      <CatalogManager initialProducts={products} />
+      <CatalogManager initialProducts={products} readOnly={readOnly} />
     </ClientPageShell>
   );
 }
