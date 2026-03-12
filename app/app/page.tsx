@@ -1,5 +1,8 @@
-﻿import { requireAppPage } from "@/lib/saas/access";
-import { readSaasData } from "@/lib/saas/store";
+import { ClientOnboardingChecklist } from "@/components/app/client-onboarding-checklist";
+import { AppDashboard } from "@/components/app/app-dashboard";
+import { getPortalConversations, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { requireAppPage } from "@/lib/saas/access";
+import { getInboxConversationDetail, listInboxConversations, readSaasData } from "@/lib/saas/store";
 
 export default async function ClientPortalHome({ searchParams }: { searchParams: Promise<{ demo?: string; tenantId?: string }> }) {
   const ctx = await requireAppPage();
@@ -9,34 +12,181 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   const data = readSaasData();
   const tenantId = ctx.tenantId || sp.tenantId || data.tenants[0]?.id || "";
   const tenant = data.tenants.find((item) => item.id === tenantId);
+  const contacts = data.contacts.filter((item) => item.tenantId === tenantId);
+  const businessSettings = Array.isArray(data.businessSettings)
+    ? data.businessSettings.find((item) => item?.tenantId === tenantId) || null
+    : null;
+  const isBackendReady = Boolean(ctx.tenantId) && isBackendConfigured();
+  let hasWhatsAppChannel = false;
+  let conversations = listInboxConversations(tenantId);
+
+  if (ctx.tenantId && isBackendReady) {
+    try {
+      const [contextResult, conversationsResult] = await Promise.all([
+        getPortalTenantContext(ctx.tenantId),
+        getPortalConversations(ctx.tenantId)
+      ]);
+
+      const channel = contextResult.data.channel;
+      hasWhatsAppChannel = String(channel?.status || "").trim().toLowerCase() === "active";
+      const portalConversations = Array.isArray(conversationsResult.data?.conversations)
+        ? conversationsResult.data.conversations
+        : [];
+
+      if (portalConversations.length > 0) {
+        conversations = portalConversations;
+      }
+    } catch {
+      hasWhatsAppChannel = false;
+    }
+  }
+
+  const messages = data.messages.filter((item) => item.tenantId === tenantId);
+  const outboundMessages = messages.filter((item) => item.direction !== "inbound");
+  const avgResponseMinutes = conversations.length > 0 ? Math.round(conversations.reduce((acc, item) => acc + item.slaMinutes, 0) / conversations.length) : 0;
+  const latestConversation = conversations[0];
+  const latestDetail = latestConversation ? getInboxConversationDetail(tenantId, latestConversation.id) : null;
+  const hasBusinessProfile =
+    Boolean(businessSettings?.openingHours?.trim()) ||
+    Boolean(businessSettings?.address?.trim()) ||
+    Boolean(businessSettings?.deliveryZones?.trim()) ||
+    Boolean(businessSettings?.paymentMethods?.trim()) ||
+    Boolean(businessSettings?.policies?.trim());
+  const hasTriedInbox = conversations.length > 0;
+  const onboardingSteps = [
+    {
+      id: "whatsapp",
+      title: "Conectar WhatsApp",
+      description: "Activa tu canal principal para recibir y responder mensajes desde Opturon.",
+      href: "/app/integrations",
+      ctaLabel: hasWhatsAppChannel ? "Revisar canal" : "Conectar WhatsApp",
+      status: hasWhatsAppChannel ? ("complete" as const) : ("pending" as const)
+    },
+    {
+      id: "business",
+      title: "Completar perfil del negocio",
+      description: "Carga datos basicos para que el portal y el equipo trabajen con mejor contexto.",
+      href: "/app/business",
+      ctaLabel: hasBusinessProfile ? "Editar perfil" : "Completar perfil",
+      status: hasBusinessProfile ? ("complete" as const) : ("pending" as const)
+    },
+    {
+      id: "inbox",
+      title: "Probar conversaciones",
+      description: "Abre el inbox y verifica que las conversaciones reales ya entren correctamente.",
+      href: "/app/inbox",
+      ctaLabel: hasTriedInbox ? "Abrir inbox" : "Probar inbox",
+      status: hasTriedInbox ? ("complete" as const) : ("pending" as const)
+    },
+    {
+      id: "automations",
+      title: "Configurar automatizaciones",
+      description: "Deja listas las respuestas y reglas basicas para empezar a automatizar tu atencion.",
+      href: "/app/automations",
+      ctaLabel: "Configurar",
+      status: "pending" as const
+    }
+  ];
+  const completedCount = onboardingSteps.filter((step) => step.status === "complete").length;
 
   return (
-    <div className="space-y-6">
-      {isDemo ? (
-        <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-200">
-          Modo demo activo (solo lectura recomendado para ventas).
-        </div>
-      ) : null}
-
-      <header>
-        <h1 className="text-3xl font-semibold">Portal Cliente</h1>
-        <p className="text-sm text-muted">Gestioná catálogo, FAQ y datos operativos del bot.</p>
-      </header>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card title="Empresa" value={tenant?.name || "-"} />
-        <Card title="Rubro" value={tenant?.industry || "-"} />
-        <Card title="Estado" value={tenant?.status || "-"} />
-      </div>
+    <div className="space-y-8">
+      <ClientOnboardingChecklist steps={onboardingSteps} completedCount={completedCount} />
+      <AppDashboard
+        tenantName={tenant?.name || "Tu empresa"}
+        tenantIndustry={tenant?.industry || "Negocio digital"}
+        demoMode={isDemo}
+        hasWhatsAppChannel={hasWhatsAppChannel}
+        channelStatus={
+          hasWhatsAppChannel
+            ? {
+                label: "Canal conectado",
+                detail: "El canal principal de WhatsApp esta listo para operar desde el portal.",
+                tone: "success"
+              }
+            : {
+                label: "WhatsApp pendiente",
+                detail: "El siguiente paso es conectar tu canal para activar conversaciones reales.",
+                tone: "warning"
+              }
+        }
+        stats={[
+          {
+            label: "Conversaciones hoy",
+            value: String(conversations.length),
+            helper: "Conversaciones visibles para seguimiento comercial y operativo.",
+            icon: "conversations"
+          },
+          {
+            label: "Contactos nuevos",
+            value: String(contacts.length),
+            helper: "Base inicial de contactos dentro del portal cliente.",
+            icon: "contacts"
+          },
+          {
+            label: "Mensajes automatizados",
+            value: String(outboundMessages.length),
+            helper: "Mensajes salientes o eventos del bot detectados en el dataset actual.",
+            icon: "bot"
+          },
+          {
+            label: "Tiempo medio de respuesta",
+            value: `${avgResponseMinutes} min`,
+            helper: "Promedio calculado sobre las conversaciones visibles del workspace.",
+            icon: "response"
+          }
+        ]}
+        recentActivity={[
+          {
+            id: "activity-conversation",
+            title: latestDetail?.contact?.name ? `Nueva actividad con ${latestDetail.contact.name}` : "Conversacion reciente",
+            detail: latestDetail?.messages?.at(-1)?.text || "La actividad del inbox aparecera aqui.",
+            timeLabel: latestDetail?.conversation?.lastMessageAt ? relativeLabel(latestDetail.conversation.lastMessageAt) : "Sin actividad",
+            tone: "neutral"
+          },
+          {
+            id: "activity-bot",
+            title: "Portal listo para atender mensajes",
+            detail: "El inbox ya soporta sugerencias, quick replies y acciones sobre conversaciones.",
+            timeLabel: "Ahora",
+            tone: "success"
+          },
+          {
+            id: "activity-channel",
+            title: hasWhatsAppChannel ? "Canal WhatsApp operativo" : "Canal WhatsApp pendiente de conexion",
+            detail: hasWhatsAppChannel
+              ? "La cuenta ya puede usar inbox y automatizaciones sobre el canal conectado."
+              : "Conectar WhatsApp habilitara conversaciones reales y la activacion del canal desde el portal.",
+            timeLabel: "Hoy",
+            tone: hasWhatsAppChannel ? "success" : "warning"
+          }
+        ]}
+        contacts={contacts.slice(0, 5).map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone || "-",
+          tags: contact.tags.length > 0 ? contact.tags : ["prospecto"],
+          lastInteraction: latestConversation ? relativeLabel(latestConversation.lastMessageAt) : "Sin actividad"
+        }))}
+        quickLinks={[
+          { label: "Abrir inbox", href: "/app/inbox", helper: "Ir a la vista completa de conversaciones y chat." },
+          { label: "Gestionar contactos", href: "/app/contacts", helper: "Ver CRM simple con tags y ultima interaccion." },
+          { label: "Ver metricas", href: "/app/metrics", helper: "Revisar conversaciones, prospectos y respuesta del bot." },
+          { label: "Conectar WhatsApp", href: "/app/integrations", helper: "Activar el canal principal del negocio." }
+        ]}
+      />
     </div>
   );
 }
 
-function Card({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-card p-4">
-      <p className="text-xs uppercase tracking-wide text-muted">{title}</p>
-      <p className="mt-1 font-medium">{value}</p>
-    </div>
-  );
+function relativeLabel(dateString: string) {
+  const value = new Date(dateString).getTime();
+  if (Number.isNaN(value)) return "Sin fecha";
+  const diffMs = Date.now() - value;
+  const minutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+  if (minutes < 60) return `Hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `Hace ${days} d`;
 }

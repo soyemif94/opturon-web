@@ -5,8 +5,8 @@ export default function AppAutomationsPage() {
   return (
     <ClientPageShell
       title="Automatizaciones"
-      description="Centro claro para entender que partes de tu atencion ya automatiza el bot y cuales conviene configurar despues."
-      badge="Bot control"
+      description="Automatiza respuestas y acciones cuando llegan mensajes de WhatsApp. Desde aqui puedes ver que esta activo, que conviene configurar y por donde empezar."
+      badge="Automatizacion"
     >
       <AutomationsHub />
     </ClientPageShell>

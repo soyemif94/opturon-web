@@ -1,4 +1,5 @@
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
+import { getPasswordOverride } from "@/lib/password-reset-store";
 
 export type AuthUser = {
   id: string;
@@ -32,6 +33,7 @@ async function readJsonAuthStore() {
 export async function getAuthUserByEmail(email: string): Promise<AuthUser | null> {
   const e = String(email || "").toLowerCase().trim();
   if (!e) return null;
+  const passwordOverride = getPasswordOverride(e);
 
   // 1) PROD FIRST / ENV-FIRST: robust for serverless deployments.
   const envEmail = String(process.env.AUTH_ADMIN_EMAIL || "").toLowerCase().trim();
@@ -46,7 +48,7 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
           id: String(matchedUser.id || "env-admin"),
           email: String(matchedUser.email || process.env.AUTH_ADMIN_EMAIL || envEmail),
           name: matchedUser.name ? String(matchedUser.name) : process.env.AUTH_ADMIN_NAME || "Admin",
-          passwordHash: envHash,
+          passwordHash: passwordOverride || envHash,
           globalRole: normalizeRole(String(matchedUser.globalRole || matchedUser.role || process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin")),
           tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
           tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
@@ -60,7 +62,7 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
       id: "env-admin",
       email: String(process.env.AUTH_ADMIN_EMAIL || envEmail),
       name: process.env.AUTH_ADMIN_NAME || "Admin",
-      passwordHash: envHash,
+      passwordHash: passwordOverride || envHash,
       globalRole: normalizeRole(process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin")
     };
   }
@@ -78,7 +80,7 @@ export async function getAuthUserByEmail(email: string): Promise<AuthUser | null
       id: String(u.id || "json-admin"),
       email: String(u.email || e),
       name: u.name ? String(u.name) : undefined,
-      passwordHash: String(u.passwordHash),
+      passwordHash: passwordOverride || String(u.passwordHash),
       globalRole: normalizeRole(String(u.globalRole || u.role || "superadmin")),
       tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
       tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined

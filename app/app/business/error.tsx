@@ -17,6 +17,7 @@ export default function BusinessPageError({
       <p className="mt-2 text-sm text-muted">
         La vista fallo al cargar. Podes reintentar o volver al portal sin perder la sesion.
       </p>
+      {error?.message ? <p className="mt-3 text-xs text-muted">Detalle: {error.message}</p> : null}
       {error?.digest ? <p className="mt-3 text-xs text-red-200">Digest: {error.digest}</p> : null}
       <div className="mt-4 flex flex-wrap gap-3">
         <button

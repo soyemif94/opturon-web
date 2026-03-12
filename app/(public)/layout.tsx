@@ -1,4 +1,6 @@
 import Script from "next/script";
+import { Footer } from "@/components/footer";
+import { Navbar } from "@/components/navbar";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim();
@@ -19,7 +21,11 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </Script>
       ) : null}
 
-      {children}
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </div>
     </>
   );
 }

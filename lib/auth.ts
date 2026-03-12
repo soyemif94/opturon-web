@@ -110,6 +110,7 @@ export const authOptions: NextAuthOptions = {
       try {
         if (user) {
           token.userId = user.id;
+          token.email = user.email;
           token.globalRole = normalizeGlobalRole((user as any).globalRole || (user as any).role);
           token.role = token.globalRole;
           token.tenantId = (user as any).tenantId;
@@ -135,6 +136,17 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       try {
+        if ((!token.tenantId || !token.tenantRole) && (token.email || session.user?.email)) {
+          const hydratedUser = await getAuthUserByEmail(String(token.email || session.user?.email || ""));
+          if (hydratedUser) {
+            token.userId = hydratedUser.id;
+            token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+            token.role = token.globalRole;
+            token.tenantId = hydratedUser.tenantId;
+            token.tenantRole = hydratedUser.tenantRole;
+          }
+        }
+
         if (session.user) {
           session.user.id = String(token.userId || "");
           session.user.globalRole = normalizeGlobalRole(String(token.globalRole || "client"));

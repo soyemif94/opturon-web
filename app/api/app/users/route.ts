@@ -27,6 +27,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const isVercelRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+  if (isVercelRuntime) {
+    return NextResponse.json(
+      {
+        error: "User creation is temporarily unavailable in production",
+        detail: "Local SaaS store is not durable on Vercel runtime"
+      },
+      { status: 503 }
+    );
+  }
+
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
@@ -58,16 +69,30 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  writeSaasData(data);
+  try {
+    writeSaasData(data);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "User was not persisted",
+        detail: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
+  }
 
-  appendAuditLog({
-    tenantId,
-    userId: guard.ctx?.userId,
-    action: "tenant_user_invited",
-    entity: "membership",
-    entityId: user.id,
-    metadata: { role: parsed.data.role, email }
-  });
+  try {
+    appendAuditLog({
+      tenantId,
+      userId: guard.ctx?.userId,
+      action: "tenant_user_invited",
+      entity: "membership",
+      entityId: user.id,
+      metadata: { role: parsed.data.role, email }
+    });
+  } catch (error) {
+    console.warn("[users-route] Audit log append failed after user persistence.", error);
+  }
 
   return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });
 }

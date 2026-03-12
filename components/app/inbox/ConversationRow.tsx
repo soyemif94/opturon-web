@@ -21,6 +21,13 @@ function slaTone(slaMinutes: number) {
   return "text-green-300";
 }
 
+function statusLabel(status: ConversationRowData["status"], unreadCount: number) {
+  if (status === "new") return "Nueva";
+  if (status === "closed") return "Resuelta";
+  if (unreadCount > 0) return "Esperando respuesta";
+  return "Activa";
+}
+
 export function ConversationRow({
   row,
   selected,
@@ -38,29 +45,40 @@ export function ConversationRow({
 }) {
   const contact = row.contact?.name || "Sin nombre";
   const meta = row.contact?.phone || row.contact?.email || "Sin contacto";
+  const preview = row.lastMessagePreview?.trim() || "Sin mensajes recientes";
+  const hasUnread = row.unreadCount > 0;
 
   return (
     <div
       className={cn(
         "group rounded-2xl border p-3 transition-colors",
-        selected ? "border-brand/40 bg-muted/10 ring-1 ring-brand/30" : "border-[color:var(--border)] hover:bg-muted/50"
+        selected ? "border-brand/40 bg-muted/10 ring-1 ring-brand/30" : "border-[color:var(--border)] hover:bg-muted/50",
+        hasUnread && !selected ? "bg-brand/5" : ""
       )}
     >
       <button onClick={onSelect} className="w-full text-left" type="button">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
+              <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
+              <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
+              {row.priority === "hot" ? <InboxBadge className="text-[11px]">Hot</InboxBadge> : null}
+            </div>
             <p className="mt-0.5 text-xs text-muted">{meta}</p>
           </div>
-          <p className="text-xs text-muted">{formatAgo(row.lastMessageAt)}</p>
+          <div className="shrink-0 text-right">
+            <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
+            {hasUnread ? (
+              <span className="mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-2 text-[11px] font-semibold text-white">
+                {row.unreadCount}
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {row.priority === "hot" ? <InboxBadge className="text-[11px]">?? Hot</InboxBadge> : null}
-            {row.status === "new" ? <InboxBadge className="text-[11px]">? Nueva</InboxBadge> : null}
-            {row.unreadCount > 0 ? <InboxBadge className="text-[11px]">?? {row.unreadCount}</InboxBadge> : null}
-          </div>
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <p className={cn("line-clamp-2 min-w-0 text-xs leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
           <span className={cn("text-xs", slaTone(row.slaMinutes))}>SLA {row.slaMinutes}m</span>
         </div>
       </button>

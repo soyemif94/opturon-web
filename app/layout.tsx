@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/navbar";
-import { Footer } from "@/components/footer";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
 import GlobalWhatsAppTracker from "@/components/analytics/GlobalWhatsAppTracker";
 import { Toaster } from "@/components/ui/toast";
@@ -25,11 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es" className={font.variable}>
       <body className="font-sans bg-bg text-text antialiased">
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </div>
+        {children}
         <Toaster />
         <GoogleAnalytics />
         <GlobalWhatsAppTracker />

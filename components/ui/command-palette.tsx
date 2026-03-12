@@ -84,6 +84,18 @@ function fuzzyScore(item: { label: string; description?: string; keywords?: stri
   return 0;
 }
 
+const DEAL_STAGE_LABELS: Record<string, string> = {
+  lead: "prospecto",
+  qualified: "calificado",
+  proposal: "propuesta",
+  won: "ganado",
+  lost: "perdido"
+};
+
+function dealStageLabel(stage: string) {
+  return DEAL_STAGE_LABELS[stage] || stage;
+}
+
 function highlight(text: string, query: string) {
   if (!query) return text;
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -343,6 +355,15 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         preview: () => ({ title: "Ir a Catalogo", description: "Gestion de productos." }),
         run: async () => router.push("/app/catalog")
       },
+      {
+        id: "nav-orders",
+        group: "navigation",
+        label: "Ir a Pedidos",
+        description: "/app/orders",
+        icon: <Package className="h-4 w-4" />,
+        preview: () => ({ title: "Ir a Pedidos", description: "Listado operativo de pedidos del portal." }),
+        run: async () => router.push("/app/orders")
+      },
       { id: "nav-faq", group: "navigation", label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") },
       { id: "nav-business", group: "navigation", label: "Ir a Negocio", description: "/app/business", run: async () => router.push("/app/business") },
       {
@@ -378,7 +399,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "inbox-search",
           group: "inbox",
-          label: "Search conversations",
+          label: "Buscar conversaciones",
           description: "Escribi nombre, telefono o email",
           preview: () => ({ title: "Buscar conversaciones", description: "Filtra el listado de conversaciones." }),
           run: async () => inputRef.current?.focus()
@@ -407,7 +428,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "inbox-only-unread",
           group: "inbox",
-          label: "Toggle show only unread",
+          label: "Alternar solo no leidas",
           preview: () => ({ title: "Solo no leidas", impact: "Alterna vista para enfocarte en pendientes." }),
           run: async () => inbox?.controls.toggleOnlyUnread?.()
         }
@@ -419,7 +440,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "conv-toggle-bot",
           group: "conversation",
-          label: inbox?.state.botEnabled ? "Toggle Bot OFF" : "Toggle Bot ON",
+          label: inbox?.state.botEnabled ? "Desactivar bot" : "Activar bot",
           description: "Alternar bot automatico",
           preview: () => ({
             title: inbox?.state.botEnabled ? "Apagar bot" : "Encender bot",
@@ -454,9 +475,9 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "conv-assign-me",
           group: "conversation",
-          label: "Assign to me",
+          label: "Asignarme",
           description: "Asignar conversacion al usuario actual",
-          preview: () => ({ title: "Asignar a mi usuario", impact: "La conversacion quedara bajo tu ownership." }),
+          preview: () => ({ title: "Asignar a mi usuario", impact: "La conversacion quedara bajo tu responsabilidad." }),
           run: async (ctx) => {
             if (!ctx.userId) throw new Error("missing_user");
             const ok = await runInboxAction("assign", { assignedTo: ctx.userId });
@@ -495,7 +516,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "conv-close-toggle",
           group: "conversation",
-          label: "Close conversation",
+          label: "Cerrar conversacion",
           preview: () => ({ title: "Cerrar conversacion", impact: "La conversacion pasara a estado cerrado." }),
           run: async () => {
             const ok = await runInboxAction("close");
@@ -505,7 +526,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "conv-reopen",
           group: "conversation",
-          label: "Reopen conversation",
+          label: "Reabrir conversacion",
           preview: () => ({ title: "Reabrir conversacion", impact: "La conversacion volvera a estado abierto." }),
           run: async () => {
             const ok = await runInboxAction("reopen");
@@ -528,8 +549,8 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "msg-templates",
           group: "messaging",
-          label: "Send template...",
-          preview: () => ({ title: "Enviar template", description: "Abrira una lista de respuestas rapidas." }),
+          label: "Enviar plantilla...",
+          preview: () => ({ title: "Enviar plantilla", description: "Abrira una lista de respuestas rapidas." }),
           run: async () => setSubview("templates")
         },
         {
@@ -587,17 +608,17 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "deal-stage",
           group: "deal",
-          label: "Move stage...",
+          label: "Mover etapa...",
           disabled: !runtime.dealId,
-          preview: () => ({ title: "Mover stage", description: "Abrira selector de stage del deal actual." }),
+          preview: () => ({ title: "Mover etapa", description: "Abrira el selector de etapa del deal actual." }),
           run: async () => setSubview("stages")
         },
         {
           id: "deal-won",
           group: "deal",
-          label: "Mark won",
+          label: "Marcar como ganado",
           disabled: !runtime.dealId,
-          preview: () => ({ title: "Marcar won", impact: "El deal quedara cerrado como ganado." }),
+          preview: () => ({ title: "Marcar como ganado", impact: "El deal quedara cerrado como ganado." }),
           run: async () => {
             const ok = await runInboxAction("change_stage", { stage: "won" });
             if (!ok) throw new Error("won_failed");
@@ -606,9 +627,9 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         {
           id: "deal-lost",
           group: "deal",
-          label: "Mark lost",
+          label: "Marcar como perdido",
           disabled: !runtime.dealId,
-          preview: () => ({ title: "Marcar lost", impact: "El deal quedara cerrado como perdido." }),
+          preview: () => ({ title: "Marcar como perdido", impact: "El deal quedara cerrado como perdido." }),
           run: async () => {
             const ok = await runInboxAction("change_stage", { stage: "lost" });
             if (!ok) throw new Error("lost_failed");
@@ -627,11 +648,11 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           group: "suggested",
           label:
             suggestion.type === "template"
-              ? `Suggested template: ${suggestion.label}`
+              ? `Plantilla sugerida: ${suggestion.label}`
               : suggestion.type === "product"
-                ? `Suggested product: ${suggestion.label}`
-                : `Suggested action: ${suggestion.label}`,
-          description: `Score ${suggestion.score}`,
+                ? `Producto sugerido: ${suggestion.label}`
+                : `Accion sugerida: ${suggestion.label}`,
+          description: `Puntaje ${suggestion.score}`,
           preview: () => ({
             title: suggestion.label,
             description: "Sugerencia por ultimo mensaje inbound.",
@@ -640,7 +661,7 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
           run: async () => {
             if (suggestion.type === "template" && suggestion.text) {
               inbox?.controls.setSearch?.(suggestion.label);
-              toast.success("Template sugerido listo para usar");
+              toast.success("Plantilla sugerida lista para usar");
             } else if (suggestion.type === "product") {
               toast.success("Producto sugerido", suggestion.label);
             } else {
@@ -679,10 +700,10 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
         id: tpl.id,
         group: "messaging",
         label: tpl.label,
-        description: "Template",
+        description: "Plantilla",
         preview: () => ({
           title: tpl.label,
-          description: "Vista previa del template",
+          description: "Vista previa de la plantilla",
           body: tpl.body,
           impact: "Insertara este mensaje en el composer."
         }),
@@ -713,10 +734,10 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
       return ["lead", "qualified", "proposal", "won", "lost"].map((stage) => ({
         id: `stage-${stage}`,
         group: "deal",
-        label: `Mover a ${stage}`,
+        label: `Mover a ${dealStageLabel(stage)}`,
         preview: () => ({
-          title: "Cambio de stage",
-          description: `Mover a: ${stage}`,
+          title: "Cambio de etapa",
+          description: `Mover a: ${dealStageLabel(stage)}`,
           impact: "Actualizara el pipeline del deal asociado."
         }),
         run: async () => {
@@ -796,14 +817,14 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
 
   const groupOrder: CommandGroup[] = ["suggested", "conversation", "messaging", "contact", "deal", "inbox", "navigation", "search"];
   const groupLabel: Record<CommandGroup, string> = {
-    suggested: "Suggested (last inbound)",
-    conversation: "Conversation actions",
-    messaging: "Messaging actions",
-    contact: "Contact actions",
-    deal: "Deal / Pipeline actions",
-    inbox: "Inbox mode",
-    navigation: "Navigation",
-    search: "Search"
+    suggested: "Sugeridas (ultimo inbound)",
+    conversation: "Acciones de conversacion",
+    messaging: "Acciones de mensajes",
+    contact: "Acciones del contacto",
+    deal: "Acciones del deal / pipeline",
+    inbox: "Modo inbox",
+    navigation: "Navegacion",
+    search: "Busqueda"
   };
 
   const activeItem = filteredItems[activeIndex];
@@ -815,10 +836,10 @@ export function CommandPalette({ scope, isStaff, userId }: { scope: PaletteScope
       <DialogContent className="w-full max-w-[900px] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-popover p-0 shadow-xl">
         {mode === "conversation" ? (
           <div className="flex flex-wrap items-center gap-2 border-b border-[color:var(--border)] px-3 py-2">
-            <Badge variant="muted">Conversation: {inbox?.state.contactName || inbox?.state.contactPhone || runtime.conversationId}</Badge>
-            {inbox?.state.intent ? <Badge variant="outline">Intent: {inbox.state.intent}</Badge> : null}
-            {inbox?.state.stage ? <Badge variant="outline">Stage: {inbox.state.stage}</Badge> : null}
-            <Badge variant={inbox?.state.botEnabled ? "success" : "warning"}>Bot {inbox?.state.botEnabled ? "ON" : "OFF"}</Badge>
+            <Badge variant="muted">Conversacion: {inbox?.state.contactName || inbox?.state.contactPhone || runtime.conversationId}</Badge>
+            {inbox?.state.intent ? <Badge variant="outline">Intencion: {inbox.state.intent}</Badge> : null}
+            {inbox?.state.stage ? <Badge variant="outline">Etapa: {dealStageLabel(inbox.state.stage)}</Badge> : null}
+            <Badge variant={inbox?.state.botEnabled ? "success" : "warning"}>Bot {inbox?.state.botEnabled ? "activo" : "pausado"}</Badge>
           </div>
         ) : null}
 

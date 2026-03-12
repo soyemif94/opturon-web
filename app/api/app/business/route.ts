@@ -22,6 +22,11 @@ function emptySettings(tenantId: string) {
   };
 }
 
+function noStore(response: NextResponse) {
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
 export async function GET() {
   const guard = await requireAppApi();
   if (guard.error) return guard.error;
@@ -32,10 +37,10 @@ export async function GET() {
     const businessSettings = Array.isArray(data.businessSettings) ? data.businessSettings : [];
     const settings = businessSettings.find((item) => item?.tenantId === tenantId) || emptySettings(tenantId);
 
-    return NextResponse.json({ settings });
+    return noStore(NextResponse.json({ settings }));
   } catch (error) {
     console.error("[api/app/business][GET] Failed to load business settings.", error);
-    return NextResponse.json({ error: "No se pudieron cargar los datos del negocio." }, { status: 500 });
+    return noStore(NextResponse.json({ error: "No se pudieron cargar los datos del negocio." }, { status: 500 }));
   }
 }
 
@@ -69,9 +74,9 @@ export async function PATCH(request: NextRequest) {
       entityId: settings.id
     });
 
-    return NextResponse.json({ ok: true, settings });
+    return noStore(NextResponse.json({ ok: true, settings }));
   } catch (error) {
     console.error("[api/app/business][PATCH] Failed to save business settings.", error);
-    return NextResponse.json({ error: "No se pudieron guardar los datos del negocio." }, { status: 500 });
+    return noStore(NextResponse.json({ error: "No se pudieron guardar los datos del negocio." }, { status: 500 }));
   }
 }

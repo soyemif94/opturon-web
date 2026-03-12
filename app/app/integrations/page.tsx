@@ -6,7 +6,7 @@ import { requireAppPage } from "@/lib/saas/access";
 export default async function AppIntegrationsPage() {
   const ctx = await requireAppPage();
   let whatsapp = {
-    state: "error" as "not_connected" | "connecting" | "connected" | "error",
+    state: "not_connected" as "not_connected" | "connecting" | "connected" | "error",
     connectedNumber: null as string | null,
     channelStatus: null as string | null,
     webhookActive: null as boolean | null,
@@ -28,7 +28,7 @@ export default async function AppIntegrationsPage() {
               : "error",
         connectedNumber: channel?.phoneNumberId || null,
         channelStatus: channel?.status || null,
-        webhookActive: Boolean(channel),
+        webhookActive: channelStatus === "active",
         lastActivity: null
       };
     } catch {
@@ -45,8 +45,8 @@ export default async function AppIntegrationsPage() {
   return (
     <ClientPageShell
       title="Integraciones"
-      description="Centro de integraciones para que el cliente entienda rapido que puede conectar y como se activa su canal principal."
-      badge="Embedded Signup ready"
+      description="Conecta tu canal principal, revisa su estado y deja tu operación lista para responder desde Opturon."
+      badge="Canales y conexiones"
     >
       <IntegrationsHub whatsapp={whatsapp} />
     </ClientPageShell>

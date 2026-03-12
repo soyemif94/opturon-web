@@ -156,19 +156,34 @@ function cloneData(data: SaasData): SaasData {
   return JSON.parse(JSON.stringify(data)) as SaasData;
 }
 
+function ensureArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function normalizeData(parsed?: Partial<SaasData> | null): SaasData {
   const base = emptyData();
   if (!parsed) return base;
   return {
     ...base,
     ...parsed,
-    contacts: parsed.contacts || [],
-    conversations: parsed.conversations || [],
-    messages: parsed.messages || [],
-    deals: parsed.deals || [],
-    templates: parsed.templates || base.templates,
-    commandActions: parsed.commandActions || base.commandActions,
-    industryTemplates: parsed.industryTemplates?.length ? parsed.industryTemplates : base.industryTemplates
+    tenants: ensureArray(parsed.tenants),
+    users: ensureArray(parsed.users),
+    memberships: ensureArray(parsed.memberships),
+    contacts: ensureArray(parsed.contacts),
+    conversations: ensureArray(parsed.conversations),
+    messages: ensureArray(parsed.messages),
+    deals: ensureArray(parsed.deals),
+    tenantNotes: ensureArray(parsed.tenantNotes),
+    tenantTasks: ensureArray(parsed.tenantTasks),
+    catalogProducts: ensureArray(parsed.catalogProducts),
+    templates: ensureArray(parsed.templates).length ? ensureArray(parsed.templates) : base.templates,
+    commandActions: ensureArray(parsed.commandActions).length ? ensureArray(parsed.commandActions) : base.commandActions,
+    catalogCategories: ensureArray(parsed.catalogCategories),
+    faqs: ensureArray(parsed.faqs),
+    businessSettings: ensureArray(parsed.businessSettings),
+    auditLog: ensureArray(parsed.auditLog),
+    industryTemplates: ensureArray(parsed.industryTemplates).length ? ensureArray(parsed.industryTemplates) : base.industryTemplates,
+    tenantMetrics: ensureArray(parsed.tenantMetrics)
   };
 }
 
@@ -197,13 +212,15 @@ export function readSaasData(): SaasData {
 
 export function writeSaasData(data: SaasData): void {
   const normalized = normalizeData(data);
-  memoryStore = cloneData(normalized);
 
   try {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
     writeFileSync(DATA_FILE, JSON.stringify(normalized, null, 2), "utf8");
+    memoryStore = cloneData(normalized);
   } catch (error) {
-    warnMemoryStore(error);
+    throw new Error(
+      `[saas-store] Persist failed for ${DATA_FILE}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 

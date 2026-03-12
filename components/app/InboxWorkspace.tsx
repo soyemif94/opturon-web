@@ -125,7 +125,9 @@ export function InboxWorkspace({
       if (!json || !Array.isArray(json.conversations)) {
         throw new Error("invalid_inbox_list_shape");
       }
-      let nextRows = json.conversations || [];
+      let nextRows = [...(json.conversations || [])].sort(
+        (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      );
       if (onlyUnread) nextRows = nextRows.filter((row) => row.unreadCount > 0);
       const nextReadOnly = Boolean(json.readOnly);
       const nextSnapshot = JSON.stringify({
