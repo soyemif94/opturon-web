@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { getPortalTenantContext, getPortalWhatsAppEmbeddedSignupStatus, isBackendConfigured } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
@@ -20,8 +20,11 @@ export async function GET() {
   }
 
   try {
-    const result = await getPortalTenantContext(auth.ctx.tenantId);
-    const status = buildWhatsAppConnectionStatus({ context: result.data });
+    const [result, onboarding] = await Promise.all([
+      getPortalTenantContext(auth.ctx.tenantId),
+      getPortalWhatsAppEmbeddedSignupStatus(auth.ctx.tenantId).catch(() => null)
+    ]);
+    const status = buildWhatsAppConnectionStatus({ context: result.data, onboarding: onboarding?.data || null });
     return NextResponse.json({
       success: true,
       data: status

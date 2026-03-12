@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BadgeCheck,
@@ -97,34 +98,54 @@ const integrations: IntegrationCard[] = [
 ];
 
 export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStatus }) {
+  const router = useRouter();
+  const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
   const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
 
   const effectiveState =
     launchState === "launching"
       ? "launching"
-      : launchState === "pending_meta" && whatsapp.state !== "connected"
+      : launchState === "pending_meta" && liveWhatsApp.state !== "connected"
         ? "pending_meta"
-        : whatsapp.state;
+        : liveWhatsApp.state;
 
-  const meta = useMemo(() => whatsappHubMeta(whatsapp, effectiveState, launchMessage), [effectiveState, launchMessage, whatsapp]);
+  const meta = useMemo(
+    () => whatsappHubMeta(liveWhatsApp, effectiveState, launchMessage),
+    [effectiveState, launchMessage, liveWhatsApp]
+  );
+
+  async function refreshWhatsAppStatus() {
+    const response = await fetch("/api/app/integrations/whatsapp", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = (await response.json().catch(() => null)) as { data?: WhatsAppConnectionStatus } | null;
+    if (json?.data) {
+      setLiveWhatsApp(json.data);
+      router.refresh();
+    }
+  }
 
   async function handleMetaConnect() {
     setLaunchState("launching");
     setLaunchMessage(null);
 
     try {
-      const bootstrap = await beginMetaWhatsAppConnection();
-      if (!bootstrap.ready) {
+      const result = await beginMetaWhatsAppConnection();
+      if (result.state === "pending_meta") {
         setLaunchState("pending_meta");
-        setLaunchMessage(bootstrap.message);
-        toast.success("Conexion preparada", bootstrap.message);
+        setLaunchMessage(result.message);
+        await refreshWhatsAppStatus();
+        toast.success("Conexion en curso", result.message);
         return;
       }
 
-      setLaunchState(bootstrap.state === "connected" ? "idle" : "pending_meta");
-      setLaunchMessage(bootstrap.message);
-      toast.success("Base de conexion lista", bootstrap.message);
+      setLaunchState(result.state === "connected" ? "idle" : "pending_meta");
+      setLaunchMessage(result.message);
+      await refreshWhatsAppStatus();
+      toast.success(
+        result.state === "connected" ? "WhatsApp conectado" : "Conexion actualizada",
+        result.message
+      );
     } catch (error) {
       setLaunchState("idle");
       const message = error instanceof Error ? error.message : "No pudimos preparar la conexion con Meta.";
@@ -146,8 +167,8 @@ export function IntegrationsHub({ whatsapp }: { whatsapp: WhatsAppConnectionStat
     },
     {
       label: "Numero conectado",
-      value: whatsapp.connectedNumber || "Pendiente",
-      tone: whatsapp.connectedNumber ? "muted" : "warning"
+      value: liveWhatsApp.connectedNumber || "Pendiente",
+      tone: liveWhatsApp.connectedNumber ? "muted" : "warning"
     }
   ] as const;
 

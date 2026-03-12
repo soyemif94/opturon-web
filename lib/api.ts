@@ -246,14 +246,96 @@ export type PortalTenantContext = {
     clinicId: string;
     provider: string | null;
     phoneNumberId: string | null;
+    displayPhoneNumber?: string | null;
+    verifiedName?: string | null;
     wabaId: string | null;
     status: string | null;
   } | null;
   reason: string;
 };
 
+export type PortalWhatsAppOnboardingSession = {
+  id: string;
+  status: string | null;
+  externalTenantId: string | null;
+  clinicId: string | null;
+  stateToken: string | null;
+  channelId: string | null;
+  wabaId: string | null;
+  phoneNumberId: string | null;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  completedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  expiresAt: string | null;
+};
+
+export type PortalWhatsAppEmbeddedSignupStatus = {
+  tenantId: string;
+  clinicId: string | null;
+  session: PortalWhatsAppOnboardingSession | null;
+  onboardingState: "idle" | "pending_meta" | "connected" | "error";
+};
+
 export async function getPortalTenantContext(tenantId: string) {
   return backendFetch<{ success: boolean; data: PortalTenantContext }>(`/portal/tenants/${tenantId}/context`, undefined, false);
+}
+
+export async function getPortalWhatsAppEmbeddedSignupStatus(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalWhatsAppEmbeddedSignupStatus;
+  }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/status`);
+}
+
+export async function createPortalWhatsAppEmbeddedSignupBootstrap(
+  tenantId: string,
+  payload: { redirectUri: string; actorUserId?: string | null; metadata?: Record<string, unknown> | null }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      ready: boolean;
+      status: string;
+      reason: string;
+      session: PortalWhatsAppOnboardingSession | null;
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/bootstrap`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function finalizePortalWhatsAppEmbeddedSignup(
+  tenantId: string,
+  payload: {
+    stateToken: string;
+    code?: string | null;
+    redirectUri: string;
+    requestId?: string | null;
+    metaPayload?: Record<string, unknown> | null;
+    error?: string | null;
+    errorDescription?: string | null;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      status: "connected" | "pending_meta";
+      channel?: PortalTenantContext["channel"] | null;
+      session: PortalWhatsAppOnboardingSession | null;
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/finalize`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export type PortalUser = {

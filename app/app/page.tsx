@@ -1,7 +1,7 @@
 import { ClientOnboardingChecklist } from "@/components/app/client-onboarding-checklist";
 import { AppDashboard } from "@/components/app/app-dashboard";
 import { canManageWorkspace } from "@/lib/app-permissions";
-import { getPortalContacts, getPortalConversations, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { getPortalContacts, getPortalConversations, getPortalTenantContext, getPortalWhatsAppEmbeddedSignupStatus, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { getInboxConversationDetail, listInboxConversations, readSaasData } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
@@ -40,13 +40,13 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
 
   if (ctx.tenantId && isBackendReady) {
     try {
-      const [contextResult, conversationsResult, contactsResult] = await Promise.all([
+      const [contextResult, conversationsResult, contactsResult, onboardingResult] = await Promise.all([
         getPortalTenantContext(ctx.tenantId),
         getPortalConversations(ctx.tenantId),
-        getPortalContacts(ctx.tenantId)
+        getPortalContacts(ctx.tenantId),
+        getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null)
       ]);
-
-      whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data });
+      whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult?.data || null });
       tenantName = contextResult.data.clinic?.name || tenantName;
       tenantIndustry = "Workspace conectado";
       const portalConversations = Array.isArray(conversationsResult.data?.conversations)

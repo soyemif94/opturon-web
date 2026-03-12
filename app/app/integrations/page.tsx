@@ -1,6 +1,6 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { IntegrationsHub } from "@/components/app/integrations-hub";
-import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { getPortalTenantContext, getPortalWhatsAppEmbeddedSignupStatus, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
@@ -10,8 +10,11 @@ export default async function AppIntegrationsPage() {
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
-      const result = await getPortalTenantContext(ctx.tenantId);
-      whatsapp = buildWhatsAppConnectionStatus({ context: result.data });
+      const [result, onboarding] = await Promise.all([
+        getPortalTenantContext(ctx.tenantId),
+        getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null)
+      ]);
+      whatsapp = buildWhatsAppConnectionStatus({ context: result.data, onboarding: onboarding?.data || null });
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
     }

@@ -4,6 +4,7 @@ import {
   getBackendErrorStatus,
   getPortalConversations,
   getPortalTenantContext,
+  getPortalWhatsAppEmbeddedSignupStatus,
   isBackendConfigured
 } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
@@ -40,12 +41,13 @@ export async function GET(request: NextRequest) {
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
-      const [contextResult, conversationsResult] = await Promise.all([
+      const [contextResult, conversationsResult, onboardingResult] = await Promise.all([
         getPortalTenantContext(tenantContext.tenantId),
-        getPortalConversations(tenantContext.tenantId)
+        getPortalConversations(tenantContext.tenantId),
+        getPortalWhatsAppEmbeddedSignupStatus(tenantContext.tenantId).catch(() => null)
       ]);
 
-      channelState = buildWhatsAppConnectionStatus({ context: contextResult.data });
+      channelState = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult?.data || null });
       conversations = conversationsResult.data.conversations || [];
     } catch (error) {
       const reason = error instanceof Error ? error.message : "backend_fetch_failed";

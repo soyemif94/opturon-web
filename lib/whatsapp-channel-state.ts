@@ -1,4 +1,5 @@
 import type { PortalTenantContext } from "@/lib/api";
+import type { PortalWhatsAppEmbeddedSignupStatus } from "@/lib/api";
 
 export type WhatsAppConnectionState =
   | "idle"
@@ -27,6 +28,7 @@ export type WhatsAppConnectionStatus = {
 
 type BuildOptions = {
   context?: PortalTenantContext | null;
+  onboarding?: PortalWhatsAppEmbeddedSignupStatus | null;
   fallbackReason?: string | null;
 };
 
@@ -37,16 +39,19 @@ function normalizeStatus(rawStatus?: string | null) {
 
 export function buildWhatsAppConnectionStatus({
   context,
+  onboarding,
   fallbackReason
 }: BuildOptions = {}): WhatsAppConnectionStatus {
   const reason = String(context?.reason || fallbackReason || "portal_channel_status_unknown").trim();
   const channelStatus = normalizeStatus(context?.channel?.status);
+  const onboardingState = String(onboarding?.onboardingState || "").trim().toLowerCase();
+  const onboardingSession = onboarding?.session || null;
   const base = {
-    reason,
+    reason: onboardingSession?.errorCode || reason,
     tenantId: context?.tenantId || null,
     clinicId: context?.clinic?.id || null,
     channelId: context?.channel?.id || null,
-    connectedNumber: context?.channel?.phoneNumberId || null,
+    connectedNumber: context?.channel?.displayPhoneNumber || context?.channel?.phoneNumberId || onboardingSession?.displayPhoneNumber || onboardingSession?.phoneNumberId || null,
     channelStatus,
     webhookActive: channelStatus === "active"
   };
@@ -72,6 +77,20 @@ export function buildWhatsAppConnectionStatus({
       helper: "En cuanto Meta termine de validar el numero y el canal, el workspace quedara listo para usar.",
       primaryCtaLabel: "Continuar conexion",
       secondaryCtaLabel: "Necesito ayuda"
+    };
+  }
+
+  if (onboardingState === "pending_meta" && !context?.channel) {
+    return {
+      ...base,
+      state: "pending_meta",
+      title: "Tu conexion con WhatsApp esta en curso",
+      description: "Ya iniciamos el onboarding con Meta para este workspace. Falta completar o confirmar la activacion final del canal.",
+      helper:
+        onboardingSession?.errorMessage ||
+        "Si cerraste la ventana de Meta antes de terminar, podes reintentar la conexion desde este mismo workspace.",
+      primaryCtaLabel: "Continuar conexion",
+      secondaryCtaLabel: "Ir a integraciones"
     };
   }
 
