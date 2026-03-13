@@ -36,7 +36,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
-import type { PortalWhatsAppTemplate, PortalWhatsAppTemplateBlueprint } from "@/lib/api";
+import type {
+  PortalWhatsAppDiscoveredAsset,
+  PortalWhatsAppTemplate,
+  PortalWhatsAppTemplateBlueprint
+} from "@/lib/api";
 import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
@@ -135,6 +139,9 @@ export function IntegrationsHub({
   });
   const [manualBusy, setManualBusy] = useState(false);
   const [manualHelpOpen, setManualHelpOpen] = useState(false);
+  const [discoveryBusy, setDiscoveryBusy] = useState(false);
+  const [discoveryItems, setDiscoveryItems] = useState<PortalWhatsAppDiscoveredAsset[]>([]);
+  const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
 
   const effectiveState =
     launchState === "launching"
@@ -242,6 +249,54 @@ export function IntegrationsHub({
     } finally {
       setManualBusy(false);
     }
+  }
+
+  async function handleDiscoverAssets() {
+    if (!manualForm.accessToken.trim()) return;
+    setDiscoveryBusy(true);
+    setDiscoveryMessage("Buscando cuentas de WhatsApp en Meta...");
+    setDiscoveryItems([]);
+    try {
+      const response = await fetch("/api/app/integrations/whatsapp/discover-assets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ accessToken: manualForm.accessToken })
+      });
+      const json = (await response.json().catch(() => null)) as
+        | { data?: { items?: PortalWhatsAppDiscoveredAsset[] }; error?: string; detail?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "No pudimos descubrir activos desde Meta.");
+      }
+
+      const items = json?.data?.items || [];
+      setDiscoveryItems(items);
+      if (items.length) {
+        setDiscoveryMessage(null);
+        toast.success("Cuentas detectadas", `Encontramos ${items.length} opcion(es) para este token.`);
+      } else {
+        setDiscoveryMessage("No encontramos cuentas accesibles con ese token. Puedes completar WABA ID y Phone Number ID manualmente.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No pudimos descubrir cuentas en Meta.";
+      setDiscoveryMessage(message);
+      toast.error("No pudimos detectar tus cuentas", message);
+    } finally {
+      setDiscoveryBusy(false);
+    }
+  }
+
+  function applyDiscoveredAsset(item: PortalWhatsAppDiscoveredAsset) {
+    setManualForm((current) => ({
+      ...current,
+      wabaId: item.wabaId,
+      phoneNumberId: item.phoneNumberId,
+      channelName: current.channelName || item.verifiedName || item.displayPhoneNumber || "Canal WhatsApp"
+    }));
+    setDiscoveryMessage(`Usaremos ${item.label} para completar la conexion manual.`);
   }
 
   async function handleCreateTemplate(templateKey: string, language: string) {
@@ -573,6 +628,53 @@ export function IntegrationsHub({
                 />
               </label>
             </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                className="rounded-2xl"
+                onClick={() => void handleDiscoverAssets()}
+                disabled={discoveryBusy || !manualForm.accessToken.trim()}
+              >
+                {discoveryBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Detectar mis cuentas
+              </Button>
+              {discoveryMessage ? <p className="self-center text-sm text-muted">{discoveryMessage}</p> : null}
+            </div>
+
+            {discoveryItems.length ? (
+              <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                <div>
+                  <p className="text-sm font-medium">Selecciona una cuenta detectada</p>
+                  <p className="mt-1 text-sm text-muted">
+                    Elegimos una opción y autocompletamos WABA ID, Phone Number ID y el nombre sugerido del canal.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {discoveryItems.map((item) => (
+                    <button
+                      key={`${item.wabaId}:${item.phoneNumberId}`}
+                      type="button"
+                      onClick={() => applyDiscoveredAsset(item)}
+                      className="w-full rounded-2xl border border-[color:var(--border)] bg-bg/70 p-4 text-left transition hover:border-brand/40 hover:bg-bg"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{item.label}</p>
+                          <div className="mt-2 space-y-1 text-xs text-muted">
+                            <p>WABA ID: {item.wabaId}</p>
+                            <p>Phone Number ID: {item.phoneNumberId}</p>
+                            {item.qualityRating ? <p>Quality: {item.qualityRating}</p> : null}
+                          </div>
+                        </div>
+                        <Badge variant="outline">Usar</Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-3">
               <Button className="rounded-2xl" onClick={() => void handleManualConnect()} disabled={manualBusy}>

@@ -401,6 +401,34 @@ export async function connectPortalWhatsAppManual(
   });
 }
 
+export type PortalWhatsAppDiscoveredAsset = {
+  wabaId: string;
+  wabaName: string | null;
+  phoneNumberId: string;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  qualityRating: string | null;
+  status: string | null;
+  label: string;
+};
+
+export async function discoverPortalWhatsAppAssets(
+  tenantId: string,
+  payload: { accessToken: string }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      items: PortalWhatsAppDiscoveredAsset[];
+    };
+  }>(`/portal/tenants/${tenantId}/whatsapp/discover-assets`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getPortalWhatsAppTemplateBlueprints(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;
