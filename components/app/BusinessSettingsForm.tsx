@@ -59,7 +59,7 @@ export function BusinessSettingsForm({
 
       if (!response.ok) {
         const json = await safeJson(response);
-        const message = json?.error?.formErrors?.[0] || json?.error || "No se pudieron guardar los datos del negocio.";
+        const message = json?.error?.formErrors?.[0] || json?.detail || json?.error || "No se pudieron guardar los datos del negocio.";
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al guardar", String(message));
         return;

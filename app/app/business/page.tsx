@@ -1,5 +1,6 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { BusinessSettingsForm } from "@/components/app/BusinessSettingsForm";
+import { getPortalBusinessSettings, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
 
@@ -18,6 +19,13 @@ export default async function BusinessPage() {
 
   try {
     if (isRealTenant) {
+      const settingsResult =
+        ctx.tenantId && isBackendConfigured() ? await getPortalBusinessSettings(ctx.tenantId).catch(() => null) : null;
+      const tenantContext =
+        ctx.tenantId && isBackendConfigured() ? await getPortalTenantContext(ctx.tenantId).catch(() => null) : null;
+      const realTenantSettings = settingsResult?.data.settings || { ...EMPTY_SETTINGS, tenantId: ctx.tenantId || "" };
+      const clinicName = tenantContext?.data?.clinic?.name || settingsResult?.data.settings?.clinicName || "Workspace del cliente";
+
       return (
         <ClientPageShell
           title="Perfil del negocio"
@@ -25,14 +33,18 @@ export default async function BusinessPage() {
           badge="Ficha operativa"
         >
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_320px]">
-            <BusinessSettingsForm initialSettings={{ ...EMPTY_SETTINGS, tenantId: ctx.tenantId || "" }} tenantName="Workspace del cliente" tenantIndustry="Configuracion pendiente" />
+            <BusinessSettingsForm
+              initialSettings={realTenantSettings}
+              tenantName={clinicName}
+              tenantIndustry="Configuracion operativa del workspace"
+            />
 
             <div className="space-y-4">
               <div className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado del workspace</p>
-                <p className="mt-3 text-xl font-semibold">Base de perfil aun no persistida en backend</p>
+                <p className="mt-3 text-xl font-semibold">Perfil operativo conectado al backend tenant-scoped</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Para tenants reales dejamos este modulo en estado seguro hasta migrar la persistencia del perfil del negocio al backend tenant-scoped.
+                  Los datos del negocio se guardan sobre la clínica real del workspace y se mantienen después de refrescar.
                 </p>
               </div>
             </div>

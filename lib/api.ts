@@ -611,6 +611,45 @@ export async function getPortalContacts(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/contacts`, undefined, false);
 }
 
+export type PortalBusinessSettings = {
+  tenantId: string;
+  clinicId: string | null;
+  clinicName: string | null;
+  openingHours: string;
+  address: string;
+  deliveryZones: string;
+  paymentMethods: string;
+  policies: string;
+};
+
+export async function getPortalBusinessSettings(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      settings: PortalBusinessSettings;
+    };
+  }>(`/portal/tenants/${tenantId}/business`);
+}
+
+export async function patchPortalBusinessSettings(
+  tenantId: string,
+  payload: Pick<PortalBusinessSettings, "openingHours" | "address" | "deliveryZones" | "paymentMethods" | "policies">
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      settings: PortalBusinessSettings;
+    };
+  }>(`/portal/tenants/${tenantId}/business`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getPortalConversationDetail(tenantId: string, conversationId: string) {
   return backendFetch<{ success: boolean; data: any }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}`,

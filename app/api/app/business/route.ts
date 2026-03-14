@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppApi } from "@/lib/saas/access";
+import {
+  getBackendErrorBody,
+  getBackendErrorStatus,
+  getPortalBusinessSettings,
+  isBackendConfigured,
+  patchPortalBusinessSettings
+} from "@/lib/api";
 import { appendAuditLog, readSaasData, writeSaasData } from "@/lib/saas/store";
 
 const schema = z.object({
@@ -27,25 +34,38 @@ function noStore(response: NextResponse) {
   return response;
 }
 
-function businessBackendUnavailable() {
-  return noStore(
-    NextResponse.json(
-      {
-        error: "business_backend_unavailable_for_real_tenant",
-        detail: "Los datos del negocio todavia no estan conectados a persistencia tenant-scoped para workspaces reales."
-      },
-      { status: 503 }
-    )
-  );
-}
-
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_workspace" });
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
 
   if (tenantId) {
-    return noStore(NextResponse.json({ settings: emptySettings(tenantId), source: "empty_real_tenant" }));
+    if (!isBackendConfigured()) {
+      return noStore(
+        NextResponse.json(
+          {
+            error: "business_backend_not_configured",
+            detail: "No hay backend persistente configurado para cargar los datos del negocio."
+          },
+          { status: 503 }
+        )
+      );
+    }
+
+    try {
+      const result = await getPortalBusinessSettings(tenantId);
+      return noStore(NextResponse.json({ settings: result.data.settings, source: "backend_real_tenant" }));
+    } catch (error) {
+      return noStore(
+        NextResponse.json(
+          getBackendErrorBody(error) || {
+            error: "business_load_failed",
+            detail: error instanceof Error ? error.message : "No se pudieron cargar los datos del negocio."
+          },
+          { status: getBackendErrorStatus(error) || 502 }
+        )
+      );
+    }
   }
 
   try {
@@ -65,14 +85,34 @@ export async function PATCH(request: NextRequest) {
   if (guard.error) return guard.error;
   const tenantId = guard.ctx?.tenantId as string;
 
-  if (tenantId) {
-    return businessBackendUnavailable();
-  }
-
   try {
     const body = await request.json().catch(() => null);
     const parsed = schema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+    if (tenantId) {
+      if (!isBackendConfigured()) {
+        return noStore(
+          NextResponse.json(
+            {
+              error: "business_backend_not_configured",
+              detail: "No hay backend persistente configurado para guardar los datos del negocio."
+            },
+            { status: 503 }
+          )
+        );
+      }
+
+      const normalizedPayload = {
+        openingHours: String(parsed.data.openingHours || ""),
+        address: String(parsed.data.address || ""),
+        deliveryZones: String(parsed.data.deliveryZones || ""),
+        paymentMethods: String(parsed.data.paymentMethods || ""),
+        policies: String(parsed.data.policies || "")
+      };
+      const result = await patchPortalBusinessSettings(tenantId, normalizedPayload);
+      return noStore(NextResponse.json({ ok: true, settings: result.data.settings, source: "backend_real_tenant" }));
+    }
 
     const data = readSaasData();
     if (!Array.isArray(data.businessSettings)) data.businessSettings = [];
@@ -97,6 +137,14 @@ export async function PATCH(request: NextRequest) {
     return noStore(NextResponse.json({ ok: true, settings }));
   } catch (error) {
     console.error("[api/app/business][PATCH] Failed to save business settings.", error);
-    return noStore(NextResponse.json({ error: "No se pudieron guardar los datos del negocio." }, { status: 500 }));
+    return noStore(
+      NextResponse.json(
+        getBackendErrorBody(error) || {
+          error: "business_save_failed",
+          detail: error instanceof Error ? error.message : "No se pudieron guardar los datos del negocio."
+        },
+        { status: getBackendErrorStatus(error) || 500 }
+      )
+    );
   }
 }
