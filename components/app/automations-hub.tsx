@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import { CheckCircle2, Clock3, UserRound } from "lucide-react";
 import { AutomationsEmptyState } from "@/components/app/automations-empty-state";
@@ -116,9 +117,11 @@ export function AutomationsHub() {
               Las automatizaciones de Opturon te ayudan a responder fuera de horario, calificar prospectos automaticamente e iniciar flujos de conversacion sin depender de configuraciones tecnicas.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button className="rounded-2xl px-5">Crear primera automatizacion</Button>
-              <Button variant="secondary" className="rounded-2xl px-5">
-                Ver recomendaciones
+              <Button asChild className="rounded-2xl px-5">
+                <Link href="/app/automations/new">Crear primera automatizacion</Link>
+              </Button>
+              <Button asChild variant="secondary" className="rounded-2xl px-5">
+                <Link href="/app/automations/templates">Ver recomendaciones</Link>
               </Button>
             </div>
           </CardContent>
@@ -188,6 +191,9 @@ export function AutomationsHub() {
                 </div>
               );
             })}
+            <Button asChild className="rounded-2xl">
+              <Link href="/app/automations">Centro de automatizacion</Link>
+            </Button>
           </CardContent>
         </Card>
       </section>

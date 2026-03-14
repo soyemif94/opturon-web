@@ -31,9 +31,11 @@ export function AutomationsEmptyState() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Button className="rounded-2xl px-5">
-            <Sparkles className="mr-2 h-4 w-4" />
-            Crear primera automatizacion
+          <Button asChild className="rounded-2xl px-5">
+            <Link href="/app/automations/new">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Crear primera automatizacion
+            </Link>
           </Button>
           <Button asChild variant="secondary" className="rounded-2xl px-5">
             <Link href="/app/integrations">Revisar canal conectado</Link>

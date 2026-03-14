@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AlarmClock, Bot, CalendarDays, Edit3, MessageSquareText, MoonStar, PhoneCall, Sparkles, UserRound, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,12 +64,16 @@ export function AutomationsList({ modules }: { modules: AutomationModule[] }) {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="secondary" className="flex-1 rounded-2xl">
-                  <Edit3 className="mr-2 h-4 w-4" />
-                  Editar
+                <Button asChild variant="secondary" className="flex-1 rounded-2xl">
+                  <Link href={`/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Editar
+                  </Link>
                 </Button>
-                <Button variant="ghost" className="rounded-2xl px-4">
-                  <Zap className="h-4 w-4" />
+                <Button asChild variant="ghost" className="rounded-2xl px-4">
+                  <Link href={`/app/automations/new?template=${encodeURIComponent(module.id)}`} aria-label={`Crear automatizacion desde ${module.name}`}>
+                    <Zap className="h-4 w-4" />
+                  </Link>
                 </Button>
               </div>
             </CardContent>
