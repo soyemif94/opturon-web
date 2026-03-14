@@ -1,7 +1,15 @@
 import { ClientOnboardingChecklist } from "@/components/app/client-onboarding-checklist";
 import { AppDashboard } from "@/components/app/app-dashboard";
 import { canManageWorkspace } from "@/lib/app-permissions";
-import { getPortalContacts, getPortalConversations, getPortalTenantContext, getPortalWhatsAppEmbeddedSignupStatus, isBackendConfigured } from "@/lib/api";
+import {
+  getPortalBusinessSettings,
+  getPortalContacts,
+  getPortalConversations,
+  getPortalTenantContext,
+  getPortalWhatsAppEmbeddedSignupStatus,
+  isBackendConfigured,
+  type PortalBusinessSettings
+} from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { getInboxConversationDetail, listInboxConversations, readSaasData } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
@@ -16,7 +24,14 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   const localData = useLocalDemoData ? readSaasData() : null;
   const tenantId = ctx.tenantId || sp.tenantId || localData?.tenants[0]?.id || "";
   const tenant = useLocalDemoData ? localData?.tenants.find((item) => item.id === tenantId) || null : null;
-  const businessSettings = useLocalDemoData && Array.isArray(localData?.businessSettings)
+  let businessSettings: PortalBusinessSettings | {
+    tenantId?: string;
+    openingHours?: string;
+    address?: string;
+    deliveryZones?: string;
+    paymentMethods?: string;
+    policies?: string;
+  } | null = useLocalDemoData && Array.isArray(localData?.businessSettings)
     ? localData.businessSettings.find((item) => item?.tenantId === tenantId) || null
     : null;
   const isBackendReady = Boolean(ctx.tenantId) && isBackendConfigured();
@@ -40,11 +55,12 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
 
   if (ctx.tenantId && isBackendReady) {
     try {
-      const [contextResult, conversationsResult, contactsResult, onboardingResult] = await Promise.all([
+      const [contextResult, conversationsResult, contactsResult, onboardingResult, businessResult] = await Promise.all([
         getPortalTenantContext(ctx.tenantId),
         getPortalConversations(ctx.tenantId),
         getPortalContacts(ctx.tenantId),
-        getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null)
+        getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null),
+        getPortalBusinessSettings(ctx.tenantId).catch(() => null)
       ]);
       whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult?.data || null });
       tenantName = contextResult.data.clinic?.name || tenantName;
@@ -62,6 +78,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         tags: contact.optedOut ? ["sin contacto"] : ["prospecto"],
         lastInteractionAt: contact.lastInteractionAt
       }));
+      businessSettings = businessResult?.data?.settings || businessSettings;
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
       conversations = [];
@@ -74,12 +91,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   const avgResponseMinutes = conversations.length > 0 ? Math.round(conversations.reduce((acc, item) => acc + item.slaMinutes, 0) / conversations.length) : 0;
   const latestConversation = conversations[0];
   const latestDetail = useLocalDemoData && latestConversation ? getInboxConversationDetail(tenantId, latestConversation.id) : null;
-  const hasBusinessProfile =
-    Boolean(businessSettings?.openingHours?.trim()) ||
-    Boolean(businessSettings?.address?.trim()) ||
-    Boolean(businessSettings?.deliveryZones?.trim()) ||
-    Boolean(businessSettings?.paymentMethods?.trim()) ||
-    Boolean(businessSettings?.policies?.trim());
+  const hasBusinessProfile = isBusinessProfileComplete(businessSettings);
   const hasTriedInbox = conversations.length > 0;
   const onboardingSteps = [
     {
@@ -244,6 +256,29 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       />
     </div>
   );
+}
+
+function isBusinessProfileComplete(
+  settings:
+    | PortalBusinessSettings
+    | {
+        openingHours?: string;
+        address?: string;
+        deliveryZones?: string;
+        paymentMethods?: string;
+        policies?: string;
+      }
+    | null
+) {
+  if (!settings) return false;
+
+  return [
+    settings.openingHours,
+    settings.address,
+    settings.deliveryZones,
+    settings.paymentMethods,
+    settings.policies
+  ].some((value) => String(value || "").trim().length > 0);
 }
 
 function relativeLabel(dateString: string) {
