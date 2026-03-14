@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -41,7 +41,11 @@ import type {
   PortalWhatsAppTemplate,
   PortalWhatsAppTemplateBlueprint
 } from "@/lib/api";
-import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
+import {
+  beginMetaWhatsAppConnection,
+  getMetaEmbeddedSignupErrorDetails,
+  type MetaEmbeddedSignupErrorKind
+} from "@/lib/meta-whatsapp-signup";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
@@ -126,10 +130,12 @@ export function IntegrationsHub({
   templates: PortalWhatsAppTemplate[];
 }) {
   const router = useRouter();
+  const manualConnectionRef = useRef<HTMLElement | null>(null);
   const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
   const [liveTemplates, setLiveTemplates] = useState(templates);
   const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
+  const [launchIssueKind, setLaunchIssueKind] = useState<MetaEmbeddedSignupErrorKind | null>(null);
   const [templatesBusy, setTemplatesBusy] = useState<string | null>(null);
   const [manualForm, setManualForm] = useState({
     wabaId: "",
@@ -172,15 +178,26 @@ export function IntegrationsHub({
     setLiveTemplates(json?.data?.templates || []);
   }
 
+  function focusManualConnection(options?: { openHelp?: boolean }) {
+    manualConnectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    manualConnectionRef.current?.focus({ preventScroll: true });
+
+    if (options?.openHelp) {
+      setManualHelpOpen(true);
+    }
+  }
+
   async function handleMetaConnect() {
     console.info("[meta-embedded-signup-ui] click_received", {
       currentState: liveWhatsApp.state
     });
     setLaunchState("launching");
     setLaunchMessage(null);
+    setLaunchIssueKind(null);
 
     try {
       const result = await beginMetaWhatsAppConnection();
+      setLaunchIssueKind(null);
       if (result.state === "pending_meta") {
         setLaunchState("pending_meta");
         setLaunchMessage(result.message);
@@ -198,12 +215,30 @@ export function IntegrationsHub({
       );
     } catch (error) {
       setLaunchState("idle");
-      const message = error instanceof Error ? error.message : "No pudimos preparar la conexion con Meta.";
-      console.error("[meta-embedded-signup-ui] launch_failed", {
-        error: message
-      });
-      setLaunchMessage(message);
-      toast.error("No pudimos iniciar la conexion", message);
+      const details = getMetaEmbeddedSignupErrorDetails(error);
+      console[details.kind === "meta_blocked" || details.kind === "cancelled" ? "warn" : "error"](
+        "[meta-embedded-signup-ui] launch_failed",
+        {
+          kind: details.kind,
+          code: details.code,
+          fallbackToManual: details.fallbackToManual,
+          error: details.message
+        }
+      );
+      setLaunchIssueKind(details.kind);
+      setLaunchMessage(details.message);
+
+      if (details.kind === "meta_blocked" || details.kind === "timeout") {
+        toast.error("Meta no habilitó la conexión guiada", details.message);
+        focusManualConnection();
+        return;
+      }
+
+      if (details.kind === "cancelled") {
+        return;
+      }
+
+      toast.error("No pudimos iniciar la conexion", details.message);
     }
   }
 
@@ -438,7 +473,26 @@ export function IntegrationsHub({
               ))}
             </div>
 
-            {launchMessage ? (
+            {launchIssueKind === "meta_blocked" || launchIssueKind === "timeout" ? (
+              <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-4 text-sm text-white/80">
+                <p className="font-semibold text-white">Meta no habilitó el alta embebida para esta app</p>
+                <p className="mt-2 leading-6">
+                  Meta no habilitó Embedded Signup para esta app. Puedes continuar ahora mismo con la conexión manual
+                  asistida sin perder el progreso.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button className="rounded-2xl" onClick={() => focusManualConnection()}>
+                    Ir a conexion manual
+                  </Button>
+                  <Button variant="secondary" className="rounded-2xl" onClick={() => focusManualConnection({ openHelp: true })}>
+                    Ver ayuda
+                  </Button>
+                  <Button variant="ghost" className="rounded-2xl" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
+                    Reintentar con Meta
+                  </Button>
+                </div>
+              </div>
+            ) : launchMessage ? (
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
                 {launchMessage}
               </div>
@@ -448,7 +502,7 @@ export function IntegrationsHub({
               {meta.primaryAction === "connect_meta" ? (
                 <Button className="rounded-2xl px-5" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
                   {launchState === "launching" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Conectar con Meta
+                  {meta.primaryLabel}
                 </Button>
               ) : meta.primaryHref ? (
                 <Button asChild className="rounded-2xl px-5">
@@ -565,19 +619,45 @@ export function IntegrationsHub({
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+      <section
+        ref={manualConnectionRef}
+        tabIndex={-1}
+        className="grid gap-5 outline-none xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]"
+      >
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="warning">Alternativa manual</Badge>}>
+          <CardHeader action={<Badge variant="warning">Ruta recomendada ahora</Badge>}>
             <div>
               <CardTitle className="text-xl">Conexion manual asistida</CardTitle>
               <CardDescription>
-                Mientras Meta habilita Embedded Signup para Tech Providers, puedes vincular tu canal validando los datos reales contra Graph.
+                Pega tu Access Token de Meta y deja que Opturon detecte automaticamente tus cuentas y numeros disponibles. Si lo prefieres, tambien puedes completar los IDs manualmente.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
+            {launchIssueKind === "meta_blocked" ? (
+              <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4">
+                <p className="text-sm font-semibold text-white">Meta no habilitó el alta embebida para esta app</p>
+                <p className="mt-2 text-sm leading-6 text-white/75">
+                  No te bloqueamos por eso. Puedes continuar ahora mismo con la conexión manual asistida validando tu
+                  token, tu WABA y tu número directamente contra Meta.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button className="rounded-2xl" onClick={() => focusManualConnection()}>
+                    Ir a conexion manual
+                  </Button>
+                  <Button variant="secondary" className="rounded-2xl" onClick={() => focusManualConnection({ openHelp: true })}>
+                    Ver ayuda
+                  </Button>
+                  <Button variant="ghost" className="rounded-2xl" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
+                    Reintentar con Meta
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
-              No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el token del canal para asociarlo al workspace correcto.
+              No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el
+              token del canal para asociarlo al workspace correcto.
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -996,7 +1076,7 @@ function whatsappHubMeta(
       webhookTone: "warning" as const,
       primaryAction: "connect_meta" as const,
       primaryHref: null,
-      primaryLabel: "Conectar con Meta",
+      primaryLabel: "Intentar conexion guiada con Meta",
       secondaryHref: "/app/integrations",
       secondaryLabel: "Quedarme aca",
       supportLabel: "Hablar con soporte",
@@ -1023,7 +1103,7 @@ function whatsappHubMeta(
       webhookTone: "warning" as const,
       primaryAction: "connect_meta" as const,
       primaryHref: null,
-      primaryLabel: "Continuar conexion",
+      primaryLabel: "Reintentar conexion guiada",
       secondaryHref: "/app/inbox",
       secondaryLabel: "Ver inbox",
       supportLabel: "Necesito ayuda",
@@ -1103,7 +1183,7 @@ function whatsappHubMeta(
     webhookTone: "warning" as const,
     primaryAction: "connect_meta" as const,
     primaryHref: null,
-    primaryLabel: "Conectar con Meta",
+    primaryLabel: "Intentar conexion guiada con Meta",
     secondaryHref: "/app/inbox",
     secondaryLabel: "Ver inbox",
     supportLabel: "Necesito ayuda",

@@ -33,6 +33,15 @@ export type MetaEmbeddedSignupLaunchResult = {
   displayPhoneNumber: string | null;
 };
 
+export type MetaEmbeddedSignupErrorKind = "meta_blocked" | "cancelled" | "config" | "timeout" | "unknown";
+
+export type MetaEmbeddedSignupErrorDetails = {
+  kind: MetaEmbeddedSignupErrorKind;
+  code: string;
+  message: string;
+  fallbackToManual: boolean;
+};
+
 type MetaCallbackPayload = {
   type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK";
   code?: string | null;
@@ -79,6 +88,143 @@ function debugError(stage: string, error: unknown, payload?: Record<string, unkn
     ...(payload || {}),
     error: error instanceof Error ? error.message : String(error || "unknown_error")
   });
+}
+
+class MetaEmbeddedSignupError extends Error {
+  readonly code: string;
+  readonly kind: MetaEmbeddedSignupErrorKind;
+  readonly fallbackToManual: boolean;
+
+  constructor(details: MetaEmbeddedSignupErrorDetails) {
+    super(details.message);
+    this.name = "MetaEmbeddedSignupError";
+    this.code = details.code;
+    this.kind = details.kind;
+    this.fallbackToManual = details.fallbackToManual;
+  }
+}
+
+function sanitizeMessage(message: string | null | undefined) {
+  return String(message || "").trim();
+}
+
+function isMetaBlockedMessage(message: string) {
+  const normalized = sanitizeMessage(message).toLowerCase();
+  if (!normalized) return false;
+
+  return [
+    "embedded signup is only available for bsps or tps",
+    "only available for bsps or tps",
+    "only available for bsps",
+    "only available for tech providers",
+    "app is not available",
+    "this app is not available",
+    "app not available",
+    "embedded signup unavailable",
+    "unsupported app",
+    "not available for this app",
+    "business solution provider",
+    "tech provider"
+  ].some((pattern) => normalized.includes(pattern));
+}
+
+function isCancellationMessage(message: string, code?: string | null) {
+  const normalized = sanitizeMessage(message).toLowerCase();
+  const normalizedCode = sanitizeMessage(code).toLowerCase();
+
+  return (
+    normalizedCode === "access_denied" ||
+    normalizedCode === "user_denied" ||
+    normalizedCode === "cancelled" ||
+    normalizedCode === "canceled" ||
+    normalizedCode === "not_authorized" ||
+    normalized.includes("access_denied") ||
+    normalized.includes("user_denied") ||
+    normalized.includes("cancelled") ||
+    normalized.includes("canceled") ||
+    normalized.includes("cancelaste") ||
+    normalized.includes("cerraste la ventana") ||
+    normalized.includes("not_authorized")
+  );
+}
+
+function buildMetaEmbeddedSignupError(params: {
+  message?: string | null;
+  code?: string | null;
+  fallbackMessage?: string;
+}): MetaEmbeddedSignupError {
+  const rawMessage = sanitizeMessage(params.message);
+  const rawCode = sanitizeMessage(params.code);
+  const message = rawMessage || params.fallbackMessage || "No pudimos completar la conexion con Meta.";
+
+  if (isMetaBlockedMessage(`${rawCode} ${rawMessage}`)) {
+    return new MetaEmbeddedSignupError({
+      kind: "meta_blocked",
+      code: rawCode || "meta_embedded_signup_unavailable",
+      message:
+        "Meta no habilitó Embedded Signup para esta app. Puedes continuar con la conexión manual asistida sin perder el progreso.",
+      fallbackToManual: true
+    });
+  }
+
+  if (isCancellationMessage(rawMessage, rawCode)) {
+    return new MetaEmbeddedSignupError({
+      kind: "cancelled",
+      code: rawCode || "meta_embedded_signup_cancelled",
+      message: "Cancelaste la conexión con Meta. Puedes reintentarlo o seguir por la conexión manual asistida.",
+      fallbackToManual: false
+    });
+  }
+
+  if (rawCode === "meta_embedded_signup_timeout") {
+    return new MetaEmbeddedSignupError({
+      kind: "timeout",
+      code: rawCode,
+      message:
+        "No recibimos una confirmación válida desde Meta. Si Embedded Signup sigue bloqueado, puedes continuar con la conexión manual asistida.",
+      fallbackToManual: true
+    });
+  }
+
+  if (rawCode.includes("config") || rawCode.includes("state_token") || rawMessage.toLowerCase().includes("falta configurar")) {
+    return new MetaEmbeddedSignupError({
+      kind: "config",
+      code: rawCode || "embedded_signup_not_ready",
+      message,
+      fallbackToManual: true
+    });
+  }
+
+  return new MetaEmbeddedSignupError({
+    kind: "unknown",
+    code: rawCode || "meta_embedded_signup_failed",
+    message,
+    fallbackToManual: false
+  });
+}
+
+export function getMetaEmbeddedSignupErrorDetails(error: unknown): MetaEmbeddedSignupErrorDetails {
+  if (error instanceof MetaEmbeddedSignupError) {
+    return {
+      kind: error.kind,
+      code: error.code,
+      message: error.message,
+      fallbackToManual: error.fallbackToManual
+    };
+  }
+
+  const message = error instanceof Error ? error.message : String(error || "meta_embedded_signup_failed");
+  const classified = buildMetaEmbeddedSignupError({
+    message,
+    code: error instanceof Error ? error.name : null
+  });
+
+  return {
+    kind: classified.kind,
+    code: classified.code,
+    message: classified.message,
+    fallbackToManual: classified.fallbackToManual
+  };
 }
 
 function normalizeMetaPayload(rawPayload: unknown): MetaEmbeddedEvent | null {
@@ -199,7 +345,7 @@ async function bootstrapEmbeddedSignup(): Promise<MetaEmbeddedSignupBootstrap> {
   if (!response.ok || !json?.data) {
     const message = json?.detail || json?.error || `embedded_signup_bootstrap_failed_${response.status}`;
     debugError("bootstrap_fail", message, { status: response.status, body: json || null });
-    throw new Error(message);
+    throw buildMetaEmbeddedSignupError({ message, code: "embedded_signup_bootstrap_failed" });
   }
 
   debugLog("bootstrap_success", {
@@ -349,7 +495,10 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
       stateTokenPresent: Boolean(bootstrap.stateToken),
       missingConfig: bootstrap.missingConfig || []
     });
-    throw new Error(message);
+    throw buildMetaEmbeddedSignupError({
+      message,
+      code: !bootstrap.ready ? "embedded_signup_not_ready" : "embedded_signup_state_token_missing"
+    });
   }
 
   debugLog("sdk_load_start", {
@@ -362,7 +511,10 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
 
   if (!window.FB) {
     debugError("sdk_missing_fb", "meta_sdk_unavailable");
-    throw new Error("meta_sdk_unavailable");
+    throw buildMetaEmbeddedSignupError({
+      message: "No pudimos cargar el SDK de Meta para abrir la conexión guiada.",
+      code: "meta_sdk_unavailable"
+    });
   }
 
   const completionPromise = waitForMetaCompletion(bootstrap.stateToken);
@@ -399,24 +551,47 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
       redirectUri: bootstrap.redirectUri,
       configIdPresent: Boolean(bootstrap.configId)
     });
-    throw error instanceof Error ? error : new Error("meta_embedded_signup_launch_failed");
+    throw buildMetaEmbeddedSignupError({
+      message: error instanceof Error ? error.message : "meta_embedded_signup_launch_failed",
+      code: "meta_embedded_signup_launch_failed"
+    });
   }
 
-  const { callback, metaEvent } = await completionPromise;
+  let callback: MetaCallbackPayload;
+  let metaEvent: MetaEmbeddedEvent | null;
+  try {
+    ({ callback, metaEvent } = await completionPromise);
+  } catch (error) {
+    throw buildMetaEmbeddedSignupError({
+      message: error instanceof Error ? error.message : "meta_embedded_signup_timeout",
+      code: error instanceof Error ? error.message : "meta_embedded_signup_timeout"
+    });
+  }
   const callbackCode = callback.code || immediateCode || null;
 
   if (callback.error) {
-    throw new Error(callback.errorDescription || callback.error);
+    throw buildMetaEmbeddedSignupError({
+      message: callback.errorDescription || metaEvent?.errorMessage || callback.error,
+      code: callback.error || metaEvent?.errorCode || null
+    });
   }
 
-  const finalized = await finalizeEmbeddedSignup({
-    stateToken: bootstrap.stateToken,
-    code: callbackCode,
-    redirectUri: bootstrap.redirectUri,
-    metaPayload: metaEvent?.raw || null,
-    error: metaEvent?.errorCode || null,
-    errorDescription: metaEvent?.errorMessage || null
-  });
+  let finalized;
+  try {
+    finalized = await finalizeEmbeddedSignup({
+      stateToken: bootstrap.stateToken,
+      code: callbackCode,
+      redirectUri: bootstrap.redirectUri,
+      metaPayload: metaEvent?.raw || null,
+      error: metaEvent?.errorCode || null,
+      errorDescription: metaEvent?.errorMessage || null
+    });
+  } catch (error) {
+    throw buildMetaEmbeddedSignupError({
+      message: error instanceof Error ? error.message : "embedded_signup_finalize_failed",
+      code: "embedded_signup_finalize_failed"
+    });
+  }
 
   return {
     state: finalized.status,
