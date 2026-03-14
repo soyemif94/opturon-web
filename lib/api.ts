@@ -731,6 +731,26 @@ export type PortalProduct = {
   updatedAt: string;
 };
 
+export type PortalAutomation = {
+  id: string;
+  clinicId: string;
+  externalTenantId: string | null;
+  name: string;
+  trigger: {
+    type: string;
+    keyword?: string | null;
+  };
+  conditions: Record<string, unknown>;
+  actions: Array<{
+    type: string;
+    message?: string | null;
+    tag?: string | null;
+  }>;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export async function getPortalOrders(tenantId: string) {
   return backendFetch<{
     success: boolean;
@@ -799,6 +819,37 @@ export async function getPortalProducts(tenantId: string) {
       products: PortalProduct[];
     };
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+}
+
+export async function getPortalAutomations(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      automations: PortalAutomation[];
+    };
+  }>(`/portal/tenants/${tenantId}/automations`);
+}
+
+export async function createPortalAutomation(
+  tenantId: string,
+  payload: {
+    name: string;
+    trigger: { type: string; keyword?: string | null };
+    actions: Array<{ type: string; message?: string | null; tag?: string | null }>;
+    enabled?: boolean;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      automation: PortalAutomation;
+    };
+  }>(`/portal/tenants/${tenantId}/automations`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function getPortalProductDetail(tenantId: string, productId: string) {

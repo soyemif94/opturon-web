@@ -8,8 +8,9 @@ import { AutomationsList, type AutomationModule } from "@/components/app/automat
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PortalAutomation } from "@/lib/api";
 
-const modules: AutomationModule[] = [
+const recommendedModules: AutomationModule[] = [
   {
     id: "welcome",
     name: "Bienvenida",
@@ -92,13 +93,55 @@ const modules: AutomationModule[] = [
   }
 ];
 
-export function AutomationsHub() {
+function summarizeTrigger(automation: PortalAutomation) {
+  if (automation.trigger.type === "keyword") {
+    return automation.trigger.keyword ? `Cuando detecta la palabra "${automation.trigger.keyword}"` : "Cuando detecta una palabra clave";
+  }
+  if (automation.trigger.type === "off_hours") return "Cuando llega un mensaje fuera de horario";
+  if (automation.trigger.type === "new_contact") return "Cuando entra un contacto nuevo";
+  return "Cuando llega un mensaje";
+}
+
+function summarizeActions(automation: PortalAutomation) {
+  return automation.actions
+    .map((action) => {
+      if (action.type === "send_message") return "Enviar mensaje";
+      if (action.type === "assign_human") return "Derivar a humano";
+      if (action.type === "tag_contact") return "Etiquetar contacto";
+      return action.type;
+    })
+    .join(" · ");
+}
+
+export function AutomationsHub({ automations }: { automations: PortalAutomation[] }) {
+  const modules = useMemo<AutomationModule[]>(
+    () =>
+      automations.map((automation) => ({
+        id: automation.id,
+        name: automation.name,
+        description: automation.enabled ? "Automatización activa en este workspace." : "Automatización creada pero todavía inactiva.",
+        state: automation.enabled ? "activa" : "inactiva",
+        summary: summarizeActions(automation) || "Sin acciones configuradas",
+        trigger: summarizeTrigger(automation),
+        action: summarizeActions(automation) || "Sin acciones configuradas",
+        icon:
+          automation.trigger.type === "off_hours"
+            ? "moon"
+            : automation.trigger.type === "new_contact"
+              ? "phone"
+              : automation.trigger.type === "keyword"
+                ? "faq"
+                : "sparkles"
+      })),
+    [automations]
+  );
+
   const stats = useMemo(() => {
     const active = modules.filter((item) => item.state === "activa").length;
     const pending = modules.filter((item) => item.state === "requiere configuracion").length;
-    const recommended = modules.filter((item) => item.state === "recomendada").length;
+    const recommended = recommendedModules.filter((item) => item.state === "recomendada").length;
     return { active, pending, recommended };
-  }, []);
+  }, [modules]);
 
   return (
     <div className="space-y-6">
