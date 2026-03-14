@@ -61,6 +61,10 @@ export function InboxWorkspace({
   const autoSuggestCacheRef = useRef<Map<string, SuggestionItem[]>>(new Map());
   const rowsSnapshotRef = useRef("");
   const detailSnapshotRef = useRef("");
+  const rowsRequestSeqRef = useRef(0);
+  const detailRequestSeqRef = useRef(0);
+  const pollInFlightRef = useRef(false);
+  const autoReadInFlightRef = useRef<string | null>(null);
 
   const querySuffix = useMemo(() => {
     const params = new URLSearchParams();
@@ -114,6 +118,7 @@ export function InboxWorkspace({
   }
 
   async function loadRows(options?: { silent?: boolean }) {
+    const requestSeq = ++rowsRequestSeqRef.current;
     if (!options?.silent) setRowsLoading(true);
     try {
       const response = await fetch(
@@ -143,7 +148,7 @@ export function InboxWorkspace({
       });
       const changed = rowsSnapshotRef.current !== nextSnapshot;
 
-      if (changed) {
+      if (changed && requestSeq === rowsRequestSeqRef.current) {
         rowsSnapshotRef.current = nextSnapshot;
         setReadOnly(nextReadOnly);
         setRows(nextRows);
@@ -164,6 +169,7 @@ export function InboxWorkspace({
   }
 
   async function loadDetail(conversationId: string, options?: { silent?: boolean }) {
+    const requestSeq = ++detailRequestSeqRef.current;
     if (!options?.silent) setDetailLoading(true);
     try {
       const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}`), { cache: "no-store" });
@@ -173,12 +179,26 @@ export function InboxWorkspace({
       const nextSnapshot = JSON.stringify(json);
       const changed = detailSnapshotRef.current !== nextSnapshot;
 
-      if (changed) {
+      if (changed && requestSeq === detailRequestSeqRef.current) {
         detailSnapshotRef.current = nextSnapshot;
         setDetail(json);
         setReadOnly(nextReadOnly);
         if (json.deal?.stage) setDealStage(json.deal.stage);
         setAssignTo(json.conversation?.assignedTo || "");
+        const latestMessage = Array.isArray(json.messages) && json.messages.length > 0 ? json.messages[json.messages.length - 1] : null;
+        if (json.conversation?.id) {
+          setRows((prev) =>
+            prev.map((row) =>
+              row.id === json.conversation.id
+                ? {
+                    ...row,
+                    lastMessageAt: latestMessage?.timestamp || json.conversation.lastMessageAt || row.lastMessageAt,
+                    lastMessagePreview: latestMessage?.text || row.lastMessagePreview
+                  }
+                : row
+            )
+          );
+        }
       }
     } finally {
       if (!options?.silent) setDetailLoading(false);
@@ -210,16 +230,56 @@ export function InboxWorkspace({
   useEffect(() => {
     if (demo || readOnly) return;
 
-    const interval = setInterval(() => {
-      void loadRows({ silent: true });
-      if (selectedId) {
-        void loadDetail(selectedId, { silent: true });
-      }
-    }, 5000);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    return () => clearInterval(interval);
+    const tick = async () => {
+      if (cancelled || pollInFlightRef.current) {
+        if (!cancelled) timer = setTimeout(() => void tick(), 5000);
+        return;
+      }
+
+      pollInFlightRef.current = true;
+      try {
+        await loadRows({ silent: true });
+        if (selectedId) {
+          await loadDetail(selectedId, { silent: true });
+        }
+      } finally {
+        pollInFlightRef.current = false;
+        if (!cancelled) timer = setTimeout(() => void tick(), 5000);
+      }
+    };
+
+    timer = setTimeout(() => void tick(), 5000);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demo, readOnly, selectedId, tenantId]);
+
+  useEffect(() => {
+    if (!selectedId || readOnly) return;
+    const selectedRow = rows.find((row) => row.id === selectedId);
+    if (!selectedRow || selectedRow.unreadCount <= 0) return;
+    if (autoReadInFlightRef.current === selectedId) return;
+
+    autoReadInFlightRef.current = selectedId;
+    setRows((prev) => prev.map((row) => (row.id === selectedId ? { ...row, unreadCount: 0 } : row)));
+    setDetail((prev) =>
+      prev && prev.conversation.id === selectedId
+        ? { ...prev, conversation: { ...prev.conversation, unreadCount: 0 } }
+        : prev
+    );
+
+    void mutateConversation(selectedId, "mark_read").finally(() => {
+      if (autoReadInFlightRef.current === selectedId) {
+        autoReadInFlightRef.current = null;
+      }
+    });
+  }, [readOnly, rows, selectedId]);
 
   const lastInboundMessage = useMemo(() => {
     return [...(detail?.messages || [])].reverse().find((message) => message.direction === "inbound");

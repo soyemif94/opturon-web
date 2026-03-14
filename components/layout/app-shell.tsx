@@ -120,6 +120,44 @@ const navItems: Array<{
 
 const APP_THEME_STORAGE_KEY = "opturon-app-theme";
 
+function ThemeToggleButton() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    try {
+      const storedTheme = window.localStorage.getItem(APP_THEME_STORAGE_KEY);
+      const nextTheme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
+      setTheme(nextTheme);
+      document.documentElement.setAttribute("data-app-theme", nextTheme);
+    } catch {
+      document.documentElement.setAttribute("data-app-theme", "dark");
+      setTheme("dark");
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      document.documentElement.setAttribute("data-app-theme", theme);
+      window.localStorage.setItem(APP_THEME_STORAGE_KEY, theme);
+    } catch {
+      document.documentElement.setAttribute("data-app-theme", theme);
+    }
+  }, [theme]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"))}
+      className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-text"
+      aria-label={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+      title={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+    >
+      {theme === "dark" ? <SunMedium className="h-3.5 w-3.5" /> : <MoonStar className="h-3.5 w-3.5" />}
+      {theme === "dark" ? "Modo claro" : "Modo oscuro"}
+    </button>
+  );
+}
+
 export function AppShell({
   children,
   tenantLabel,
@@ -141,7 +179,6 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const accessContext = { globalRole, tenantRole };
   const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module));
   const showManageShortcut = canManageWorkspace(accessContext);
@@ -154,27 +191,8 @@ export function AppShell({
     .filter(Boolean)
     .join(" | ");
 
-  useEffect(() => {
-    try {
-      const storedTheme = window.localStorage.getItem(APP_THEME_STORAGE_KEY);
-      if (storedTheme === "light" || storedTheme === "dark") {
-        setTheme(storedTheme);
-      }
-    } catch {
-      setTheme("dark");
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(APP_THEME_STORAGE_KEY, theme);
-    } catch {
-      // Ignore storage write failures and keep in-memory theme.
-    }
-  }, [theme]);
-
   return (
-    <section data-app-theme={theme} className="w-full bg-[color:var(--bg)] px-5 py-5 text-[color:var(--text)] transition-colors">
+    <section className="w-full bg-[color:var(--bg)] px-5 py-5 text-[color:var(--text)]">
       <div className="flex min-h-[calc(100vh-40px)] w-full gap-5">
         <aside className="hidden w-[304px] shrink-0 xl:block">
           <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
@@ -314,16 +332,7 @@ export function AppShell({
                     <h1 className="mt-1 text-2xl font-semibold tracking-tight">Gestiona conversaciones, automatizaciones y crecimiento</h1>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"))}
-                      className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-text"
-                      aria-label={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-                      title={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-                    >
-                      {theme === "dark" ? <SunMedium className="h-3.5 w-3.5" /> : <MoonStar className="h-3.5 w-3.5" />}
-                      {theme === "dark" ? "Modo claro" : "Modo oscuro"}
-                    </button>
+                    <ThemeToggleButton />
                     <Badge variant="muted">Workspace cliente</Badge>
                     <Badge variant="success">Portal activo</Badge>
                     <Badge variant="outline" className="gap-1.5">
