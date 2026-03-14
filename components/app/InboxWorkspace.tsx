@@ -553,12 +553,24 @@ export function InboxWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: selectedId, text })
       });
-      if (!response.ok) throw new Error("message_failed");
+      if (!response.ok) {
+        let payload: { error?: string; detail?: string; details?: string } | null = null;
+        try {
+          payload = (await response.json()) as { error?: string; detail?: string; details?: string };
+        } catch {
+          payload = null;
+        }
+        const error = new Error(
+          payload?.detail || payload?.details || payload?.error || `message_failed_${response.status}`
+        );
+        throw error;
+      }
       await loadRows();
       await loadDetail(selectedId);
-    } catch {
+    } catch (error) {
       setDetail((prev) => (prev ? { ...prev, messages: prev.messages.filter((item) => item.id !== optimisticId) } : prev));
-      toast.error("No se pudo enviar el mensaje", "Reintenta en unos segundos.");
+      const detailMessage = error instanceof Error ? error.message : "Reintenta en unos segundos.";
+      toast.error("No se pudo enviar el mensaje", detailMessage);
     }
   }
 

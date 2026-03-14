@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getBackendErrorStatus, isBackendConfigured, sendPortalMessage } from "@/lib/api";
+import { getBackendErrorBody, getBackendErrorStatus, isBackendConfigured, sendPortalMessage } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, newId, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 
@@ -35,9 +35,12 @@ export async function POST(request: NextRequest) {
       const result = await sendPortalMessage(tenantContext.tenantId, parsed.data);
       return NextResponse.json({ ok: true, message: result.data.message }, { status: 201 });
     } catch (error) {
+      const backendBody = getBackendErrorBody(error) as { error?: string; details?: string } | null;
       return NextResponse.json(
         {
-          error: error instanceof Error ? error.message : "backend_fetch_failed"
+          error: error instanceof Error ? error.message : "backend_fetch_failed",
+          detail: backendBody && typeof backendBody.error === "string" ? backendBody.error : undefined,
+          details: backendBody && typeof backendBody.details === "string" ? backendBody.details : undefined
         },
         {
           status: getBackendErrorStatus(error) || 502
