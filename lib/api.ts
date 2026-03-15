@@ -251,6 +251,32 @@ export type PortalTenantContext = {
     wabaId: string | null;
     status: string | null;
   } | null;
+  channels?: Array<{
+    id: string;
+    clinicId: string;
+    provider: string | null;
+    phoneNumberId: string | null;
+    displayPhoneNumber?: string | null;
+    verifiedName?: string | null;
+    wabaId: string | null;
+    status: string | null;
+  }>;
+  channelSelection?: {
+    reason: string;
+    strategy: string | null;
+    explicitChannelId: string | null;
+  };
+  reason: string;
+};
+
+export type PortalWhatsAppDefaultChannelSettings = {
+  tenantId: string;
+  clinicId: string | null;
+  defaultChannelId: string | null;
+  defaultChannel: PortalTenantContext["channel"] | null;
+  activeChannels: NonNullable<PortalTenantContext["channels"]>;
+  strategy: string;
+  source: string;
   reason: string;
 };
 
@@ -425,6 +451,26 @@ export async function discoverPortalWhatsAppAssets(
     };
   }>(`/portal/tenants/${tenantId}/whatsapp/discover-assets`, {
     method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalWhatsAppDefaultChannelSettings(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalWhatsAppDefaultChannelSettings;
+  }>(`/portal/tenants/${tenantId}/whatsapp/default-channel`);
+}
+
+export async function patchPortalWhatsAppDefaultChannelSettings(
+  tenantId: string,
+  payload: { channelId: string }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalWhatsAppDefaultChannelSettings;
+  }>(`/portal/tenants/${tenantId}/whatsapp/default-channel`, {
+    method: "PATCH",
     body: JSON.stringify(payload)
   });
 }

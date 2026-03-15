@@ -2,10 +2,12 @@ import { ClientPageShell } from "@/components/app/client-page-shell";
 import { IntegrationsHub } from "@/components/app/integrations-hub";
 import {
   getPortalTenantContext,
+  getPortalWhatsAppDefaultChannelSettings,
   getPortalWhatsAppEmbeddedSignupStatus,
   getPortalWhatsAppTemplateBlueprints,
   getPortalWhatsAppTemplates,
   isBackendConfigured,
+  type PortalWhatsAppDefaultChannelSettings,
   type PortalWhatsAppTemplate,
   type PortalWhatsAppTemplateBlueprint
 } from "@/lib/api";
@@ -17,18 +19,21 @@ export default async function AppIntegrationsPage() {
   let whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "workspace_without_backend" });
   let templateBlueprints: PortalWhatsAppTemplateBlueprint[] = [];
   let templates: PortalWhatsAppTemplate[] = [];
+  let defaultChannelSettings: PortalWhatsAppDefaultChannelSettings | null = null;
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
-      const [result, onboarding, blueprintsResult, templatesResult] = await Promise.all([
+      const [result, onboarding, blueprintsResult, templatesResult, defaultChannelResult] = await Promise.all([
         getPortalTenantContext(ctx.tenantId),
         getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null),
         getPortalWhatsAppTemplateBlueprints(ctx.tenantId).catch(() => null),
-        getPortalWhatsAppTemplates(ctx.tenantId).catch(() => null)
+        getPortalWhatsAppTemplates(ctx.tenantId).catch(() => null),
+        getPortalWhatsAppDefaultChannelSettings(ctx.tenantId).catch(() => null)
       ]);
       whatsapp = buildWhatsAppConnectionStatus({ context: result.data, onboarding: onboarding?.data || null });
       templateBlueprints = blueprintsResult?.data?.blueprints || [];
       templates = templatesResult?.data?.templates || [];
+      defaultChannelSettings = defaultChannelResult?.data || null;
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
     }
@@ -40,7 +45,12 @@ export default async function AppIntegrationsPage() {
       description="Conecta tu WhatsApp Business, revisa el estado real del canal y deja tu workspace listo para responder desde Opturon."
       badge="Canales y conexiones"
     >
-      <IntegrationsHub whatsapp={whatsapp} templateBlueprints={templateBlueprints} templates={templates} />
+      <IntegrationsHub
+        whatsapp={whatsapp}
+        templateBlueprints={templateBlueprints}
+        templates={templates}
+        defaultChannelSettings={defaultChannelSettings}
+      />
     </ClientPageShell>
   );
 }

@@ -37,6 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type {
+  PortalWhatsAppDefaultChannelSettings,
   PortalWhatsAppDiscoveredAsset,
   PortalWhatsAppTemplate,
   PortalWhatsAppTemplateBlueprint
@@ -123,16 +124,19 @@ const integrations: IntegrationCard[] = [
 export function IntegrationsHub({
   whatsapp,
   templateBlueprints,
-  templates
+  templates,
+  defaultChannelSettings
 }: {
   whatsapp: WhatsAppConnectionStatus;
   templateBlueprints: PortalWhatsAppTemplateBlueprint[];
   templates: PortalWhatsAppTemplate[];
+  defaultChannelSettings: PortalWhatsAppDefaultChannelSettings | null;
 }) {
   const router = useRouter();
   const manualConnectionRef = useRef<HTMLElement | null>(null);
   const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
   const [liveTemplates, setLiveTemplates] = useState(templates);
+  const [liveDefaultChannelSettings, setLiveDefaultChannelSettings] = useState(defaultChannelSettings);
   const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
   const [launchIssueKind, setLaunchIssueKind] = useState<MetaEmbeddedSignupErrorKind | null>(null);
@@ -148,6 +152,7 @@ export function IntegrationsHub({
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
   const [discoveryItems, setDiscoveryItems] = useState<PortalWhatsAppDiscoveredAsset[]>([]);
   const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
+  const [defaultChannelBusy, setDefaultChannelBusy] = useState<string | null>(null);
 
   const effectiveState =
     launchState === "launching"
@@ -168,6 +173,17 @@ export function IntegrationsHub({
     if (json?.data) {
       setLiveWhatsApp(json.data);
       router.refresh();
+    }
+  }
+
+  async function refreshDefaultChannelSettings() {
+    const response = await fetch("/api/app/integrations/whatsapp/default-channel", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = (await response.json().catch(() => null)) as
+      | { data?: PortalWhatsAppDefaultChannelSettings }
+      | null;
+    if (json?.data) {
+      setLiveDefaultChannelSettings(json.data);
     }
   }
 
@@ -272,6 +288,7 @@ export function IntegrationsHub({
       }
 
       await refreshWhatsAppStatus();
+      await refreshDefaultChannelSettings();
       router.refresh();
       toast.success(
         json?.data?.status === "connected" ? "WhatsApp conectado" : "Conexion validada",
@@ -283,6 +300,37 @@ export function IntegrationsHub({
       toast.error("No pudimos conectar el canal", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setManualBusy(false);
+    }
+  }
+
+  async function handleSetDefaultChannel(channelId: string) {
+    setDefaultChannelBusy(channelId);
+    try {
+      const response = await fetch("/api/app/integrations/whatsapp/default-channel", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ channelId })
+      });
+      const json = (await response.json().catch(() => null)) as
+        | { data?: PortalWhatsAppDefaultChannelSettings; error?: string; detail?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "No pudimos guardar el canal por defecto.");
+      }
+
+      if (json?.data) {
+        setLiveDefaultChannelSettings(json.data);
+      }
+      await refreshWhatsAppStatus();
+      router.refresh();
+      toast.success("Canal por defecto actualizado", "El workspace ya tiene un canal principal definido para WhatsApp.");
+    } catch (error) {
+      toast.error("No pudimos actualizar el canal", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setDefaultChannelBusy(null);
     }
   }
 
@@ -423,6 +471,9 @@ export function IntegrationsHub({
       tone: liveWhatsApp.connectedNumber ? "muted" : "warning"
     }
   ] as const;
+
+  const activeChannels = liveDefaultChannelSettings?.activeChannels || [];
+  const selectedDefaultChannelId = liveDefaultChannelSettings?.defaultChannelId || liveDefaultChannelSettings?.defaultChannel?.id || null;
 
   return (
     <div className="space-y-6">
@@ -871,6 +922,91 @@ export function IntegrationsHub({
                 {item}
               </div>
             ))}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">Canal por defecto</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Workspace default WhatsApp channel</CardTitle>
+              <CardDescription>
+                Define qué canal debe usar el workspace cuando haya más de un canal activo. La escritura se guarda solo en <code>settings.whatsapp.defaultChannelId</code>.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {activeChannels.length === 0 ? (
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
+                No hay canales activos disponibles para seleccionar.
+              </div>
+            ) : (
+              activeChannels.map((channel) => {
+                const isSelected = selectedDefaultChannelId === channel.id;
+                const isBusy = defaultChannelBusy === channel.id;
+                return (
+                  <div
+                    key={channel.id}
+                    className={`rounded-2xl border px-4 py-4 ${isSelected ? "border-brand/40 bg-brand/10" : "border-[color:var(--border)] bg-surface/65"}`}
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium">
+                            {channel.displayPhoneNumber || channel.phoneNumberId || "Canal WhatsApp"}
+                          </p>
+                          <Badge variant={isSelected ? "success" : "muted"}>
+                            {isSelected ? "Por defecto" : "Activo"}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-muted">
+                          {channel.verifiedName || "Sin nombre verificado"} · WABA {channel.wabaId || "sin WABA"}
+                        </p>
+                        <p className="mt-1 font-mono text-xs text-muted">{channel.id}</p>
+                      </div>
+
+                      <Button
+                        className="rounded-2xl"
+                        variant={isSelected ? "secondary" : "default"}
+                        onClick={() => void handleSetDefaultChannel(channel.id)}
+                        disabled={isBusy || isSelected}
+                      >
+                        {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSelected ? "Seleccionado" : "Usar este canal"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">Resolución</Badge>}>
+            <div>
+              <CardTitle className="text-lg">Cómo decide el canal</CardTitle>
+              <CardDescription>
+                Trazabilidad operativa del workspace para escenarios multi-canal.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0 text-sm text-muted">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+              <p className="font-medium text-text">Source</p>
+              <p className="mt-2">{liveDefaultChannelSettings?.source || "none"}</p>
+            </div>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+              <p className="font-medium text-text">Strategy</p>
+              <p className="mt-2">{liveDefaultChannelSettings?.strategy || "not_resolved"}</p>
+            </div>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+              <p className="font-medium text-text">Default channel ID</p>
+              <p className="mt-2 font-mono text-xs">
+                {selectedDefaultChannelId || "Sin selección explícita"}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </section>
