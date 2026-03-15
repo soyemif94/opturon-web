@@ -32,21 +32,21 @@ export default async function AppInvoiceDraftCreatePage({
 
   return (
     <ClientPageShell
-      title={isCreditNote ? "Nueva credit note draft" : "Nueva invoice draft"}
+      title={isCreditNote ? "Nuevo borrador de nota de credito" : "Nuevo borrador de factura"}
       description={
         isCreditNote
-          ? "Genera una nota de credito simple asociada a la invoice origen y dejala lista para emitir luego."
-          : "Crea un borrador simple con items manuales y dejalo listo para emitir luego desde el modulo de billing."
+          ? "Genera una nota de credito simple asociada a la factura origen y dejala lista para emitir luego."
+          : "Crea un borrador simple con items manuales y dejalo listo para emitir luego desde el modulo de facturacion."
       }
-      badge={isCreditNote ? "Credit note" : "Draft"}
+      badge={isCreditNote ? "Nota de credito" : "Borrador"}
     >
       {readOnly ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Este workspace esta en modo solo lectura y no puede crear drafts.
+          Este workspace esta en modo solo lectura y no puede crear borradores.
         </div>
       ) : isCreditNote && !parentInvoice ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          No pudimos cargar la invoice origen para crear esta credit note.
+          No pudimos cargar la factura origen para crear esta nota de credito.
         </div>
       ) : (
         <InvoiceDraftEditor contacts={contacts} parentInvoice={parentInvoice} />

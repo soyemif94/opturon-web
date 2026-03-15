@@ -69,7 +69,39 @@ export function badgeToneByStatus(value: string | null | undefined): "muted" | "
 export function titleCaseLabel(value: string | null | undefined) {
   const normalized = String(value || "").trim();
   if (!normalized) return "-";
-  return normalized.replace(/_/g, " ");
+  const dictionary: Record<string, string> = {
+    invoice: "Factura",
+    credit_note: "Nota de credito",
+    draft: "Borrador",
+    issued: "Emitida",
+    void: "Anulada",
+    recorded: "Registrado",
+    unpaid: "Sin cobrar",
+    partially_paid: "Cobro parcial",
+    paid: "Cobrada",
+    overpaid: "Sobrepagada",
+    not_applicable: "No aplica",
+    bank_transfer: "Transferencia",
+    cash: "Efectivo",
+    card: "Tarjeta",
+    other: "Otro",
+    active: "Activo",
+    inactive: "Inactivo",
+    archived: "Archivado",
+    internal_only: "Solo interno",
+    external_provider: "Proveedor externo",
+    synced_external: "Sincronizado",
+    positive: "Debito",
+    negative: "Credito",
+    success: "Exito",
+    warning: "Advertencia",
+    danger: "Riesgo"
+  };
+  const lower = normalized.toLowerCase();
+  if (dictionary[lower]) return dictionary[lower];
+  return normalized
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function quantizeMoney(value: number | string | null | undefined) {

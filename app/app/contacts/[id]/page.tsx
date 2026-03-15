@@ -1,14 +1,17 @@
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ClientPageShell } from "@/components/app/client-page-shell";
-import { getPortalContactDetail, isBackendConfigured } from "@/lib/api";
 import Link from "next/link";
-import { formatDateLabel, formatDateTimeLabel, formatMoney, titleCaseLabel, badgeToneByStatus } from "@/lib/billing";
+import { ClientPageShell } from "@/components/app/client-page-shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { canEditWorkspace } from "@/lib/app-permissions";
+import { badgeToneByStatus, formatDateLabel, formatDateTimeLabel, formatMoney, titleCaseLabel } from "@/lib/billing";
+import { getPortalContactDetail, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireAppPage();
   const { id } = await params;
+  const readOnly = !ctx.tenantId || !canEditWorkspace(ctx);
   let contact = null;
 
   if (ctx.tenantId && isBackendConfigured()) {
@@ -28,7 +31,18 @@ export default async function AppContactDetailPage({ params }: { params: Promise
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant={contact?.status === "archived" ? "danger" : "success"}>{contact?.status || "active"}</Badge>}>
+          <CardHeader
+            action={
+              <div className="flex items-center gap-2">
+                <Badge variant={contact?.status === "archived" ? "danger" : "success"}>{titleCaseLabel(contact?.status || "active")}</Badge>
+                {!readOnly && contact ? (
+                  <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                    <Link href={`/app/contacts/${contact.id}/edit`}>Editar contacto</Link>
+                  </Button>
+                ) : null}
+              </div>
+            }
+          >
             <div>
               <CardTitle className="text-xl">{contact?.name || "Contacto no disponible"}</CardTitle>
               <CardDescription>{contact?.companyName || contact?.email || contact?.phone || "Sin contexto adicional"}</CardDescription>
@@ -39,7 +53,7 @@ export default async function AppContactDetailPage({ params }: { params: Promise
             <DetailTile label="Telefono" value={contact?.phone || "-"} />
             <DetailTile label="WhatsApp" value={contact?.whatsappPhone || contact?.waId || "-"} />
             <DetailTile label="Empresa" value={contact?.companyName || "-"} />
-            <DetailTile label="Tax ID" value={contact?.taxId || "-"} />
+            <DetailTile label="Documento fiscal" value={contact?.taxId || "-"} />
             <DetailTile label="Condicion fiscal" value={contact?.taxCondition || "-"} />
             <DetailTile label="Creado" value={formatDateTimeLabel(contact?.createdAt)} />
             <DetailTile label="Actualizado" value={formatDateTimeLabel(contact?.updatedAt)} />
@@ -68,7 +82,7 @@ export default async function AppContactDetailPage({ params }: { params: Promise
         <CardHeader>
           <div>
             <CardTitle className="text-xl">Documentos relacionados</CardTitle>
-            <CardDescription>Invoices y credit notes del contacto para conectar el snapshot con documentos reales.</CardDescription>
+            <CardDescription>Facturas y notas de credito del contacto para conectar el snapshot con documentos reales.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
@@ -99,7 +113,7 @@ export default async function AppContactDetailPage({ params }: { params: Promise
             ))
           ) : (
             <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-              Este contacto todavia no tiene invoices ni credit notes visibles.
+              Este contacto todavia no tiene facturas ni notas de credito visibles.
             </div>
           )}
         </CardContent>
@@ -109,7 +123,7 @@ export default async function AppContactDetailPage({ params }: { params: Promise
         <Card className="border-white/6 bg-card/90">
           <CardHeader>
             <div>
-              <CardTitle className="text-xl">Payments relacionados</CardTitle>
+              <CardTitle className="text-xl">Cobros relacionados</CardTitle>
               <CardDescription>Resumen corto de cobranzas del contacto para complementar la lectura operativa.</CardDescription>
             </div>
           </CardHeader>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ComponentType, type FormEvent, useMemo, useState } from "react";
-import { ArrowRight, Boxes, Package, PencilLine, ScanLine, Upload, Warehouse } from "lucide-react";
+import { ArrowRight, Boxes, Package, PencilLine, ScanLine, Search, Upload, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,10 +91,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [bulkPreview, setBulkPreview] = useState<BulkPreviewRow[]>([]);
   const [bulkResult, setBulkResult] = useState<BulkResultSummary | null>(null);
   const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [bulkImporting, setBulkImporting] = useState(false);
+  const [search, setSearch] = useState("");
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedId) || null,
@@ -103,9 +103,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   const metrics = useMemo(() => {
     const active = products.filter((product) => resolveStatus(product) === "active").length;
-    const inactive = products.length - active;
+    const archived = products.length - active;
     const stockValue = products.reduce((sum, product) => sum + resolvePrice(product) * resolveStock(product), 0);
-    return { total: products.length, active, inactive, stockValue };
+    return { total: products.length, active, archived, stockValue };
   }, [products]);
   const inventoryAlerts = useMemo(
     () =>
@@ -115,6 +115,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       }),
     [products]
   );
+  const filteredProducts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return products;
+    return products.filter((product) => {
+      const haystack = [product.name, product.sku, product.description].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [products, search]);
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
 
@@ -173,16 +181,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     setSaving(true);
     try {
-      const method = editingId ? "PATCH" : "POST";
-      const path = editingId ? `/api/app/catalog/${editingId}` : "/api/app/catalog";
-      const response = await fetch(path, {
-        method,
+      const response = await fetch("/api/app/catalog", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: draft.name.trim(),
           description: draft.description.trim() || null,
           sku: draft.sku.trim() || null,
           price,
+          vatRate: 0,
           stock,
           currency: draft.currency.trim() || "ARS"
         })
@@ -192,14 +199,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         throw new Error(json?.error || "No se pudo guardar el producto.");
       }
 
-      const nextSelected = await reloadProducts(json?.product?.id || editingId || undefined);
-      setEditingId(null);
+      const nextSelected = await reloadProducts(json?.product?.id || undefined);
       setDraft(EMPTY_DRAFT);
       setFeedback({
         tone: "success",
-        text: editingId ? "Producto actualizado correctamente." : "Producto creado correctamente."
+        text: "Producto creado correctamente."
       });
-      toast.success(editingId ? "Producto actualizado" : "Producto creado");
+      toast.success("Producto creado");
       if (nextSelected) setSelectedId(nextSelected.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo guardar el producto.";
@@ -210,16 +216,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
   }
 
-  function startEdit(product: Product) {
-    setSelectedId(product.id);
-    setEditingId(product.id);
-    setDraft(hydrateDraft(product));
-    setMode("single");
-    setFeedback(null);
-  }
-
   function startCreate() {
-    setEditingId(null);
     setDraft(EMPTY_DRAFT);
     setFeedback(null);
   }
@@ -312,7 +309,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   async function toggleStatus(product: Product) {
     if (readOnly) return;
-    const nextStatus = resolveStatus(product) === "active" ? "inactive" : "active";
+    const nextStatus = resolveStatus(product) === "active" ? "archived" : "active";
     setStatusUpdatingId(product.id);
     setFeedback(null);
 
@@ -328,7 +325,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       }
 
       setProducts((current) => current.map((item) => (item.id === product.id ? json.product : item)));
-      toast.success(nextStatus === "active" ? "Producto activado" : "Producto desactivado");
+      toast.success(nextStatus === "active" ? "Producto activado" : "Producto archivado");
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo actualizar el estado del producto.";
       setFeedback({ tone: "error", text: message });
@@ -343,7 +340,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Boxes} label="Productos cargados" value={String(metrics.total)} helper="Base inicial del catalogo para ventas y pedidos." />
         <MetricCard icon={Package} label="Activos" value={String(metrics.active)} helper="Productos listos para vender o sumar a un pedido." />
-        <MetricCard icon={ScanLine} label="Inactivos" value={String(metrics.inactive)} helper="Productos pausados sin borrar el historial comercial." />
+        <MetricCard icon={ScanLine} label="Archivados" value={String(metrics.archived)} helper="Productos pausados sin borrar el historial comercial." />
         <MetricCard icon={Warehouse} label="Valor bruto" value={formatCurrency(metrics.stockValue)} helper="Referencia simple de stock valorizado a precio actual." />
       </section>
 
@@ -412,19 +409,32 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">{metrics.total} productos</Badge>}>
+          <CardHeader action={<Badge variant="muted">{filteredProducts.length} visibles</Badge>}>
             <div>
               <CardTitle className="text-xl">Catalogo del negocio</CardTitle>
               <CardDescription>Lista simple de productos con precio, stock y estado operativo para usar luego en pedidos y commerce conversacional.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <Input
+                className="pl-10"
+                placeholder="Buscar por nombre o codigo SKU"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
             {products.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
                 Todavia no hay productos. Crea el primero desde el panel lateral o pega varias lineas en carga masiva para poblar rapido el catalogo.
               </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+                No encontramos productos para esa busqueda. Prueba con otro nombre o SKU.
+              </div>
             ) : (
-              products.map((product) => (
+              filteredProducts.map((product) => (
                 <div
                   key={product.id}
                   className={`rounded-[22px] border p-4 transition-colors ${
@@ -436,7 +446,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-base font-semibold">{product.name}</p>
                         <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
-                          {resolveStatus(product) === "active" ? "Activo" : "Inactivo"}
+                          {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
                         </Badge>
                         <Badge variant={getStockState(resolveStock(product)).variant}>
                           {getStockState(resolveStock(product)).label}
@@ -450,12 +460,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
-                      <Button type="button" variant="secondary" size="sm" onClick={() => startEdit(product)} disabled={readOnly}>
-                        <PencilLine className="mr-1 h-4 w-4" />
-                        Editar
+                      <Button asChild variant="secondary" size="sm">
+                        <Link href={`/app/catalog/${product.id}/edit`}>
+                          <PencilLine className="mr-1 h-4 w-4" />
+                          Editar
+                        </Link>
                       </Button>
                       <Button type="button" variant="secondary" size="sm" disabled={readOnly || statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
-                        {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Desactivar" : "Activar"}
+                        {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Archivar" : "Activar"}
                       </Button>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={`/app/catalog/${product.id}`}>
@@ -473,7 +485,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
         <div className="space-y-6">
           <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : editingId ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : editingId ? "Edicion" : "Alta rapida"}</Badge>}>
+            <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : "Alta rapida"}</Badge>}>
               <div>
                 <CardTitle className="text-xl">Carga de productos</CardTitle>
                 <CardDescription>Elige entre alta individual o carga masiva para poblar el catalogo mas rapido sin salir del portal.</CardDescription>
@@ -524,7 +536,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       Limpiar
                     </Button>
                     <Button type="submit" disabled={readOnly || saving}>
-                      {saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear producto"}
+                      {saving ? "Guardando..." : "Crear producto"}
                     </Button>
                   </div>
                 </form>
@@ -604,7 +616,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           </Card>
 
           <Card className="border-white/6 bg-card/90">
-            <CardHeader action={selectedProduct ? <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>{resolveStatus(selectedProduct) === "active" ? "Activo" : "Inactivo"}</Badge> : null}>
+            <CardHeader action={selectedProduct ? <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>{resolveStatus(selectedProduct) === "active" ? "Activo" : "Archivado"}</Badge> : null}>
               <div>
                 <CardTitle className="text-xl">Detalle rapido</CardTitle>
                 <CardDescription>Contexto rapido del producto seleccionado para validar precio, stock y disponibilidad.</CardDescription>
@@ -620,7 +632,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <DetailStat label="Producto" value={selectedProduct.name} />
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>
-                      {resolveStatus(selectedProduct) === "active" ? "Activo" : "Inactivo"}
+                      {resolveStatus(selectedProduct) === "active" ? "Activo" : "Archivado"}
                     </Badge>
                     <Badge variant={getStockState(resolveStock(selectedProduct)).variant}>
                       {getStockState(resolveStock(selectedProduct)).label}
@@ -632,6 +644,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>
+                  {!readOnly ? (
+                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                      <Link href={`/app/catalog/${selectedProduct.id}/edit`}>
+                        <PencilLine className="mr-2 h-4 w-4" />
+                        Editar producto
+                      </Link>
+                    </Button>
+                  ) : null}
                   {getStockState(resolveStock(selectedProduct)).isLowStock ? (
                     <p className="text-sm text-amber-300">Quedan pocas unidades disponibles de este producto.</p>
                   ) : null}
@@ -767,7 +787,7 @@ function resolveStock(product: Product) {
 
 function resolveStatus(product: Product) {
   if (product.status) return product.status;
-  return product.active === false ? "inactive" : "active";
+  return product.active === false ? "archived" : "active";
 }
 
 function MetricCard({
