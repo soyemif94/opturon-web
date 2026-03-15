@@ -2,6 +2,7 @@ export type FilterKey = "all" | "hot" | "sin_responder" | "nuevas" | "asignadas"
 
 export type ConversationRowData = {
   id: string;
+  channelId?: string | null;
   status: "open" | "closed" | "new";
   assignedTo?: string;
   lastMessageAt: string;
@@ -25,4 +26,29 @@ export type DetailPayload = {
   assignee?: { id: string; name: string };
   quickReplies: Array<{ intent: string; text: string }>;
   aiEvents: Array<{ id: string; text: string; createdAt: string }>;
+  channelBinding?: {
+    conversationChannelId: string | null;
+    conversationChannel: {
+      id: string;
+      clinicId: string;
+      provider: string | null;
+      phoneNumberId: string | null;
+      displayPhoneNumber?: string | null;
+      verifiedName?: string | null;
+      wabaId: string | null;
+      status: string | null;
+    } | null;
+    workspaceDefaultChannel: {
+      id: string;
+      clinicId: string;
+      provider: string | null;
+      phoneNumberId: string | null;
+      displayPhoneNumber?: string | null;
+      verifiedName?: string | null;
+      wabaId: string | null;
+      status: string | null;
+    } | null;
+    matchesWorkspaceDefault: boolean | null;
+    resolutionStatus: string;
+  };
 };

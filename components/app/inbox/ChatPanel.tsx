@@ -8,6 +8,9 @@ import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
 import type { DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
 
+type ChannelBinding = NonNullable<DetailPayload["channelBinding"]>;
+type BoundChannel = ChannelBinding["conversationChannel"] | ChannelBinding["workspaceDefaultChannel"];
+
 function stageLabel(value?: string) {
   if (!value) return "Sin etapa";
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -24,6 +27,60 @@ function responseMode(detail: DetailPayload) {
   if (detail.conversation.assignedTo) return "humano";
   if (!detail.conversation.botEnabled) return "derivada";
   return "bot";
+}
+
+function channelLabel(channel?: BoundChannel | null) {
+  if (!channel) return "No resuelto";
+  return channel.displayPhoneNumber || channel.phoneNumberId || channel.id;
+}
+
+function channelBindingMeta(detail: DetailPayload) {
+  const binding = detail.channelBinding;
+  if (!binding) {
+    return {
+      tone: "muted",
+      label: "Sin trazabilidad de canal",
+      helper: "El detalle actual no incluye contexto de canal para esta conversación."
+    } as const;
+  }
+
+  if (binding.resolutionStatus === "conversation_channel_inactive") {
+    return {
+      tone: "warning",
+      label: "Canal de conversación inactivo",
+      helper: "La conversación sigue ligada a un canal inactivo. El workspace tiene otro canal por defecto operativo."
+    } as const;
+  }
+
+  if (binding.resolutionStatus === "conversation_channel_missing") {
+    return {
+      tone: "warning",
+      label: "Canal de conversación no encontrado",
+      helper: "La conversación quedó sin un canal válido asociado y conviene revisarla antes de operar."
+    } as const;
+  }
+
+  if (binding.resolutionStatus === "different_from_workspace_default") {
+    return {
+      tone: "muted",
+      label: "Canal distinto al por defecto",
+      helper: "La conversación mantiene su canal propio aunque el workspace tenga otro canal configurado por defecto."
+    } as const;
+  }
+
+  if (binding.resolutionStatus === "matches_workspace_default") {
+    return {
+      tone: "success",
+      label: "Canal alineado",
+      helper: "La conversación está ligada al mismo canal que el workspace usa como predeterminado."
+    } as const;
+  }
+
+  return {
+    tone: "muted",
+    label: "Canal por defecto no resuelto",
+    helper: "El workspace todavía no tiene un canal por defecto explícito o hay más de un canal activo."
+  } as const;
 }
 
 type ChatPanelProps = {
@@ -75,6 +132,14 @@ export function ChatPanel({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [timeline.length]);
+
+  const bindingMeta = detail ? channelBindingMeta(detail) : null;
+  const bindingToneClass =
+    bindingMeta?.tone === "warning"
+      ? "border-amber-500/35 bg-amber-500/10 text-amber-100"
+      : bindingMeta?.tone === "success"
+        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+        : "border-[color:var(--border)] bg-card/60 text-muted";
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
@@ -128,6 +193,33 @@ export function ChatPanel({
                 <PhoneCall className="h-3.5 w-3.5" />
                 Archivar
               </button>
+            </div>
+
+            <div className={`rounded-2xl border px-4 py-3 text-sm ${bindingToneClass}`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <InboxBadge className="capitalize">{bindingMeta?.label || "Canal"}</InboxBadge>
+              </div>
+              <p className="mt-2 leading-6">{bindingMeta?.helper}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-current/70">Canal de la conversación</p>
+                  <p className="mt-2 font-medium text-current">
+                    {channelLabel(detail.channelBinding?.conversationChannel)}
+                  </p>
+                  <p className="mt-1 text-xs text-current/75">
+                    {detail.channelBinding?.conversationChannel?.verifiedName || detail.channelBinding?.conversationChannel?.wabaId || "Sin metadatos"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-current/70">Canal por defecto del workspace</p>
+                  <p className="mt-2 font-medium text-current">
+                    {channelLabel(detail.channelBinding?.workspaceDefaultChannel)}
+                  </p>
+                  <p className="mt-1 text-xs text-current/75">
+                    {detail.channelBinding?.workspaceDefaultChannel?.verifiedName || detail.channelBinding?.workspaceDefaultChannel?.wabaId || "Sin selección explícita"}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
