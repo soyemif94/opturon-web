@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Bot, Hand, PauseCircle, PhoneCall, Sparkles, UserRound } from "lucide-react";
+import { Bot, Hand, LoaderCircle, PauseCircle, PhoneCall, Sparkles, UserRound, Wrench } from "lucide-react";
 import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
 import { InboxBadge } from "@/components/app/inbox/Badge";
@@ -98,6 +98,8 @@ type ChatPanelProps = {
   onToggleBot: () => void;
   onTakeConversation: () => void;
   onArchive: () => void;
+  onRepairChannel: (channelId?: string) => void;
+  repairChannelBusy: boolean;
 };
 
 export function ChatPanel({
@@ -114,7 +116,9 @@ export function ChatPanel({
   onRegenerateAutoSuggestions,
   onToggleBot,
   onTakeConversation,
-  onArchive
+  onArchive,
+  onRepairChannel,
+  repairChannelBusy
 }: ChatPanelProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -134,6 +138,18 @@ export function ChatPanel({
   }, [timeline.length]);
 
   const bindingMeta = detail ? channelBindingMeta(detail) : null;
+  const binding = detail?.channelBinding || null;
+  const canRepairChannel =
+    !readOnly &&
+    Boolean(
+      binding &&
+        (binding.resolutionStatus === "conversation_channel_inactive" ||
+          binding.resolutionStatus === "conversation_channel_missing")
+    );
+  const repairCandidates = (binding?.activeWorkspaceChannels || []).filter(
+    (channel) => channel.id !== binding?.conversationChannelId
+  );
+  const primaryRepairChannel = binding?.workspaceDefaultChannel || repairCandidates[0] || null;
   const bindingToneClass =
     bindingMeta?.tone === "warning"
       ? "border-amber-500/35 bg-amber-500/10 text-amber-100"
@@ -220,6 +236,38 @@ export function ChatPanel({
                   </p>
                 </div>
               </div>
+              {canRepairChannel ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {primaryRepairChannel ? (
+                    <button
+                      type="button"
+                      onClick={() => onRepairChannel(primaryRepairChannel.id)}
+                      disabled={repairChannelBusy}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/15 px-3 py-1.5 text-xs text-current hover:opacity-90 disabled:opacity-50"
+                    >
+                      {repairChannelBusy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                      {binding?.workspaceDefaultChannel?.id === primaryRepairChannel.id
+                        ? "Reparar con canal por defecto"
+                        : "Reparar con canal activo"}
+                    </button>
+                  ) : null}
+                  {repairCandidates
+                    .filter((channel) => !primaryRepairChannel || channel.id !== primaryRepairChannel.id)
+                    .slice(0, 2)
+                    .map((channel) => (
+                      <button
+                        key={channel.id}
+                        type="button"
+                        onClick={() => onRepairChannel(channel.id)}
+                        disabled={repairChannelBusy}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/10 px-3 py-1.5 text-xs text-current/90 hover:opacity-90 disabled:opacity-50"
+                      >
+                        {repairChannelBusy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                        Usar {channel.displayPhoneNumber || channel.phoneNumberId || "canal"}
+                      </button>
+                    ))}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : (

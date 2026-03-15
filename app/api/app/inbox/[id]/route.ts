@@ -5,13 +5,14 @@ import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
 const patchSchema = z.object({
-  action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage"]),
+  action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage", "repair_channel"]),
   assignedTo: z.string().optional(),
   botEnabled: z.boolean().optional(),
   text: z.string().optional(),
   title: z.string().optional(),
   dueDate: z.string().optional(),
-  stage: z.enum(["lead", "qualified", "proposal", "won", "lost"]).optional()
+  stage: z.enum(["lead", "qualified", "proposal", "won", "lost"]).optional(),
+  channelId: z.string().optional()
 });
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

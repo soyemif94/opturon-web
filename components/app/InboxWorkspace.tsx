@@ -54,6 +54,7 @@ export function InboxWorkspace({
   const [taskTitle, setTaskTitle] = useState("");
   const [dealStage, setDealStage] = useState("lead");
   const [assignTo, setAssignTo] = useState("");
+  const [repairChannelBusy, setRepairChannelBusy] = useState(false);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [autoSuggestions, setAutoSuggestions] = useState<SuggestionItem[]>([]);
@@ -585,6 +586,21 @@ export function InboxWorkspace({
     if (!ok) toast.error("No se pudo guardar el cambio");
   }
 
+  async function repairConversationChannel(channelId?: string) {
+    if (!selectedId || !detail || readOnly) return;
+    setRepairChannelBusy(true);
+    try {
+      const ok = await mutateConversation(selectedId, "repair_channel", channelId ? { channelId } : {});
+      if (!ok) {
+        toast.error("No se pudo reparar el canal", "Revisa que exista un canal activo válido en este workspace.");
+        return;
+      }
+      toast.success("Canal reparado", "La conversación quedó vinculada a un canal activo del workspace.");
+    } finally {
+      setRepairChannelBusy(false);
+    }
+  }
+
   async function takeConversation() {
     if (!selectedId || !currentUserId || readOnly) return;
     setAssignTo(currentUserId);
@@ -714,6 +730,8 @@ export function InboxWorkspace({
               onToggleBot={() => void runAction("toggle_bot")}
               onTakeConversation={() => void takeConversation()}
               onArchive={() => void runAction("close")}
+              onRepairChannel={(channelId) => void repairConversationChannel(channelId)}
+              repairChannelBusy={repairChannelBusy}
             />
           }
           right={

@@ -48,6 +48,16 @@ export type DetailPayload = {
       wabaId: string | null;
       status: string | null;
     } | null;
+    activeWorkspaceChannels: Array<{
+      id: string;
+      clinicId: string;
+      provider: string | null;
+      phoneNumberId: string | null;
+      displayPhoneNumber?: string | null;
+      verifiedName?: string | null;
+      wabaId: string | null;
+      status: string | null;
+    }>;
     matchesWorkspaceDefault: boolean | null;
     resolutionStatus: string;
   };
