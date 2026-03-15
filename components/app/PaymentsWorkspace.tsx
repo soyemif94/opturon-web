@@ -111,10 +111,10 @@ export function PaymentsWorkspace({
     const invoicesJson = await invoicesResponse.json().catch(() => null);
 
     if (!paymentsResponse.ok) {
-      throw new Error(String(paymentsJson?.error || "No se pudieron refrescar los payments."));
+      throw new Error(String(paymentsJson?.error || "No se pudieron refrescar los cobros."));
     }
     if (!invoicesResponse.ok) {
-      throw new Error(String(invoicesJson?.error || "No se pudieron refrescar las invoices."));
+      throw new Error(String(invoicesJson?.error || "No se pudieron refrescar las facturas."));
     }
 
     setPayments(Array.isArray(paymentsJson?.payments) ? paymentsJson.payments : []);
@@ -127,7 +127,7 @@ export function PaymentsWorkspace({
 
     const amount = Number(draft.amount || 0);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Monto invalido", "Ingresa un importe valido para registrar el payment.");
+      toast.error("Monto invalido", "Ingresa un importe valido para registrar el cobro.");
       return;
     }
 
@@ -150,14 +150,14 @@ export function PaymentsWorkspace({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo registrar el payment."));
+        throw new Error(String(json?.error || "No se pudo registrar el cobro."));
       }
 
       await refreshWorkspace();
       setDraft(EMPTY_DRAFT);
-      toast.success("Payment registrado", "La cobranza ya esta visible en el modulo de billing.");
+      toast.success("Cobro registrado", "La cobranza ya esta visible en el modulo de facturacion.");
     } catch (error) {
-      toast.error("No se pudo registrar el payment", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo registrar el cobro", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -173,13 +173,13 @@ export function PaymentsWorkspace({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo anular el payment."));
+        throw new Error(String(json?.error || "No se pudo anular el cobro."));
       }
 
       await refreshWorkspace();
-      toast.success("Payment anulado");
+      toast.success("Cobro anulado");
     } catch (error) {
-      toast.error("No se pudo anular el payment", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo anular el cobro", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -190,9 +190,9 @@ export function PaymentsWorkspace({
       <Card className="border-white/6 bg-card/90">
         <CardHeader action={<Badge variant="muted">{filteredPayments.length} visibles</Badge>}>
           <div>
-            <CardTitle className="text-xl">Listado de payments</CardTitle>
-            <CardDescription>Filtros cortos para seguir cobranza, saldo libre y anulaciones sin sumar complejidad de backoffice.</CardDescription>
-          </div>
+          <CardTitle className="text-xl">Listado de cobros</CardTitle>
+          <CardDescription>Filtros cortos para seguir cobranza, saldo libre y anulaciones sin sumar complejidad de backoffice.</CardDescription>
+        </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_180px_180px_220px]">
@@ -200,7 +200,7 @@ export function PaymentsWorkspace({
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
               <Input
                 className="pl-10"
-                placeholder="Buscar por contacto, referencia o invoice"
+                placeholder="Buscar por contacto, referencia o factura"
                 value={filters.search}
                 onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
               />
@@ -211,8 +211,8 @@ export function PaymentsWorkspace({
               onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
             >
               <option value="all">Todos los estados</option>
-              <option value="recorded">Recorded</option>
-              <option value="void">Void</option>
+              <option value="recorded">Registrado</option>
+              <option value="void">Anulado</option>
             </select>
             <select
               className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
@@ -241,12 +241,12 @@ export function PaymentsWorkspace({
 
           {!payments.length ? (
             <EmptyState
-              title="Todavia no hay payments visibles"
+              title="Todavia no hay cobros visibles"
               description="Cuando registres cobros apareceran aqui con su estado y distribucion."
             />
           ) : !filteredPayments.length ? (
             <EmptyState
-              title="No hay payments para este filtro"
+              title="No hay cobros para este filtro"
               description="Prueba con otro estado, metodo o contacto para volver a ver cobranzas."
             />
           ) : (
@@ -256,7 +256,7 @@ export function PaymentsWorkspace({
                 <span>Metodo</span>
                 <span>Estado</span>
                 <span>Contacto</span>
-                <span>Invoice / allocation</span>
+                <span>Factura / asignacion</span>
                 <span>Fecha</span>
                 <span>Accion</span>
               </div>
@@ -274,7 +274,7 @@ export function PaymentsWorkspace({
                   <div className="min-w-0 text-sm text-muted">
                     {payment.allocations?.length ? (
                       <>
-                        <p>{payment.allocations.length} allocation(es)</p>
+                        <p>{payment.allocations.length} asignacion(es)</p>
                         <p className="mt-1 truncate">
                           {payment.allocations
                             .slice(0, 2)
@@ -283,7 +283,7 @@ export function PaymentsWorkspace({
                         </p>
                       </>
                     ) : (
-                      <p>{payment.invoiceId ? `Invoice ${payment.invoiceId.slice(0, 8)}` : "Pago a cuenta / sin asignar"}</p>
+                      <p>{payment.invoiceId ? `Factura ${payment.invoiceId.slice(0, 8)}` : "Pago a cuenta / sin asignar"}</p>
                     )}
                   </div>
                   <div className="text-sm text-muted">{formatDateLabel(payment.paidAt || payment.createdAt)}</div>
@@ -297,7 +297,7 @@ export function PaymentsWorkspace({
                         disabled={busyAction !== null}
                       >
                         {busyAction === payment.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
-                        Void
+                        Anular
                       </Button>
                     ) : (
                       <Badge variant="muted">Sin accion</Badge>
@@ -313,8 +313,8 @@ export function PaymentsWorkspace({
       <Card className="border-white/6 bg-card/90">
         <CardHeader action={readOnly ? <Badge variant="muted">Solo lectura</Badge> : <Badge variant="warning">Registrar</Badge>}>
           <div>
-            <CardTitle className="text-xl">Registrar payment</CardTitle>
-            <CardDescription>Carga minima para cobrar una invoice o dejar un pago a cuenta visible.</CardDescription>
+            <CardTitle className="text-xl">Registrar cobro</CardTitle>
+            <CardDescription>Carga minima para cobrar una factura o dejar un pago a cuenta visible.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
@@ -351,7 +351,7 @@ export function PaymentsWorkspace({
               onChange={(event) => setDraft((current) => ({ ...current, invoiceId: event.target.value }))}
               disabled={readOnly || busyAction !== null}
             >
-              <option value="">Sin invoice especifica</option>
+              <option value="">Sin factura especifica</option>
               {payableInvoices.map((invoice) => (
                 <option key={invoice.id} value={invoice.id}>
                   {(invoice.invoiceNumber || invoice.id.slice(0, 8))} - {formatMoney(invoice.outstandingAmount, invoice.currency)}
@@ -360,14 +360,14 @@ export function PaymentsWorkspace({
             </select>
             <Textarea
               rows={3}
-              placeholder="Notas internas del payment"
+              placeholder="Notas internas del cobro"
               value={draft.notes}
               onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
               disabled={readOnly || busyAction !== null}
             />
             <Button type="submit" className="w-full rounded-2xl" disabled={readOnly || busyAction !== null}>
               {busyAction === "create_payment" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-              Registrar payment
+              Registrar cobro
             </Button>
           </form>
         </CardContent>

@@ -689,6 +689,30 @@ export async function createPortalContact(
   );
 }
 
+export async function patchPortalContact(
+  tenantId: string,
+  contactId: string,
+  payload: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    whatsappPhone?: string | null;
+    companyName?: string | null;
+    taxId?: string | null;
+    taxCondition?: string | null;
+    notes?: string | null;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalContactDetail }>(
+    `/portal/tenants/${tenantId}/contacts/${contactId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
 export type PortalBusinessSettings = {
   tenantId: string;
   clinicId: string | null;
@@ -800,11 +824,16 @@ export type PortalProduct = {
   clinicId: string;
   name: string;
   description: string | null;
+  unitPrice?: number;
   price: number;
   currency: string;
+  vatRate?: number;
+  taxRate?: number;
   stock: number;
   status: string;
+  active?: boolean;
   sku: string | null;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
@@ -1254,9 +1283,12 @@ export async function createPortalProduct(
     description?: string | null;
     price: number;
     currency?: string;
+    vatRate?: number;
+    taxRate?: number;
     stock?: number;
     sku?: string | null;
     status?: string;
+    metadata?: Record<string, unknown>;
   }
 ) {
   return backendFetch<{ success: boolean; data: PortalProduct }>(
@@ -1277,9 +1309,12 @@ export async function patchPortalProduct(
     description?: string | null;
     price?: number;
     currency?: string;
+    vatRate?: number;
+    taxRate?: number;
     stock?: number;
     sku?: string | null;
     status?: string;
+    metadata?: Record<string, unknown>;
   }
 ) {
   return backendFetch<{ success: boolean; data: PortalProduct }>(

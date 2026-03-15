@@ -48,7 +48,7 @@ export default async function AppContactsPage() {
     <ClientPageShell
       title="Contactos"
       description="Primera vista visible de CRM para listar registros, revisar contexto comercial y cargar nuevos contactos sin salir del portal."
-      badge="CRM / Billing"
+      badge="CRM / Facturacion"
     >
       <ContactsWorkspace initialContacts={contacts} readOnly={!ctx.tenantId || readOnly} />
     </ClientPageShell>

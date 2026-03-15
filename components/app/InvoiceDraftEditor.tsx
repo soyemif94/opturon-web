@@ -107,7 +107,7 @@ export function InvoiceDraftEditor({
       taxAmount,
       totalAmount
     };
-  }, [draft]);
+  }, [draft, isCreditNote]);
 
   function updateItem(itemId: string, patch: Partial<DraftItem>) {
     setDraft((current) => ({
@@ -143,7 +143,7 @@ export function InvoiceDraftEditor({
 
     const validItems = computed.items.filter((item) => item.descriptionSnapshot.trim());
     if (!draft.contactId) {
-      toast.error("Contacto requerido", "Selecciona un contacto antes de guardar la invoice.");
+      toast.error("Contacto requerido", "Selecciona un contacto antes de guardar la factura.");
       return;
     }
     if (!validItems.length) {
@@ -182,15 +182,15 @@ export function InvoiceDraftEditor({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo guardar la invoice draft."));
+        throw new Error(String(json?.error || "No se pudo guardar el borrador."));
       }
 
       const nextInvoice = json?.invoice;
-      toast.success(invoice ? "Draft actualizada" : "Draft creada");
+      toast.success(invoice ? "Borrador actualizado" : "Borrador creado");
       router.push(`/app/invoices/${nextInvoice.id}`);
       router.refresh();
     } catch (error) {
-      toast.error("No se pudo guardar la invoice", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo guardar la factura", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setSaving(false);
     }
@@ -200,15 +200,21 @@ export function InvoiceDraftEditor({
     <form className="space-y-6" onSubmit={submitDraft}>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Credit note draft" : "Draft editable"}</Badge>}>
+          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de credito en borrador" : "Borrador editable"}</Badge>}>
             <div>
               <CardTitle className="text-xl">
-                {invoice ? (isCreditNote ? "Editar credit note draft" : "Editar invoice draft") : isCreditNote ? "Crear credit note draft" : "Crear invoice draft"}
+                {invoice
+                  ? isCreditNote
+                    ? "Editar borrador de nota de credito"
+                    : "Editar borrador de factura"
+                  : isCreditNote
+                    ? "Crear borrador de nota de credito"
+                    : "Crear borrador de factura"}
               </CardTitle>
               <CardDescription>
                 {isCreditNote
-                  ? "Nota de credito simple asociada a una invoice origen, con items negativos y lista para emitir despues."
-                  : "Editor minimo de billing para preparar items y emitir despues desde el portal."}
+                  ? "Nota de credito simple asociada a una factura origen, con items negativos y lista para emitir despues."
+                  : "Editor minimo de facturacion para preparar items y emitir despues desde el portal."}
               </CardDescription>
             </div>
           </CardHeader>
@@ -232,12 +238,12 @@ export function InvoiceDraftEditor({
 
             {isCreditNote && parentInvoice ? (
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
-                <p className="font-medium text-text">Invoice origen</p>
+                <p className="font-medium text-text">Factura origen</p>
                 <p className="mt-1">
-                  {parentInvoice.invoiceNumber || parentInvoice.id.slice(0, 8)} · {parentInvoice.contact?.name || "Sin contacto"} · {formatMoney(parentInvoice.totalAmount, parentInvoice.currency)}
+                  {parentInvoice.invoiceNumber || parentInvoice.id.slice(0, 8)} - {parentInvoice.contact?.name || "Sin contacto"} - {formatMoney(parentInvoice.totalAmount, parentInvoice.currency)}
                 </p>
                 <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted">
-                  Puedes dejarla total o ajustar cantidades/importes para una devolucion parcial.
+                  Puedes dejarla total o ajustar cantidades e importes para una devolucion parcial.
                 </p>
               </div>
             ) : null}
@@ -312,7 +318,7 @@ export function InvoiceDraftEditor({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Resumen</CardTitle>
-                <CardDescription>Totales recalculados en frontend para preparar el guardado del draft.</CardDescription>
+                <CardDescription>Totales recalculados en frontend para preparar el guardado del borrador.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -326,20 +332,24 @@ export function InvoiceDraftEditor({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Siguiente paso</CardTitle>
-                <CardDescription>Despues de guardar, la draft queda lista para emitirse desde el detail.</CardDescription>
+                <CardDescription>Despues de guardar, el borrador queda listo para emitirse desde el detalle.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
                 <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted">
                   <ReceiptText className="h-4 w-4" />
-                  <span>Workflow</span>
+                  <span>Flujo</span>
                 </div>
-                <p>{isCreditNote ? "Guardar draft - revisar origen e impacto - emitir cuando la nota de credito ya este lista." : "Guardar draft - revisar detail - emitir cuando el documento ya este listo."}</p>
+                <p>
+                  {isCreditNote
+                    ? "Guardar borrador - revisar origen e impacto - emitir cuando la nota de credito ya este lista."
+                    : "Guardar borrador - revisar detalle - emitir cuando el documento ya este listo."}
+                </p>
               </div>
               <Button type="submit" className="w-full rounded-2xl" disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear credit note draft" : "Crear draft"}
+                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear borrador de nota de credito" : "Crear borrador"}
               </Button>
             </CardContent>
           </Card>

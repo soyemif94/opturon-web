@@ -77,14 +77,14 @@ export function InvoicesWorkspace({
             <Badge variant="muted">{filteredInvoices.length} visibles</Badge>
             {!readOnly ? (
               <Button asChild size="sm" className="rounded-2xl">
-                <Link href="/app/invoices/new">Nueva draft</Link>
+                <Link href="/app/invoices/new">Nuevo borrador</Link>
               </Button>
             ) : null}
           </div>
         }
       >
         <div>
-          <CardTitle className="text-xl">Listado de invoices</CardTitle>
+          <CardTitle className="text-xl">Listado de facturas</CardTitle>
           <CardDescription>Filtros cortos para leer estado documental y cobranza sin convertir esto en un backoffice pesado.</CardDescription>
         </div>
       </CardHeader>
@@ -105,9 +105,9 @@ export function InvoicesWorkspace({
             onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
           >
             <option value="all">Todos los estados</option>
-            <option value="draft">Draft</option>
-            <option value="issued">Issued</option>
-            <option value="void">Void</option>
+            <option value="draft">Borrador</option>
+            <option value="issued">Emitida</option>
+            <option value="void">Anulada</option>
           </select>
           <select
             className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
@@ -115,11 +115,11 @@ export function InvoicesWorkspace({
             onChange={(event) => setFilters((current) => ({ ...current, receivableStatus: event.target.value }))}
           >
             <option value="all">Toda cobranza</option>
-            <option value="unpaid">Unpaid</option>
-            <option value="partially_paid">Partially paid</option>
-            <option value="paid">Paid</option>
-            <option value="overpaid">Overpaid</option>
-            <option value="not_applicable">Not applicable</option>
+            <option value="unpaid">Sin cobrar</option>
+            <option value="partially_paid">Cobro parcial</option>
+            <option value="paid">Cobrada</option>
+            <option value="overpaid">Sobrepagada</option>
+            <option value="not_applicable">No aplica</option>
           </select>
           <select
             className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
@@ -137,7 +137,7 @@ export function InvoicesWorkspace({
 
         {!filteredInvoices.length ? (
           <EmptyState
-            title="No hay invoices para este filtro"
+            title="No hay facturas para este filtro"
             description="Prueba con otro estado, cobranza o contacto para volver a ver documentos."
           />
         ) : (

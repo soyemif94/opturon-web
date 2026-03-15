@@ -208,7 +208,7 @@ export function ContactsWorkspace({
                 <Input placeholder="WhatsApp" value={draft.whatsappPhone} onChange={(event) => setDraft((current) => ({ ...current, whatsappPhone: event.target.value }))} disabled={readOnly || saving} />
                 <Input placeholder="Empresa" value={draft.companyName} onChange={(event) => setDraft((current) => ({ ...current, companyName: event.target.value }))} disabled={readOnly || saving} />
               </div>
-              <Input placeholder="Tax ID / Documento" value={draft.taxId} onChange={(event) => setDraft((current) => ({ ...current, taxId: event.target.value }))} disabled={readOnly || saving} />
+              <Input placeholder="Documento fiscal" value={draft.taxId} onChange={(event) => setDraft((current) => ({ ...current, taxId: event.target.value }))} disabled={readOnly || saving} />
               <Textarea placeholder="Notas internas" rows={3} value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} disabled={readOnly || saving} />
               <Button type="submit" className="w-full rounded-2xl" disabled={readOnly || saving}>
                 <Plus className="mr-2 h-4 w-4" />
