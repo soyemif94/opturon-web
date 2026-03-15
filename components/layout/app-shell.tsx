@@ -19,6 +19,7 @@ import {
   Package,
   PhoneCall,
   PlugZap,
+  ReceiptText,
   Receipt,
   Settings2,
   Sparkles
@@ -75,6 +76,22 @@ const navItems: Array<{
     icon: Receipt,
     module: "orders",
     match: (pathname: string) => pathname.startsWith("/app/orders")
+  },
+  {
+    href: "/app/invoices",
+    label: "Invoices",
+    description: "Documentos internos, saldo y lifecycle de facturacion",
+    icon: ReceiptText,
+    module: "invoices",
+    match: (pathname: string) => pathname.startsWith("/app/invoices")
+  },
+  {
+    href: "/app/payments",
+    label: "Payments",
+    description: "Cobros registrados, estado y asignacion sobre invoices",
+    icon: PhoneCall,
+    module: "payments",
+    match: (pathname: string) => pathname.startsWith("/app/payments")
   },
   {
     href: "/app/automations",

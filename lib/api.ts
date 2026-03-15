@@ -599,6 +599,54 @@ export type PortalContact = {
   optedOut: boolean;
   lastInteractionAt: string | null;
   conversationCount: number;
+  financialSignal?: {
+    outstandingAmount: number;
+    unallocatedPayments: number;
+    status: "has_debt" | "settled" | "unallocated_payment";
+  };
+};
+
+export type PortalContactDetail = PortalContact & {
+  email?: string | null;
+  whatsappPhone?: string | null;
+  taxId?: string | null;
+  taxCondition?: string | null;
+  companyName?: string | null;
+  notes?: string | null;
+  status?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  financialSnapshot?: {
+    totalInvoiced: number;
+    totalCredited: number;
+    totalDocumentBalance: number;
+    totalPaid: number;
+    outstandingAmount: number;
+    unallocatedPayments: number;
+  };
+  relatedDocuments?: Array<{
+    id: string;
+    invoiceNumber: string | null;
+    type: string;
+    status: string;
+    currency: string;
+    totalAmount: number;
+    paidAmount: number;
+    outstandingAmount: number;
+    issuedAt: string | null;
+    createdAt: string | null;
+  }>;
+  relatedPayments?: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    method: string;
+    status: string;
+    paidAt: string | null;
+    allocatedAmount: number;
+    unallocatedAmount: number;
+  }>;
 };
 
 export async function getPortalContacts(tenantId: string) {
@@ -609,6 +657,36 @@ export async function getPortalContacts(tenantId: string) {
       contacts: PortalContact[];
     };
   }>(`/portal/tenants/${tenantId}/contacts`, undefined, false);
+}
+
+export async function getPortalContactDetail(tenantId: string, contactId: string) {
+  return backendFetch<{ success: boolean; data: PortalContactDetail }>(
+    `/portal/tenants/${tenantId}/contacts/${contactId}`,
+    undefined,
+    false
+  );
+}
+
+export async function createPortalContact(
+  tenantId: string,
+  payload: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    whatsappPhone?: string | null;
+    companyName?: string | null;
+    taxId?: string | null;
+    notes?: string | null;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalContactDetail }>(
+    `/portal/tenants/${tenantId}/contacts`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
 }
 
 export type PortalBusinessSettings = {
@@ -731,6 +809,146 @@ export type PortalProduct = {
   updatedAt: string;
 };
 
+export type PortalInvoiceItem = {
+  id: string;
+  productId: string | null;
+  descriptionSnapshot: string;
+  quantity: number;
+  unitPrice: number;
+  taxRate: number;
+  subtotalAmount: number;
+  totalAmount: number;
+  createdAt: string | null;
+};
+
+export type PortalPaymentAllocation = {
+  id: string;
+  clinicId: string;
+  paymentId: string;
+  invoiceId: string;
+  amount: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  payment?: {
+    id: string;
+    status: string | null;
+    amount: number;
+    currency: string | null;
+    paidAt: string | null;
+  } | null;
+  invoice?: {
+    id: string;
+    invoiceNumber: string | null;
+    type: string | null;
+    status: string | null;
+    totalAmount: number;
+    currency: string | null;
+  } | null;
+};
+
+export type PortalInvoice = {
+  id: string;
+  clinicId: string;
+  contactId: string | null;
+  orderId: string | null;
+  parentInvoiceId: string | null;
+  invoiceNumber: string | null;
+  type: string;
+  status: string;
+  documentMode: string;
+  providerStatus: string | null;
+  currency: string;
+  subtotalAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  issuedAt: string | null;
+  dueAt: string | null;
+  externalProvider: string | null;
+  externalReference: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  balanceImpact: {
+    affectsOperationalBalance: boolean;
+    sign: string;
+    amount: number;
+  };
+  paidAmount: number;
+  outstandingAmount: number;
+  receivableStatus: string;
+  lifecycle?: {
+    canEdit: boolean;
+    canIssue: boolean;
+    canVoid: boolean;
+    internalStatus: string;
+    providerStatus: string | null;
+    documentMode: string;
+  };
+  contact?: {
+    id: string;
+    name: string | null;
+    phone: string | null;
+  } | null;
+  parentInvoice?: {
+    id: string;
+    invoiceNumber: string | null;
+    type: string | null;
+    status: string | null;
+    totalAmount: number;
+  } | null;
+  items?: PortalInvoiceItem[];
+  allocations?: PortalPaymentAllocation[];
+  relatedCreditNotes?: Array<{
+    id: string;
+    invoiceNumber: string | null;
+    type: string;
+    status: string;
+    currency: string;
+    totalAmount: number;
+    issuedAt: string | null;
+    createdAt: string | null;
+    balanceImpact: {
+      affectsOperationalBalance: boolean;
+      sign: string;
+      amount: number;
+    };
+  }>;
+};
+
+export type PortalPayment = {
+  id: string;
+  clinicId: string;
+  contactId: string | null;
+  invoiceId: string | null;
+  amount: number;
+  currency: string;
+  method: string;
+  status: string;
+  paidAt: string | null;
+  externalReference: string | null;
+  notes: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  balanceImpact: {
+    affectsOutstanding: boolean;
+    amount: number;
+  };
+  allocatedAmount?: number;
+  unallocatedAmount?: number;
+  lifecycle?: {
+    canVoid: boolean;
+    canAllocate?: boolean;
+    internalStatus: string;
+  };
+  contact?: {
+    id: string;
+    name: string | null;
+    phone: string | null;
+  } | null;
+  allocations?: PortalPaymentAllocation[];
+};
+
 export type PortalAutomation = {
   id: string;
   clinicId: string;
@@ -819,6 +1037,175 @@ export async function getPortalProducts(tenantId: string) {
       products: PortalProduct[];
     };
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+}
+
+export async function getPortalInvoices(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      invoices: PortalInvoice[];
+    };
+  }>(`/portal/tenants/${tenantId}/invoices`, undefined, false);
+}
+
+export async function createPortalInvoice(
+  tenantId: string,
+  payload: {
+    contactId: string | null;
+    type?: string;
+    parentInvoiceId?: string | null;
+    documentMode?: string;
+    currency?: string;
+    items: Array<{
+      descriptionSnapshot: string;
+      quantity: number;
+      unitPrice: number;
+      taxRate: number;
+    }>;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalInvoice }>(
+    `/portal/tenants/${tenantId}/invoices`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function getPortalInvoiceDetail(tenantId: string, invoiceId: string) {
+  return backendFetch<{ success: boolean; data: PortalInvoice }>(
+    `/portal/tenants/${tenantId}/invoices/${invoiceId}`,
+    undefined,
+    false
+  );
+}
+
+export async function updatePortalInvoice(
+  tenantId: string,
+  invoiceId: string,
+  payload: {
+    contactId: string | null;
+    type?: string;
+    parentInvoiceId?: string | null;
+    documentMode?: string;
+    currency?: string;
+    items: Array<{
+      descriptionSnapshot: string;
+      quantity: number;
+      unitPrice: number;
+      taxRate: number;
+    }>;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalInvoice }>(
+    `/portal/tenants/${tenantId}/invoices/${invoiceId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function issuePortalInvoice(tenantId: string, invoiceId: string, payload?: { issuedAt?: string; metadata?: Record<string, unknown> }) {
+  return backendFetch<{ success: boolean; data: PortalInvoice }>(
+    `/portal/tenants/${tenantId}/invoices/${invoiceId}/issue`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload || {})
+    },
+    false
+  );
+}
+
+export async function voidPortalInvoice(tenantId: string, invoiceId: string, payload?: { reason?: string; metadata?: Record<string, unknown> }) {
+  return backendFetch<{ success: boolean; data: PortalInvoice }>(
+    `/portal/tenants/${tenantId}/invoices/${invoiceId}/void`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload || {})
+    },
+    false
+  );
+}
+
+export async function getPortalPayments(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      payments: PortalPayment[];
+    };
+  }>(`/portal/tenants/${tenantId}/payments`, undefined, false);
+}
+
+export async function getPortalPaymentDetail(tenantId: string, paymentId: string) {
+  return backendFetch<{ success: boolean; data: PortalPayment }>(
+    `/portal/tenants/${tenantId}/payments/${paymentId}`,
+    undefined,
+    false
+  );
+}
+
+export async function createPortalPayment(
+  tenantId: string,
+  payload: {
+    amount: number;
+    currency?: string;
+    method?: string;
+    paidAt?: string;
+    contactId?: string | null;
+    invoiceId?: string | null;
+    notes?: string | null;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalPayment }>(
+    `/portal/tenants/${tenantId}/payments`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function voidPortalPayment(
+  tenantId: string,
+  paymentId: string,
+  payload?: { reason?: string; notes?: string | null; metadata?: Record<string, unknown> }
+) {
+  return backendFetch<{ success: boolean; data: PortalPayment }>(
+    `/portal/tenants/${tenantId}/payments/${paymentId}/void`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload || {})
+    },
+    false
+  );
+}
+
+export async function createPortalPaymentAllocation(
+  tenantId: string,
+  paymentId: string,
+  payload: { invoiceId: string; amount: number }
+) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      allocation: PortalPaymentAllocation;
+      payment: PortalPayment;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/payments/${paymentId}/allocations`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
 }
 
 export async function getPortalAutomations(tenantId: string) {
