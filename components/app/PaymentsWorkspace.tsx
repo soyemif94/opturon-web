@@ -57,6 +57,10 @@ export function PaymentsWorkspace({
   const [filters, setFilters] = useState<PaymentFilterState>(EMPTY_FILTERS);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
+  function normalizeSearchValue(value: unknown) {
+    return String(value ?? "").trim().toLowerCase();
+  }
+
   const payableInvoices = useMemo(
     () =>
       invoices.filter(
@@ -77,7 +81,7 @@ export function PaymentsWorkspace({
   }, [payments]);
 
   const filteredPayments = useMemo(() => {
-    const search = filters.search.trim().toLowerCase();
+    const search = normalizeSearchValue(filters.search);
     return payments.filter((payment) => {
       if (filters.status !== "all" && payment.status !== filters.status) return false;
       if (filters.method !== "all" && payment.method !== filters.method) return false;
