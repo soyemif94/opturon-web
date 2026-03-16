@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendErrorBody, getBackendErrorStatus, getPortalContactDetail, isBackendConfigured, patchPortalContact } from "@/lib/api";
+import {
+  getBackendErrorBody,
+  getBackendErrorStatus,
+  getPortalContactDetail,
+  isBackendConfigured,
+  patchPortalContact
+} from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {

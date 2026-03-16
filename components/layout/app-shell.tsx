@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
+import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 
@@ -79,16 +80,16 @@ const navItems: Array<{
   },
   {
     href: "/app/invoices",
-    label: "Facturas",
-    description: "Documentos internos, saldo y ciclo de facturacion",
+    label: "Invoices",
+    description: "Documentos internos, saldo y lifecycle de facturacion",
     icon: ReceiptText,
     module: "invoices",
     match: (pathname: string) => pathname.startsWith("/app/invoices")
   },
   {
     href: "/app/payments",
-    label: "Cobros",
-    description: "Cobros registrados, estado y asignacion sobre facturas",
+    label: "Payments",
+    description: "Cobros registrados, estado y asignacion sobre invoices",
     icon: PhoneCall,
     module: "payments",
     match: (pathname: string) => pathname.startsWith("/app/payments")
@@ -177,15 +178,18 @@ function ThemeToggleButton() {
 
 export function AppShell({
   children,
+  tenantId,
   tenantLabel,
   topbar,
   buildMarker,
   buildEnv,
   deploymentId,
   globalRole,
-  tenantRole
+  tenantRole,
+  whatsappStatus
 }: {
   children: React.ReactNode;
+  tenantId?: string | null;
   tenantLabel?: string;
   topbar?: React.ReactNode;
   buildMarker?: string;
@@ -193,6 +197,7 @@ export function AppShell({
   deploymentId?: string;
   globalRole?: GlobalRole;
   tenantRole?: TenantRole;
+  whatsappStatus?: WhatsAppConnectionStatus;
 }) {
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
@@ -200,6 +205,40 @@ export function AppShell({
   const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module));
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
+  const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
+
+  useEffect(() => {
+    setSidebarStatus(whatsappStatus);
+  }, [whatsappStatus]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+
+    const controller = new AbortController();
+
+    void fetch("/api/app/integrations/whatsapp", {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`sidebar_whatsapp_status_failed_${response.status}`);
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        if (payload?.data) {
+          setSidebarStatus(payload.data as WhatsAppConnectionStatus);
+        }
+      })
+      .catch(() => {
+        // Keep the current sidebar state if the refresh fails.
+      });
+
+    return () => controller.abort();
+  }, [tenantId, pathname]);
+
   const buildLabel = [
     buildMarker ? `Build ${buildMarker}` : null,
     buildEnv ? `Env ${buildEnv}` : null,
@@ -207,12 +246,30 @@ export function AppShell({
   ]
     .filter(Boolean)
     .join(" | ");
+  const sidebarWhatsAppState = sidebarStatus?.state || "not_connected";
+  const sidebarChannelStatusLabel =
+    sidebarWhatsAppState === "connected"
+      ? "Conectado"
+      : sidebarWhatsAppState === "pending_meta" || sidebarWhatsAppState === "launching"
+        ? "Pendiente"
+        : sidebarWhatsAppState === "ambiguous_configuration"
+          ? "Revisar"
+          : sidebarWhatsAppState === "error"
+            ? "Error"
+            : "No conectado";
+  const sidebarChannelTone =
+    sidebarWhatsAppState === "connected"
+      ? "text-emerald-300"
+      : sidebarWhatsAppState === "error" || sidebarWhatsAppState === "ambiguous_configuration"
+        ? "text-rose-300"
+        : "text-amber-300";
+  const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
-    <section className="h-screen overflow-hidden bg-[color:var(--bg)] px-5 py-5 text-[color:var(--text)]">
-      <div className="flex h-full w-full gap-5">
-        <aside className="hidden h-full w-[304px] shrink-0 overflow-hidden xl:block">
-          <div className="relative h-full overflow-y-auto rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+    <section className="w-full bg-[color:var(--bg)] px-5 py-5 text-[color:var(--text)]">
+      <div className="flex min-h-[calc(100vh-40px)] w-full gap-5">
+        <aside className="hidden w-[304px] shrink-0 xl:block">
+          <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
 
             <div className="relative">
@@ -286,7 +343,7 @@ export function AppShell({
                 <div className="mt-4 space-y-3 text-sm text-muted">
                   <div className="flex items-center justify-between">
                     <span>Estado del canal</span>
-                    <span className="text-amber-300">No conectado</span>
+                    <span className={sidebarChannelTone}>{sidebarChannelStatusLabel}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Inbox</span>
@@ -298,7 +355,9 @@ export function AppShell({
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Integraciones</span>
-                    <span className="text-amber-300">Siguiente paso</span>
+                    <span className={sidebarWhatsAppState === "connected" ? "text-emerald-300" : "text-amber-300"}>
+                      {sidebarWhatsAppState === "connected" ? "Operativas" : "Proximo paso"}
+                    </span>
                   </div>
                 </div>
                 {showManageShortcut ? (
@@ -307,7 +366,7 @@ export function AppShell({
                     className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
                   >
                     <PhoneCall className="h-4 w-4" />
-                    Conectar WhatsApp
+                    {sidebarActionLabel}
                   </Link>
                 ) : null}
                 {!showManageShortcut && showUsersShortcut ? (
@@ -333,19 +392,19 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="min-h-0 min-w-0 flex-1">
-            <div
-              className={cn(
-                isInboxRoute
-                  ? "flex h-full min-h-0 flex-col"
-                  : "flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
-              )}
-            >
+        <div className="min-w-0 flex-1">
+          <div
+            className={cn(
+              isInboxRoute
+                ? "min-h-[calc(100vh-40px)]"
+                : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
+            )}
+          >
             <header className="border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
               {topbar || (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal cliente</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Client portal</p>
                     <h1 className="mt-1 text-2xl font-semibold tracking-tight">Gestiona conversaciones, automatizaciones y crecimiento</h1>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -396,7 +455,7 @@ export function AppShell({
 
             <main
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto",
+                "min-h-[calc(100vh-140px)]",
                 isInboxRoute
                   ? "bg-transparent p-0"
                   : "bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"

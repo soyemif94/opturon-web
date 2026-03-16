@@ -30,26 +30,26 @@ export default async function AppInvoiceDraftEditPage({ params }: { params: Prom
       title={
         invoice?.invoiceNumber
           ? `Editar ${invoice.type === "credit_note" ? "nota de credito" : "factura"} ${invoice.invoiceNumber}`
-          : "Editar borrador de factura"
+          : "Editar factura draft"
       }
       description={
         invoice?.type === "credit_note"
-          ? "Ajusta el borrador de nota de credito antes de emitirlo desde su detalle."
-          : "Ajusta items y datos basicos del borrador antes de emitirlo desde el detalle."
+          ? "Ajusta la nota de credito draft antes de emitirla desde su detail."
+          : "Ajusta items y datos basicos del borrador antes de emitirlo desde el detail."
       }
-      badge={invoice?.type === "credit_note" ? "Edicion de nota de credito" : "Edicion de borrador"}
+      badge={invoice?.type === "credit_note" ? "Editar nota de credito" : "Editar draft"}
     >
       {!invoice ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          No pudimos cargar el borrador solicitado.
+          No pudimos cargar la draft solicitada.
         </div>
       ) : readOnly ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Este workspace esta en modo solo lectura y no puede editar borradores.
+          Este workspace esta en modo solo lectura y no puede editar drafts.
         </div>
       ) : invoice.status !== "draft" ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Solo las facturas en estado borrador pueden editarse.
+          Solo las invoices en estado draft pueden editarse.
         </div>
       ) : (
         <InvoiceDraftEditor contacts={contacts} invoice={invoice} />

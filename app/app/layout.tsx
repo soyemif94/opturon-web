@@ -2,6 +2,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CommandPaletteProvider } from "@/components/ui/command-palette";
 import { requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
+import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 export default async function ClientPortalLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireAppPage();
@@ -26,6 +27,9 @@ export default async function ClientPortalLayout({ children }: { children: React
       process.env.VERCEL_URL?.replace(/\.vercel\.app$/i, "") ||
       undefined
     : undefined;
+  const whatsappStatus = buildWhatsAppConnectionStatus({
+    fallbackReason: ctx.tenantId ? "portal_status_pending_client_refresh" : "workspace_without_backend"
+  });
 
   return (
     <CommandPaletteProvider
@@ -38,12 +42,14 @@ export default async function ClientPortalLayout({ children }: { children: React
     >
       <div className="flex min-h-screen w-full">
         <AppShell
+          tenantId={ctx.tenantId}
           tenantLabel={tenantLabel}
           buildMarker={buildMarker}
           buildEnv={buildEnv}
           deploymentId={deploymentId}
           globalRole={ctx.globalRole}
           tenantRole={ctx.tenantRole}
+          whatsappStatus={whatsappStatus}
         >
           {children}
         </AppShell>

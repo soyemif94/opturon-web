@@ -82,14 +82,15 @@ export function InvoiceDraftEditor({
   const computed = useMemo(() => {
     const items = draft.items.map((item) => {
       const quantity = Number(item.quantity || 0);
-      const rawUnitPrice = Number(item.unitPrice || 0);
-      const unitPrice = isCreditNote ? -Math.abs(rawUnitPrice) : rawUnitPrice;
+      const enteredUnitPrice = Number(item.unitPrice || 0);
+      const unitPrice = isCreditNote ? -Math.abs(enteredUnitPrice) : enteredUnitPrice;
       const taxRate = Number(item.taxRate || 0);
       const amounts = calculateInvoiceLineAmounts({ quantity, unitPrice, taxRate });
 
       return {
         ...item,
         quantityNumber: quantity,
+        enteredUnitPriceNumber: enteredUnitPrice,
         unitPriceNumber: unitPrice,
         taxRateNumber: taxRate,
         subtotalAmount: amounts.subtotalAmount,
@@ -143,7 +144,7 @@ export function InvoiceDraftEditor({
 
     const validItems = computed.items.filter((item) => item.descriptionSnapshot.trim());
     if (!draft.contactId) {
-      toast.error("Contacto requerido", "Selecciona un contacto antes de guardar la factura.");
+      toast.error("Contacto requerido", "Selecciona un contacto antes de guardar la invoice.");
       return;
     }
     if (!validItems.length) {
@@ -154,7 +155,7 @@ export function InvoiceDraftEditor({
       toast.error("Cantidad invalida", "Cada item debe tener una cantidad mayor a cero.");
       return;
     }
-    if (validItems.some((item) => !Number.isFinite(item.unitPriceNumber) || item.unitPriceNumber < 0)) {
+    if (validItems.some((item) => !Number.isFinite(item.enteredUnitPriceNumber) || item.enteredUnitPriceNumber < 0)) {
       toast.error("Precio invalido", "Cada item necesita un precio valido.");
       return;
     }
@@ -182,15 +183,18 @@ export function InvoiceDraftEditor({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo guardar el borrador."));
+        throw new Error(String(json?.error || "No se pudo guardar la invoice draft."));
       }
 
       const nextInvoice = json?.invoice;
-      toast.success(invoice ? "Borrador actualizado" : "Borrador creado");
+      if (!nextInvoice?.id) {
+        throw new Error("invoice_response_missing_id");
+      }
+      toast.success(invoice ? "Draft actualizada" : "Draft creada");
       router.push(`/app/invoices/${nextInvoice.id}`);
       router.refresh();
     } catch (error) {
-      toast.error("No se pudo guardar la factura", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo guardar la invoice", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setSaving(false);
     }
@@ -200,21 +204,15 @@ export function InvoiceDraftEditor({
     <form className="space-y-6" onSubmit={submitDraft}>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de credito en borrador" : "Borrador editable"}</Badge>}>
+          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de credito draft" : "Draft editable"}</Badge>}>
             <div>
               <CardTitle className="text-xl">
-                {invoice
-                  ? isCreditNote
-                    ? "Editar borrador de nota de credito"
-                    : "Editar borrador de factura"
-                  : isCreditNote
-                    ? "Crear borrador de nota de credito"
-                    : "Crear borrador de factura"}
+                {invoice ? (isCreditNote ? "Editar nota de credito draft" : "Editar factura draft") : isCreditNote ? "Crear nota de credito draft" : "Crear factura draft"}
               </CardTitle>
               <CardDescription>
                 {isCreditNote
                   ? "Nota de credito simple asociada a una factura origen, con items negativos y lista para emitir despues."
-                  : "Editor minimo de facturacion para preparar items y emitir despues desde el portal."}
+                  : "Editor minimo de billing para preparar items y emitir despues desde el portal."}
               </CardDescription>
             </div>
           </CardHeader>
@@ -240,10 +238,10 @@ export function InvoiceDraftEditor({
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
                 <p className="font-medium text-text">Factura origen</p>
                 <p className="mt-1">
-                  {parentInvoice.invoiceNumber || parentInvoice.id.slice(0, 8)} - {parentInvoice.contact?.name || "Sin contacto"} - {formatMoney(parentInvoice.totalAmount, parentInvoice.currency)}
+                  {parentInvoice.invoiceNumber || parentInvoice.id.slice(0, 8)} · {parentInvoice.contact?.name || "Sin contacto"} · {formatMoney(parentInvoice.totalAmount, parentInvoice.currency)}
                 </p>
                 <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted">
-                  Puedes dejarla total o ajustar cantidades e importes para una devolucion parcial.
+                  Puedes dejarla total o ajustar cantidades/importes para una devolucion parcial.
                 </p>
               </div>
             ) : null}
@@ -318,7 +316,7 @@ export function InvoiceDraftEditor({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Resumen</CardTitle>
-                <CardDescription>Totales recalculados en frontend para preparar el guardado del borrador.</CardDescription>
+                <CardDescription>Totales recalculados en frontend para preparar el guardado del draft.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -332,24 +330,20 @@ export function InvoiceDraftEditor({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Siguiente paso</CardTitle>
-                <CardDescription>Despues de guardar, el borrador queda listo para emitirse desde el detalle.</CardDescription>
+                <CardDescription>Despues de guardar, la draft queda lista para emitirse desde el detail.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
                 <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted">
                   <ReceiptText className="h-4 w-4" />
-                  <span>Flujo</span>
+                  <span>Workflow</span>
                 </div>
-                <p>
-                  {isCreditNote
-                    ? "Guardar borrador - revisar origen e impacto - emitir cuando la nota de credito ya este lista."
-                    : "Guardar borrador - revisar detalle - emitir cuando el documento ya este listo."}
-                </p>
+                <p>{isCreditNote ? "Guardar draft - revisar origen e impacto - emitir cuando la nota de credito ya este lista." : "Guardar draft - revisar detalle - emitir cuando el documento ya este listo."}</p>
               </div>
               <Button type="submit" className="w-full rounded-2xl" disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear borrador de nota de credito" : "Crear borrador"}
+                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear nota de credito draft" : "Crear draft"}
               </Button>
             </CardContent>
           </Card>

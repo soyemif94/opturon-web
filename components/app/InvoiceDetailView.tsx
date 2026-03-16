@@ -86,10 +86,10 @@ export function InvoiceDetailView({
     const paymentsJson = await paymentsResponse.json().catch(() => null);
 
     if (!invoiceResponse.ok) {
-      throw new Error(String(invoiceJson?.error || "No se pudo refrescar la factura."));
+      throw new Error(String(invoiceJson?.error || "No se pudo refrescar la invoice."));
     }
     if (!paymentsResponse.ok) {
-      throw new Error(String(paymentsJson?.error || "No se pudieron refrescar los cobros."));
+      throw new Error(String(paymentsJson?.error || "No se pudieron refrescar los payments."));
     }
 
     setInvoice(invoiceJson?.invoice || initialInvoice);
@@ -110,10 +110,10 @@ export function InvoiceDetailView({
       }
 
       await refreshInvoiceAndPayments();
-      toast.success(action === "issue" ? "Factura emitida" : "Factura anulada");
+      toast.success(action === "issue" ? "Invoice emitida" : "Invoice anulada");
     } catch (error) {
       toast.error(
-        action === "issue" ? "No se pudo emitir la factura" : "No se pudo anular la factura",
+        action === "issue" ? "No se pudo emitir la invoice" : "No se pudo anular la invoice",
         error instanceof Error ? error.message : "unknown_error"
       );
     } finally {
@@ -148,7 +148,7 @@ export function InvoiceDetailView({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo registrar el cobro."));
+        throw new Error(String(json?.error || "No se pudo registrar el pago."));
       }
 
       await refreshInvoiceAndPayments();
@@ -156,9 +156,9 @@ export function InvoiceDetailView({
         ...EMPTY_PAYMENT_DRAFT,
         amount: ""
       });
-      toast.success("Cobro registrado", "La cobranza ya impacta en el saldo de la factura.");
+      toast.success("Payment registrado", "La cobranza ya impacta en el saldo de la invoice.");
     } catch (error) {
-      toast.error("No se pudo registrar el cobro", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo registrar el payment", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -167,13 +167,13 @@ export function InvoiceDetailView({
   async function createAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedPaymentId) {
-      toast.error("Selecciona un cobro");
+      toast.error("Selecciona un payment");
       return;
     }
 
     const amount = Number(allocationAmount || 0);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Monto invalido", "Ingresa un importe valido para la asignacion.");
+      toast.error("Monto invalido", "Ingresa un importe valido para la allocation.");
       return;
     }
 
@@ -189,15 +189,15 @@ export function InvoiceDetailView({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo crear la asignacion."));
+        throw new Error(String(json?.error || "No se pudo crear la allocation."));
       }
 
       await refreshInvoiceAndPayments();
       setSelectedPaymentId("");
       setAllocationAmount("");
-      toast.success("Asignacion creada", "El cobro ya quedo asignado a esta factura.");
+      toast.success("Allocation creada", "El payment ya quedo asignado a esta invoice.");
     } catch (error) {
-      toast.error("No se pudo crear la asignacion", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo crear la allocation", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -209,7 +209,7 @@ export function InvoiceDetailView({
         <Button asChild variant="secondary" size="sm" className="rounded-2xl">
           <Link href="/app/invoices">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a facturas
+            Volver a invoices
           </Link>
         </Button>
         <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
@@ -223,7 +223,7 @@ export function InvoiceDetailView({
         ) : null}
         {!readOnly && invoice.lifecycle?.canEdit ? (
           <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-            <Link href={`/app/invoices/${invoice.id}/edit`}>Editar borrador</Link>
+            <Link href={`/app/invoices/${invoice.id}/edit`}>Editar draft</Link>
           </Button>
         ) : null}
         {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
@@ -244,11 +244,11 @@ export function InvoiceDetailView({
           <CardHeader>
             <div>
               <CardTitle className="text-xl">
-                {invoice.type === "credit_note" ? "Nota de credito" : "Factura"} {invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                {invoice.type === "credit_note" ? "Nota de credito" : "Documento"} {invoice.invoiceNumber || invoice.id.slice(0, 8)}
               </CardTitle>
               <CardDescription>
                 {invoice.type === "credit_note"
-                  ? "Impacto negativo, referencia a la factura origen y ciclo visible desde el mismo modulo."
+                  ? "Impacto negativo, referencia a la invoice origen y lifecycle visible desde el mismo modulo."
                   : "Items, importes y trazabilidad principal del comprobante interno."}
               </CardDescription>
             </div>
@@ -256,7 +256,7 @@ export function InvoiceDetailView({
           <CardContent className="space-y-5 pt-0">
             {invoice.type === "credit_note" ? (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Esta nota de credito reduce impacto documental y no se cobra como una factura normal.
+                Esta nota de credito reduce impacto documental y no se cobra como una invoice normal.
               </div>
             ) : null}
             <div className="grid gap-3 md:grid-cols-4">
@@ -290,7 +290,7 @@ export function InvoiceDetailView({
 
             {!invoice.items?.length ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                No encontramos items en esta factura.
+                No encontramos items en esta invoice.
               </div>
             ) : null}
           </CardContent>
@@ -300,7 +300,7 @@ export function InvoiceDetailView({
           <Card className="border-white/6 bg-card/90">
             <CardHeader>
               <div>
-                <CardTitle className="text-xl">Ciclo documental</CardTitle>
+                <CardTitle className="text-xl">Lifecycle</CardTitle>
                 <CardDescription>Estado interno y modo documental del comprobante.</CardDescription>
               </div>
             </CardHeader>
@@ -313,8 +313,8 @@ export function InvoiceDetailView({
               {invoice.lifecycle?.canEdit ? (
                 <div className="rounded-2xl border border-brand/25 bg-brand/8 p-4 text-sm">
                   {invoice.type === "credit_note"
-                    ? "Esta nota de credito sigue en borrador. Puedes ajustar items y luego emitirla desde este mismo detalle cuando quede lista."
-                    : "Esta factura sigue en borrador. Puedes editar items y luego emitirla desde este mismo detalle cuando quede lista."}
+                    ? "Esta credit note sigue en draft. Puedes ajustar items y luego emitirla desde este mismo detail cuando quede lista."
+                    : "Esta invoice sigue en draft. Puedes editar items y luego emitirla desde este mismo detail cuando quede lista."}
                 </div>
               ) : null}
             </CardContent>
@@ -324,22 +324,22 @@ export function InvoiceDetailView({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Contacto y referencia</CardTitle>
-                <CardDescription>Contexto comercial basico de la factura.</CardDescription>
+                <CardDescription>Contexto comercial basico de la invoice.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
               <InfoRow icon={<UserRound className="h-4 w-4" />} label="Contacto" value={invoice.contact?.name || "Sin contacto"} />
               <InfoRow icon={<UserRound className="h-4 w-4" />} label="Telefono" value={invoice.contact?.phone || "-"} />
-              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Pedido" value={invoice.orderId || "-"} />
+              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Order" value={invoice.orderId || "-"} />
               <InfoRow
                 icon={<ReceiptText className="h-4 w-4" />}
-                label={invoice.type === "credit_note" ? "Factura origen" : "Factura padre"}
+                label={invoice.type === "credit_note" ? "Factura origen" : "Documento padre"}
                 value={invoice.parentInvoice?.invoiceNumber || invoice.parentInvoiceId || "-"}
               />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Vencimiento" value={formatDateLabel(invoice.dueAt)} />
               {invoice.type === "credit_note" && invoice.parentInvoice?.id ? (
                 <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl">
-                  <Link href={`/app/invoices/${invoice.parentInvoice.id}`}>Ver factura origen</Link>
+                  <Link href={`/app/invoices/${invoice.parentInvoice.id}`}>Ver invoice origen</Link>
                 </Button>
               ) : null}
             </CardContent>
@@ -350,12 +350,12 @@ export function InvoiceDetailView({
               <CardHeader>
                 <div>
                   <CardTitle className="text-xl">Notas de credito relacionadas</CardTitle>
-                  <CardDescription>Visibilidad operativa de ajustes posteriores sobre esta factura.</CardDescription>
+                  <CardDescription>Visibilidad operativa de ajustes posteriores sobre esta invoice.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <MetricTile label="Cantidad" value={String(relatedCreditNotes.length)} helper="Notas de credito asociadas" />
+                  <MetricTile label="Cantidad" value={String(relatedCreditNotes.length)} helper="Credit notes asociadas" />
                   <MetricTile label="Total acreditado" value={formatMoney(creditedTotal, invoice.currency)} helper="Acumulado visible" />
                 </div>
 
@@ -386,7 +386,7 @@ export function InvoiceDetailView({
                   ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                    Esta factura todavia no tiene notas de credito relacionadas.
+                    Esta invoice todavia no tiene notas de credito relacionadas.
                   </div>
                 )}
               </CardContent>
@@ -396,8 +396,8 @@ export function InvoiceDetailView({
           <Card className="border-white/6 bg-card/90">
             <CardHeader>
               <div>
-                <CardTitle className="text-xl">Registrar cobro</CardTitle>
-                <CardDescription>Alta minima de cobranza sobre esta factura.</CardDescription>
+                <CardTitle className="text-xl">Registrar payment</CardTitle>
+                <CardDescription>Alta minima de cobranza sobre esta invoice.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -440,12 +440,12 @@ export function InvoiceDetailView({
                   />
                   <Button type="submit" className="w-full rounded-2xl" disabled={busyAction !== null}>
                     {busyAction === "create_payment" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-                    Registrar cobro
+                    Registrar payment
                   </Button>
                 </form>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                  Los cobros solo se registran sobre facturas emitidas, no anuladas y con saldo pendiente.
+                  Los payments solo se registran sobre invoices emitidas, no anuladas y con saldo pendiente.
                 </div>
               )}
             </CardContent>
@@ -454,8 +454,8 @@ export function InvoiceDetailView({
           <Card className="border-white/6 bg-card/90">
             <CardHeader>
               <div>
-                <CardTitle className="text-xl">Asignaciones</CardTitle>
-                <CardDescription>Asignaciones de cobro y camino simple para aplicar cobros existentes.</CardDescription>
+                <CardTitle className="text-xl">Allocations</CardTitle>
+                <CardDescription>Asignaciones de cobro y camino simple para aplicar pagos existentes.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -466,7 +466,7 @@ export function InvoiceDetailView({
                       <div>
                         <p className="text-sm font-medium">{formatMoney(allocation.amount, invoice.currency)}</p>
                         <p className="mt-1 text-xs text-muted">
-                          Cobro {allocation.payment?.id.slice(0, 8) || allocation.paymentId.slice(0, 8)} - {titleCaseLabel(allocation.payment?.status)}
+                          Pago {allocation.payment?.id.slice(0, 8) || allocation.paymentId.slice(0, 8)} - {titleCaseLabel(allocation.payment?.status)}
                         </p>
                       </div>
                       <Badge variant={badgeToneByStatus(allocation.payment?.status)}>{titleCaseLabel(allocation.payment?.status)}</Badge>
@@ -475,20 +475,20 @@ export function InvoiceDetailView({
                 ))
               ) : (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                  Esta factura todavia no muestra asignaciones registradas.
+                  Esta invoice todavia no muestra allocations registradas.
                 </div>
               )}
 
               {!readOnly && invoice.status === "issued" && invoice.type === "invoice" && Number(invoice.outstandingAmount || 0) > 0 ? (
                 <form className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/45 p-4" onSubmit={createAllocation}>
-                  <p className="text-sm font-medium">Asignar cobro existente</p>
+                  <p className="text-sm font-medium">Asignar payment existente</p>
                   <select
                     className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
                     value={selectedPaymentId}
                     onChange={(event) => setSelectedPaymentId(event.target.value)}
                     disabled={busyAction !== null}
                   >
-                    <option value="">Selecciona un cobro con saldo libre</option>
+                    <option value="">Selecciona un pago con saldo libre</option>
                     {allocatablePayments.map((payment) => (
                       <option key={payment.id} value={payment.id}>
                         {payment.id.slice(0, 8)} - {formatMoney(payment.unallocatedAmount, payment.currency)}

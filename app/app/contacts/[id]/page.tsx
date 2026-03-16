@@ -1,11 +1,11 @@
-import Link from "next/link";
-import { ClientPageShell } from "@/components/app/client-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ClientPageShell } from "@/components/app/client-page-shell";
 import { canEditWorkspace } from "@/lib/app-permissions";
-import { badgeToneByStatus, formatDateLabel, formatDateTimeLabel, formatMoney, titleCaseLabel } from "@/lib/billing";
 import { getPortalContactDetail, isBackendConfigured } from "@/lib/api";
+import Link from "next/link";
+import { formatDateLabel, formatDateTimeLabel, formatMoney, titleCaseLabel, badgeToneByStatus } from "@/lib/billing";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
