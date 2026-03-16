@@ -307,7 +307,7 @@ export function InvoiceDetailView({
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
               <InfoRow icon={<FileText className="h-4 w-4" />} label="Estado interno" value={titleCaseLabel(invoice.lifecycle?.internalStatus || invoice.status)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Modo" value={titleCaseLabel(invoice.lifecycle?.documentMode || invoice.documentMode)} />
-              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Provider status" value={titleCaseLabel(invoice.lifecycle?.providerStatus || invoice.providerStatus)} />
+              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Estado del proveedor" value={titleCaseLabel(invoice.lifecycle?.providerStatus || invoice.providerStatus)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Emitida" value={formatDateTimeLabel(invoice.issuedAt)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Creada" value={formatDateTimeLabel(invoice.createdAt)} />
               {invoice.lifecycle?.canEdit ? (
@@ -333,7 +333,7 @@ export function InvoiceDetailView({
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Order" value={invoice.orderId || "-"} />
               <InfoRow
                 icon={<ReceiptText className="h-4 w-4" />}
-                label={invoice.type === "credit_note" ? "Invoice origen" : "Parent invoice"}
+                label={invoice.type === "credit_note" ? "Factura origen" : "Documento padre"}
                 value={invoice.parentInvoice?.invoiceNumber || invoice.parentInvoiceId || "-"}
               />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Vencimiento" value={formatDateLabel(invoice.dueAt)} />
@@ -466,7 +466,7 @@ export function InvoiceDetailView({
                       <div>
                         <p className="text-sm font-medium">{formatMoney(allocation.amount, invoice.currency)}</p>
                         <p className="mt-1 text-xs text-muted">
-                          Payment {allocation.payment?.id.slice(0, 8) || allocation.paymentId.slice(0, 8)} - {titleCaseLabel(allocation.payment?.status)}
+                          Pago {allocation.payment?.id.slice(0, 8) || allocation.paymentId.slice(0, 8)} - {titleCaseLabel(allocation.payment?.status)}
                         </p>
                       </div>
                       <Badge variant={badgeToneByStatus(allocation.payment?.status)}>{titleCaseLabel(allocation.payment?.status)}</Badge>
@@ -488,7 +488,7 @@ export function InvoiceDetailView({
                     onChange={(event) => setSelectedPaymentId(event.target.value)}
                     disabled={busyAction !== null}
                   >
-                    <option value="">Selecciona un payment con saldo libre</option>
+                    <option value="">Selecciona un pago con saldo libre</option>
                     {allocatablePayments.map((payment) => (
                       <option key={payment.id} value={payment.id}>
                         {payment.id.slice(0, 8)} - {formatMoney(payment.unallocatedAmount, payment.currency)}
@@ -506,7 +506,7 @@ export function InvoiceDetailView({
                   />
                   <Button type="submit" variant="secondary" className="w-full rounded-2xl" disabled={busyAction !== null || !allocatablePayments.length}>
                     {busyAction === "create_allocation" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Crear allocation
+                    Crear asignacion
                   </Button>
                 </form>
               ) : null}

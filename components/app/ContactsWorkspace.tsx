@@ -152,9 +152,16 @@ export function ContactsWorkspace({
           <CardHeader
             action={
               selected ? (
-                <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-                  <Link href={`/app/contacts/${selected.id}`}>Abrir detalle</Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                  {!readOnly ? (
+                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                      <Link href={`/app/contacts/${selected.id}/edit`}>Editar</Link>
+                    </Button>
+                  ) : null}
+                  <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                    <Link href={`/app/contacts/${selected.id}`}>Abrir detalle</Link>
+                  </Button>
+                </div>
               ) : null
             }
           >

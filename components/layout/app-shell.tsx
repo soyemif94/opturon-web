@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
+import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 
@@ -177,15 +178,18 @@ function ThemeToggleButton() {
 
 export function AppShell({
   children,
+  tenantId,
   tenantLabel,
   topbar,
   buildMarker,
   buildEnv,
   deploymentId,
   globalRole,
-  tenantRole
+  tenantRole,
+  whatsappStatus
 }: {
   children: React.ReactNode;
+  tenantId?: string | null;
   tenantLabel?: string;
   topbar?: React.ReactNode;
   buildMarker?: string;
@@ -193,6 +197,7 @@ export function AppShell({
   deploymentId?: string;
   globalRole?: GlobalRole;
   tenantRole?: TenantRole;
+  whatsappStatus?: WhatsAppConnectionStatus;
 }) {
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
@@ -200,6 +205,40 @@ export function AppShell({
   const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module));
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
+  const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
+
+  useEffect(() => {
+    setSidebarStatus(whatsappStatus);
+  }, [whatsappStatus]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+
+    const controller = new AbortController();
+
+    void fetch("/api/app/integrations/whatsapp", {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`sidebar_whatsapp_status_failed_${response.status}`);
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        if (payload?.data) {
+          setSidebarStatus(payload.data as WhatsAppConnectionStatus);
+        }
+      })
+      .catch(() => {
+        // Keep the current sidebar state if the refresh fails.
+      });
+
+    return () => controller.abort();
+  }, [tenantId, pathname]);
+
   const buildLabel = [
     buildMarker ? `Build ${buildMarker}` : null,
     buildEnv ? `Env ${buildEnv}` : null,
@@ -207,6 +246,24 @@ export function AppShell({
   ]
     .filter(Boolean)
     .join(" | ");
+  const sidebarWhatsAppState = sidebarStatus?.state || "not_connected";
+  const sidebarChannelStatusLabel =
+    sidebarWhatsAppState === "connected"
+      ? "Conectado"
+      : sidebarWhatsAppState === "pending_meta" || sidebarWhatsAppState === "launching"
+        ? "Pendiente"
+        : sidebarWhatsAppState === "ambiguous_configuration"
+          ? "Revisar"
+          : sidebarWhatsAppState === "error"
+            ? "Error"
+            : "No conectado";
+  const sidebarChannelTone =
+    sidebarWhatsAppState === "connected"
+      ? "text-emerald-300"
+      : sidebarWhatsAppState === "error" || sidebarWhatsAppState === "ambiguous_configuration"
+        ? "text-rose-300"
+        : "text-amber-300";
+  const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
     <section className="w-full bg-[color:var(--bg)] px-5 py-5 text-[color:var(--text)]">
@@ -286,7 +343,7 @@ export function AppShell({
                 <div className="mt-4 space-y-3 text-sm text-muted">
                   <div className="flex items-center justify-between">
                     <span>Estado del canal</span>
-                    <span className="text-amber-300">No conectado</span>
+                    <span className={sidebarChannelTone}>{sidebarChannelStatusLabel}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Inbox</span>
@@ -298,7 +355,9 @@ export function AppShell({
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Integraciones</span>
-                    <span className="text-amber-300">Proximo paso</span>
+                    <span className={sidebarWhatsAppState === "connected" ? "text-emerald-300" : "text-amber-300"}>
+                      {sidebarWhatsAppState === "connected" ? "Operativas" : "Proximo paso"}
+                    </span>
                   </div>
                 </div>
                 {showManageShortcut ? (
@@ -307,7 +366,7 @@ export function AppShell({
                     className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
                   >
                     <PhoneCall className="h-4 w-4" />
-                    Conectar WhatsApp
+                    {sidebarActionLabel}
                   </Link>
                 ) : null}
                 {!showManageShortcut && showUsersShortcut ? (

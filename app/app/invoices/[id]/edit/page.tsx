@@ -29,15 +29,15 @@ export default async function AppInvoiceDraftEditPage({ params }: { params: Prom
     <ClientPageShell
       title={
         invoice?.invoiceNumber
-          ? `Editar ${invoice.type === "credit_note" ? "credit note" : "invoice"} ${invoice.invoiceNumber}`
-          : "Editar invoice draft"
+          ? `Editar ${invoice.type === "credit_note" ? "nota de credito" : "factura"} ${invoice.invoiceNumber}`
+          : "Editar factura draft"
       }
       description={
         invoice?.type === "credit_note"
           ? "Ajusta la nota de credito draft antes de emitirla desde su detail."
           : "Ajusta items y datos basicos del borrador antes de emitirlo desde el detail."
       }
-      badge={invoice?.type === "credit_note" ? "Credit note edit" : "Draft edit"}
+      badge={invoice?.type === "credit_note" ? "Editar nota de credito" : "Editar draft"}
     >
       {!invoice ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
