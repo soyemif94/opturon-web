@@ -1086,6 +1086,7 @@ export async function createPortalInvoice(
     parentInvoiceId?: string | null;
     documentMode?: string;
     currency?: string;
+    metadata?: Record<string, unknown>;
     items: Array<{
       descriptionSnapshot: string;
       quantity: number;
@@ -1121,6 +1122,7 @@ export async function updatePortalInvoice(
     parentInvoiceId?: string | null;
     documentMode?: string;
     currency?: string;
+    metadata?: Record<string, unknown>;
     items: Array<{
       descriptionSnapshot: string;
       quantity: number;

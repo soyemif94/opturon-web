@@ -9,7 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import type { PortalInvoice } from "@/lib/api";
-import { badgeToneByStatus, formatDateLabel, formatMoney, titleCaseLabel } from "@/lib/billing";
+import {
+  badgeToneByStatus,
+  formatDateLabel,
+  formatMoney,
+  getInvoiceDocumentKindLabel,
+  titleCaseLabel
+} from "@/lib/billing";
 
 type InvoiceFilterState = {
   search: string;
@@ -159,7 +165,10 @@ export function InvoicesWorkspace({
                 className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px] gap-4 border-b border-[color:var(--border)] px-4 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
               >
                 <div className="flex items-center">
-                  <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
+                  <div className="space-y-1">
+                    <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
+                    <p className="text-xs text-muted">{getInvoiceDocumentKindLabel(invoice.metadata)}</p>
+                  </div>
                 </div>
                 <div className="flex items-center">
                   <Badge variant={badgeToneByStatus(invoice.status)}>{titleCaseLabel(invoice.status)}</Badge>

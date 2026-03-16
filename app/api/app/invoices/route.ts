@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       parentInvoiceId: body?.parentInvoiceId || null,
       documentMode: body?.documentMode || "internal_only",
       currency: body?.currency || "ARS",
+      metadata: body?.metadata && typeof body.metadata === "object" ? body.metadata : {},
       items: Array.isArray(body?.items) ? body.items : []
     });
 

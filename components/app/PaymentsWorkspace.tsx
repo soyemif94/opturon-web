@@ -10,7 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { PortalInvoice, PortalPayment } from "@/lib/api";
-import { badgeToneByStatus, formatDateLabel, formatMoney, titleCaseLabel } from "@/lib/billing";
+import {
+  badgeToneByStatus,
+  formatDateLabel,
+  formatMoney,
+  parseLocalizedMoneyInput,
+  titleCaseLabel
+} from "@/lib/billing";
 
 type PaymentDraft = {
   amount: string;
@@ -129,7 +135,7 @@ export function PaymentsWorkspace({
     event.preventDefault();
     if (readOnly) return;
 
-    const amount = Number(draft.amount || 0);
+    const amount = parseLocalizedMoneyInput(draft.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Monto invalido", "Ingresa un importe valido para registrar el cobro.");
       return;
@@ -254,18 +260,19 @@ export function PaymentsWorkspace({
               description="Prueba con otro estado, metodo o contacto para volver a ver cobranzas."
             />
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
-              <div className="grid grid-cols-[140px_140px_120px_minmax(0,1fr)_220px_140px_120px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
-                <span>Monto</span>
-                <span>Metodo</span>
-                <span>Estado</span>
-                <span>Contacto</span>
-                <span>Factura / asignacion</span>
-                <span>Fecha</span>
-                <span>Accion</span>
+            <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
+              <div className="min-w-[1120px]">
+              <div className="grid grid-cols-[150px_120px_120px_minmax(220px,1fr)_minmax(240px,1.1fr)_120px_120px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
+                <span className="leading-snug">Monto</span>
+                <span className="leading-snug">Metodo</span>
+                <span className="leading-snug">Estado</span>
+                <span className="leading-snug">Contacto</span>
+                <span className="leading-snug">Factura / asignacion</span>
+                <span className="leading-snug">Fecha</span>
+                <span className="leading-snug">Accion</span>
               </div>
               {filteredPayments.map((payment) => (
-                <div key={payment.id} className="grid grid-cols-[140px_140px_120px_minmax(0,1fr)_220px_140px_120px] gap-4 border-b border-[color:var(--border)] px-4 py-4 last:border-b-0">
+                <div key={payment.id} className="grid grid-cols-[150px_120px_120px_minmax(220px,1fr)_minmax(240px,1.1fr)_120px_120px] gap-4 border-b border-[color:var(--border)] px-4 py-4 last:border-b-0">
                   <PaymentAmountStack payment={payment} />
                   <div className="flex items-center text-sm text-muted">{titleCaseLabel(payment.method)}</div>
                   <div className="flex items-center">
@@ -309,6 +316,7 @@ export function PaymentsWorkspace({
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </CardContent>
@@ -323,15 +331,18 @@ export function PaymentsWorkspace({
         </CardHeader>
         <CardContent className="pt-0">
           <form className="space-y-3" onSubmit={createPayment}>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Monto"
-              value={draft.amount}
-              onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}
-              disabled={readOnly || busyAction !== null}
-            />
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted">$</span>
+              <Input
+                type="text"
+                inputMode="decimal"
+                className="pl-8"
+                placeholder="25.000,50"
+                value={draft.amount}
+                onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}
+                disabled={readOnly || busyAction !== null}
+              />
+            </div>
             <select
               className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
               value={draft.method}

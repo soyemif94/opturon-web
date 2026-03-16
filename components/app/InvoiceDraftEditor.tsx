@@ -9,7 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { PortalContactDetail, PortalInvoice } from "@/lib/api";
-import { calculateInvoiceLineAmounts, formatMoney, quantizeMoney } from "@/lib/billing";
+import {
+  calculateInvoiceLineAmounts,
+  formatMoney,
+  getInvoiceDocumentKindLabel,
+  INVOICE_DOCUMENT_KIND_OPTIONS,
+  quantizeMoney
+} from "@/lib/billing";
 
 type DraftItem = {
   id: string;
@@ -23,6 +29,7 @@ type DraftState = {
   contactId: string;
   currency: string;
   type: "invoice" | "credit_note";
+  documentKind: string;
   parentInvoiceId: string;
   items: DraftItem[];
 };
@@ -60,6 +67,12 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
     contactId: invoice?.contactId || parentInvoice?.contactId || "",
     currency: invoice?.currency || parentInvoice?.currency || "ARS",
     type: inferredType,
+    documentKind:
+      typeof invoice?.metadata?.documentKind === "string"
+        ? invoice.metadata.documentKind
+        : typeof parentInvoice?.metadata?.documentKind === "string"
+          ? parentInvoice.metadata.documentKind
+          : "invoice_c",
     parentInvoiceId: invoice?.parentInvoiceId || parentInvoice?.id || "",
     items: seedItems
   };
@@ -168,6 +181,10 @@ export function InvoiceDraftEditor({
         parentInvoiceId: draft.parentInvoiceId || null,
         documentMode: "internal_only",
         currency: draft.currency,
+        metadata: {
+          ...(invoice?.metadata || parentInvoice?.metadata || {}),
+          documentKind: draft.documentKind
+        },
         items: validItems.map((item) => ({
           descriptionSnapshot: item.descriptionSnapshot.trim(),
           quantity: quantizeMoney(item.quantityNumber),
@@ -232,6 +249,27 @@ export function InvoiceDraftEditor({
                 ))}
               </select>
               <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving} />
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/40 px-3 py-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">Tipo de comprobante</p>
+                <p className="mt-2 text-sm text-muted">
+                  Lo usamos como identificacion comercial visible sin tocar el lifecycle interno del documento.
+                </p>
+              </div>
+              <select
+                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                value={draft.documentKind}
+                onChange={(event) => setDraft((current) => ({ ...current, documentKind: event.target.value }))}
+                disabled={saving}
+              >
+                {INVOICE_DOCUMENT_KIND_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {isCreditNote && parentInvoice ? (
@@ -320,6 +358,7 @@ export function InvoiceDraftEditor({
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
+              <SummaryRow label="Comprobante" value={getInvoiceDocumentKindLabel({ documentKind: draft.documentKind })} />
               <SummaryRow label="Subtotal" value={formatMoney(computed.subtotalAmount, draft.currency)} />
               <SummaryRow label="IVA" value={formatMoney(computed.taxAmount, draft.currency)} />
               <SummaryRow label={isCreditNote ? "Impacto" : "Total"} value={formatMoney(computed.totalAmount, draft.currency)} highlight />

@@ -7,6 +7,45 @@ export function formatMoney(amount: number | null | undefined, currency = "ARS")
   }).format(safeAmount);
 }
 
+export const INVOICE_DOCUMENT_KIND_OPTIONS = [
+  { value: "invoice_a", label: "Factura A" },
+  { value: "invoice_b", label: "Factura B" },
+  { value: "invoice_c", label: "Factura C" },
+  { value: "delivery_note", label: "Remito" }
+] as const;
+
+export function getInvoiceDocumentKindLabel(metadata: Record<string, unknown> | null | undefined) {
+  const raw = String(metadata?.documentKind || "").trim().toLowerCase();
+  const match = INVOICE_DOCUMENT_KIND_OPTIONS.find((option) => option.value === raw);
+  return match?.label || "Factura C";
+}
+
+export function parseLocalizedMoneyInput(value: string | number | null | undefined) {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/\$/g, "");
+
+  if (!raw) return NaN;
+
+  const hasComma = raw.includes(",");
+  const dotCount = (raw.match(/\./g) || []).length;
+
+  let normalized = raw;
+
+  if (hasComma) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (dotCount > 1) {
+    normalized = normalized.replace(/\./g, "");
+  } else if (dotCount === 1) {
+    const [whole, fraction = ""] = normalized.split(".");
+    normalized = fraction.length === 3 ? `${whole}${fraction}` : `${whole}.${fraction}`;
+  }
+
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : NaN;
+}
+
 export function formatDateLabel(value: string | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);

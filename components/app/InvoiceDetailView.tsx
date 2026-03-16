@@ -10,7 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { PortalInvoice, PortalPayment } from "@/lib/api";
-import { badgeToneByStatus, formatDateLabel, formatDateTimeLabel, formatMoney, titleCaseLabel } from "@/lib/billing";
+import {
+  badgeToneByStatus,
+  formatDateLabel,
+  formatDateTimeLabel,
+  formatMoney,
+  getInvoiceDocumentKindLabel,
+  parseLocalizedMoneyInput,
+  titleCaseLabel
+} from "@/lib/billing";
 
 type PaymentDraft = {
   amount: string;
@@ -125,7 +133,7 @@ export function InvoiceDetailView({
     event.preventDefault();
     if (!canRegisterPayment) return;
 
-    const amount = Number(paymentDraft.amount || 0);
+    const amount = parseLocalizedMoneyInput(paymentDraft.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Monto invalido", "Ingresa un importe mayor a cero.");
       return;
@@ -306,6 +314,7 @@ export function InvoiceDetailView({
             </CardHeader>
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
               <InfoRow icon={<FileText className="h-4 w-4" />} label="Estado interno" value={titleCaseLabel(invoice.lifecycle?.internalStatus || invoice.status)} />
+              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Comprobante" value={getInvoiceDocumentKindLabel(invoice.metadata)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Modo" value={titleCaseLabel(invoice.lifecycle?.documentMode || invoice.documentMode)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Estado del proveedor" value={titleCaseLabel(invoice.lifecycle?.providerStatus || invoice.providerStatus)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Emitida" value={formatDateTimeLabel(invoice.issuedAt)} />
@@ -404,15 +413,18 @@ export function InvoiceDetailView({
               {canRegisterPayment ? (
                 <form className="space-y-3" onSubmit={createPayment}>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Monto"
-                      value={paymentDraft.amount}
-                      onChange={(event) => setPaymentDraft((current) => ({ ...current, amount: event.target.value }))}
-                      disabled={busyAction !== null}
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted">$</span>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="pl-8"
+                        placeholder="25.000,50"
+                        value={paymentDraft.amount}
+                        onChange={(event) => setPaymentDraft((current) => ({ ...current, amount: event.target.value }))}
+                        disabled={busyAction !== null}
+                      />
+                    </div>
                     <select
                       className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
                       value={paymentDraft.method}
