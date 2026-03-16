@@ -14,7 +14,9 @@ import {
   badgeToneByStatus,
   formatDateLabel,
   formatMoney,
+  normalizePaymentMethodValue,
   parseLocalizedMoneyInput,
+  PAYMENT_METHOD_OPTIONS,
   titleCaseLabel
 } from "@/lib/billing";
 
@@ -90,7 +92,7 @@ export function PaymentsWorkspace({
     const search = normalizeSearchValue(filters.search);
     return payments.filter((payment) => {
       if (filters.status !== "all" && payment.status !== filters.status) return false;
-      if (filters.method !== "all" && payment.method !== filters.method) return false;
+      if (filters.method !== "all" && normalizePaymentMethodValue(payment.method) !== filters.method) return false;
       if (filters.contactId !== "all" && payment.contact?.id !== filters.contactId) return false;
 
       if (!search) return true;
@@ -233,7 +235,11 @@ export function PaymentsWorkspace({
               <option value="bank_transfer">Transferencia</option>
               <option value="cash">Efectivo</option>
               <option value="card">Tarjeta</option>
-              <option value="other">Otro</option>
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             <select
               className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
@@ -349,10 +355,11 @@ export function PaymentsWorkspace({
               onChange={(event) => setDraft((current) => ({ ...current, method: event.target.value }))}
               disabled={readOnly || busyAction !== null}
             >
-              <option value="bank_transfer">Transferencia</option>
-              <option value="cash">Efectivo</option>
-              <option value="card">Tarjeta</option>
-              <option value="other">Otro</option>
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             <Input
               type="datetime-local"

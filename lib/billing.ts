@@ -14,6 +14,13 @@ export const INVOICE_DOCUMENT_KIND_OPTIONS = [
   { value: "delivery_note", label: "Remito" }
 ] as const;
 
+export const PAYMENT_METHOD_OPTIONS = [
+  { value: "bank_transfer", label: "Transferencia" },
+  { value: "cash", label: "Efectivo" },
+  { value: "card", label: "Tarjeta" },
+  { value: "combined", label: "Combinados" }
+] as const;
+
 export function getInvoiceDocumentKindLabel(metadata: Record<string, unknown> | null | undefined) {
   const raw = String(metadata?.documentKind || "").trim().toLowerCase();
   const match = INVOICE_DOCUMENT_KIND_OPTIONS.find((option) => option.value === raw);
@@ -44,6 +51,12 @@ export function parseLocalizedMoneyInput(value: string | number | null | undefin
 
   const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : NaN;
+}
+
+export function normalizePaymentMethodValue(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "other") return "combined";
+  return normalized;
 }
 
 export function formatDateLabel(value: string | null | undefined) {
@@ -123,7 +136,8 @@ export function titleCaseLabel(value: string | null | undefined) {
     bank_transfer: "Transferencia",
     cash: "Efectivo",
     card: "Tarjeta",
-    other: "Otro",
+    other: "Combinados",
+    combined: "Combinados",
     active: "Activo",
     inactive: "Inactivo",
     archived: "Archivado",

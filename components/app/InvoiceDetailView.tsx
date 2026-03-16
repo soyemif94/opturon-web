@@ -17,6 +17,7 @@ import {
   formatMoney,
   getInvoiceDocumentKindLabel,
   parseLocalizedMoneyInput,
+  PAYMENT_METHOD_OPTIONS,
   titleCaseLabel
 } from "@/lib/billing";
 
@@ -431,10 +432,11 @@ export function InvoiceDetailView({
                       onChange={(event) => setPaymentDraft((current) => ({ ...current, method: event.target.value }))}
                       disabled={busyAction !== null}
                     >
-                      <option value="bank_transfer">Transferencia</option>
-                      <option value="cash">Efectivo</option>
-                      <option value="card">Tarjeta</option>
-                      <option value="other">Otro</option>
+                      {PAYMENT_METHOD_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <Input

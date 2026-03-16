@@ -64,6 +64,8 @@ export function InvoicesWorkspace({
         invoice.contact?.name,
         invoice.contact?.phone,
         invoice.type,
+        invoice.parentInvoice?.invoiceNumber,
+        invoice.parentInvoiceId,
         invoice.status,
         invoice.receivableStatus
       ]
@@ -176,6 +178,11 @@ export function InvoicesWorkspace({
                 <div className="min-w-0">
                   <p className="truncate font-medium">{invoice.contact?.name || "Sin contacto"}</p>
                   <p className="mt-1 truncate text-sm text-muted">{invoice.invoiceNumber || invoice.id.slice(0, 8)}</p>
+                  {invoice.type === "credit_note" ? (
+                    <p className="mt-1 truncate text-xs text-amber-200">
+                      Sobre {invoice.parentInvoice?.invoiceNumber || invoice.parentInvoiceId || "factura origen"}
+                    </p>
+                  ) : null}
                 </div>
                 <MoneyStack primary={formatMoney(invoice.totalAmount, invoice.currency)} secondary={`Impacto ${formatMoney(invoice.balanceImpact?.amount, invoice.currency)}`} />
                 <MoneyStack primary={formatMoney(invoice.paidAmount, invoice.currency)} secondary="Cobrado" positive />
