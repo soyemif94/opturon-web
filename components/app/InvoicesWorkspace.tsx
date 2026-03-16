@@ -149,8 +149,9 @@ export function InvoicesWorkspace({
             description="Prueba con otro estado, cobranza o contacto para volver a ver documentos."
           />
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
-            <div className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
+          <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
+            <div className="min-w-[1360px]">
+            <div className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px_190px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
               <span>Tipo</span>
               <span>Estado</span>
               <span>Contacto</span>
@@ -159,12 +160,12 @@ export function InvoicesWorkspace({
               <span>Pendiente</span>
               <span>Cobranza</span>
               <span>Fecha</span>
+              <span>Acción</span>
             </div>
             {filteredInvoices.map((invoice) => (
-              <Link
+              <div
                 key={invoice.id}
-                href={`/app/invoices/${invoice.id}`}
-                className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px] gap-4 border-b border-[color:var(--border)] px-4 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
+                className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px_190px] gap-4 border-b border-[color:var(--border)] px-4 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
               >
                 <div className="flex items-center">
                   <div className="space-y-1">
@@ -191,8 +192,19 @@ export function InvoicesWorkspace({
                   <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
                 </div>
                 <div className="text-sm text-muted">{formatDateLabel(invoice.issuedAt || invoice.createdAt)}</div>
-              </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                    <Link href={`/app/invoices/${invoice.id}`}>Ver detalle</Link>
+                  </Button>
+                  {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
+                    <Button asChild size="sm" className="rounded-2xl">
+                      <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             ))}
+            </div>
           </div>
         )}
       </CardContent>

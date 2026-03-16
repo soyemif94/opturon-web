@@ -123,7 +123,7 @@ export function titleCaseLabel(value: string | null | undefined) {
   if (!normalized) return "-";
   const dictionary: Record<string, string> = {
     invoice: "Factura",
-    credit_note: "Nota de credito",
+    credit_note: "Nota de crédito",
     draft: "Borrador",
     issued: "Emitida",
     void: "Anulada",

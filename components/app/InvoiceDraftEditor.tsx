@@ -14,6 +14,9 @@ import {
   formatMoney,
   getInvoiceDocumentKindLabel,
   INVOICE_DOCUMENT_KIND_OPTIONS,
+  normalizePaymentMethodValue,
+  parseLocalizedMoneyInput,
+  PAYMENT_METHOD_OPTIONS,
   quantizeMoney
 } from "@/lib/billing";
 
@@ -31,6 +34,9 @@ type DraftState = {
   type: "invoice" | "credit_note";
   documentKind: string;
   parentInvoiceId: string;
+  initialPaymentStatus: "unpaid" | "partial" | "paid";
+  initialPaymentAmount: string;
+  initialPaymentMethod: string;
   items: DraftItem[];
 };
 
@@ -44,6 +50,15 @@ const EMPTY_ITEM: DraftItem = {
 
 function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: PortalInvoice | null): DraftState {
   const inferredType = (invoice?.type || (parentInvoice ? "credit_note" : "invoice")) as "invoice" | "credit_note";
+  const initialPaymentPlan =
+    invoice?.metadata && typeof invoice.metadata === "object" && !Array.isArray(invoice.metadata)
+      ? (invoice.metadata.initialPaymentPlan as Record<string, unknown> | undefined)
+      : undefined;
+  const initialPaymentStatus =
+    typeof initialPaymentPlan?.status === "string" &&
+    ["unpaid", "partial", "paid"].includes(initialPaymentPlan.status)
+      ? (initialPaymentPlan.status as "unpaid" | "partial" | "paid")
+      : "unpaid";
   const seedItems =
     invoice?.items?.length
       ? invoice.items.map((item) => ({
@@ -74,6 +89,17 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
           ? parentInvoice.metadata.documentKind
           : "invoice_c",
     parentInvoiceId: invoice?.parentInvoiceId || parentInvoice?.id || "",
+    initialPaymentStatus: inferredType === "credit_note" ? "unpaid" : initialPaymentStatus,
+    initialPaymentAmount:
+      inferredType === "credit_note" || initialPaymentStatus !== "partial"
+        ? ""
+        : typeof initialPaymentPlan?.amount === "number"
+          ? String(initialPaymentPlan.amount)
+          : "",
+    initialPaymentMethod:
+      inferredType === "credit_note"
+        ? "bank_transfer"
+        : normalizePaymentMethodValue(typeof initialPaymentPlan?.method === "string" ? initialPaymentPlan.method : "bank_transfer") || "bank_transfer",
     items: seedItems
   };
 }
@@ -172,9 +198,34 @@ export function InvoiceDraftEditor({
       toast.error("Precio invalido", "Cada item necesita un precio valido.");
       return;
     }
+    const absoluteTotal = Math.abs(Number(computed.totalAmount || 0));
+    const initialPaymentAmount = parseLocalizedMoneyInput(draft.initialPaymentAmount);
+    if (!isCreditNote && draft.initialPaymentStatus === "partial") {
+      if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0) {
+        toast.error("Cobro inicial invalido", "Ingresa un monto inicial mayor a cero.");
+        return;
+      }
+      if (initialPaymentAmount > absoluteTotal) {
+        toast.error("Cobro inicial invalido", "El cobro inicial no puede superar el total de la factura.");
+        return;
+      }
+    }
+    if (!isCreditNote && draft.initialPaymentStatus === "paid" && absoluteTotal <= 0) {
+      toast.error("Total invalido", "La factura necesita un total mayor a cero para marcarla como paga al emitir.");
+      return;
+    }
 
     setSaving(true);
     try {
+      const baseMetadata = invoice?.metadata && typeof invoice.metadata === "object" && !Array.isArray(invoice.metadata) ? invoice.metadata : {};
+      const initialPaymentPlan =
+        isCreditNote || draft.initialPaymentStatus === "unpaid"
+          ? null
+          : {
+              status: draft.initialPaymentStatus,
+              amount: draft.initialPaymentStatus === "paid" ? quantizeMoney(absoluteTotal) : quantizeMoney(initialPaymentAmount),
+              method: draft.initialPaymentMethod
+            };
       const payload = {
         contactId: draft.contactId,
         type: draft.type,
@@ -182,8 +233,9 @@ export function InvoiceDraftEditor({
         documentMode: "internal_only",
         currency: draft.currency,
         metadata: {
-          ...(invoice?.metadata || parentInvoice?.metadata || {}),
-          documentKind: draft.documentKind
+          ...baseMetadata,
+          documentKind: draft.documentKind,
+          initialPaymentPlan
         },
         items: validItems.map((item) => ({
           descriptionSnapshot: item.descriptionSnapshot.trim(),
@@ -221,14 +273,14 @@ export function InvoiceDraftEditor({
     <form className="space-y-6" onSubmit={submitDraft}>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de credito draft" : "Draft editable"}</Badge>}>
+          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de crédito draft" : "Draft editable"}</Badge>}>
             <div>
               <CardTitle className="text-xl">
-                {invoice ? (isCreditNote ? "Editar nota de credito draft" : "Editar factura draft") : isCreditNote ? "Crear nota de credito draft" : "Crear factura draft"}
+                {invoice ? (isCreditNote ? "Editar nota de crédito draft" : "Editar factura draft") : isCreditNote ? "Crear nota de crédito draft" : "Crear factura draft"}
               </CardTitle>
               <CardDescription>
                 {isCreditNote
-                  ? "Nota de credito simple asociada a una factura origen, con items negativos y lista para emitir despues."
+                  ? "Nota de crédito simple asociada a una factura origen, con items negativos y lista para emitir despues."
                   : "Editor minimo de billing para preparar items y emitir despues desde el portal."}
               </CardDescription>
             </div>
@@ -271,6 +323,67 @@ export function InvoiceDraftEditor({
                 ))}
               </select>
             </div>
+
+            {!isCreditNote ? (
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_220px]">
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/40 px-3 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Estado de pago inicial</p>
+                  <p className="mt-2 text-sm text-muted">
+                    Si defines un cobro inicial, el sistema lo registrara automaticamente al emitir la factura.
+                  </p>
+                </div>
+                <select
+                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={draft.initialPaymentStatus}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      initialPaymentStatus: event.target.value as DraftState["initialPaymentStatus"],
+                      initialPaymentAmount: event.target.value === "partial" ? current.initialPaymentAmount : ""
+                    }))
+                  }
+                  disabled={saving}
+                >
+                  <option value="unpaid">Pendiente</option>
+                  <option value="partial">Pago parcial al emitir</option>
+                  <option value="paid">Pago total al emitir</option>
+                </select>
+                {draft.initialPaymentStatus !== "unpaid" ? (
+                  <>
+                    {draft.initialPaymentStatus === "partial" ? (
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted">$</span>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          className="pl-8"
+                          placeholder="25.000,50"
+                          value={draft.initialPaymentAmount}
+                          onChange={(event) => setDraft((current) => ({ ...current, initialPaymentAmount: event.target.value }))}
+                          disabled={saving}
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-[color:var(--border)] bg-bg/60 px-3 py-3 text-sm text-muted">
+                        Se registrara {formatMoney(Math.abs(computed.totalAmount), draft.currency)} al emitir.
+                      </div>
+                    )}
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={draft.initialPaymentMethod}
+                      onChange={(event) => setDraft((current) => ({ ...current, initialPaymentMethod: event.target.value }))}
+                      disabled={saving}
+                    >
+                      {PAYMENT_METHOD_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             {isCreditNote && parentInvoice ? (
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
@@ -359,6 +472,18 @@ export function InvoiceDraftEditor({
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
               <SummaryRow label="Comprobante" value={getInvoiceDocumentKindLabel({ documentKind: draft.documentKind })} />
+              {!isCreditNote ? (
+                <SummaryRow
+                  label="Cobro inicial"
+                  value={
+                    draft.initialPaymentStatus === "unpaid"
+                      ? "Pendiente"
+                      : draft.initialPaymentStatus === "paid"
+                        ? `Total al emitir · ${formatMoney(Math.abs(computed.totalAmount), draft.currency)}`
+                        : `Parcial al emitir · ${formatMoney(parseLocalizedMoneyInput(draft.initialPaymentAmount) || 0, draft.currency)}`
+                  }
+                />
+              ) : null}
               <SummaryRow label="Subtotal" value={formatMoney(computed.subtotalAmount, draft.currency)} />
               <SummaryRow label="IVA" value={formatMoney(computed.taxAmount, draft.currency)} />
               <SummaryRow label={isCreditNote ? "Impacto" : "Total"} value={formatMoney(computed.totalAmount, draft.currency)} highlight />
@@ -382,7 +507,7 @@ export function InvoiceDraftEditor({
               </div>
               <Button type="submit" className="w-full rounded-2xl" disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear nota de credito draft" : "Crear draft"}
+                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear nota de crédito draft" : "Crear draft"}
               </Button>
             </CardContent>
           </Card>

@@ -76,6 +76,15 @@ export function InvoiceDetailView({
     () => (Array.isArray(invoice.relatedCreditNotes) ? invoice.relatedCreditNotes : []),
     [invoice.relatedCreditNotes]
   );
+  const initialPaymentPlan = useMemo(() => {
+    const candidate = invoice.metadata && typeof invoice.metadata === "object" ? invoice.metadata.initialPaymentPlan : null;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+    const rawPlan = candidate as Record<string, unknown>;
+    const status = typeof rawPlan.status === "string" ? rawPlan.status : "unpaid";
+    const amount = Number(rawPlan.amount || 0);
+    const method = typeof rawPlan.method === "string" ? rawPlan.method : "bank_transfer";
+    return { status, amount, method };
+  }, [invoice.metadata]);
   const creditedTotal = useMemo(
     () =>
       relatedCreditNotes.reduce((sum, creditNote) => {
@@ -227,7 +236,7 @@ export function InvoiceDetailView({
         {!readOnly && invoice.lifecycle?.canIssue ? (
           <Button size="sm" className="rounded-2xl" onClick={() => void runInvoiceAction("issue")} disabled={busyAction !== null}>
             {busyAction === "issue" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Emitir
+            {invoice.type === "invoice" && initialPaymentPlan && initialPaymentPlan.status !== "unpaid" ? "Emitir y registrar cobro" : "Emitir"}
           </Button>
         ) : null}
         {!readOnly && invoice.lifecycle?.canEdit ? (
@@ -237,7 +246,7 @@ export function InvoiceDetailView({
         ) : null}
         {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
           <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-            <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de credito</Link>
+            <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
           </Button>
         ) : null}
         {!readOnly && invoice.lifecycle?.canVoid ? (
@@ -253,11 +262,11 @@ export function InvoiceDetailView({
           <CardHeader>
             <div>
               <CardTitle className="text-xl">
-                {invoice.type === "credit_note" ? "Nota de credito" : "Documento"} {invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                {invoice.type === "credit_note" ? "Nota de crédito" : "Documento"} {invoice.invoiceNumber || invoice.id.slice(0, 8)}
               </CardTitle>
               <CardDescription>
                 {invoice.type === "credit_note"
-                  ? "Impacto negativo, referencia a la invoice origen y lifecycle visible desde el mismo modulo."
+                    ? "Impacto negativo, referencia a la invoice origen y lifecycle visible desde el mismo modulo."
                   : "Items, importes y trazabilidad principal del comprobante interno."}
               </CardDescription>
             </div>
@@ -320,10 +329,24 @@ export function InvoiceDetailView({
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Estado del proveedor" value={titleCaseLabel(invoice.lifecycle?.providerStatus || invoice.providerStatus)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Emitida" value={formatDateTimeLabel(invoice.issuedAt)} />
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Creada" value={formatDateTimeLabel(invoice.createdAt)} />
+              {invoice.type === "invoice" && invoice.status === "draft" ? (
+                <div className="rounded-2xl border border-brand/25 bg-brand/8 p-4 text-sm">
+                  {initialPaymentPlan && initialPaymentPlan.status !== "unpaid" ? (
+                    <p>
+                      Al emitir se registrara un cobro{" "}
+                      <strong>{initialPaymentPlan.status === "paid" ? "total" : "parcial"}</strong>{" "}
+                      por {formatMoney(initialPaymentPlan.status === "paid" ? invoice.totalAmount : initialPaymentPlan.amount, invoice.currency)} via{" "}
+                      {titleCaseLabel(initialPaymentPlan.method)}.
+                    </p>
+                  ) : (
+                    <p>Esta factura quedara pendiente al emitirse, sin generar un cobro inicial automatico.</p>
+                  )}
+                </div>
+              ) : null}
               {invoice.lifecycle?.canEdit ? (
                 <div className="rounded-2xl border border-brand/25 bg-brand/8 p-4 text-sm">
                   {invoice.type === "credit_note"
-                    ? "Esta credit note sigue en draft. Puedes ajustar items y luego emitirla desde este mismo detail cuando quede lista."
+                    ? "Esta nota de crédito sigue en draft. Puedes ajustar items y luego emitirla desde este mismo detail cuando quede lista."
                     : "Esta invoice sigue en draft. Puedes editar items y luego emitirla desde este mismo detail cuando quede lista."}
                 </div>
               ) : null}
@@ -357,9 +380,17 @@ export function InvoiceDetailView({
 
           {invoice.type === "invoice" ? (
             <Card className="border-white/6 bg-card/90">
-              <CardHeader>
+              <CardHeader
+                action={
+                  !readOnly && invoice.status === "issued" ? (
+                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                      <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
+                    </Button>
+                  ) : undefined
+                }
+              >
                 <div>
-                  <CardTitle className="text-xl">Notas de credito relacionadas</CardTitle>
+                  <CardTitle className="text-xl">Notas de crédito relacionadas</CardTitle>
                   <CardDescription>Visibilidad operativa de ajustes posteriores sobre esta invoice.</CardDescription>
                 </div>
               </CardHeader>
@@ -396,7 +427,7 @@ export function InvoiceDetailView({
                   ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                    Esta invoice todavia no tiene notas de credito relacionadas.
+                    Esta invoice todavia no tiene notas de crédito relacionadas.
                   </div>
                 )}
               </CardContent>

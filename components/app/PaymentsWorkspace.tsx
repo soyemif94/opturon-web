@@ -232,9 +232,6 @@ export function PaymentsWorkspace({
               onChange={(event) => setFilters((current) => ({ ...current, method: event.target.value }))}
             >
               <option value="all">Todos los metodos</option>
-              <option value="bank_transfer">Transferencia</option>
-              <option value="cash">Efectivo</option>
-              <option value="card">Tarjeta</option>
               {PAYMENT_METHOD_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
