@@ -14,6 +14,14 @@ export const INVOICE_DOCUMENT_KIND_OPTIONS = [
   { value: "delivery_note", label: "Remito" }
 ] as const;
 
+export const BILLING_DOCUMENT_SELECTOR_OPTIONS = [
+  { value: "invoice_a", label: "Factura A" },
+  { value: "invoice_b", label: "Factura B" },
+  { value: "invoice_c", label: "Factura C" },
+  { value: "delivery_note", label: "Remito" },
+  { value: "credit_note", label: "Nota de credito vinculada" }
+] as const;
+
 export const PAYMENT_METHOD_OPTIONS = [
   { value: "bank_transfer", label: "Transferencia" },
   { value: "cash", label: "Efectivo" },

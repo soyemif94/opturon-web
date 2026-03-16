@@ -1,7 +1,7 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { InvoiceDraftEditor } from "@/components/app/InvoiceDraftEditor";
 import { canEditWorkspace } from "@/lib/app-permissions";
-import { getPortalContacts, getPortalInvoiceDetail, isBackendConfigured, type PortalContactDetail } from "@/lib/api";
+import { getPortalContacts, getPortalInvoiceDetail, getPortalInvoices, isBackendConfigured, type PortalContactDetail, type PortalInvoice } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppInvoiceDraftCreatePage({
@@ -13,19 +13,25 @@ export default async function AppInvoiceDraftCreatePage({
   const params = await searchParams;
   const readOnly = !ctx.tenantId || !canEditWorkspace(ctx);
   let contacts: PortalContactDetail[] = [];
-  let parentInvoice = null;
+  let parentInvoice: PortalInvoice | null = null;
+  let availableParentInvoices: PortalInvoice[] = [];
   const isCreditNote = params?.type === "credit_note" && Boolean(params?.parentInvoiceId);
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
-      const [contactsResult, parentInvoiceResult] = await Promise.all([
+      const [contactsResult, invoicesResult, parentInvoiceResult] = await Promise.all([
         getPortalContacts(ctx.tenantId),
+        getPortalInvoices(ctx.tenantId),
         isCreditNote && params.parentInvoiceId ? getPortalInvoiceDetail(ctx.tenantId, params.parentInvoiceId).catch(() => null) : Promise.resolve(null)
       ]);
       contacts = Array.isArray(contactsResult.data?.contacts) ? (contactsResult.data.contacts as PortalContactDetail[]) : [];
+      availableParentInvoices = Array.isArray(invoicesResult.data?.invoices)
+        ? (invoicesResult.data.invoices as PortalInvoice[]).filter((invoice) => invoice.type === "invoice" && invoice.status === "issued")
+        : [];
       parentInvoice = parentInvoiceResult?.data || null;
     } catch {
       contacts = [];
+      availableParentInvoices = [];
       parentInvoice = null;
     }
   }
@@ -49,7 +55,7 @@ export default async function AppInvoiceDraftCreatePage({
           No pudimos cargar la factura origen para crear esta nota de credito.
         </div>
       ) : (
-        <InvoiceDraftEditor contacts={contacts} parentInvoice={parentInvoice} />
+        <InvoiceDraftEditor contacts={contacts} parentInvoice={parentInvoice} availableParentInvoices={availableParentInvoices} />
       )}
     </ClientPageShell>
   );

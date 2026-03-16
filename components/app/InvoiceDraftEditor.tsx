@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MinusCircle, Plus, ReceiptText, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { PortalContactDetail, PortalInvoice } from "@/lib/api";
 import {
+  BILLING_DOCUMENT_SELECTOR_OPTIONS,
   calculateInvoiceLineAmounts,
   formatMoney,
   getInvoiceDocumentKindLabel,
@@ -107,16 +108,21 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
 export function InvoiceDraftEditor({
   contacts,
   invoice = null,
-  parentInvoice = null
+  parentInvoice: initialParentInvoice = null,
+  availableParentInvoices = []
 }: {
   contacts: PortalContactDetail[];
   invoice?: PortalInvoice | null;
   parentInvoice?: PortalInvoice | null;
+  availableParentInvoices?: PortalInvoice[];
 }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<DraftState>(buildInitialState(invoice, parentInvoice));
+  const [draft, setDraft] = useState<DraftState>(buildInitialState(invoice, initialParentInvoice));
   const [saving, setSaving] = useState(false);
+  const [selectedParentInvoice, setSelectedParentInvoice] = useState<PortalInvoice | null>(initialParentInvoice);
   const isCreditNote = draft.type === "credit_note";
+  const documentSelectorValue = isCreditNote ? "credit_note" : draft.documentKind;
+  const parentInvoice = selectedParentInvoice ?? initialParentInvoice;
 
   const computed = useMemo(() => {
     const items = draft.items.map((item) => {
@@ -148,6 +154,54 @@ export function InvoiceDraftEditor({
       totalAmount
     };
   }, [draft, isCreditNote]);
+
+  useEffect(() => {
+    setSelectedParentInvoice(initialParentInvoice);
+  }, [initialParentInvoice]);
+
+  useEffect(() => {
+    if (!isCreditNote || !draft.parentInvoiceId || selectedParentInvoice?.id === draft.parentInvoiceId) {
+      return;
+    }
+
+    let cancelled = false;
+    async function loadParentInvoice() {
+      try {
+        const response = await fetch(`/api/app/invoices/${draft.parentInvoiceId}`, { cache: "no-store" });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(String(json?.error || "No se pudo cargar la factura origen."));
+        }
+
+        const nextParentInvoice = json?.invoice as PortalInvoice | undefined;
+        if (!cancelled && nextParentInvoice?.id) {
+          setDraft((current) => ({
+            ...current,
+            contactId: nextParentInvoice.contactId || current.contactId,
+            currency: nextParentInvoice.currency || current.currency,
+            items: Array.isArray(nextParentInvoice.items) && nextParentInvoice.items.length
+              ? nextParentInvoice.items.map((item) => ({
+                  id: `seed_${item.id}`,
+                  descriptionSnapshot: item.descriptionSnapshot,
+                  quantity: String(item.quantity),
+                  unitPrice: String(-Math.abs(Number(item.unitPrice || 0))),
+                  taxRate: String(item.taxRate)
+                }))
+              : current.items
+          }));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error("No se pudo cargar la factura origen", error instanceof Error ? error.message : "unknown_error");
+        }
+      }
+    }
+
+    void loadParentInvoice();
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.parentInvoiceId, isCreditNote, selectedParentInvoice]);
 
   function updateItem(itemId: string, patch: Partial<DraftItem>) {
     setDraft((current) => ({
@@ -196,6 +250,10 @@ export function InvoiceDraftEditor({
     }
     if (validItems.some((item) => !Number.isFinite(item.enteredUnitPriceNumber) || item.enteredUnitPriceNumber < 0)) {
       toast.error("Precio invalido", "Cada item necesita un precio valido.");
+      return;
+    }
+    if (isCreditNote && !draft.parentInvoiceId) {
+      toast.error("Factura origen requerida", "Selecciona la factura emitida sobre la que vas a crear la nota de credito.");
       return;
     }
     const absoluteTotal = Math.abs(Number(computed.totalAmount || 0));
@@ -307,22 +365,65 @@ export function InvoiceDraftEditor({
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/40 px-3 py-3">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Tipo de comprobante</p>
                 <p className="mt-2 text-sm text-muted">
-                  Lo usamos como identificacion comercial visible sin tocar el lifecycle interno del documento.
+                  Desde aqui puedes crear factura o pasar a nota de credito vinculada sin perder trazabilidad.
                 </p>
               </div>
               <select
                 className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                value={draft.documentKind}
-                onChange={(event) => setDraft((current) => ({ ...current, documentKind: event.target.value }))}
+                value={documentSelectorValue}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    type: event.target.value === "credit_note" ? "credit_note" : "invoice",
+                    documentKind: event.target.value === "credit_note" ? current.documentKind || "invoice_c" : event.target.value,
+                    initialPaymentStatus: event.target.value === "credit_note" ? "unpaid" : current.initialPaymentStatus,
+                    initialPaymentAmount: event.target.value === "credit_note" ? "" : current.initialPaymentAmount,
+                    initialPaymentMethod: event.target.value === "credit_note" ? "bank_transfer" : current.initialPaymentMethod,
+                    parentInvoiceId: event.target.value === "credit_note" ? current.parentInvoiceId : "",
+                    items:
+                      event.target.value === "credit_note" && current.parentInvoiceId
+                        ? current.items
+                        : event.target.value === "credit_note"
+                          ? [{ ...EMPTY_ITEM, id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` }]
+                          : current.items.map((item) => ({
+                              ...item,
+                              unitPrice: String(Math.abs(Number(item.unitPrice || 0)))
+                            }))
+                  }))
+                }
                 disabled={saving}
               >
-                {INVOICE_DOCUMENT_KIND_OPTIONS.map((option) => (
+                {BILLING_DOCUMENT_SELECTOR_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {isCreditNote ? (
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/40 px-3 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Factura origen emitida</p>
+                  <p className="mt-2 text-sm text-muted">
+                    La nota de credito no se guarda suelta. Debe quedar vinculada a una factura emitida.
+                  </p>
+                </div>
+                <select
+                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={draft.parentInvoiceId}
+                  onChange={(event) => setDraft((current) => ({ ...current, parentInvoiceId: event.target.value }))}
+                  disabled={saving}
+                >
+                  <option value="">Selecciona una factura emitida</option>
+                  {availableParentInvoices.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {(candidate.invoiceNumber || candidate.id.slice(0, 8))} - {candidate.contact?.name || "Sin contacto"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             {!isCreditNote ? (
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_220px]">
