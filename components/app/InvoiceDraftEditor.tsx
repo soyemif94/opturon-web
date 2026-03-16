@@ -175,6 +175,7 @@ export function InvoiceDraftEditor({
 
         const nextParentInvoice = json?.invoice as PortalInvoice | undefined;
         if (!cancelled && nextParentInvoice?.id) {
+          setSelectedParentInvoice(nextParentInvoice);
           setDraft((current) => ({
             ...current,
             contactId: nextParentInvoice.contactId || current.contactId,
