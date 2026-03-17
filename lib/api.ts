@@ -1191,6 +1191,7 @@ export async function createPortalPayment(
     contactId?: string | null;
     invoiceId?: string | null;
     notes?: string | null;
+    metadata?: Record<string, unknown> | null;
   }
 ) {
   return backendFetch<{ success: boolean; data: PortalPayment }>(

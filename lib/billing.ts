@@ -46,6 +46,16 @@ export const PAYMENT_METHOD_OPTIONS = [
   { value: "combined", label: "Combinados" }
 ] as const;
 
+export const PAYMENT_DESTINATION_OPTIONS = [
+  { value: "cash_drawer", label: "Caja" },
+  { value: "mercado_pago", label: "Mercado Pago" },
+  { value: "uala", label: "Uala" },
+  { value: "naranja_x", label: "Naranja X" },
+  { value: "santander", label: "Santander" },
+  { value: "galicia", label: "Galicia" },
+  { value: "other", label: "Otro" }
+] as const;
+
 export function getInvoiceDocumentKindLabel(metadata: Record<string, unknown> | null | undefined) {
   const raw = String(metadata?.documentKind || "").trim().toLowerCase();
   const match = INVOICE_DOCUMENT_KIND_OPTIONS.find((option) => option.value === raw);
@@ -82,6 +92,18 @@ export function normalizePaymentMethodValue(value: string | null | undefined) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "other") return "combined";
   return normalized;
+}
+
+export function normalizePaymentDestinationValue(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  const allowed = new Set<string>(PAYMENT_DESTINATION_OPTIONS.map((option) => option.value));
+  return allowed.has(normalized) ? normalized : "other";
+}
+
+export function getPaymentDestinationLabel(value: string | null | undefined) {
+  const normalized = normalizePaymentDestinationValue(value);
+  const match = PAYMENT_DESTINATION_OPTIONS.find((option) => option.value === normalized);
+  return match?.label || "Otro";
 }
 
 export function formatDateLabel(value: string | null | undefined) {

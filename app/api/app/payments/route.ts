@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
       paidAt: body?.paidAt || undefined,
       contactId: body?.contactId || null,
       invoiceId: body?.invoiceId || null,
-      notes: body?.notes || null
+      notes: body?.notes || null,
+      metadata: body?.metadata && typeof body.metadata === "object" ? body.metadata : null
     });
 
     return noStore(NextResponse.json({ ok: true, payment: result.data }, { status: 201 }));
