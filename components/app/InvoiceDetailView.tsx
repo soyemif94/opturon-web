@@ -93,6 +93,10 @@ export function InvoiceDetailView({
       }, 0),
     [relatedCreditNotes]
   );
+  const netCommerceRevenue = useMemo(
+    () => Number(invoice.totalAmount || 0) - creditedTotal,
+    [creditedTotal, invoice.totalAmount]
+  );
 
   async function refreshInvoiceAndPayments() {
     const [invoiceResponse, paymentsResponse] = await Promise.all([
@@ -309,6 +313,17 @@ export function InvoiceDetailView({
             {!invoice.items?.length ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
                 No encontramos items en esta invoice.
+              </div>
+            ) : null}
+
+            {invoice.type === "invoice" ? (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">Ingreso neto real</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <MetricTile label="Total factura" value={formatMoney(invoice.totalAmount, invoice.currency)} />
+                  <MetricTile label="Total acreditado" value={formatMoney(creditedTotal, invoice.currency)} helper="Notas de credito emitidas" />
+                  <MetricTile label="Ingreso neto real" value={formatMoney(netCommerceRevenue, invoice.currency)} helper="Total menos creditos" />
+                </div>
               </div>
             ) : null}
           </CardContent>

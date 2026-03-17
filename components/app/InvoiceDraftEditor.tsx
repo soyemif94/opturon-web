@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { PortalContactDetail, PortalInvoice } from "@/lib/api";
 import {
+  BILLING_CURRENCY_OPTIONS,
   BILLING_DOCUMENT_SELECTOR_OPTIONS,
   calculateInvoiceLineAmounts,
   formatMoney,
   getInvoiceDocumentKindLabel,
-  INVOICE_DOCUMENT_KIND_OPTIONS,
   normalizePaymentMethodValue,
   normalizeCurrencyCode,
   parseLocalizedMoneyInput,
@@ -72,7 +72,7 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
           id: item.id,
           descriptionSnapshot: item.descriptionSnapshot,
           quantity: String(item.quantity),
-          unitPrice: String(item.unitPrice),
+          unitPrice: inferredType === "credit_note" ? String(Math.abs(Number(item.unitPrice || 0))) : String(item.unitPrice),
           taxRate: String(item.taxRate)
         }))
       : parentInvoice?.items?.length
@@ -80,7 +80,7 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
             id: `seed_${item.id}`,
             descriptionSnapshot: item.descriptionSnapshot,
             quantity: String(item.quantity),
-            unitPrice: String(-Math.abs(Number(item.unitPrice || 0))),
+            unitPrice: String(Math.abs(Number(item.unitPrice || 0))),
             taxRate: String(item.taxRate)
           }))
         : [{ ...EMPTY_ITEM }];
@@ -191,7 +191,7 @@ export function InvoiceDraftEditor({
                   id: `seed_${item.id}`,
                   descriptionSnapshot: item.descriptionSnapshot,
                   quantity: String(item.quantity),
-                  unitPrice: String(-Math.abs(Number(item.unitPrice || 0))),
+                  unitPrice: String(Math.abs(Number(item.unitPrice || 0))),
                   taxRate: String(item.taxRate)
                 }))
               : current.items
@@ -365,9 +365,9 @@ export function InvoiceDraftEditor({
                   </option>
                 ))}
               </select>
-              <Input
+              <select
+                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
                 value={draft.currency}
-                maxLength={3}
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
@@ -375,7 +375,13 @@ export function InvoiceDraftEditor({
                   }))
                 }
                 disabled={saving}
-              />
+              >
+                {BILLING_CURRENCY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">

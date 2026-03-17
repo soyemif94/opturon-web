@@ -33,6 +33,12 @@ export const BILLING_DOCUMENT_SELECTOR_OPTIONS = [
   { value: "credit_note", label: "Nota de credito vinculada" }
 ] as const;
 
+export const BILLING_CURRENCY_OPTIONS = [
+  { value: "ARS", label: "ARS" },
+  { value: "USD", label: "USD" },
+  { value: "EUR", label: "EUR" }
+] as const;
+
 export const PAYMENT_METHOD_OPTIONS = [
   { value: "bank_transfer", label: "Transferencia" },
   { value: "cash", label: "Efectivo" },
