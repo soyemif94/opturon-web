@@ -49,6 +49,11 @@ const EMPTY_ITEM: DraftItem = {
   taxRate: "0"
 };
 
+function parseDraftDecimal(value: string | number | null | undefined) {
+  const numeric = parseLocalizedMoneyInput(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: PortalInvoice | null): DraftState {
   const inferredType = (invoice?.type || (parentInvoice ? "credit_note" : "invoice")) as "invoice" | "credit_note";
   const initialPaymentPlan =
@@ -126,10 +131,10 @@ export function InvoiceDraftEditor({
 
   const computed = useMemo(() => {
     const items = draft.items.map((item) => {
-      const quantity = Number(item.quantity || 0);
-      const enteredUnitPrice = Number(item.unitPrice || 0);
+      const quantity = parseDraftDecimal(item.quantity);
+      const enteredUnitPrice = parseDraftDecimal(item.unitPrice);
       const unitPrice = isCreditNote ? -Math.abs(enteredUnitPrice) : enteredUnitPrice;
-      const taxRate = Number(item.taxRate || 0);
+      const taxRate = parseDraftDecimal(item.taxRate);
       const amounts = calculateInvoiceLineAmounts({ quantity, unitPrice, taxRate });
 
       return {
@@ -520,29 +525,26 @@ export function InvoiceDraftEditor({
                       />
                       <div className="grid gap-3 md:grid-cols-3">
                         <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           placeholder="Cantidad"
-                          value={item.quantity}
+                          value={item.quantity ?? ""}
                           onChange={(event) => updateItem(item.id, { quantity: event.target.value })}
                           disabled={saving}
                         />
                         <Input
-                          type="number"
-                          step="0.01"
-                          min={isCreditNote ? undefined : "0"}
+                          type="text"
+                          inputMode="decimal"
                           placeholder="Precio unitario"
-                          value={item.unitPrice}
+                          value={item.unitPrice ?? ""}
                           onChange={(event) => updateItem(item.id, { unitPrice: event.target.value })}
                           disabled={saving}
                         />
                         <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           placeholder="IVA %"
-                          value={item.taxRate}
+                          value={item.taxRate ?? ""}
                           onChange={(event) => updateItem(item.id, { taxRate: event.target.value })}
                           disabled={saving}
                         />
