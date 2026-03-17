@@ -150,60 +150,60 @@ export function InvoicesWorkspace({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
-            <div className="min-w-[1360px]">
-            <div className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px_190px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
-              <span>Tipo</span>
-              <span>Estado</span>
-              <span>Contacto</span>
-              <span>Total</span>
-              <span>Cobrado</span>
-              <span>Pendiente</span>
-              <span>Cobranza</span>
-              <span>Fecha</span>
-              <span>Acción</span>
-            </div>
-            {filteredInvoices.map((invoice) => (
-              <div
-                key={invoice.id}
-                className="grid grid-cols-[120px_120px_minmax(0,1.2fr)_160px_180px_180px_150px_140px_190px] gap-4 border-b border-[color:var(--border)] px-4 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
-              >
-                <div className="flex items-center">
-                  <div className="space-y-1">
-                    <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
-                    <p className="text-xs text-muted">{getInvoiceDocumentKindLabel(invoice.metadata)}</p>
+            <div className="min-w-[1500px]">
+              <div className="grid grid-cols-[120px_120px_minmax(280px,1.45fr)_180px_180px_180px_160px_150px_240px] gap-5 border-b border-[color:var(--border)] bg-surface/70 px-5 py-3 text-xs uppercase tracking-[0.16em] text-muted">
+                <span className="leading-snug">Tipo</span>
+                <span className="leading-snug">Estado</span>
+                <span className="leading-snug">Contacto</span>
+                <span className="leading-snug">Total</span>
+                <span className="leading-snug">Cobrado</span>
+                <span className="leading-snug">Pendiente</span>
+                <span className="leading-snug">Cobranza</span>
+                <span className="leading-snug">Fecha</span>
+                <span className="leading-snug">Acción</span>
+              </div>
+              {filteredInvoices.map((invoice) => (
+                <div
+                  key={invoice.id}
+                  className="grid grid-cols-[120px_120px_minmax(280px,1.45fr)_180px_180px_180px_160px_150px_240px] gap-5 border-b border-[color:var(--border)] px-5 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
+                >
+                  <div className="flex items-center">
+                    <div className="space-y-1">
+                      <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
+                      <p className="text-xs leading-snug text-muted">{getInvoiceDocumentKindLabel(invoice.metadata)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Badge variant={badgeToneByStatus(invoice.status)}>{titleCaseLabel(invoice.status)}</Badge>
+                  </div>
+                  <div className="min-w-0 pr-2">
+                    <p className="truncate font-medium">{invoice.contact?.name || "Sin contacto"}</p>
+                    <p className="mt-1 truncate text-sm text-muted">{invoice.invoiceNumber || invoice.id.slice(0, 8)}</p>
+                    {invoice.type === "credit_note" ? (
+                      <p className="mt-1 truncate text-xs leading-snug text-amber-200">
+                        Sobre {invoice.parentInvoice?.invoiceNumber || invoice.parentInvoiceId || "factura origen"}
+                      </p>
+                    ) : null}
+                  </div>
+                  <MoneyStack primary={formatMoney(invoice.totalAmount, invoice.currency)} secondary={`Impacto ${formatMoney(invoice.balanceImpact?.amount, invoice.currency)}`} />
+                  <MoneyStack primary={formatMoney(invoice.paidAmount, invoice.currency)} secondary="Cobrado" positive />
+                  <MoneyStack primary={formatMoney(invoice.outstandingAmount, invoice.currency)} secondary="Pendiente" warning />
+                  <div className="flex items-center">
+                    <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
+                  </div>
+                  <div className="text-sm text-muted">{formatDateLabel(invoice.issuedAt || invoice.createdAt)}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                      <Link href={`/app/invoices/${invoice.id}`}>Ver detalle</Link>
+                    </Button>
+                    {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
+                      <Button asChild size="sm" className="rounded-2xl">
+                        <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
-                <div className="flex items-center">
-                  <Badge variant={badgeToneByStatus(invoice.status)}>{titleCaseLabel(invoice.status)}</Badge>
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{invoice.contact?.name || "Sin contacto"}</p>
-                  <p className="mt-1 truncate text-sm text-muted">{invoice.invoiceNumber || invoice.id.slice(0, 8)}</p>
-                  {invoice.type === "credit_note" ? (
-                    <p className="mt-1 truncate text-xs text-amber-200">
-                      Sobre {invoice.parentInvoice?.invoiceNumber || invoice.parentInvoiceId || "factura origen"}
-                    </p>
-                  ) : null}
-                </div>
-                <MoneyStack primary={formatMoney(invoice.totalAmount, invoice.currency)} secondary={`Impacto ${formatMoney(invoice.balanceImpact?.amount, invoice.currency)}`} />
-                <MoneyStack primary={formatMoney(invoice.paidAmount, invoice.currency)} secondary="Cobrado" positive />
-                <MoneyStack primary={formatMoney(invoice.outstandingAmount, invoice.currency)} secondary="Pendiente" warning />
-                <div className="flex items-center">
-                  <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
-                </div>
-                <div className="text-sm text-muted">{formatDateLabel(invoice.issuedAt || invoice.createdAt)}</div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-                    <Link href={`/app/invoices/${invoice.id}`}>Ver detalle</Link>
-                  </Button>
-                  {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
-                    <Button asChild size="sm" className="rounded-2xl">
-                      <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+              ))}
             </div>
           </div>
         )}
@@ -224,9 +224,9 @@ function MoneyStack({
   warning?: boolean;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 pr-2">
       <p className={`font-medium ${positive ? "text-emerald-300" : warning ? "text-amber-300" : ""}`}>{primary}</p>
-      <p className="mt-1 truncate text-sm text-muted">{secondary}</p>
+      <p className="mt-1 truncate text-sm leading-snug text-muted">{secondary}</p>
     </div>
   );
 }
