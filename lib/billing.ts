@@ -53,6 +53,7 @@ export const PAYMENT_DESTINATION_OPTIONS = [
   { value: "naranja_x", label: "Naranja X" },
   { value: "santander", label: "Santander" },
   { value: "galicia", label: "Galicia" },
+  { value: "unclassified", label: "Sin clasificar" },
   { value: "other", label: "Otro" }
 ] as const;
 
