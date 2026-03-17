@@ -1,8 +1,19 @@
+export function normalizeCurrencyCode(currency: string | null | undefined, fallback = "ARS") {
+  const normalized = String(currency || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 3);
+
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : fallback;
+}
+
 export function formatMoney(amount: number | null | undefined, currency = "ARS") {
   const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+  const safeCurrency = normalizeCurrencyCode(currency);
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
-    currency,
+    currency: safeCurrency,
     maximumFractionDigits: 2
   }).format(safeAmount);
 }

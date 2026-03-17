@@ -16,6 +16,7 @@ import {
   getInvoiceDocumentKindLabel,
   INVOICE_DOCUMENT_KIND_OPTIONS,
   normalizePaymentMethodValue,
+  normalizeCurrencyCode,
   parseLocalizedMoneyInput,
   PAYMENT_METHOD_OPTIONS,
   quantizeMoney
@@ -86,7 +87,7 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
 
   return {
     contactId: invoice?.contactId || parentInvoice?.contactId || "",
-    currency: invoice?.currency || parentInvoice?.currency || "ARS",
+    currency: normalizeCurrencyCode(invoice?.currency || parentInvoice?.currency || "ARS"),
     type: inferredType,
     documentKind:
       typeof invoice?.metadata?.documentKind === "string"
@@ -184,7 +185,7 @@ export function InvoiceDraftEditor({
           setDraft((current) => ({
             ...current,
             contactId: nextParentInvoice.contactId || current.contactId,
-            currency: nextParentInvoice.currency || current.currency,
+            currency: normalizeCurrencyCode(nextParentInvoice.currency || current.currency),
             items: Array.isArray(nextParentInvoice.items) && nextParentInvoice.items.length
               ? nextParentInvoice.items.map((item) => ({
                   id: `seed_${item.id}`,
@@ -364,7 +365,17 @@ export function InvoiceDraftEditor({
                   </option>
                 ))}
               </select>
-              <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving} />
+              <Input
+                value={draft.currency}
+                maxLength={3}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    currency: normalizeCurrencyCode(event.target.value, current.currency || "ARS")
+                  }))
+                }
+                disabled={saving}
+              />
             </div>
 
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
