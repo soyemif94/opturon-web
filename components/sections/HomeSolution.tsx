@@ -4,27 +4,27 @@ import { Section } from "@/components/ui/Section";
 const capabilities = [
   {
     title: "Todos los chats en un mismo lugar",
-    description: "Cada conversacion entra con contexto, responsable y proximo paso visible para todo el equipo.",
+    description: "Tienes todos tus chats en un solo lugar, con contexto y proximo paso claro para todo el equipo.",
     icon: MessagesSquare
   },
   {
     title: "Cada cliente con historial real",
-    description: "El contacto, lo que pidio y en que etapa esta la venta quedan ordenados en la misma ficha.",
+    description: "Ves que pidio cada cliente, en que etapa esta y que hay que hacer para mover la venta.",
     icon: Users
   },
   {
     title: "Primeras respuestas y seguimiento activos",
-    description: "Las respuestas iniciales y recordatorios dejan de depender de quien se acuerda primero.",
+    description: "Las respuestas iniciales y recordatorios salen a tiempo, sin depender de memoria humana.",
     icon: Bot
   },
   {
     title: "Cada mensaje se vuelve oportunidad",
-    description: "Lo que antes quedaba en un chat suelto pasa a ser una venta visible para trabajarla y cerrarla.",
+    description: "Lo que antes quedaba en un chat suelto pasa a ser una oportunidad visible para trabajarla y cerrarla.",
     icon: ArrowRightLeft
   },
   {
     title: "El pipeline muestra que hacer despues",
-    description: "Sabes que esta por entrar, que esta tibio y que hay que empujar hoy para cerrar.",
+    description: "Sabes que esta por entrar, que se enfrio y que tienes que empujar hoy para cerrar.",
     icon: ChartNoAxesColumn
   }
 ];
@@ -44,6 +44,7 @@ export function HomeSolution() {
             No se trata solo de responder WhatsApp. Se trata de ordenar lo que entra, seguir lo que importa y mover
             cada oportunidad hasta el cierre desde un mismo flujo.
           </p>
+          <p className="mt-4 text-sm font-medium uppercase tracking-[0.2em] text-brandBright">Asi se traduce en resultado.</p>
         </div>
       </div>
 

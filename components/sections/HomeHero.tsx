@@ -58,8 +58,8 @@ export function HomeHero() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton href="#producto" ariaLabel="Ver como funciona Opturon">
-              Ver como funciona
+            <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando">
+              Ver el sistema funcionando
               <ArrowRight className="ml-2 h-4 w-4" />
             </PrimaryButton>
             <WhatsAppCtaLink
@@ -74,7 +74,9 @@ export function HomeHero() {
             </WhatsAppCtaLink>
           </div>
 
-          <p className="text-sm text-muted">Pensado para equipos que venden por WhatsApp todos los dias.</p>
+          <p className="text-sm text-muted">
+            En menos de 2 minutos | Sin instalar nada | Pensado para negocios que venden por WhatsApp
+          </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {heroStats.map((item) => {

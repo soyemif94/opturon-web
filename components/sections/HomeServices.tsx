@@ -43,6 +43,7 @@ export function HomeServices() {
         <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
           El producto no esta para decorar la home. Esta para mostrar como ordenas tus ventas.
         </h2>
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-brandBright">Asi se ve ese orden en la practica.</p>
         <p className="max-w-3xl text-lg leading-8 text-muted">
           Inbox, pipeline, automatizaciones y fichas de clientes conectados en un mismo flujo para que cada mensaje
           avance hacia una venta.

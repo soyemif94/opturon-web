@@ -39,11 +39,14 @@ export function HomeProblems() {
           </p>
           <div className="space-y-3 text-base text-text/90">
             <p>Respondes tarde y el lead se enfria.</p>
+            <p>Respondes, pero no sabes a quien hacerle seguimiento.</p>
+            <p>Perdes conversaciones que si podian convertirse en ventas.</p>
             <p>Nadie sabe a quien hay que cerrar hoy.</p>
             <p>El seguimiento depende de memoria humana.</p>
             <p>El pipeline real de ventas no existe.</p>
           </div>
           <p className="text-base font-medium text-text">Ahi es donde se escapan las ventas que ya estaban empezadas.</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-brandBright">Para eso existe Opturon.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">

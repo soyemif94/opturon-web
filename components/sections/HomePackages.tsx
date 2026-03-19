@@ -7,19 +7,19 @@ import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 const stages = [
   {
     name: "Inicio ordenado",
-    description: "Si hoy respondes como puedes y cada chat queda suelto, esta etapa te ayuda a ordenar lo basico sin complicarte.",
+    description: "Si hoy respondes como puedes y cada chat queda suelto, esta etapa te ayuda a dejar de vender a ciegas sin complicarte.",
     bullets: ["Inbox centralizado", "Clientes ordenados", "Primer seguimiento claro"],
     featured: false
   },
   {
     name: "Seguimiento activo",
-    description: "Si ya tienes consultas todos los dias y quieres convertir mas, esta etapa te da pipeline, ritmo y seguimiento.",
+    description: "Si ya tienes consultas todos los dias pero no llegas a responder todo, esta etapa te da pipeline, ritmo y seguimiento.",
     bullets: ["Pipeline visible", "Tareas y recordatorios", "Seguimiento automatico"],
     featured: true
   },
   {
     name: "Operacion en crecimiento",
-    description: "Si ya vendes todos los dias y el volumen empezo a desordenarte, esta etapa te da control sin sumar caos.",
+    description: "Si ya vendes todos los dias y el volumen empezo a desordenarte, esta etapa te da control y seguimiento claro sin sumar caos.",
     bullets: ["Mas usuarios", "Mas volumen de conversaciones", "Mas control del flujo comercial"],
     featured: false
   }
@@ -74,8 +74,8 @@ export function HomePackages() {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-3">
-        <PrimaryButton href="#producto" ariaLabel="Ver como funciona Opturon con WhatsApp">
-          Ver como funciona
+        <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando">
+          Ver el sistema funcionando
           <ArrowRight className="ml-2 h-4 w-4" />
         </PrimaryButton>
         <WhatsAppCtaLink

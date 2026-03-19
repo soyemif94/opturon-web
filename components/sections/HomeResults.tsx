@@ -12,7 +12,7 @@ const proofCards = [
   },
   {
     label: "Impacto",
-    value: "Menos conversaciones perdidas y mas claridad para saber que habia que empujar ese dia."
+    value: "No pierden conversaciones que si podian convertirse en ventas y saben que habia que empujar ese dia."
   }
 ];
 
@@ -35,6 +35,9 @@ export function HomeResults() {
           <p className="mt-5 max-w-2xl text-sm leading-7 text-muted">
             Un equipo comercial que ya recibia consultas por WhatsApp pudo pasar de reaccionar tarde a trabajar cada
             oportunidad con mas orden y seguimiento visible.
+          </p>
+          <p className="mt-4 text-sm font-medium text-text/90">
+            El cambio no fue solo operativo: fue dejar de perder ventas por falta de seguimiento.
           </p>
         </article>
 
