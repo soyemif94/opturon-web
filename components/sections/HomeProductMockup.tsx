@@ -9,15 +9,15 @@ type HomeProductMockupProps = {
 };
 
 const inboxItems = [
-  { name: "Maria Diaz", stage: "Nuevo lead", tone: "text-emerald-300", message: "Hola, quiero info para empezar." },
-  { name: "Tienda Nova", stage: "Seguimiento", tone: "text-amber-300", message: "Me pasas condiciones y forma de pago?" },
-  { name: "Lucas Vera", stage: "Cierre", tone: "text-sky-300", message: "Listo, avancemos con el alta." }
+  { name: "Maria Diaz", stage: "Nuevo lead", tone: "text-emerald-300", message: "Hola, quiero empezar esta semana. Me orientas?" },
+  { name: "Tienda Nova", stage: "Seguimiento", tone: "text-amber-300", message: "Quedo pendiente la propuesta. Me la compartes hoy?" },
+  { name: "Lucas Vera", stage: "Cierre", tone: "text-sky-300", message: "Perfecto. Enviame el link y avanzamos." }
 ];
 
 const pipelineColumns = [
-  { title: "Entrantes", count: "14", cards: ["Consulta nueva", "Pedido de precio"] },
-  { title: "Seguimiento", count: "9", cards: ["Enviar propuesta", "Recordar demo"] },
-  { title: "Cierre", count: "4", cards: ["Cobro pendiente", "Alta aprobada"] }
+  { title: "Entrantes", count: "14", cards: ["Consulta nueva", "Pedido de propuesta"] },
+  { title: "Seguimiento", count: "9", cards: ["Enviar demo", "Recordar decision"] },
+  { title: "Cierre", count: "4", cards: ["Cobro pendiente", "Alta por confirmar"] }
 ];
 
 const automationSteps = [
@@ -161,7 +161,7 @@ function SelectedConversation() {
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">Cliente seleccionado</p>
           <h3 className="mt-2 text-xl font-semibold">Maria Diaz</h3>
-          <p className="mt-1 text-sm text-zinc-400">Quiere empezar esta semana y ya pidio condiciones.</p>
+          <p className="mt-1 text-sm text-zinc-400">Pide propuesta hoy y ya viene con intencion clara de compra.</p>
         </div>
         <button className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
           <MoreHorizontal className="h-4 w-4 text-zinc-300" />
@@ -169,9 +169,9 @@ function SelectedConversation() {
       </div>
 
       <div className="mt-5 grid gap-3">
-        <MessageBubble author="Cliente" text="Hola, quiero empezar hoy. Como sigue?" />
-        <MessageBubble author="Opturon" text="Ya te respondimos y activamos seguimiento automatico." accent />
-        <MessageBubble author="Ventas" text="Quedo en etapa propuesta y con tarea para cierre." />
+        <MessageBubble author="Cliente" text="Hola, quiero avanzar hoy. Que sigue para empezar?" />
+        <MessageBubble author="Opturon" text="Se envio respuesta inicial, se creo la oportunidad y quedo activo el seguimiento." accent />
+        <MessageBubble author="Ventas" text="Quedo en etapa propuesta con tarea de cierre para hoy." />
       </div>
     </div>
   );
@@ -281,10 +281,10 @@ function CrmBoard() {
       <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
         <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">Historial</p>
         <div className="mt-4 grid gap-3">
-          <TimelineEvent title="Primera consulta" meta="WhatsApp · Hoy 09:15" />
-          <TimelineEvent title="Respuesta automatica enviada" meta="Bot · Hoy 09:16" />
-          <TimelineEvent title="Oportunidad creada" meta="Pipeline · Hoy 09:17" />
-          <TimelineEvent title="Tarea de cierre asignada" meta="Ventas · Hoy 09:20" />
+          <TimelineEvent title="Primera consulta" meta="WhatsApp | Hoy 09:15" />
+          <TimelineEvent title="Respuesta automatica enviada" meta="Bot | Hoy 09:16" />
+          <TimelineEvent title="Oportunidad creada" meta="Pipeline | Hoy 09:17" />
+          <TimelineEvent title="Tarea de cierre asignada" meta="Ventas | Hoy 09:20" />
         </div>
       </div>
     </div>

@@ -38,7 +38,8 @@ export function HomeHero() {
               Converti WhatsApp en tu sistema de ventas
             </h1>
             <p className="max-w-xl text-lg leading-8 text-muted md:text-xl">
-              Organiza conversaciones, automatiza respuestas y cerra mas ventas desde un solo lugar.
+              Pensado para equipos que venden por WhatsApp todos los dias: inbox, pipeline y automatizaciones para
+              captar, seguir y cerrar ventas sin perder contexto.
             </p>
           </div>
 

@@ -1,7 +1,11 @@
 import { Section } from "@/components/ui/Section";
 
 const traditionalCrm = ["Carga manual", "Seguimiento manual", "Procesos lentos"];
-const opturonWay = ["Conversaciones automaticas", "Seguimiento en tiempo real", "Ventas desde WhatsApp"];
+const opturonWay = [
+  "Conversaciones automaticas",
+  "Seguimiento en tiempo real",
+  "Menos carga manual y menos contexto perdido"
+];
 
 export function HomeDifferentiator() {
   return (
@@ -35,6 +39,9 @@ export function HomeDifferentiator() {
               </div>
             ))}
           </div>
+          <p className="mt-6 max-w-md text-sm leading-7 text-text/85">
+            No se trata solo de registrar datos: se trata de mover conversaciones reales hasta el cierre.
+          </p>
         </article>
       </div>
     </Section>
