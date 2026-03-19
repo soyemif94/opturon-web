@@ -46,7 +46,7 @@ export function HomeProductMockup({ variant = "hero", compact = false }: HomePro
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[2rem] border border-white/10 bg-[#101010] text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)]",
+        "min-w-0 w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#101010] text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)]",
         compact ? "min-h-[20rem]" : "min-h-[28rem]"
       )}
     >
@@ -63,7 +63,7 @@ export function HomeProductMockup({ variant = "hero", compact = false }: HomePro
       </div>
 
       {isHero ? (
-        <div className="grid gap-4 p-4 lg:grid-cols-[0.88fr_1.12fr]">
+        <div className="grid min-w-0 gap-4 p-4 lg:grid-cols-[0.9fr_1.1fr]">
           <SidebarPanel compact={compact} />
           <MainPanel variant="hero" compact={compact} />
         </div>
@@ -78,7 +78,7 @@ export function HomeProductMockup({ variant = "hero", compact = false }: HomePro
 
 function SidebarPanel({ compact }: { compact: boolean }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
+    <div className="min-w-0 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">Inbox</p>
@@ -106,7 +106,7 @@ function SidebarPanel({ compact }: { compact: boolean }) {
 function MainPanel({ variant, compact }: { variant: MockupVariant; compact: boolean }) {
   if (variant === "inbox") {
     return (
-      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <SidebarPanel compact={compact} />
         <SelectedConversation />
       </div>
@@ -119,7 +119,7 @@ function MainPanel({ variant, compact }: { variant: MockupVariant; compact: bool
   if (variant === "metrics") return <MetricsBoard />;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 gap-4">
       <TopMetrics />
       <div className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
         <SelectedConversation />
