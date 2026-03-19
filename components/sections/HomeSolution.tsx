@@ -1,64 +1,68 @@
-import { BarChart3, Bot, Database } from "lucide-react";
-import { GlowCard } from "@/components/ui/GlowCard";
+import { ArrowRightLeft, Bot, ChartNoAxesColumn, MessagesSquare, Users } from "lucide-react";
 import { Section } from "@/components/ui/Section";
 
-const pillars = [
+const capabilities = [
   {
-    title: "Automatizacion inteligente",
-    description: "Flujos de respuesta y seguimiento que reducen demoras sin perder calidad.",
+    title: "Centraliza los mensajes",
+    description: "Todo entra al mismo flujo para que el equipo vea contexto y proximo paso.",
+    icon: MessagesSquare
+  },
+  {
+    title: "Organiza cada cliente",
+    description: "Cada conversacion queda asociada a un contacto con historial y estado comercial.",
+    icon: Users
+  },
+  {
+    title: "Automatiza respuestas",
+    description: "Las primeras respuestas y seguimientos dejan de depender de memoria humana.",
     icon: Bot
   },
   {
-    title: "Integracion CRM",
-    description: "Cada conversacion queda vinculada a tu pipeline para evitar perdida de contexto.",
-    icon: Database
+    title: "Crea oportunidades",
+    description: "Un mensaje se convierte en oportunidad visible para trabajarla y cerrarla.",
+    icon: ArrowRightLeft
   },
   {
-    title: "Optimizacion continua",
-    description: "Medimos, ajustamos y mejoramos conversion con datos operativos reales.",
-    icon: BarChart3
+    title: "Permite hacer seguimiento",
+    description: "El pipeline muestra donde esta cada venta y que toca hacer despues.",
+    icon: ChartNoAxesColumn
   }
-];
-
-const optimizationMetrics = [
-  "Tiempo de primera respuesta",
-  "Tasa de calificación",
-  "Seguimiento efectivo",
-  "Conversión a oportunidad en CRM"
 ];
 
 export function HomeSolution() {
   return (
-    <Section id="solucion" className="scroll-mt-24 border-y border-[color:var(--border)] bg-surface/40">
-      <div className="mb-8 max-w-4xl">
-        <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-          Disenamos un sistema que organiza, automatiza y optimiza cada conversacion comercial
+    <Section id="solucion">
+      <div className="max-w-4xl space-y-5">
+        <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">La propuesta</p>
+        <h2 className="text-balance text-3xl font-semibold md:text-5xl">
+          Opturon convierte conversaciones en ventas
         </h2>
+        <p className="max-w-3xl text-lg text-muted">
+          Centraliza todos los mensajes, organiza cada cliente, automatiza respuestas, crea oportunidades de venta y
+          te permite hacer seguimiento sin salir del mismo flujo.
+        </p>
       </div>
 
-      <div className="mb-8 rounded-2xl border border-[color:var(--border)] bg-card/60 p-6">
-        <h3 className="text-lg font-semibold text-text">Qué medimos para optimizar</h3>
-        <p className="mt-2 text-sm text-muted">Porque en WhatsApp, la velocidad es margen.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {optimizationMetrics.map((metric) => (
-            <div key={metric} className="rounded-xl border border-[color:var(--border)] bg-bg/50 px-3 py-4">
-              <p className="text-xs font-medium text-muted">{metric}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {pillars.map((pillar) => {
-          const Icon = pillar.icon;
+      <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {capabilities.map((item) => {
+          const Icon = item.icon;
           return (
-            <GlowCard key={pillar.title}>
-              <Icon className="h-5 w-5 text-brandBright" />
-              <h3 className="mt-3 text-lg font-semibold">{pillar.title}</h3>
-              <p className="mt-2 text-sm text-muted">{pillar.description}</p>
-            </GlowCard>
+            <article
+              key={item.title}
+              className="rounded-3xl border border-[color:var(--border)] bg-card/85 p-5 xl:min-h-[15rem]"
+            >
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10">
+                <Icon className="h-4 w-4 text-brandBright" />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-text">{item.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-muted">{item.description}</p>
+            </article>
           );
         })}
+      </div>
+
+      <div className="mt-8 rounded-3xl border border-brand/30 bg-[linear-gradient(135deg,rgba(176,80,0,0.16),rgba(255,255,255,0.04))] px-6 py-5">
+        <p className="text-lg font-semibold text-text md:text-2xl">Todo en un solo sistema.</p>
       </div>
     </Section>
   );

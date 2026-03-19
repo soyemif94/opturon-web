@@ -1,13 +1,22 @@
-﻿import { ArrowRight, MessageCircle, Sparkles } from "lucide-react";
-import { SecondaryButton } from "@/components/ui/SecondaryButton";
+import { ArrowRight, ChartNoAxesColumn, MessageCircle, TimerReset, Users } from "lucide-react";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
 import { WhatsAppCtaLink } from "@/components/ui/WhatsAppCtaLink";
 import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
+import { HomeProductMockup } from "./HomeProductMockup";
 
-const certaintyBullets = [
-  "Respuesta en el día hábil",
-  "Auditoría estratégica inicial (15 min)",
-  "Sin compromiso"
+const quickBenefits = [
+  "Responde en segundos",
+  "No pierdas leads",
+  "Seguimiento automatico",
+  "Pipeline integrado"
+];
+
+const heroStats = [
+  { label: "Inbox ordenado", value: "Todo el equipo ve lo mismo", icon: MessageCircle },
+  { label: "Seguimiento", value: "Tareas y oportunidades activas", icon: TimerReset },
+  { label: "Pipeline", value: "Etapas claras para vender", icon: ChartNoAxesColumn },
+  { label: "Clientes", value: "Historial en cada ficha", icon: Users }
 ];
 
 export function HomeHero() {
@@ -15,85 +24,74 @@ export function HomeHero() {
   const isExternalWhatsApp = isWhatsAppExternalLink(whatsAppLink);
 
   return (
-    <Section className="overflow-hidden pt-20 md:pt-28">
-      <div className="absolute inset-0 -z-10 opacity-80">
-        <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-brand/20 blur-3xl" />
-        <div className="absolute right-0 top-6 h-80 w-80 rounded-full bg-brandDeep/20 blur-3xl" />
-      </div>
+    <Section className="overflow-hidden pt-16 md:pt-24" containerClassName="relative">
+      <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,rgba(176,80,0,0.24),transparent_35%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent)]" />
 
-      <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs text-brandBright">
-            <Sparkles className="h-3.5 w-3.5" />
-            Opturon AI Systems
-          </span>
-          <h1 className="text-balance text-4xl font-semibold leading-tight md:text-6xl">
-            Automatizamos WhatsApp para equipos comerciales que quieren vender más sin aumentar carga operativa
-          </h1>
-          <p className="max-w-3xl text-lg text-muted md:text-xl">
-            Diseñamos e implementamos sistemas inteligentes con IA e integración CRM para que cada conversación tenga
-            seguimiento, contexto y próximos pasos claros.
-          </p>
-
-          <div className="rounded-2xl border border-brand/30 bg-brand/10 p-4 text-sm text-text/90">
-            Ideal para empresas con equipo comercial y volumen constante de consultas (50+ por mes). Si estás por
-            debajo, escribinos igual: te decimos si tiene sentido automatizar ahora.
+      <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
+        <div className="max-w-2xl space-y-7">
+          <div className="whatsapp-accent-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.24em]">
+            CRM conversacional para ventas por WhatsApp
           </div>
 
-          <p className="text-sm text-muted">
-            Implementación en semanas. Optimización continua basada en métricas reales.
-          </p>
+          <div className="space-y-4">
+            <h1 className="text-balance text-4xl font-semibold leading-tight md:text-6xl">
+              Converti WhatsApp en tu sistema de ventas
+            </h1>
+            <p className="max-w-xl text-lg leading-8 text-muted md:text-xl">
+              Organiza conversaciones, automatiza respuestas y cerra mas ventas desde un solo lugar.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {quickBenefits.map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-text/95"
+              >
+                {item}
+              </div>
+            ))}
+          </div>
 
           <div className="flex flex-wrap gap-3">
+            <PrimaryButton href="#producto" ariaLabel="Ver demo visual del sistema">
+              Ver demo (2 min)
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </PrimaryButton>
             <WhatsAppCtaLink
               href={whatsAppLink}
               origin="hero"
               ariaLabel="Hablar por WhatsApp con Opturon desde hero"
               isExternal={isExternalWhatsApp}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-brandBright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              <MessageCircle className="mr-2 h-4 w-4" />
+              <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
               Hablar por WhatsApp
             </WhatsAppCtaLink>
-            <SecondaryButton href="#solucion" ariaLabel="Ver como funciona y navegar a la sección solución">
-              Ver el sistema (2 min)
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </SecondaryButton>
           </div>
 
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
-            {certaintyBullets.map((item) => (
-              <span key={item} className="inline-flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-brandBright" />
-                {item}
-              </span>
-            ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {heroStats.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-2xl border border-white/10 bg-black/20 p-4 backdrop-blur">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10">
+                    <Icon className="h-4 w-4 text-brandBright" />
+                  </div>
+                  <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted">{item.label}</p>
+                  <p className="mt-2 text-sm font-medium text-text">{item.value}</p>
+                </div>
+              );
+            })}
           </div>
-          <p className="text-xs text-muted">
-            Te respondemos en el día hábil (lun-vie). Auditoría estratégica inicial (15 min) por WhatsApp.
-          </p>
         </div>
 
         <div className="relative">
-          <div className="rounded-3xl border border-brand/30 bg-brand-linear p-8">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <StatBox label="Conversaciones con seguimiento" value="100% trazables" />
-              <StatBox label="Integración comercial" value="WhatsApp + CRM" />
-              <StatBox label="Ventana de implementación" value="Semanas" />
-              <StatBox label="Iteración" value="Continua con métricas" />
-            </div>
-          </div>
+          <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
+          <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
+          <HomeProductMockup variant="hero" />
         </div>
       </div>
     </Section>
-  );
-}
-
-function StatBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[color:var(--border)] bg-bg/50 p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-text">{value}</p>
-    </div>
   );
 }

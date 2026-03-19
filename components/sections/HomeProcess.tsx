@@ -1,25 +1,34 @@
 import { Section } from "@/components/ui/Section";
 
 const steps = [
-  "Diagnostico estrategico",
-  "Diseno del flujo comercial",
-  "Implementacion tecnica",
-  "Medicion y optimizacion"
+  "Llega un mensaje por WhatsApp",
+  "Se crea el cliente automaticamente",
+  "Se organiza en el inbox",
+  "Se convierte en oportunidad",
+  "Se mueve en el pipeline",
+  "Se cierra la venta"
 ];
 
 export function HomeProcess() {
   return (
-    <Section>
-      <h2 className="text-3xl font-semibold md:text-4xl">Como trabajamos</h2>
-      <p className="mt-3 text-sm text-muted">Tiempo estimado: semanas, no meses.</p>
-      <div className="mt-10 grid gap-4 md:grid-cols-4">
+    <Section className="border-y border-[color:var(--border)] bg-surface/35">
+      <div className="max-w-3xl">
+        <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Como funciona</p>
+        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">De mensaje a venta</h2>
+      </div>
+
+      <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {steps.map((step, index) => (
-          <div key={step} className="rounded-2xl border border-[color:var(--border)] bg-card/70 p-5">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 text-xs text-brandBright">
+          <article
+            key={step}
+            className="relative overflow-hidden rounded-3xl border border-[color:var(--border)] bg-card/80 p-6"
+          >
+            <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-brand/10 blur-2xl" />
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/40 bg-brand/10 text-sm font-semibold text-brandBright">
               {index + 1}
             </span>
-            <p className="mt-4 text-sm font-medium text-text">{step}</p>
-          </div>
+            <p className="mt-5 max-w-[18rem] text-lg font-medium leading-8 text-text">{step}</p>
+          </article>
         ))}
       </div>
     </Section>

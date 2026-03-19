@@ -1,59 +1,73 @@
-import { Bot, Cog, MessageCircleCode, Workflow } from "lucide-react";
-import Link from "next/link";
-import { GlowCard } from "@/components/ui/GlowCard";
+import { BarChart3, Bot, LayoutPanelTop, UserRoundSearch, Workflow } from "lucide-react";
 import { Section } from "@/components/ui/Section";
+import { HomeProductMockup } from "./HomeProductMockup";
 
-const services = [
+const featureBlocks = [
   {
-    title: "Automatización de WhatsApp",
-    text: "Flujos inteligentes para captar, calificar y responder en tiempo real.",
-    icon: MessageCircleCode
+    title: "Inbox omnicanal",
+    description: "Gestiona todas las conversaciones desde un solo lugar.",
+    icon: LayoutPanelTop,
+    variant: "inbox" as const
   },
   {
-    title: "Integración de sistemas",
-    text: "Conectamos CRM, agendas y herramientas internas para eliminar fricción.",
-    icon: Workflow
+    title: "Pipeline de ventas",
+    description: "Visualiza en que etapa esta cada cliente.",
+    icon: Workflow,
+    variant: "pipeline" as const
   },
   {
-    title: "Asistentes IA de negocio",
-    text: "Bots útiles con lógica operativa, no respuestas vacías.",
-    icon: Bot
+    title: "Automatizaciones",
+    description: "Responde y da seguimiento automaticamente.",
+    icon: Bot,
+    variant: "automation" as const
   },
   {
-    title: "Optimización continua",
-    text: "Iteramos sobre métricas y procesos para sostener resultados.",
-    icon: Cog
+    title: "Contactos y CRM",
+    description: "Accede al historial completo de cada cliente.",
+    icon: UserRoundSearch,
+    variant: "crm" as const
+  },
+  {
+    title: "Metricas",
+    description: "Mide rendimiento, actividad y ventas en tiempo real.",
+    icon: BarChart3,
+    variant: "metrics" as const
   }
 ];
 
 export function HomeServices() {
   return (
-    <Section id="servicios" className="scroll-mt-24 md:scroll-mt-28">
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <h2 className="text-3xl font-semibold md:text-4xl">Servicios premium</h2>
+    <Section id="producto">
+      <div className="max-w-4xl">
+        <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Producto</p>
+        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
+          Lo que ves es lo que ordena tus ventas
+        </h2>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {services.map((service) => {
-          const Icon = service.icon;
+
+      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+        {featureBlocks.map((feature) => {
+          const Icon = feature.icon;
           return (
-            <GlowCard key={service.title}>
-              <Icon className="h-5 w-5 text-brandBright" />
-              <h3 className="mt-3 text-lg font-semibold">{service.title}</h3>
-              <p className="mt-2 text-sm text-muted">{service.text}</p>
-            </GlowCard>
+            <article
+              key={feature.title}
+              className={`overflow-hidden rounded-[2rem] border border-[color:var(--border)] bg-card/90 ${
+                feature.variant === "inbox" || feature.variant === "automation" ? "whatsapp-accent-hover" : ""
+              }`}
+            >
+              <div className="border-b border-[color:var(--border)] p-6">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10">
+                  <Icon className="whatsapp-accent-icon h-5 w-5 text-brandBright" />
+                </div>
+                <h3 className="mt-4 text-2xl font-semibold">{feature.title}</h3>
+                <p className="mt-3 max-w-lg text-sm leading-7 text-muted">{feature.description}</p>
+              </div>
+              <div className="p-5">
+                <HomeProductMockup variant={feature.variant} compact />
+              </div>
+            </article>
           );
         })}
-      </div>
-      <div className="mt-8 flex flex-wrap gap-5 text-sm">
-        <Link href="/servicios/diseno-web" className="text-brandBright transition hover:text-brand">
-          Tambien disenamos sitios web premium →
-        </Link>
-        <Link href="/casos" className="text-brandBright transition hover:text-brand">
-          Ver casos →
-        </Link>
-        <Link href="/blog" className="text-brandBright transition hover:text-brand">
-          Leer blog →
-        </Link>
       </div>
     </Section>
   );

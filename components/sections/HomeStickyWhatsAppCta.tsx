@@ -14,9 +14,9 @@ export function HomeStickyWhatsAppCta() {
         origin="sticky"
         ariaLabel="Hablar por WhatsApp con Opturon desde CTA sticky"
         isExternal={isExternalWhatsApp}
-        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition-all duration-200 ease-out hover:bg-brandBright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+        className="whatsapp-accent-hover inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
       >
-        <MessageCircle className="mr-2 h-4 w-4" />
+        <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
         Hablar por WhatsApp
       </WhatsAppCtaLink>
     </div>

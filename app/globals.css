@@ -14,6 +14,10 @@
   --text: #F5F5F5;
   --text-muted: #BDBDBD;
   --border: rgba(255, 255, 255, 0.08);
+  --whatsapp-accent: #25d366;
+  --whatsapp-accent-soft: rgba(37, 211, 102, 0.14);
+  --whatsapp-accent-border: rgba(37, 211, 102, 0.34);
+  --whatsapp-accent-glow: rgba(37, 211, 102, 0.18);
   --inbox-system-bubble-bg: rgba(245, 247, 250, 0.94);
   --inbox-system-bubble-text: #10233f;
   --inbox-system-bubble-muted: #4e6585;
@@ -32,6 +36,10 @@
   --text: #10233f;
   --text-muted: #526581;
   --border: rgba(37, 99, 235, 0.12);
+  --whatsapp-accent: #1faa59;
+  --whatsapp-accent-soft: rgba(31, 170, 89, 0.1);
+  --whatsapp-accent-border: rgba(31, 170, 89, 0.22);
+  --whatsapp-accent-glow: rgba(31, 170, 89, 0.14);
   --inbox-system-bubble-bg: rgba(16, 35, 63, 0.94);
   --inbox-system-bubble-text: #f4f8ff;
   --inbox-system-bubble-muted: #b7c6e0;
@@ -83,6 +91,32 @@ a {
 
 .glow-brand {
   box-shadow: 0 0 0 1px rgba(176, 80, 0, 0.3), 0 12px 34px rgba(176, 80, 0, 0.18);
+}
+
+.whatsapp-accent-hover {
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease,
+    color 220ms ease,
+    transform 220ms ease;
+}
+
+.whatsapp-accent-hover:hover {
+  border-color: var(--whatsapp-accent-border);
+  background-color: var(--whatsapp-accent-soft);
+  box-shadow: 0 0 0 1px rgba(37, 211, 102, 0.12), 0 16px 38px var(--whatsapp-accent-glow);
+}
+
+.whatsapp-accent-hover:hover .whatsapp-accent-icon,
+.whatsapp-accent-hover:hover .whatsapp-accent-text {
+  color: var(--whatsapp-accent);
+}
+
+.whatsapp-accent-badge {
+  border-color: var(--whatsapp-accent-border);
+  background-color: var(--whatsapp-accent-soft);
+  color: var(--whatsapp-accent);
 }
 
 @keyframes inbox-message-in {

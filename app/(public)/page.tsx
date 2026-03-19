@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { HomePageEvents } from "@/components/analytics/HomePageEvents";
+import { HomeDifferentiator } from "@/components/sections/HomeDifferentiator";
 import { HomeFaq } from "@/components/sections/HomeFaq";
 import { HomeFinalCta } from "@/components/sections/HomeFinalCta";
 import { HomeHero } from "@/components/sections/HomeHero";
@@ -7,40 +8,40 @@ import { HomePackages } from "@/components/sections/HomePackages";
 import { HomeProblems } from "@/components/sections/HomeProblems";
 import { HomeProcess } from "@/components/sections/HomeProcess";
 import { HomeResults } from "@/components/sections/HomeResults";
+import { HomeServices } from "@/components/sections/HomeServices";
 import { HomeSolution } from "@/components/sections/HomeSolution";
 import { HomeStickyWhatsAppCta } from "@/components/sections/HomeStickyWhatsAppCta";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://opturon.com"),
   title: {
-    default: "Opturon | Automatizacion Empresarial con IA",
+    default: "Opturon | CRM conversacional para vender por WhatsApp",
     template: "%s | Opturon"
   },
   description:
-    "Agencia de automatizacion empresarial con IA aplicada. Automatizamos WhatsApp Business, procesos internos e integraciones para escalar negocios de forma inteligente.",
+    "Organiza conversaciones, automatiza seguimiento y convierte WhatsApp en tu sistema de ventas con Opturon.",
   keywords: [
-    "automatizacion empresarial",
-    "automatizacion WhatsApp Business",
-    "bots con IA para empresas",
-    "integracion CRM automatizacion",
-    "automatizacion de procesos",
-    "agencia de automatizacion digital",
-    "IA aplicada a negocios"
+    "crm whatsapp",
+    "ventas por whatsapp",
+    "inbox whatsapp para empresas",
+    "pipeline de ventas whatsapp",
+    "seguimiento automatico leads",
+    "crm conversacional",
+    "opturon"
   ],
   openGraph: {
-    title: "Opturon | Automatizacion Empresarial con IA",
-    description:
-      "Sistemas inteligentes que automatizan WhatsApp, procesos y operaciones para escalar negocios.",
+    title: "Opturon | Convierte WhatsApp en tu sistema de ventas",
+    description: "Inbox, pipeline, contactos, automatizaciones y metricas para vender mejor desde WhatsApp.",
     url: "https://opturon.com",
     siteName: "Opturon",
     type: "website",
     locale: "es_AR",
-    images: [{ url: "/og", width: 1200, height: 630, alt: "Opturon - Automatizacion con IA" }]
+    images: [{ url: "/og", width: 1200, height: 630, alt: "Opturon - CRM conversacional para ventas" }]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Opturon | Automatizacion con IA",
-    description: "Automatizamos WhatsApp, procesos y sistemas para empresas que quieren escalar.",
+    title: "Opturon | CRM conversacional para WhatsApp",
+    description: "Organiza clientes, automatiza seguimiento y cierra mas ventas desde un solo lugar.",
     images: ["/og"]
   },
   robots: {
@@ -76,12 +77,12 @@ export default function HomePage() {
     {
       "@context": "https://schema.org",
       "@type": "Service",
-      name: "Automatizacion empresarial con IA",
+      name: "CRM conversacional para ventas por WhatsApp",
       provider: {
         "@id": "https://opturon.com/#organization"
       },
       areaServed: "AR",
-      serviceType: "Automatizacion WhatsApp Business, Integraciones, Bots IA"
+      serviceType: "CRM conversacional, inbox de ventas, pipeline y automatizaciones para WhatsApp"
     }
   ];
 
@@ -96,6 +97,8 @@ export default function HomePage() {
       <HomeProblems />
       <HomeSolution />
       <HomeProcess />
+      <HomeServices />
+      <HomeDifferentiator />
       <HomePackages />
       <HomeResults />
       <HomeFaq />
