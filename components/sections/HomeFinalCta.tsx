@@ -20,8 +20,8 @@ export function HomeFinalCta() {
           </p>
         </div>
         <div className="mt-8 flex flex-wrap gap-3">
-          <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando">
-            Ver el sistema funcionando
+          <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando en 2 minutos">
+            Ver el sistema funcionando (2 min)
             <ArrowRight className="ml-2 h-4 w-4" />
           </PrimaryButton>
           <WhatsAppCtaLink
@@ -32,7 +32,7 @@ export function HomeFinalCta() {
             className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
-            Hablar por WhatsApp
+            Quiero ver esto en mi negocio
           </WhatsAppCtaLink>
         </div>
         <p className="mt-4 text-sm text-muted">Primero lo ves funcionando. Despues vemos si encaja con tu operacion.</p>

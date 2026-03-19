@@ -25,7 +25,7 @@ export function HomeHero() {
 
   return (
     <Section
-      className="overflow-x-clip overflow-y-visible pt-12 md:pt-16 lg:flex lg:min-h-[84vh] lg:items-center"
+      className="overflow-x-clip overflow-y-visible pt-16 md:pt-20 lg:flex lg:min-h-[82vh] lg:items-center lg:pt-16"
       containerClassName="relative w-full"
     >
       <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,rgba(176,80,0,0.24),transparent_35%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent)]" />
@@ -44,6 +44,9 @@ export function HomeHero() {
               Ordena chats, seguimientos y oportunidades en un solo flujo para responder mejor, mover cada contacto y
               cerrar mas ventas desde WhatsApp.
             </p>
+            <p className="max-w-xl text-sm font-medium leading-7 text-text/90">
+              La mayoria de las ventas no se pierden por falta de consultas, sino por falta de seguimiento.
+            </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -58,8 +61,8 @@ export function HomeHero() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando">
-              Ver el sistema funcionando
+            <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando en 2 minutos">
+              Ver el sistema funcionando (2 min)
               <ArrowRight className="ml-2 h-4 w-4" />
             </PrimaryButton>
             <WhatsAppCtaLink
@@ -70,13 +73,14 @@ export function HomeHero() {
               className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
               <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
-              Hablar por WhatsApp
+              Quiero ver esto en mi negocio
             </WhatsAppCtaLink>
           </div>
 
           <p className="text-sm text-muted">
             En menos de 2 minutos | Sin instalar nada | Pensado para negocios que venden por WhatsApp
           </p>
+          <p className="text-sm text-text/85">Si hoy vendes por WhatsApp, esto ya te puede ordenar las ventas.</p>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {heroStats.map((item) => {
@@ -94,7 +98,7 @@ export function HomeHero() {
           </div>
         </div>
 
-        <div className="relative mx-auto flex w-full max-w-[40rem] items-center justify-center lg:max-w-none lg:py-6">
+        <div className="relative mx-auto flex w-full max-w-[40rem] items-center justify-center pt-2 md:pt-4 lg:max-w-none lg:pt-8">
           <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
           <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
           <div className="relative z-10 w-full">

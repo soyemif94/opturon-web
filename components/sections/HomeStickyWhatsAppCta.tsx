@@ -17,7 +17,7 @@ export function HomeStickyWhatsAppCta() {
         className="whatsapp-accent-hover inline-flex h-11 w-full items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
       >
         <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
-        Hablar por WhatsApp
+        Quiero ver esto en mi negocio
       </WhatsAppCtaLink>
     </div>
   );
