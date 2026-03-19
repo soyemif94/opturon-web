@@ -3,28 +3,28 @@ import { Section } from "@/components/ui/Section";
 
 const capabilities = [
   {
-    title: "Centraliza los mensajes",
-    description: "Todo entra al mismo flujo para que el equipo vea contexto y proximo paso.",
+    title: "Todos los chats en un mismo lugar",
+    description: "Cada conversacion entra con contexto, responsable y proximo paso visible para todo el equipo.",
     icon: MessagesSquare
   },
   {
-    title: "Organiza cada cliente",
-    description: "Cada conversacion queda asociada a un contacto con historial y estado comercial.",
+    title: "Cada cliente con historial real",
+    description: "El contacto, lo que pidio y en que etapa esta la venta quedan ordenados en la misma ficha.",
     icon: Users
   },
   {
-    title: "Automatiza respuestas",
-    description: "Las primeras respuestas y seguimientos dejan de depender de memoria humana.",
+    title: "Primeras respuestas y seguimiento activos",
+    description: "Las respuestas iniciales y recordatorios dejan de depender de quien se acuerda primero.",
     icon: Bot
   },
   {
-    title: "Crea oportunidades",
-    description: "Un mensaje se convierte en oportunidad visible para trabajarla y cerrarla.",
+    title: "Cada mensaje se vuelve oportunidad",
+    description: "Lo que antes quedaba en un chat suelto pasa a ser una venta visible para trabajarla y cerrarla.",
     icon: ArrowRightLeft
   },
   {
-    title: "Permite hacer seguimiento",
-    description: "El pipeline muestra donde esta cada venta y que toca hacer despues.",
+    title: "El pipeline muestra que hacer despues",
+    description: "Sabes que esta por entrar, que esta tibio y que hay que empujar hoy para cerrar.",
     icon: ChartNoAxesColumn
   }
 ];
@@ -32,15 +32,19 @@ const capabilities = [
 export function HomeSolution() {
   return (
     <Section id="solucion">
-      <div className="max-w-4xl space-y-5">
-        <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">La propuesta</p>
-        <h2 className="text-balance text-3xl font-semibold md:text-5xl">
-          Opturon convierte conversaciones en ventas
-        </h2>
-        <p className="max-w-3xl text-lg text-muted">
-          Centraliza todos los mensajes, organiza cada cliente, automatiza respuestas, crea oportunidades de venta y
-          te permite hacer seguimiento sin salir del mismo flujo.
-        </p>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-end">
+        <div className="space-y-5">
+          <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">La propuesta</p>
+          <h2 className="text-balance text-3xl font-semibold md:text-5xl">
+            Opturon convierte conversaciones en ventas
+          </h2>
+        </div>
+        <div className="max-w-2xl">
+          <p className="text-lg leading-8 text-muted">
+            No se trata solo de responder WhatsApp. Se trata de ordenar lo que entra, seguir lo que importa y mover
+            cada oportunidad hasta el cierre desde un mismo flujo.
+          </p>
+        </div>
       </div>
 
       <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -62,7 +66,9 @@ export function HomeSolution() {
       </div>
 
       <div className="mt-8 rounded-3xl border border-brand/30 bg-[linear-gradient(135deg,rgba(176,80,0,0.16),rgba(255,255,255,0.04))] px-6 py-5">
-        <p className="text-lg font-semibold text-text md:text-2xl">Todo en un solo sistema.</p>
+        <p className="text-lg font-semibold text-text md:text-2xl">
+          Menos chats sueltos. Mas seguimiento visible. Mas chances reales de cerrar.
+        </p>
       </div>
     </Section>
   );

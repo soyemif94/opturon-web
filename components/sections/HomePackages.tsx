@@ -7,19 +7,19 @@ import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 const stages = [
   {
     name: "Inicio ordenado",
-    description: "Para negocios que ya reciben consultas por WhatsApp y necesitan dejar de responder a ciegas.",
+    description: "Si hoy respondes como puedes y cada chat queda suelto, esta etapa te ayuda a ordenar lo basico sin complicarte.",
     bullets: ["Inbox centralizado", "Clientes ordenados", "Primer seguimiento claro"],
     featured: false
   },
   {
     name: "Seguimiento activo",
-    description: "Para equipos que quieren mover cada contacto con pipeline y automatizaciones simples.",
+    description: "Si ya tienes consultas todos los dias y quieres convertir mas, esta etapa te da pipeline, ritmo y seguimiento.",
     bullets: ["Pipeline visible", "Tareas y recordatorios", "Seguimiento automatico"],
     featured: true
   },
   {
     name: "Operacion en crecimiento",
-    description: "Para equipos que ya venden todos los dias y necesitan mas control operativo sin sumar caos.",
+    description: "Si ya vendes todos los dias y el volumen empezo a desordenarte, esta etapa te da control sin sumar caos.",
     bullets: ["Mas usuarios", "Mas volumen de conversaciones", "Mas control del flujo comercial"],
     featured: false
   }
@@ -33,9 +33,10 @@ export function HomePackages() {
     <Section id="planes">
       <div className="max-w-3xl">
         <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Planes</p>
-        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">Planes para cada etapa de venta</h2>
+        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">Una etapa para cada momento comercial</h2>
         <p className="mt-4 max-w-2xl text-base leading-8 text-muted">
-          Opturon se configura segun tu operacion, tu volumen y el nivel de seguimiento que hoy necesita tu equipo.
+          La idea no es que elijas una caja. La idea es que te reconozcas rapido en la etapa que hoy necesita mas
+          orden para vender mejor.
         </p>
       </div>
 
@@ -73,19 +74,19 @@ export function HomePackages() {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-3">
-        <PrimaryButton href="#producto" ariaLabel="Ver demo visual del producto">
-          Ver demo
+        <PrimaryButton href="#producto" ariaLabel="Ver como funciona Opturon con WhatsApp">
+          Ver como funciona
           <ArrowRight className="ml-2 h-4 w-4" />
         </PrimaryButton>
         <WhatsAppCtaLink
           href={whatsAppLink}
           origin="home-plans"
-          ariaLabel="Consultar plan por WhatsApp"
+          ariaLabel="Hablar por WhatsApp sobre la etapa ideal"
           isExternal={isExternalWhatsApp}
           className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
-          Consultar plan
+          Hablar por WhatsApp
         </WhatsAppCtaLink>
       </div>
 

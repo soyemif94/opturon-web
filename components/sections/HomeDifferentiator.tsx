@@ -1,10 +1,10 @@
 import { Section } from "@/components/ui/Section";
 
-const traditionalCrm = ["Carga manual", "Seguimiento manual", "Procesos lentos"];
+const traditionalCrm = ["Cargas datos despues del chat", "El seguimiento depende de cada persona", "El cierre llega tarde y con poco contexto"];
 const opturonWay = [
-  "Conversaciones automaticas",
-  "Seguimiento en tiempo real",
-  "Menos carga manual y menos contexto perdido"
+  "El chat ya entra ordenado al flujo comercial",
+  "Cada contacto tiene proximo paso visible",
+  "Menos caos operativo y mas chances de cerrar"
 ];
 
 export function HomeDifferentiator() {
@@ -13,6 +13,9 @@ export function HomeDifferentiator() {
       <div className="max-w-3xl">
         <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Diferencial</p>
         <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">No es un CRM mas</h2>
+        <p className="mt-4 max-w-2xl text-lg leading-8 text-muted">
+          No vienes a cargar datos al final del dia. Vienes a ordenar conversaciones para vender con menos friccion.
+        </p>
       </div>
 
       <div className="mt-10 grid gap-5 lg:grid-cols-2">
@@ -40,7 +43,7 @@ export function HomeDifferentiator() {
             ))}
           </div>
           <p className="mt-6 max-w-md text-sm leading-7 text-text/85">
-            No se trata solo de registrar datos: se trata de mover conversaciones reales hasta el cierre.
+            Menos trabajo manual, menos contexto perdido y mas ventas moviendose con orden hasta el cierre.
           </p>
         </article>
       </div>

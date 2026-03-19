@@ -12,7 +12,7 @@ export function Section({ id, className, containerClassName, children }: Section
       id={id}
       className={cn(
         "relative py-16 md:py-24",
-        id ? "scroll-mt-24 md:scroll-mt-28" : "",
+        id ? "scroll-mt-28 md:scroll-mt-32 lg:scroll-mt-36" : "",
         className
       )}
     >

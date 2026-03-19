@@ -14,7 +14,10 @@ export function HomeProcess() {
     <Section className="border-y border-[color:var(--border)] bg-surface/35">
       <div className="max-w-3xl">
         <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Como funciona</p>
-        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">De mensaje a venta</h2>
+        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">De mensaje a venta, sin perder el hilo</h2>
+        <p className="mt-4 max-w-2xl text-lg leading-8 text-muted">
+          El recorrido comercial tiene que entenderse rapido: entra un chat, se ordena, se sigue y se mueve hasta el cierre.
+        </p>
       </div>
 
       <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

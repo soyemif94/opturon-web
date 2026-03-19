@@ -8,7 +8,7 @@ export function HomeStickyWhatsAppCta() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-brand/30 bg-bg/95 p-3 backdrop-blur md:hidden">
-      <p className="mb-2 text-center text-[11px] text-muted">Auditoría estratégica inicial (15 min) · Sin compromiso</p>
+      <p className="mb-2 text-center text-[11px] text-muted">Resolver dudas y ver tu caso por WhatsApp | Sin compromiso</p>
       <WhatsAppCtaLink
         href={whatsAppLink}
         origin="sticky"

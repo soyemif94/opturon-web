@@ -24,10 +24,13 @@ export function HomeHero() {
   const isExternalWhatsApp = isWhatsAppExternalLink(whatsAppLink);
 
   return (
-    <Section className="overflow-hidden pt-16 md:pt-24" containerClassName="relative">
+    <Section
+      className="overflow-x-clip overflow-y-visible pt-12 md:pt-16 lg:flex lg:min-h-[84vh] lg:items-center"
+      containerClassName="relative w-full"
+    >
       <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,rgba(176,80,0,0.24),transparent_35%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent)]" />
 
-      <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
+      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] lg:gap-10 xl:gap-14">
         <div className="max-w-2xl space-y-7">
           <div className="whatsapp-accent-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.24em]">
             CRM conversacional para ventas por WhatsApp
@@ -38,8 +41,8 @@ export function HomeHero() {
               Converti WhatsApp en tu sistema de ventas
             </h1>
             <p className="max-w-xl text-lg leading-8 text-muted md:text-xl">
-              Pensado para equipos que venden por WhatsApp todos los dias: inbox, pipeline y automatizaciones para
-              captar, seguir y cerrar ventas sin perder contexto.
+              Ordena chats, seguimientos y oportunidades en un solo flujo para responder mejor, mover cada contacto y
+              cerrar mas ventas desde WhatsApp.
             </p>
           </div>
 
@@ -55,8 +58,8 @@ export function HomeHero() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton href="#producto" ariaLabel="Ver demo visual del sistema">
-              Ver demo (2 min)
+            <PrimaryButton href="#producto" ariaLabel="Ver como funciona Opturon">
+              Ver como funciona
               <ArrowRight className="ml-2 h-4 w-4" />
             </PrimaryButton>
             <WhatsAppCtaLink
@@ -70,6 +73,8 @@ export function HomeHero() {
               Hablar por WhatsApp
             </WhatsAppCtaLink>
           </div>
+
+          <p className="text-sm text-muted">Pensado para equipos que venden por WhatsApp todos los dias.</p>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {heroStats.map((item) => {
@@ -87,10 +92,12 @@ export function HomeHero() {
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative mx-auto flex w-full max-w-[40rem] items-center justify-center lg:max-w-none lg:py-6">
           <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
           <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
-          <HomeProductMockup variant="hero" />
+          <div className="relative z-10 w-full">
+            <HomeProductMockup variant="hero" />
+          </div>
         </div>
       </div>
     </Section>

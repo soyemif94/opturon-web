@@ -96,11 +96,11 @@ export default function HomePage() {
       <HomeHero />
       <HomeProblems />
       <HomeSolution />
-      <HomeProcess />
       <HomeServices />
+      <HomeProcess />
       <HomeDifferentiator />
-      <HomePackages />
       <HomeResults />
+      <HomePackages />
       <HomeFaq />
       <HomeFinalCta />
       <HomePageEvents />

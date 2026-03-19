@@ -4,22 +4,22 @@ import { Section } from "@/components/ui/Section";
 const painPoints = [
   {
     title: "Respondes tarde",
-    text: "El cliente escribe con intencion de compra y recibe respuesta cuando ya siguio de largo.",
+    text: "El cliente llega con interes real y recibe respuesta cuando ya comparo, dudo o se fue con otro.",
     icon: Clock3
   },
   {
-    title: "Los clientes se enfrían",
-    text: "Sin seguimiento, las conversaciones se apagan aunque el contacto ya estaba interesado.",
+    title: "Los clientes se enfrian",
+    text: "Sin seguimiento claro, la conversacion se enfria aunque el contacto ya estaba listo para avanzar.",
     icon: Flame
   },
   {
     title: "Pierdes el hilo",
-    text: "El historial queda en chats sueltos y nadie sabe en que quedo cada venta.",
+    text: "El historial queda repartido y el equipo deja de saber que prometio, que falta y quien sigue.",
     icon: MessageSquareOff
   },
   {
     title: "No sabes que cerrar",
-    text: "Sin etapas ni prioridad, todo parece urgente y nada avanza con orden.",
+    text: "Sin prioridad ni proximo paso, todo parece urgente y las ventas mas calientes quedan mezcladas con el resto.",
     icon: Target
   }
 ];
@@ -27,22 +27,23 @@ const painPoints = [
 export function HomeProblems() {
   return (
     <Section className="border-y border-[color:var(--border)] bg-surface/30">
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-8">
         <div className="max-w-xl space-y-5">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">El problema</p>
           <h2 className="text-balance text-3xl font-semibold md:text-5xl">
-            El problema no es la cantidad de consultas
+            No estas perdiendo consultas. Estas perdiendo ventas despues del primer mensaje.
           </h2>
-          <p className="text-lg text-muted">Es lo que pasa despues.</p>
-          <div className="space-y-3 text-base text-text/90">
-            <p>Respondes tarde.</p>
-            <p>Se enfrían los clientes.</p>
-            <p>Pierdes el seguimiento.</p>
-            <p>No sabes en que estado esta cada venta.</p>
-          </div>
-          <p className="text-base font-medium text-text">
-            Ahi es donde se pierde la mayor parte de las ventas.
+          <p className="text-lg leading-8 text-muted">
+            Cuando el equipo responde tarde, nadie sabe que contacto seguir y el estado de cada venta queda perdido en
+            chats sueltos.
           </p>
+          <div className="space-y-3 text-base text-text/90">
+            <p>Respondes tarde y el lead se enfria.</p>
+            <p>Nadie sabe a quien hay que cerrar hoy.</p>
+            <p>El seguimiento depende de memoria humana.</p>
+            <p>El pipeline real de ventas no existe.</p>
+          </div>
+          <p className="text-base font-medium text-text">Ahi es donde se escapan las ventas que ya estaban empezadas.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">

@@ -14,11 +14,13 @@ export function HomeFinalCta() {
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(176,80,0,0.24),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]" />
         <div className="max-w-3xl">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Cierre</p>
-          <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">Empeza a vender mejor desde hoy</h2>
+          <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
+            Si hoy vendes por WhatsApp, ya puedes mostrarle a tu equipo un sistema mas claro
+          </h2>
         </div>
         <div className="mt-8 flex flex-wrap gap-3">
-          <PrimaryButton href="#producto" ariaLabel="Ver demo visual del producto">
-            Ver demo
+          <PrimaryButton href="#producto" ariaLabel="Ver como funciona Opturon con WhatsApp">
+            Ver como funciona
             <ArrowRight className="ml-2 h-4 w-4" />
           </PrimaryButton>
           <WhatsAppCtaLink
@@ -32,6 +34,7 @@ export function HomeFinalCta() {
             Hablar por WhatsApp
           </WhatsAppCtaLink>
         </div>
+        <p className="mt-4 text-sm text-muted">Primero entiendes como funciona. Despues vemos si encaja con tu operacion.</p>
       </div>
     </Section>
   );
