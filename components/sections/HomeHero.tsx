@@ -30,7 +30,7 @@ export function HomeHero() {
     >
       <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,rgba(176,80,0,0.24),transparent_35%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent)]" />
 
-      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)] lg:gap-10 xl:gap-14">
+      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10 xl:gap-12">
         <div className="max-w-2xl space-y-7">
           <div className="whatsapp-accent-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.24em]">
             CRM conversacional para ventas por WhatsApp
@@ -98,7 +98,7 @@ export function HomeHero() {
           </div>
         </div>
 
-        <div className="relative mx-auto flex min-w-0 w-full max-w-[40rem] items-center justify-center pt-2 md:pt-4 lg:max-w-[36rem] lg:justify-self-end lg:pt-8 xl:max-w-[39rem] 2xl:max-w-[41rem]">
+        <div className="relative mx-auto flex min-w-0 w-full max-w-[40rem] items-center justify-center pt-2 md:pt-4 lg:max-w-[33.5rem] lg:pt-8 xl:max-w-[36rem] 2xl:max-w-[38rem]">
           <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
           <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
           <div className="relative z-10 min-w-0 w-full">
