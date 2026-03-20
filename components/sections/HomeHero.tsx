@@ -25,7 +25,7 @@ export function HomeHero() {
 
   return (
     <Section
-      className="overflow-x-clip overflow-y-visible pt-16 md:pt-20 lg:flex lg:min-h-[82vh] lg:items-center lg:pt-16"
+      className="overflow-visible pt-16 md:pt-20 lg:flex lg:min-h-[82vh] lg:items-center lg:pt-16"
       containerClassName="relative w-full"
     >
       <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,rgba(176,80,0,0.24),transparent_35%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent)]" />
@@ -98,10 +98,10 @@ export function HomeHero() {
           </div>
         </div>
 
-        <div className="relative mx-auto flex min-w-0 w-full max-w-[40rem] items-center justify-center pt-2 md:pt-4 lg:max-w-[40rem] lg:justify-self-center lg:px-4 lg:pt-8 xl:max-w-[41rem] xl:px-0 xl:pr-5 2xl:max-w-[43rem]">
+        <div className="relative mx-auto flex min-w-0 w-full max-w-[40rem] items-center justify-center pt-2 md:pt-4 lg:max-w-[34rem] lg:justify-self-center lg:pr-2 lg:pt-8 xl:max-w-[41rem] xl:px-0 xl:pr-5 2xl:max-w-[43rem]">
           <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
           <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
-          <div className="relative z-10 min-w-0 w-full lg:scale-[0.88] lg:origin-center xl:scale-100">
+          <div className="relative z-10 min-w-0 w-full">
             <HomeProductMockup variant="hero" />
           </div>
         </div>
