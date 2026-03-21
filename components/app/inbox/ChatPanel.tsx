@@ -72,9 +72,11 @@ export function ChatPanel({
     });
   }, [detail]);
 
+  const lastTimelineKey = timeline[timeline.length - 1]?.id || null;
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [timeline.length]);
+  }, [detail?.conversation.id, lastTimelineKey]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
@@ -136,7 +138,7 @@ export function ChatPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_24%)] p-4">
-        {loading ? (
+        {loading && !detail ? (
           <div className="space-y-3">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
@@ -158,8 +160,13 @@ export function ChatPanel({
           </div>
         ) : null}
 
-        {!loading && detail ? (
+        {detail ? (
           <div className="space-y-3">
+            {loading ? (
+              <div className="rounded-[20px] border border-[color:var(--border)] bg-card/55 px-4 py-3 text-xs text-muted">
+                Actualizando conversacion...
+              </div>
+            ) : null}
             <div className="rounded-[24px] border border-[color:var(--border)] bg-card/60 p-4">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                 <Sparkles className="h-3.5 w-3.5 text-brandBright" />

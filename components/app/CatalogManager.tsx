@@ -67,6 +67,13 @@ type BulkResultSummary = {
   results: BulkDisplayResult[];
 };
 
+type DeleteAttemptResult = {
+  productId: string;
+  ok: boolean;
+  blocked: boolean;
+  message?: string;
+};
+
 const EMPTY_DRAFT: Draft = {
   name: "",
   description: "",
@@ -183,6 +190,24 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       filteredProducts.forEach((product) => next.add(product.id));
       return Array.from(next);
     });
+  }
+
+  async function requestDelete(productId: string): Promise<DeleteAttemptResult> {
+    const response = await fetch(`/api/app/catalog/${productId}`, {
+      method: "DELETE"
+    });
+
+    if (response.ok) {
+      return { productId, ok: true, blocked: false };
+    }
+
+    const json = await response.json().catch(() => null);
+    return {
+      productId,
+      ok: false,
+      blocked: json?.error === "product_delete_blocked",
+      message: json?.error || "No se pudo eliminar el producto."
+    };
   }
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
@@ -373,12 +398,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     setFeedback(null);
 
     try {
-      const response = await fetch(`/api/app/catalog/${product.id}`, {
-        method: "DELETE"
-      });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(json?.error || "No se pudo eliminar el producto.");
+      const result = await requestDelete(product.id);
+      if (!result.ok) {
+        throw new Error(result.message || "No se pudo eliminar el producto.");
       }
 
       await reloadProducts(selectedId === product.id ? null : selectedId);
@@ -397,42 +419,52 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   async function deleteSelectedProducts() {
     if (readOnly || selectedIds.length === 0) return;
 
-    const names = products.filter((product) => selectedIds.includes(product.id)).map((product) => product.name);
+    const selectionSnapshot = [...selectedIds];
+    const names = products.filter((product) => selectionSnapshot.includes(product.id)).map((product) => product.name);
     const confirmed = window.confirm(
-      `Se eliminaran ${selectedIds.length} producto(s): ${names.slice(0, 3).join(", ")}${names.length > 3 ? "..." : ""}.`
+      `Se eliminaran ${selectionSnapshot.length} producto(s): ${names.slice(0, 3).join(", ")}${names.length > 3 ? "..." : ""}.`
     );
     if (!confirmed) return;
 
     setBulkDeleting(true);
     setFeedback(null);
 
-    let deleted = 0;
-    let blocked = 0;
-
     try {
-      for (const productId of selectedIds) {
-        const response = await fetch(`/api/app/catalog/${productId}`, { method: "DELETE" });
-        if (response.ok) {
-          deleted += 1;
-          continue;
-        }
+      const pending = [...selectionSnapshot];
+      const results: DeleteAttemptResult[] = [];
+      const workerCount = Math.min(4, pending.length);
 
-        const json = await response.json().catch(() => null);
-        blocked += 1;
-        if (json?.error === "product_delete_blocked") {
-          continue;
-        }
-      }
+      await Promise.all(
+        Array.from({ length: workerCount }).map(async () => {
+          while (pending.length > 0) {
+            const nextId = pending.shift();
+            if (!nextId) return;
+            results.push(await requestDelete(nextId));
+          }
+        })
+      );
+
+      const deleted = results.filter((result) => result.ok).length;
+      const blocked = results.filter((result) => !result.ok && result.blocked).length;
+      const failed = results.filter((result) => !result.ok && !result.blocked);
 
       await reloadProducts(selectedId);
-      setSelectedIds([]);
+      setSelectedIds((current) => current.filter((id) => !selectionSnapshot.includes(id)));
 
-      if (deleted > 0 && blocked === 0) {
+      if (deleted > 0 && blocked === 0 && failed.length === 0) {
         setFeedback({ tone: "success", text: `Se eliminaron ${deleted} productos seleccionados.` });
         toast.success("Productos eliminados");
       } else if (deleted > 0) {
-        setFeedback({ tone: "warning", text: `Se eliminaron ${deleted} productos y ${blocked} no pudieron borrarse por referencias activas.` });
+        const fragments = [`Se eliminaron ${deleted} productos.`];
+        if (blocked > 0) fragments.push(`${blocked} quedaron bloqueados por referencias activas.`);
+        if (failed.length > 0) fragments.push(`${failed.length} fallaron y necesitan reintento.`);
+        setFeedback({ tone: "warning", text: fragments.join(" ") });
         toast.success("Borrado masivo parcial");
+      } else if (blocked > 0 && failed.length === 0) {
+        setFeedback({ tone: "warning", text: "No se pudo eliminar ningun producto seleccionado porque tienen referencias activas." });
+        toast.error("Borrado masivo bloqueado");
+      } else if (failed.length > 0) {
+        throw new Error(failed[0]?.message || "No se pudieron eliminar los productos seleccionados.");
       } else {
         setFeedback({ tone: "warning", text: "No se pudo eliminar ningun producto seleccionado." });
         toast.error("Borrado masivo bloqueado");
