@@ -10,6 +10,7 @@ import {
   ChartColumn,
   ChevronRight,
   ContactRound,
+  Gift,
   Headset,
   House,
   MessageSquareText,
@@ -22,7 +23,8 @@ import {
   ReceiptText,
   Receipt,
   Settings2,
-  Sparkles
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
@@ -61,6 +63,22 @@ const navItems: Array<{
     icon: ContactRound,
     module: "contacts",
     match: (pathname: string) => pathname.startsWith("/app/contacts")
+  },
+  {
+    href: "/app/sales",
+    label: "Sales",
+    description: "KPIs, oportunidades y lectura comercial del workspace",
+    icon: TrendingUp,
+    module: "sales",
+    match: (pathname: string) => pathname.startsWith("/app/sales")
+  },
+  {
+    href: "/app/loyalty",
+    label: "Loyalty",
+    description: "Puntos, recompensas y retencion por cliente",
+    icon: Gift,
+    module: "loyalty",
+    match: (pathname: string) => pathname.startsWith("/app/loyalty")
   },
   {
     href: "/app/catalog",

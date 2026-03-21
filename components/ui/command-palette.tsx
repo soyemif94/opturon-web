@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, MessageSquare, Package, Search, Shield, Users } from "lucide-react";
+import { Building2, Gift, MessageSquare, Package, Search, Shield, TrendingUp, Users } from "lucide-react";
 import { useInboxContextOptional } from "@/components/inbox/inbox-context";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -392,6 +392,24 @@ export function CommandPalette({
         icon: <Package className="h-4 w-4" />,
         preview: () => ({ title: "Ir a Pedidos", description: "Listado operativo de pedidos del portal." }),
         run: async () => router.push("/app/orders")
+      }] : []),
+      ...(canAccessAppModule(runtime, "sales") ? [{
+        id: "nav-sales",
+        group: "navigation" as const,
+        label: "Ir a Sales",
+        description: "/app/sales",
+        icon: <TrendingUp className="h-4 w-4" />,
+        preview: () => ({ title: "Ir a Sales", description: "KPIs y lectura comercial del workspace." }),
+        run: async () => router.push("/app/sales")
+      }] : []),
+      ...(canAccessAppModule(runtime, "loyalty") ? [{
+        id: "nav-loyalty",
+        group: "navigation" as const,
+        label: "Ir a Loyalty",
+        description: "/app/loyalty",
+        icon: <Gift className="h-4 w-4" />,
+        preview: () => ({ title: "Ir a Loyalty", description: "Puntos, recompensas y canjes manuales." }),
+        run: async () => router.push("/app/loyalty")
       }] : []),
       ...(canAccessAppModule(runtime, "faqs") ? [{ id: "nav-faq", group: "navigation" as const, label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") }] : []),
       ...(canAccessAppModule(runtime, "business") ? [{ id: "nav-business", group: "navigation" as const, label: "Ir a Negocio", description: "/app/business", run: async () => router.push("/app/business") }] : []),
