@@ -29,17 +29,17 @@ export default async function AppInvoiceDetailPage({ params }: { params: Promise
     <ClientPageShell
       title={
         invoice?.invoiceNumber
-          ? `${invoice.type === "credit_note" ? "Nota de credito" : "Factura"} ${invoice.invoiceNumber}`
+          ? `${invoice.type === "credit_note" ? "Nota de credito interna" : "Comprobante interno"} ${invoice.internalDocumentNumber || invoice.invoiceNumber}`
           : invoice?.type === "credit_note"
-            ? "Detalle de nota de credito"
-            : "Detalle de factura"
+            ? "Detalle de nota de credito interna"
+            : "Detalle de comprobante interno"
       }
       description={
         invoice?.type === "credit_note"
-          ? "Panel para revisar origen, lifecycle e impacto documental negativo de la nota de credito."
-          : "Panel inicial para revisar items, lifecycle, saldo documental y asignaciones visibles del comprobante."
+          ? "Panel para revisar origen, preparacion contable e impacto documental negativo de la nota de credito."
+          : "Panel para revisar items, estado contable, saldo documental y descarga del documento interno."
       }
-      badge={invoice?.type === "credit_note" ? "Detalle de nota de credito" : "Detalle de factura"}
+      badge={invoice?.type === "credit_note" ? "Detalle contable" : "Comprobante interno"}
     >
       {invoice ? (
         <InvoiceDetailView invoice={invoice} payments={payments} readOnly={readOnly} />

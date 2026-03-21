@@ -2,7 +2,7 @@
 
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, FileText, Loader2, ReceiptText, UserRound } from "lucide-react";
+import { ArrowLeft, CreditCard, Download, FileText, Loader2, ReceiptText, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,23 @@ const EMPTY_PAYMENT_DRAFT: PaymentDraft = {
   notes: ""
 };
 
+const NO_FISCAL_LEGEND = "Documento interno no valido como factura fiscal";
+
+type AccountantDraft = {
+  documentKind: string;
+  fiscalStatus: string;
+  customerLegalName: string;
+  customerTaxId: string;
+  customerTaxIdType: string;
+  customerVatCondition: string;
+  issuerLegalName: string;
+  issuerTaxId: string;
+  issuerVatCondition: string;
+  suggestedFiscalVoucherType: string;
+  accountantNotes: string;
+  accountantReferenceNumber: string;
+};
+
 export function InvoiceDetailView({
   invoice: initialInvoice,
   payments: initialPayments,
@@ -46,6 +63,20 @@ export function InvoiceDetailView({
 }) {
   const [invoice, setInvoice] = useState(initialInvoice);
   const [payments, setPayments] = useState(Array.isArray(initialPayments) ? initialPayments : []);
+  const [accountantDraft, setAccountantDraft] = useState<AccountantDraft>({
+    documentKind: initialInvoice.documentKind || "internal_invoice",
+    fiscalStatus: initialInvoice.fiscalStatus || "draft",
+    customerLegalName: initialInvoice.customerLegalName || "",
+    customerTaxId: initialInvoice.customerTaxId || "",
+    customerTaxIdType: initialInvoice.customerTaxIdType || "NONE",
+    customerVatCondition: initialInvoice.customerVatCondition || "",
+    issuerLegalName: initialInvoice.issuerLegalName || "",
+    issuerTaxId: initialInvoice.issuerTaxId || "",
+    issuerVatCondition: initialInvoice.issuerVatCondition || "",
+    suggestedFiscalVoucherType: initialInvoice.suggestedFiscalVoucherType || "NONE",
+    accountantNotes: initialInvoice.accountantNotes || "",
+    accountantReferenceNumber: initialInvoice.accountantReferenceNumber || ""
+  });
   const [paymentDraft, setPaymentDraft] = useState<PaymentDraft>({
     ...EMPTY_PAYMENT_DRAFT,
     amount: initialInvoice.outstandingAmount > 0 ? String(initialInvoice.outstandingAmount) : ""
@@ -115,6 +146,20 @@ export function InvoiceDetailView({
     }
 
     setInvoice(invoiceJson?.invoice || initialInvoice);
+    setAccountantDraft({
+      documentKind: invoiceJson?.invoice?.documentKind || "internal_invoice",
+      fiscalStatus: invoiceJson?.invoice?.fiscalStatus || "draft",
+      customerLegalName: invoiceJson?.invoice?.customerLegalName || "",
+      customerTaxId: invoiceJson?.invoice?.customerTaxId || "",
+      customerTaxIdType: invoiceJson?.invoice?.customerTaxIdType || "NONE",
+      customerVatCondition: invoiceJson?.invoice?.customerVatCondition || "",
+      issuerLegalName: invoiceJson?.invoice?.issuerLegalName || "",
+      issuerTaxId: invoiceJson?.invoice?.issuerTaxId || "",
+      issuerVatCondition: invoiceJson?.invoice?.issuerVatCondition || "",
+      suggestedFiscalVoucherType: invoiceJson?.invoice?.suggestedFiscalVoucherType || "NONE",
+      accountantNotes: invoiceJson?.invoice?.accountantNotes || "",
+      accountantReferenceNumber: invoiceJson?.invoice?.accountantReferenceNumber || ""
+    });
     setPayments(Array.isArray(paymentsJson?.payments) ? paymentsJson.payments : []);
   }
 
@@ -225,27 +270,57 @@ export function InvoiceDetailView({
     }
   }
 
+  async function saveAccounting(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusyAction("save_accounting");
+    try {
+      const response = await fetch(`/api/app/invoices/${invoice.id}/accounting`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(accountantDraft)
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "No se pudo guardar la preparacion contable."));
+      }
+      setInvoice(json?.invoice || invoice);
+      await refreshInvoiceAndPayments();
+      toast.success("Preparacion contable guardada", "El comprobante ya quedo actualizado para contador.");
+    } catch (error) {
+      toast.error("No se pudo guardar la preparacion contable", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <Button asChild variant="secondary" size="sm" className="rounded-2xl">
           <Link href="/app/invoices">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a invoices
+            Volver a comprobantes
           </Link>
         </Button>
         <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
         <Badge variant={badgeToneByStatus(invoice.status)}>{titleCaseLabel(invoice.status)}</Badge>
+        <Badge variant={badgeToneByStatus(invoice.fiscalStatus)}>{titleCaseLabel(invoice.fiscalStatus)}</Badge>
         <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
+        <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+          <a href={`/api/app/invoices/${invoice.id}/document`}>
+            <Download className="mr-2 h-4 w-4" />
+            Descargar documento
+          </a>
+        </Button>
         {!readOnly && invoice.lifecycle?.canIssue ? (
           <Button size="sm" className="rounded-2xl" onClick={() => void runInvoiceAction("issue")} disabled={busyAction !== null}>
             {busyAction === "issue" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {invoice.type === "invoice" && initialPaymentPlan && initialPaymentPlan.status !== "unpaid" ? "Emitir y registrar cobro" : "Emitir"}
+            {invoice.type === "invoice" && initialPaymentPlan && initialPaymentPlan.status !== "unpaid" ? "Emitir y registrar cobro" : "Emitir documento"}
           </Button>
         ) : null}
         {!readOnly && invoice.lifecycle?.canEdit ? (
           <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-            <Link href={`/app/invoices/${invoice.id}/edit`}>Editar draft</Link>
+            <Link href={`/app/invoices/${invoice.id}/edit`}>Editar borrador</Link>
           </Button>
         ) : null}
         {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
@@ -259,6 +334,10 @@ export function InvoiceDetailView({
             Anular
           </Button>
         ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+        {invoice.noFiscalLegend || NO_FISCAL_LEGEND}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px]">
@@ -448,6 +527,130 @@ export function InvoiceDetailView({
               </CardContent>
             </Card>
           ) : null}
+
+          <Card className="border-white/6 bg-card/90">
+            <CardHeader>
+              <div>
+                <CardTitle className="text-xl">Preparacion contable</CardTitle>
+                <CardDescription>Completa los datos minimos para contador sin mezclar esta operacion con facturacion fiscal real.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <form className="space-y-3" onSubmit={saveAccounting}>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input value={invoice.internalDocumentNumber || "-"} disabled />
+                  <select
+                    className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={accountantDraft.fiscalStatus}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, fiscalStatus: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  >
+                    <option value="draft">Borrador</option>
+                    <option value="ready_for_accountant">Listo para contador</option>
+                    <option value="delivered_to_accountant">Entregado al contador</option>
+                    <option value="invoiced_by_accountant">Facturado por contador</option>
+                  </select>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <select
+                    className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={accountantDraft.documentKind}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, documentKind: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  >
+                    <option value="internal_invoice">Comprobante interno</option>
+                    <option value="proforma">Proforma</option>
+                    <option value="order_summary">Resumen de pedido</option>
+                  </select>
+                  <select
+                    className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={accountantDraft.suggestedFiscalVoucherType}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, suggestedFiscalVoucherType: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  >
+                    <option value="NONE">Comprobante sugerido: NONE</option>
+                    <option value="A">Comprobante sugerido: A</option>
+                    <option value="B">Comprobante sugerido: B</option>
+                    <option value="C">Comprobante sugerido: C</option>
+                  </select>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    placeholder="Razon social del cliente"
+                    value={accountantDraft.customerLegalName}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, customerLegalName: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                  <Input
+                    placeholder="CUIT / DNI del cliente"
+                    value={accountantDraft.customerTaxId}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, customerTaxId: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <select
+                    className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={accountantDraft.customerTaxIdType}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, customerTaxIdType: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  >
+                    <option value="NONE">Tipo ID cliente: NONE</option>
+                    <option value="DNI">Tipo ID cliente: DNI</option>
+                    <option value="CUIT">Tipo ID cliente: CUIT</option>
+                    <option value="CUIL">Tipo ID cliente: CUIL</option>
+                  </select>
+                  <Input
+                    placeholder="Condicion IVA del cliente"
+                    value={accountantDraft.customerVatCondition}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, customerVatCondition: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    placeholder="Razon social del emisor"
+                    value={accountantDraft.issuerLegalName}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerLegalName: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                  <Input
+                    placeholder="CUIT del emisor"
+                    value={accountantDraft.issuerTaxId}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerTaxId: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    placeholder="Condicion IVA del emisor"
+                    value={accountantDraft.issuerVatCondition}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerVatCondition: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                  <Input
+                    placeholder="Referencia del contador"
+                    value={accountantDraft.accountantReferenceNumber}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, accountantReferenceNumber: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                </div>
+                <Textarea
+                  rows={4}
+                  placeholder="Observaciones para contador"
+                  value={accountantDraft.accountantNotes}
+                  onChange={(event) => setAccountantDraft((current) => ({ ...current, accountantNotes: event.target.value }))}
+                  disabled={busyAction !== null || readOnly}
+                />
+                {!readOnly ? (
+                  <Button type="submit" className="w-full rounded-2xl" disabled={busyAction !== null}>
+                    {busyAction === "save_accounting" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Guardar preparacion contable
+                  </Button>
+                ) : null}
+              </form>
+            </CardContent>
+          </Card>
 
           <Card className="border-white/6 bg-card/90">
             <CardHeader>

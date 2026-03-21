@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,14 +22,22 @@ type InvoiceFilterState = {
   status: string;
   receivableStatus: string;
   contactId: string;
+  fiscalStatus: string;
+  dateFrom: string;
+  dateTo: string;
 };
 
 const EMPTY_FILTERS: InvoiceFilterState = {
   search: "",
   status: "all",
   receivableStatus: "all",
-  contactId: "all"
+  contactId: "all",
+  fiscalStatus: "all",
+  dateFrom: "",
+  dateTo: ""
 };
+
+const NO_FISCAL_LEGEND = "Documento interno no valido como factura fiscal";
 
 export function InvoicesWorkspace({
   initialInvoices,
@@ -56,18 +64,31 @@ export function InvoicesWorkspace({
       if (filters.status !== "all" && invoice.status !== filters.status) return false;
       if (filters.receivableStatus !== "all" && invoice.receivableStatus !== filters.receivableStatus) return false;
       if (filters.contactId !== "all" && invoice.contact?.id !== filters.contactId) return false;
+      if (filters.fiscalStatus !== "all" && invoice.fiscalStatus !== filters.fiscalStatus) return false;
+
+      const referenceDate = new Date(invoice.issuedAt || invoice.createdAt || 0);
+      if (filters.dateFrom) {
+        const from = new Date(`${filters.dateFrom}T00:00:00`);
+        if (referenceDate < from) return false;
+      }
+      if (filters.dateTo) {
+        const to = new Date(`${filters.dateTo}T23:59:59`);
+        if (referenceDate > to) return false;
+      }
 
       if (!search) return true;
       const haystack = [
+        invoice.internalDocumentNumber,
         invoice.invoiceNumber,
         invoice.id,
         invoice.contact?.name,
         invoice.contact?.phone,
+        invoice.customerLegalName,
+        invoice.customerTaxId,
         invoice.type,
-        invoice.parentInvoice?.invoiceNumber,
-        invoice.parentInvoiceId,
         invoice.status,
-        invoice.receivableStatus
+        invoice.receivableStatus,
+        invoice.fiscalStatus
       ]
         .filter(Boolean)
         .join(" ")
@@ -77,12 +98,29 @@ export function InvoicesWorkspace({
     });
   }, [filters, initialInvoices]);
 
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filters.search) params.set("search", filters.search);
+    if (filters.contactId !== "all") params.set("contactId", filters.contactId);
+    if (filters.fiscalStatus !== "all") params.set("fiscalStatus", filters.fiscalStatus);
+    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+    if (filters.dateTo) params.set("dateTo", filters.dateTo);
+    return `/api/app/invoices/export?${params.toString()}`;
+  }, [filters]);
+
   return (
     <Card className="border-white/6 bg-card/90">
       <CardHeader
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warning">{NO_FISCAL_LEGEND}</Badge>
             <Badge variant="muted">{filteredInvoices.length} visibles</Badge>
+            <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+              <a href={exportHref}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar CSV
+              </a>
+            </Button>
             {!readOnly ? (
               <Button asChild size="sm" className="rounded-2xl">
                 <Link href="/app/invoices/new">Nuevo borrador</Link>
@@ -92,31 +130,46 @@ export function InvoicesWorkspace({
         }
       >
         <div>
-          <CardTitle className="text-xl">Listado de facturas</CardTitle>
-          <CardDescription>Filtros cortos para leer estado documental y cobranza sin convertir esto en un backoffice pesado.</CardDescription>
+          <CardTitle className="text-xl">Listado de comprobantes internos</CardTitle>
+          <CardDescription>Filtra por estado contable, fecha y cliente para preparar lote de entrega al estudio contable.</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_180px_200px_220px]">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_180px_180px_220px_160px_160px]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
               className="pl-10"
-              placeholder="Buscar por numero, contacto o estado"
+              placeholder="Buscar por numero, cliente, CUIT o estado"
               value={filters.search}
               onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
             />
           </div>
           <select
             className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-            value={filters.status}
-            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+            value={filters.fiscalStatus}
+            onChange={(event) => setFilters((current) => ({ ...current, fiscalStatus: event.target.value }))}
           >
-            <option value="all">Todos los estados</option>
+            <option value="all">Todo estado contable</option>
             <option value="draft">Borrador</option>
-            <option value="issued">Emitida</option>
-            <option value="void">Anulada</option>
+            <option value="ready_for_accountant">Listo para contador</option>
+            <option value="delivered_to_accountant">Entregado al contador</option>
+            <option value="invoiced_by_accountant">Facturado por contador</option>
           </select>
+          <select
+            className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+            value={filters.contactId}
+            onChange={(event) => setFilters((current) => ({ ...current, contactId: event.target.value }))}
+          >
+            <option value="all">Todos los clientes</option>
+            {contactOptions.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.name}
+              </option>
+            ))}
+          </select>
+          <Input type="date" value={filters.dateFrom} onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))} />
+          <Input type="date" value={filters.dateTo} onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))} />
           <select
             className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
             value={filters.receivableStatus}
@@ -129,78 +182,58 @@ export function InvoicesWorkspace({
             <option value="overpaid">Sobrepagada</option>
             <option value="not_applicable">No aplica</option>
           </select>
-          <select
-            className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-            value={filters.contactId}
-            onChange={(event) => setFilters((current) => ({ ...current, contactId: event.target.value }))}
-          >
-            <option value="all">Todos los contactos</option>
-            {contactOptions.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contact.name}
-              </option>
-            ))}
-          </select>
         </div>
 
         {!filteredInvoices.length ? (
           <EmptyState
-            title="No hay facturas para este filtro"
-            description="Prueba con otro estado, cobranza o contacto para volver a ver documentos."
+            title="No hay comprobantes para este filtro"
+            description="Prueba con otro estado contable, rango de fechas o cliente para volver a ver documentos."
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
-            <div className="min-w-[1500px]">
-              <div className="grid grid-cols-[120px_120px_minmax(280px,1.45fr)_180px_180px_180px_160px_150px_240px] gap-5 border-b border-[color:var(--border)] bg-surface/70 px-5 py-3 text-xs uppercase tracking-[0.16em] text-muted">
-                <span className="leading-snug">Tipo</span>
-                <span className="leading-snug">Estado</span>
-                <span className="leading-snug">Contacto</span>
-                <span className="leading-snug">Total</span>
-                <span className="leading-snug">Cobrado</span>
-                <span className="leading-snug">Pendiente</span>
-                <span className="leading-snug">Cobranza</span>
-                <span className="leading-snug">Fecha</span>
-                <span className="leading-snug">Acción</span>
+            <div className="min-w-[1700px]">
+              <div className="grid grid-cols-[160px_180px_minmax(260px,1.35fr)_150px_170px_150px_150px_150px_220px] gap-5 border-b border-[color:var(--border)] bg-surface/70 px-5 py-3 text-xs uppercase tracking-[0.16em] text-muted">
+                <span>Documento</span>
+                <span>Estado contable</span>
+                <span>Cliente</span>
+                <span>Total</span>
+                <span>Cobranza</span>
+                <span>Emitido</span>
+                <span>Comprobante sug.</span>
+                <span>Tipo</span>
+                <span>Accion</span>
               </div>
               {filteredInvoices.map((invoice) => (
                 <div
                   key={invoice.id}
-                  className="grid grid-cols-[120px_120px_minmax(280px,1.45fr)_180px_180px_180px_160px_150px_240px] gap-5 border-b border-[color:var(--border)] px-5 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
+                  className="grid grid-cols-[160px_180px_minmax(260px,1.35fr)_150px_170px_150px_150px_150px_220px] gap-5 border-b border-[color:var(--border)] px-5 py-4 transition-colors hover:bg-surface/35 last:border-b-0"
                 >
-                  <div className="flex items-center">
-                    <div className="space-y-1">
-                      <Badge variant={badgeToneByStatus(invoice.type)}>{titleCaseLabel(invoice.type)}</Badge>
-                      <p className="text-xs leading-snug text-muted">{getInvoiceDocumentKindLabel(invoice.metadata)}</p>
-                    </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">{invoice.internalDocumentNumber || invoice.invoiceNumber || invoice.id.slice(0, 8)}</p>
+                    <p className="text-xs text-muted">{getInvoiceDocumentKindLabel({ documentKind: invoice.documentKind || invoice.metadata?.documentKind })}</p>
                   </div>
                   <div className="flex items-center">
-                    <Badge variant={badgeToneByStatus(invoice.status)}>{titleCaseLabel(invoice.status)}</Badge>
+                    <Badge variant={badgeToneByStatus(invoice.fiscalStatus)}>{titleCaseLabel(invoice.fiscalStatus)}</Badge>
                   </div>
-                  <div className="min-w-0 pr-2">
-                    <p className="truncate font-medium">{invoice.contact?.name || "Sin contacto"}</p>
-                    <p className="mt-1 truncate text-sm text-muted">{invoice.invoiceNumber || invoice.id.slice(0, 8)}</p>
-                    {invoice.type === "credit_note" ? (
-                      <p className="mt-1 truncate text-xs leading-snug text-amber-200">
-                        Sobre {invoice.parentInvoice?.invoiceNumber || invoice.parentInvoiceId || "factura origen"}
-                      </p>
-                    ) : null}
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{invoice.customerLegalName || invoice.contact?.name || "Sin cliente"}</p>
+                    <p className="mt-1 truncate text-sm text-muted">{invoice.customerTaxId || invoice.contact?.phone || "Sin identificacion"}</p>
                   </div>
-                  <MoneyStack primary={formatMoney(invoice.totalAmount, invoice.currency)} secondary={`Impacto ${formatMoney(invoice.balanceImpact?.amount, invoice.currency)}`} />
-                  <MoneyStack primary={formatMoney(invoice.paidAmount, invoice.currency)} secondary="Cobrado" positive />
-                  <MoneyStack primary={formatMoney(invoice.outstandingAmount, invoice.currency)} secondary="Pendiente" warning />
-                  <div className="flex items-center">
+                  <MoneyStack primary={formatMoney(invoice.totalAmount, invoice.currency)} secondary="Total interno" />
+                  <div className="space-y-1">
                     <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
+                    <p className="text-xs text-muted">{formatMoney(invoice.paidAmount, invoice.currency)} cobrados</p>
                   </div>
                   <div className="text-sm text-muted">{formatDateLabel(invoice.issuedAt || invoice.createdAt)}</div>
+                  <div className="text-sm text-muted">{invoice.suggestedFiscalVoucherType || "NONE"}</div>
+                  <div className="text-sm text-muted">{titleCaseLabel(invoice.type)}</div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                       <Link href={`/app/invoices/${invoice.id}`}>Ver detalle</Link>
                     </Button>
-                    {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
-                      <Button asChild size="sm" className="rounded-2xl">
-                        <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
-                      </Button>
-                    ) : null}
+                    <Button asChild size="sm" className="rounded-2xl">
+                      <a href={`/api/app/invoices/${invoice.id}/document`}>Descargar</a>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -214,18 +247,14 @@ export function InvoicesWorkspace({
 
 function MoneyStack({
   primary,
-  secondary,
-  positive = false,
-  warning = false
+  secondary
 }: {
   primary: string;
   secondary: string;
-  positive?: boolean;
-  warning?: boolean;
 }) {
   return (
     <div className="min-w-0 pr-2">
-      <p className={`font-medium ${positive ? "text-emerald-300" : warning ? "text-amber-300" : ""}`}>{primary}</p>
+      <p className="font-medium">{primary}</p>
       <p className="mt-1 truncate text-sm leading-snug text-muted">{secondary}</p>
     </div>
   );

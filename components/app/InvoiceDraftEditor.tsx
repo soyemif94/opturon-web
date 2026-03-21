@@ -94,7 +94,7 @@ function buildInitialState(invoice?: PortalInvoice | null, parentInvoice?: Porta
         ? invoice.metadata.documentKind
         : typeof parentInvoice?.metadata?.documentKind === "string"
           ? parentInvoice.metadata.documentKind
-          : "invoice_c",
+          : "internal_invoice",
     parentInvoiceId: invoice?.parentInvoiceId || parentInvoice?.id || "",
     initialPaymentStatus: inferredType === "credit_note" ? "unpaid" : initialPaymentStatus,
     initialPaymentAmount:
@@ -244,7 +244,7 @@ export function InvoiceDraftEditor({
 
     const validItems = computed.items.filter((item) => item.descriptionSnapshot.trim());
     if (!draft.contactId) {
-      toast.error("Contacto requerido", "Selecciona un contacto antes de guardar la invoice.");
+      toast.error("Contacto requerido", "Selecciona un contacto antes de guardar el comprobante.");
       return;
     }
     if (!validItems.length) {
@@ -260,7 +260,7 @@ export function InvoiceDraftEditor({
       return;
     }
     if (isCreditNote && !draft.parentInvoiceId) {
-      toast.error("Factura origen requerida", "Selecciona la factura emitida sobre la que vas a crear la nota de credito.");
+      toast.error("Comprobante origen requerido", "Selecciona el comprobante emitido sobre el que vas a crear la nota de credito.");
       return;
     }
     const absoluteTotal = Math.abs(Number(computed.totalAmount || 0));
@@ -276,7 +276,7 @@ export function InvoiceDraftEditor({
       }
     }
     if (!isCreditNote && draft.initialPaymentStatus === "paid" && absoluteTotal <= 0) {
-      toast.error("Total invalido", "La factura necesita un total mayor a cero para marcarla como paga al emitir.");
+      toast.error("Total invalido", "El comprobante necesita un total mayor a cero para marcarlo como cobrado al emitir.");
       return;
     }
 
@@ -317,7 +317,7 @@ export function InvoiceDraftEditor({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo guardar la invoice draft."));
+        throw new Error(String(json?.error || "No se pudo guardar el borrador."));
       }
 
       const nextInvoice = json?.invoice;
@@ -328,7 +328,7 @@ export function InvoiceDraftEditor({
       router.push(`/app/invoices/${nextInvoice.id}`);
       router.refresh();
     } catch (error) {
-      toast.error("No se pudo guardar la invoice", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo guardar el comprobante", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setSaving(false);
     }

@@ -20,9 +20,9 @@ export default async function AppInvoicesPage() {
 
   return (
     <ClientPageShell
-      title="Facturas"
-      description="Primera vista operativa de facturacion para revisar documentos internos, saldo documental y cobranza sobre cada factura."
-      badge="Facturacion"
+      title="Comprobantes internos"
+      description="Pre-facturacion operativa para preparar documentos internos, revisar cobranza y dejar cada comprobante listo para contador."
+      badge="Pre-facturacion"
     >
       <InvoicesWorkspace initialInvoices={invoices} readOnly={readOnly} />
     </ClientPageShell>

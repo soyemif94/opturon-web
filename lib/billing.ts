@@ -19,18 +19,16 @@ export function formatMoney(amount: number | null | undefined, currency = "ARS")
 }
 
 export const INVOICE_DOCUMENT_KIND_OPTIONS = [
-  { value: "invoice_a", label: "Factura A" },
-  { value: "invoice_b", label: "Factura B" },
-  { value: "invoice_c", label: "Factura C" },
-  { value: "delivery_note", label: "Remito" }
+  { value: "internal_invoice", label: "Comprobante interno" },
+  { value: "proforma", label: "Proforma" },
+  { value: "order_summary", label: "Resumen de pedido" }
 ] as const;
 
 export const BILLING_DOCUMENT_SELECTOR_OPTIONS = [
-  { value: "invoice_a", label: "Factura A" },
-  { value: "invoice_b", label: "Factura B" },
-  { value: "invoice_c", label: "Factura C" },
-  { value: "delivery_note", label: "Remito" },
-  { value: "credit_note", label: "Nota de credito vinculada" }
+  { value: "internal_invoice", label: "Comprobante interno" },
+  { value: "proforma", label: "Proforma" },
+  { value: "order_summary", label: "Resumen de pedido" },
+  { value: "credit_note", label: "Nota de credito interna" }
 ] as const;
 
 export const BILLING_CURRENCY_OPTIONS = [
@@ -59,8 +57,10 @@ export const PAYMENT_DESTINATION_OPTIONS = [
 
 export function getInvoiceDocumentKindLabel(metadata: Record<string, unknown> | null | undefined) {
   const raw = String(metadata?.documentKind || "").trim().toLowerCase();
+  if (["invoice_a", "invoice_b", "invoice_c"].includes(raw)) return "Comprobante interno";
+  if (raw === "delivery_note") return "Resumen de pedido";
   const match = INVOICE_DOCUMENT_KIND_OPTIONS.find((option) => option.value === raw);
-  return match?.label || "Factura C";
+  return match?.label || "Comprobante interno";
 }
 
 export function parseLocalizedMoneyInput(value: string | number | null | undefined) {
@@ -169,6 +169,13 @@ export function badgeToneByStatus(value: string | null | undefined): "muted" | "
 export function titleCaseLabel(value: string | null | undefined) {
   const normalized = String(value || "").trim();
   if (!normalized) return "-";
+  const lower = normalized.toLowerCase();
+  if (lower === "invoice") return "Comprobante";
+  if (lower === "credit_note") return "Nota de credito";
+  if (lower === "issued") return "Emitido";
+  if (lower === "ready_for_accountant") return "Listo para contador";
+  if (lower === "delivered_to_accountant") return "Entregado al contador";
+  if (lower === "invoiced_by_accountant") return "Facturado por contador";
   const dictionary: Record<string, string> = {
     invoice: "Factura",
     credit_note: "Nota de crédito",
@@ -198,7 +205,6 @@ export function titleCaseLabel(value: string | null | undefined) {
     warning: "Advertencia",
     danger: "Riesgo"
   };
-  const lower = normalized.toLowerCase();
   if (dictionary[lower]) return dictionary[lower];
   return normalized
     .replace(/_/g, " ")

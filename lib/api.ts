@@ -893,8 +893,11 @@ export type PortalInvoice = {
   orderId: string | null;
   parentInvoiceId: string | null;
   invoiceNumber: string | null;
+  internalDocumentNumber: string | null;
   type: string;
   status: string;
+  documentKind: string;
+  fiscalStatus: string;
   documentMode: string;
   providerStatus: string | null;
   currency: string;
@@ -905,6 +908,20 @@ export type PortalInvoice = {
   dueAt: string | null;
   externalProvider: string | null;
   externalReference: string | null;
+  customerTaxId: string | null;
+  customerTaxIdType: string;
+  customerLegalName: string | null;
+  customerVatCondition: string | null;
+  issuerLegalName: string | null;
+  issuerTaxId: string | null;
+  issuerVatCondition: string | null;
+  suggestedFiscalVoucherType: string;
+  accountantNotes: string | null;
+  deliveredToAccountantAt: string | null;
+  invoicedByAccountantAt: string | null;
+  accountantReferenceNumber: string | null;
+  noFiscal?: boolean;
+  noFiscalLegend?: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -1276,6 +1293,34 @@ export async function updatePortalInvoice(
 ) {
   return backendFetch<{ success: boolean; data: PortalInvoice }>(
     `/portal/tenants/${tenantId}/invoices/${invoiceId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function updatePortalInvoiceAccounting(
+  tenantId: string,
+  invoiceId: string,
+  payload: {
+    documentKind?: string;
+    fiscalStatus?: string;
+    customerTaxId?: string | null;
+    customerTaxIdType?: string;
+    customerLegalName?: string | null;
+    customerVatCondition?: string | null;
+    issuerLegalName?: string | null;
+    issuerTaxId?: string | null;
+    issuerVatCondition?: string | null;
+    suggestedFiscalVoucherType?: string;
+    accountantNotes?: string | null;
+    accountantReferenceNumber?: string | null;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalInvoice }>(
+    `/portal/tenants/${tenantId}/invoices/${invoiceId}/accounting`,
     {
       method: "PATCH",
       body: JSON.stringify(payload)
