@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  deletePortalProduct,
   getBackendErrorStatus,
   getPortalProductDetail,
   isBackendConfigured,
@@ -76,6 +77,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       NextResponse.json(
         {
           error: error instanceof Error ? error.message : "backend_update_failed"
+        },
+        { status: getBackendErrorStatus(error) || 502 }
+      )
+    );
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
+  if (tenantContext.error) return tenantContext.error;
+  if (!isBackendConfigured()) {
+    return noStore(NextResponse.json({ error: "catalog_backend_unavailable" }, { status: 503 }));
+  }
+
+  const { id } = await params;
+
+  try {
+    const result = await deletePortalProduct(tenantContext.tenantId, id);
+    return noStore(NextResponse.json({ ok: true, productId: result.data.productId }));
+  } catch (error) {
+    return noStore(
+      NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "backend_delete_failed"
         },
         { status: getBackendErrorStatus(error) || 502 }
       )

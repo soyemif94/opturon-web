@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type ComponentType, type FormEvent, useMemo, useState } from "react";
-import { ArrowRight, Boxes, Package, PencilLine, ScanLine, Search, Upload, Warehouse } from "lucide-react";
+import { ArrowRight, Boxes, CheckSquare, ChevronDown, ChevronUp, Package, PencilLine, ScanLine, Search, Trash2, Upload, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +85,7 @@ const BULK_EXAMPLE = [
 export function CatalogManager({ initialProducts, readOnly = false }: { initialProducts: Product[]; readOnly?: boolean }) {
   const [products, setProducts] = useState(Array.isArray(initialProducts) ? initialProducts : []);
   const [selectedId, setSelectedId] = useState<string | null>(initialProducts[0]?.id || null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [bulkText, setBulkText] = useState("");
@@ -93,8 +94,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
+  const [listExpanded, setListExpanded] = useState(true);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedId) || null,
@@ -125,6 +129,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   }, [products, search]);
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
+  const allVisibleSelected = filteredProducts.length > 0 && filteredProducts.every((product) => selectedIds.includes(product.id));
+  const selectedVisibleCount = filteredProducts.filter((product) => selectedIds.includes(product.id)).length;
 
   function hydrateDraft(product?: Product | null): Draft {
     return {
@@ -146,6 +152,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     const nextProducts = Array.isArray(json?.products) ? json.products : [];
     setProducts(nextProducts);
+    setSelectedIds((current) => current.filter((id) => nextProducts.some((product: Product) => product.id === id)));
 
     const nextSelected =
       nextProducts.find((product: Product) => product.id === preferredId) ||
@@ -155,6 +162,27 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     setSelectedId(nextSelected?.id || null);
     return nextSelected;
+  }
+
+  function toggleSelection(productId: string) {
+    setSelectedIds((current) => (
+      current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId]
+    ));
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedIds((current) => current.filter((id) => !filteredProducts.some((product) => product.id === id)));
+      return;
+    }
+
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      filteredProducts.forEach((product) => next.add(product.id));
+      return Array.from(next);
+    });
   }
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
@@ -335,6 +363,89 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
   }
 
+  async function deleteProduct(product: Product) {
+    if (readOnly) return;
+
+    const confirmed = window.confirm(`Se eliminara "${product.name}". Esta accion no se puede deshacer.`);
+    if (!confirmed) return;
+
+    setDeletingId(product.id);
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`/api/app/catalog/${product.id}`, {
+        method: "DELETE"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.error || "No se pudo eliminar el producto.");
+      }
+
+      await reloadProducts(selectedId === product.id ? null : selectedId);
+      setSelectedIds((current) => current.filter((id) => id !== product.id));
+      setFeedback({ tone: "success", text: `Producto eliminado: ${product.name}.` });
+      toast.success("Producto eliminado");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo eliminar el producto.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al eliminar producto", message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function deleteSelectedProducts() {
+    if (readOnly || selectedIds.length === 0) return;
+
+    const names = products.filter((product) => selectedIds.includes(product.id)).map((product) => product.name);
+    const confirmed = window.confirm(
+      `Se eliminaran ${selectedIds.length} producto(s): ${names.slice(0, 3).join(", ")}${names.length > 3 ? "..." : ""}.`
+    );
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    setFeedback(null);
+
+    let deleted = 0;
+    let blocked = 0;
+
+    try {
+      for (const productId of selectedIds) {
+        const response = await fetch(`/api/app/catalog/${productId}`, { method: "DELETE" });
+        if (response.ok) {
+          deleted += 1;
+          continue;
+        }
+
+        const json = await response.json().catch(() => null);
+        blocked += 1;
+        if (json?.error === "product_delete_blocked") {
+          continue;
+        }
+      }
+
+      await reloadProducts(selectedId);
+      setSelectedIds([]);
+
+      if (deleted > 0 && blocked === 0) {
+        setFeedback({ tone: "success", text: `Se eliminaron ${deleted} productos seleccionados.` });
+        toast.success("Productos eliminados");
+      } else if (deleted > 0) {
+        setFeedback({ tone: "warning", text: `Se eliminaron ${deleted} productos y ${blocked} no pudieron borrarse por referencias activas.` });
+        toast.success("Borrado masivo parcial");
+      } else {
+        setFeedback({ tone: "warning", text: "No se pudo eliminar ningun producto seleccionado." });
+        toast.error("Borrado masivo bloqueado");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudieron eliminar los productos seleccionados.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al eliminar seleccionados", message);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -354,7 +465,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
       {readOnly ? (
         <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-200">
-          Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear ni editar.
+          Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear, editar ni eliminar.
         </div>
       ) : null}
 
@@ -409,10 +520,20 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">{filteredProducts.length} visibles</Badge>}>
+          <CardHeader
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="muted">{filteredProducts.length} visibles</Badge>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setListExpanded((current) => !current)}>
+                  {listExpanded ? "Colapsar" : "Expandir"}
+                  {listExpanded ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
+                </Button>
+              </div>
+            }
+          >
             <div>
               <CardTitle className="text-xl">Catalogo del negocio</CardTitle>
-              <CardDescription>Lista simple de productos con precio, stock y estado operativo para usar luego en pedidos y commerce conversacional.</CardDescription>
+              <CardDescription>Lista operativa de productos con precio, stock y estado para revisar rapido, seleccionar en bloque y limpiar catalogo sin perder contexto.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -425,7 +546,32 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
-            {products.length === 0 ? (
+            {products.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <CheckSquare className="h-4 w-4 text-brandBright" />
+                  <span>{selectedIds.length} seleccionados</span>
+                  {selectedVisibleCount > 0 ? <span>· {selectedVisibleCount} visibles</span> : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={toggleSelectAllVisible}>
+                    {allVisibleSelected ? "Limpiar visibles" : "Seleccionar todo"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
+                    Limpiar seleccion
+                  </Button>
+                  <Button type="button" variant="destructive" size="sm" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    {bulkDeleting ? "Eliminando..." : "Eliminar seleccionados"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {!listExpanded && products.length > 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+                Listado colapsado para ahorrar espacio operativo. Mantienes buscador y acciones masivas listas para expandir cuando necesites revisar productos.
+              </div>
+            ) : products.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
                 Todavia no hay productos. Crea el primero desde el panel lateral o pega varias lineas en carga masiva para poblar rapido el catalogo.
               </div>
@@ -442,21 +588,30 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   }`}
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold">{product.name}</p>
-                        <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
-                          {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
-                        </Badge>
-                        <Badge variant={getStockState(resolveStock(product)).variant}>
-                          {getStockState(resolveStock(product)).label}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 text-sm text-muted">
-                        {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
-                    </button>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(product.id)}
+                        onChange={() => toggleSelection(product.id)}
+                        className="mt-1 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
+                        aria-label={`Seleccionar ${product.name}`}
+                      />
+                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold">{product.name}</p>
+                          <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
+                            {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
+                          </Badge>
+                          <Badge variant={getStockState(resolveStock(product)).variant}>
+                            {getStockState(resolveStock(product)).label}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-muted">
+                          {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
+                      </button>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
@@ -468,6 +623,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       </Button>
                       <Button type="button" variant="secondary" size="sm" disabled={readOnly || statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
                         {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Archivar" : "Activar"}
+                      </Button>
+                      <Button type="button" variant="destructive" size="sm" disabled={readOnly || deletingId === product.id || bulkDeleting} onClick={() => void deleteProduct(product)}>
+                        <Trash2 className="mr-1 h-4 w-4" />
+                        {deletingId === product.id ? "Eliminando..." : "Eliminar"}
                       </Button>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={`/app/catalog/${product.id}`}>
@@ -843,3 +1002,5 @@ function formatDate(value?: string | null) {
     timeStyle: "short"
   }).format(date);
 }
+
+

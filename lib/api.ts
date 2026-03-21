@@ -1201,6 +1201,16 @@ export async function getPortalProducts(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
 }
 
+export async function deletePortalProduct(tenantId: string, productId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      productId: string;
+    };
+  }>(`/portal/tenants/${tenantId}/products/${productId}`, { method: "DELETE" }, false);
+}
+
 export async function getPortalInvoices(tenantId: string) {
   return backendFetch<{
     success: boolean;
