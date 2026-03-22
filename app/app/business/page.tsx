@@ -6,12 +6,26 @@ import { readSaasData } from "@/lib/saas/store";
 
 const EMPTY_SETTINGS = {
   tenantId: "",
+  legalName: "",
+  taxId: "",
+  taxIdType: "NONE",
+  vatCondition: "",
+  grossIncomeNumber: "",
+  fiscalAddress: "",
+  city: "",
+  province: "",
+  pointOfSaleSuggested: "",
+  defaultSuggestedFiscalVoucherType: "NONE",
+  accountantEmail: "",
+  accountantName: "",
   openingHours: "",
   address: "",
   deliveryZones: "",
   paymentMethods: "",
   policies: ""
 };
+
+type BusinessProfilePageSettings = typeof EMPTY_SETTINGS;
 
 export default async function BusinessPage() {
   const ctx = await requireAppPage({ permission: "manage_workspace" });
@@ -23,14 +37,18 @@ export default async function BusinessPage() {
         ctx.tenantId && isBackendConfigured() ? await getPortalBusinessSettings(ctx.tenantId).catch(() => null) : null;
       const tenantContext =
         ctx.tenantId && isBackendConfigured() ? await getPortalTenantContext(ctx.tenantId).catch(() => null) : null;
-      const realTenantSettings = settingsResult?.data.settings || { ...EMPTY_SETTINGS, tenantId: ctx.tenantId || "" };
+      const realTenantSettings: BusinessProfilePageSettings = {
+        ...EMPTY_SETTINGS,
+        ...(settingsResult?.data.settings || {}),
+        tenantId: ctx.tenantId || settingsResult?.data.settings?.tenantId || ""
+      };
       const clinicName = tenantContext?.data?.clinic?.name || settingsResult?.data.settings?.clinicName || "Workspace del cliente";
 
       return (
         <ClientPageShell
-          title="Perfil del negocio"
-          description="Configura la informacion principal de tu negocio para que el equipo, el canal y las automatizaciones respondan con mejor contexto."
-          badge="Ficha operativa"
+          title="Perfil fiscal del negocio"
+          description="Centraliza los datos del emisor para que los comprobantes internos salgan listos para contador sin recargar cada documento."
+          badge="Perfil emisor"
         >
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_320px]">
             <BusinessSettingsForm
@@ -41,10 +59,10 @@ export default async function BusinessPage() {
 
             <div className="space-y-4">
               <div className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado del workspace</p>
-                <p className="mt-3 text-xl font-semibold">Perfil operativo conectado al backend tenant-scoped</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado del perfil fiscal</p>
+                <p className="mt-3 text-xl font-semibold">Fuente central del emisor conectada al workspace</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Los datos del negocio se guardan sobre la clínica real del workspace y se mantienen después de refrescar.
+                  Los datos del negocio se guardan sobre la clinica real del workspace y alimentan por default la pre-facturacion contable.
                 </p>
               </div>
             </div>
@@ -58,20 +76,29 @@ export default async function BusinessPage() {
     const businessSettings = Array.isArray(data.businessSettings) ? data.businessSettings : [];
     const tenantId = tenants[0]?.id || "";
     const tenant = tenants.find((item) => item.id === tenantId) || null;
-    const settings =
-      businessSettings.find((item) => item?.tenantId === tenantId) || {
-        ...EMPTY_SETTINGS,
-        tenantId
-      };
-    const profileFields = [settings.openingHours, settings.address, settings.deliveryZones, settings.paymentMethods, settings.policies];
-    const completedFields = profileFields.filter((value) => String(value || "").trim().length > 0).length;
+    const settings: BusinessProfilePageSettings = {
+      ...EMPTY_SETTINGS,
+      ...(businessSettings.find((item) => item?.tenantId === tenantId) || {}),
+      tenantId
+    };
+    const profileFields = [
+      settings.legalName,
+      settings.taxId,
+      settings.vatCondition,
+      settings.fiscalAddress,
+      settings.pointOfSaleSuggested,
+      settings.defaultSuggestedFiscalVoucherType,
+      settings.accountantName,
+      settings.accountantEmail
+    ];
+    const completedFields = profileFields.filter((value) => String(value || "").trim().length > 0 && value !== "NONE").length;
     const completionLabel = `${completedFields} de ${profileFields.length} bloques cargados`;
 
     return (
       <ClientPageShell
-        title="Perfil del negocio"
-        description="Configura la informacion principal de tu negocio para que el equipo, el canal y las automatizaciones respondan con mejor contexto."
-        badge="Ficha operativa"
+        title="Perfil fiscal del negocio"
+        description="Centraliza los datos del emisor para que los comprobantes internos salgan listos para contador sin recargar cada documento."
+        badge="Perfil emisor"
       >
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_320px]">
           <BusinessSettingsForm initialSettings={settings} tenantName={tenant?.name} tenantIndustry={tenant?.industry} />
@@ -82,10 +109,10 @@ export default async function BusinessPage() {
               <p className="mt-3 text-xl font-semibold">{tenant?.name || "Tu negocio"}</p>
               <p className="mt-1 text-sm text-muted">{tenant?.industry || "Operacion comercial"}</p>
               <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Completitud del perfil</p>
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Completitud fiscal</p>
                 <p className="mt-2 text-lg font-semibold">{completionLabel}</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Estos datos ayudan a ordenar la atencion, mejorar respuestas y darle mas contexto al canal y a las automatizaciones.
+                  Estos datos completan mejor al emisor, mejoran la pre-facturacion y ordenan el envio de lotes al contador.
                 </p>
               </div>
             </div>
@@ -94,9 +121,9 @@ export default async function BusinessPage() {
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Por que importa</p>
               <div className="mt-4 space-y-3">
                 {[
-                  "Un horario claro mejora respuestas fuera de horario y la experiencia del cliente.",
-                  "La direccion y la zona de atencion ayudan a orientar mejor consultas y seguimiento comercial.",
-                  "Medios de pago y politicas hacen que el equipo y el bot respondan con mas consistencia."
+                  "Una razon social, CUIT y condicion IVA consistentes reducen correcciones manuales en cada comprobante.",
+                  "El punto de venta sugerido y el tipo de comprobante orientan mejor al contador sin mezclar numeracion fiscal real.",
+                  "Tener el contacto del estudio contable centralizado ordena la entrega de lotes y el seguimiento posterior."
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
                     {item}
@@ -112,9 +139,9 @@ export default async function BusinessPage() {
     console.error("[app/business] Failed to render business page.", error);
     return (
       <ClientPageShell
-        title="Perfil del negocio"
-        description="Configura la informacion principal de tu negocio para que el equipo, el canal y las automatizaciones respondan con mejor contexto."
-        badge="Ficha operativa"
+        title="Perfil fiscal del negocio"
+        description="Centraliza los datos del emisor para que los comprobantes internos salgan listos para contador sin recargar cada documento."
+        badge="Perfil emisor"
       >
         <BusinessSettingsForm initialSettings={{ ...EMPTY_SETTINGS, tenantId: ctx.tenantId || "" }} />
       </ClientPageShell>

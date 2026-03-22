@@ -1,16 +1,31 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useMemo, useState } from "react";
 import { toast } from "@/components/ui/toast";
 
 type Settings = {
   tenantId?: string;
+  legalName?: string;
+  taxId?: string;
+  taxIdType?: string;
+  vatCondition?: string;
+  grossIncomeNumber?: string;
+  fiscalAddress?: string;
+  city?: string;
+  province?: string;
+  pointOfSaleSuggested?: string;
+  defaultSuggestedFiscalVoucherType?: string;
+  accountantEmail?: string;
+  accountantName?: string;
   openingHours?: string;
   address?: string;
   deliveryZones?: string;
   paymentMethods?: string;
   policies?: string;
 };
+
+const TAX_ID_TYPES = ["NONE", "DNI", "CUIT", "CUIL"] as const;
+const VOUCHER_TYPES = ["NONE", "A", "B", "C"] as const;
 
 export function BusinessSettingsForm({
   initialSettings,
@@ -27,46 +42,42 @@ export function BusinessSettingsForm({
     tone: null,
     text: ""
   });
+
   const completion = useMemo(() => {
-    const values = [form.openingHours, form.address, form.deliveryZones, form.paymentMethods, form.policies];
-    const total = values.length;
-    const completed = values.filter((value) => String(value || "").trim().length > 0).length;
-    return {
-      total,
-      completed,
-      progress: total > 0 ? Math.round((completed / total) * 100) : 0
-    };
+    const values = [
+      form.legalName,
+      form.taxId,
+      form.vatCondition,
+      form.fiscalAddress,
+      form.pointOfSaleSuggested,
+      form.defaultSuggestedFiscalVoucherType,
+      form.accountantName,
+      form.accountantEmail
+    ];
+    const completed = values.filter((value) => String(value || "").trim().length > 0 && value !== "NONE").length;
+    return { total: values.length, completed, progress: Math.round((completed / values.length) * 100) };
   }, [form]);
 
   async function save(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    const hasAnyValue = Object.values(form).some((value) => String(value || "").trim().length > 0);
-    if (!hasAnyValue) {
-      setFeedback({ tone: "error", text: "Completa al menos un dato del negocio antes de guardar." });
-      toast.error("No hay cambios utiles para guardar");
-      return;
-    }
-
     setIsSaving(true);
     setFeedback({ tone: null, text: "" });
-
     try {
       const response = await fetch("/api/app/business", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
       });
-
+      const json = await safeJson(response);
       if (!response.ok) {
-        const json = await safeJson(response);
         const message = json?.error?.formErrors?.[0] || json?.detail || json?.error || "No se pudieron guardar los datos del negocio.";
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al guardar", String(message));
         return;
       }
-
-      setFeedback({ tone: "success", text: "Datos del negocio guardados correctamente." });
-      toast.success("Datos del negocio actualizados");
+      setForm(json?.settings || form);
+      setFeedback({ tone: "success", text: "Perfil fiscal y operativo guardado correctamente." });
+      toast.success("Perfil del negocio actualizado");
     } catch {
       setFeedback({ tone: "error", text: "Ocurrio un error de red. Reintenta en unos segundos." });
       toast.error("Error de red", "No pudimos guardar los datos del negocio.");
@@ -77,13 +88,13 @@ export function BusinessSettingsForm({
 
   return (
     <form className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm" onSubmit={save}>
-      <h1 className="text-2xl font-semibold">Datos principales del negocio</h1>
+      <h1 className="text-2xl font-semibold">Perfil fiscal y operativo del negocio</h1>
       <p className="mt-2 text-sm leading-7 text-muted">
-        Mantener este perfil actualizado ayuda a responder mejor en WhatsApp, ordenar la operacion y darle mas contexto al bot y al equipo.
+        Este perfil alimenta por default los comprobantes internos y reduce la carga manual documento por documento.
       </p>
       {tenantName || tenantIndustry ? (
         <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Perfil actual</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Workspace actual</p>
           <p className="mt-2 text-base font-semibold">{tenantName || "Tu negocio"}</p>
           <p className="mt-1 text-sm text-muted">{tenantIndustry || "Operacion comercial"}</p>
         </div>
@@ -92,12 +103,9 @@ export function BusinessSettingsForm({
       <div className="mt-5 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Checklist del perfil</p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Checklist contable</p>
             <p className="mt-1 text-base font-semibold">
-              {completion.completed} de {completion.total} bloques completados
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              Completa lo esencial para que el canal, el inbox y las automatizaciones trabajen con mejor contexto.
+              {completion.completed} de {completion.total} bloques fiscales completos
             </p>
           </div>
           <div className="rounded-2xl border border-[color:var(--border)] bg-bg px-4 py-3 text-sm">
@@ -111,106 +119,85 @@ export function BusinessSettingsForm({
       </div>
 
       <div className="mt-5 grid gap-5">
-        <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">Atencion y operacion</p>
-              <p className="mt-1 text-xs leading-6 text-muted">Define cuando atiendes y en que zonas operas para responder con mayor claridad.</p>
-            </div>
-            <span className="rounded-full border border-[color:var(--border)] bg-bg px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-muted">
-              Basico
-            </span>
+        <Section title="Perfil fiscal del emisor" helper="Estos datos se usan como fuente por default para los comprobantes internos nuevos.">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Razon social" value={form.legalName || ""} onChange={(v) => setForm((p) => ({ ...p, legalName: v }))} />
+            <Field label="CUIT / DNI" value={form.taxId || ""} onChange={(v) => setForm((p) => ({ ...p, taxId: v }))} />
           </div>
-          <div className="grid gap-3">
-            <Field
-              label="Horarios"
-              helper="Ejemplo: Lun a Vie de 9 a 18 hs, Sab de 10 a 13 hs."
-              placeholder="Lun a Vie 9 a 18 hs"
-              value={form.openingHours || ""}
-              onChange={(v) => setForm((p) => ({ ...p, openingHours: v }))}
-            />
-            <Field
-              label="Direccion"
-              helper="Sirve para orientar visitas, retiro en local o consultas de ubicacion."
-              placeholder="Av. Ejemplo 123, Bahia Blanca"
-              value={form.address || ""}
-              onChange={(v) => setForm((p) => ({ ...p, address: v }))}
-            />
-            <Field
-              label="Zonas de entrega o atencion"
-              helper="Indica barrios, ciudades o area de cobertura."
-              placeholder="Bahia Blanca centro, Palihue, Villa Mitre"
-              value={form.deliveryZones || ""}
-              onChange={(v) => setForm((p) => ({ ...p, deliveryZones: v }))}
-              multiline
+          <div className="grid gap-3 md:grid-cols-3">
+            <SelectField label="Tipo ID" value={form.taxIdType || "NONE"} onChange={(v) => setForm((p) => ({ ...p, taxIdType: v }))} options={TAX_ID_TYPES} />
+            <Field label="Condicion IVA" value={form.vatCondition || ""} onChange={(v) => setForm((p) => ({ ...p, vatCondition: v }))} />
+            <Field label="Ingresos Brutos" value={form.grossIncomeNumber || ""} onChange={(v) => setForm((p) => ({ ...p, grossIncomeNumber: v }))} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Direccion fiscal" value={form.fiscalAddress || ""} onChange={(v) => setForm((p) => ({ ...p, fiscalAddress: v }))} />
+            <Field label="Ciudad" value={form.city || ""} onChange={(v) => setForm((p) => ({ ...p, city: v }))} />
+            <Field label="Provincia" value={form.province || ""} onChange={(v) => setForm((p) => ({ ...p, province: v }))} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Punto de venta sugerido" value={form.pointOfSaleSuggested || ""} onChange={(v) => setForm((p) => ({ ...p, pointOfSaleSuggested: v }))} />
+            <SelectField
+              label="Comprobante sugerido por default"
+              value={form.defaultSuggestedFiscalVoucherType || "NONE"}
+              onChange={(v) => setForm((p) => ({ ...p, defaultSuggestedFiscalVoucherType: v }))}
+              options={VOUCHER_TYPES}
             />
           </div>
-        </section>
+        </Section>
 
-        <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">Condiciones comerciales</p>
-              <p className="mt-1 text-xs leading-6 text-muted">Estos datos ayudan a responder mejor sobre pagos, condiciones y reglas del negocio.</p>
-            </div>
-            <span className="rounded-full border border-[color:var(--border)] bg-bg px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-muted">
-              Recomendado
-            </span>
+        <Section title="Contacto con contador" helper="Sirve para cerrar mejor el flujo de entrega al estudio contable.">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Nombre del contador" value={form.accountantName || ""} onChange={(v) => setForm((p) => ({ ...p, accountantName: v }))} />
+            <Field label="Email del contador" value={form.accountantEmail || ""} onChange={(v) => setForm((p) => ({ ...p, accountantEmail: v }))} />
           </div>
+        </Section>
+
+        <Section title="Operacion del negocio" helper="Se mantiene la ficha operativa de Fase 1 para inbox, ventas y automatizaciones.">
           <div className="grid gap-3">
-            <Field
-              label="Medios de pago"
-              helper="Aclara metodos disponibles para evitar consultas repetidas."
-              placeholder="Transferencia, debito, credito, efectivo"
-              value={form.paymentMethods || ""}
-              onChange={(v) => setForm((p) => ({ ...p, paymentMethods: v }))}
-            />
-            <Field
-              label="Politicas"
-              helper="Incluye cambios, devoluciones, senas o condiciones importantes."
-              placeholder="Cambios dentro de las 72 hs con ticket. Senas no reembolsables."
-              value={form.policies || ""}
-              onChange={(v) => setForm((p) => ({ ...p, policies: v }))}
-              multiline
-              rows={4}
-            />
+            <Field label="Horarios" value={form.openingHours || ""} onChange={(v) => setForm((p) => ({ ...p, openingHours: v }))} />
+            <Field label="Direccion operativa" value={form.address || ""} onChange={(v) => setForm((p) => ({ ...p, address: v }))} />
+            <Field label="Zonas de entrega o atencion" value={form.deliveryZones || ""} onChange={(v) => setForm((p) => ({ ...p, deliveryZones: v }))} multiline />
+            <Field label="Medios de pago" value={form.paymentMethods || ""} onChange={(v) => setForm((p) => ({ ...p, paymentMethods: v }))} />
+            <Field label="Politicas" value={form.policies || ""} onChange={(v) => setForm((p) => ({ ...p, policies: v }))} multiline rows={4} />
           </div>
-        </section>
+        </Section>
       </div>
 
       <div className="mt-5 flex flex-col gap-3 border-t border-[color:var(--border)] pt-4 md:flex-row md:items-center md:justify-between">
         <p className="text-sm leading-6 text-muted">
-          Guarda esta ficha para que el equipo y las automatizaciones respondan con mejor contexto desde el primer mensaje.
+          Lo que cargues aqui se toma como default del emisor en los comprobantes nuevos, sin reescribir historicos.
         </p>
         <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {isSaving ? "Guardando..." : "Guardar"}
-        </button>
-        {feedback.tone ? (
-          <p className={`text-xs ${feedback.tone === "success" ? "text-green-400" : "text-red-300"}`}>{feedback.text}</p>
-        ) : null}
+          <button type="submit" disabled={isSaving} className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {isSaving ? "Guardando..." : "Guardar perfil"}
+          </button>
+          {feedback.tone ? <p className={`text-xs ${feedback.tone === "success" ? "text-green-400" : "text-red-300"}`}>{feedback.text}</p> : null}
         </div>
       </div>
     </form>
   );
 }
 
+function Section({ title, helper, children }: { title: string; helper: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+      <div className="mb-4">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs leading-6 text-muted">{helper}</p>
+      </div>
+      <div className="grid gap-3">{children}</div>
+    </section>
+  );
+}
+
 function Field({
   label,
-  helper,
-  placeholder,
   value,
   onChange,
   multiline,
   rows
 }: {
   label: string;
-  helper?: string;
-  placeholder?: string;
   value: string;
   onChange: (v: string) => void;
   multiline?: boolean;
@@ -219,23 +206,36 @@ function Field({
   return (
     <label className="grid gap-1 text-sm">
       <span className="font-medium text-text">{label}</span>
-      {helper ? <span className="text-xs leading-5 text-muted">{helper}</span> : null}
       {multiline ? (
-        <textarea
-          className="w-full rounded-lg border border-[color:var(--border)] bg-bg p-2"
-          rows={rows || 3}
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <textarea className="w-full rounded-lg border border-[color:var(--border)] bg-bg p-2" rows={rows || 3} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
-        <input
-          className="w-full rounded-lg border border-[color:var(--border)] bg-bg p-2"
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <input className="w-full rounded-lg border border-[color:var(--border)] bg-bg p-2" value={value} onChange={(e) => onChange(e.target.value)} />
       )}
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+}) {
+  return (
+    <label className="grid gap-1 text-sm">
+      <span className="font-medium text-text">{label}</span>
+      <select className="w-full rounded-lg border border-[color:var(--border)] bg-bg p-2" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

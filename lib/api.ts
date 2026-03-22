@@ -728,6 +728,18 @@ export type PortalBusinessSettings = {
   tenantId: string;
   clinicId: string | null;
   clinicName: string | null;
+  legalName: string;
+  taxId: string;
+  taxIdType: string;
+  vatCondition: string;
+  grossIncomeNumber: string;
+  fiscalAddress: string;
+  city: string;
+  province: string;
+  pointOfSaleSuggested: string;
+  defaultSuggestedFiscalVoucherType: string;
+  accountantEmail: string;
+  accountantName: string;
   openingHours: string;
   address: string;
   deliveryZones: string;
@@ -748,7 +760,7 @@ export async function getPortalBusinessSettings(tenantId: string) {
 
 export async function patchPortalBusinessSettings(
   tenantId: string,
-  payload: Pick<PortalBusinessSettings, "openingHours" | "address" | "deliveryZones" | "paymentMethods" | "policies">
+  payload: Partial<PortalBusinessSettings>
 ) {
   return backendPortalFetch<{
     success: boolean;
@@ -914,7 +926,13 @@ export type PortalInvoice = {
   customerVatCondition: string | null;
   issuerLegalName: string | null;
   issuerTaxId: string | null;
+  issuerTaxIdType: string;
   issuerVatCondition: string | null;
+  issuerGrossIncomeNumber: string | null;
+  issuerFiscalAddress: string | null;
+  issuerCity: string | null;
+  issuerProvince: string | null;
+  pointOfSaleSuggested: string | null;
   suggestedFiscalVoucherType: string;
   accountantNotes: string | null;
   deliveredToAccountantAt: string | null;
@@ -922,6 +940,8 @@ export type PortalInvoice = {
   accountantReferenceNumber: string | null;
   noFiscal?: boolean;
   noFiscalLegend?: string | null;
+  missingDataFlags?: string[];
+  accountingComplete?: boolean;
   metadata: Record<string, unknown> | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -1313,7 +1333,13 @@ export async function updatePortalInvoiceAccounting(
     customerVatCondition?: string | null;
     issuerLegalName?: string | null;
     issuerTaxId?: string | null;
+    issuerTaxIdType?: string;
     issuerVatCondition?: string | null;
+    issuerGrossIncomeNumber?: string | null;
+    issuerFiscalAddress?: string | null;
+    issuerCity?: string | null;
+    issuerProvince?: string | null;
+    pointOfSaleSuggested?: string | null;
     suggestedFiscalVoucherType?: string;
     accountantNotes?: string | null;
     accountantReferenceNumber?: string | null;
@@ -1321,6 +1347,30 @@ export async function updatePortalInvoiceAccounting(
 ) {
   return backendFetch<{ success: boolean; data: PortalInvoice }>(
     `/portal/tenants/${tenantId}/invoices/${invoiceId}/accounting`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function updatePortalInvoicesBulkStatus(
+  tenantId: string,
+  payload: {
+    invoiceIds: string[];
+    fiscalStatus: string;
+  }
+) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      fiscalStatus: string;
+      invoices: PortalInvoice[];
+    };
+  }>(
+    `/portal/tenants/${tenantId}/invoices/bulk-status`,
     {
       method: "PATCH",
       body: JSON.stringify(payload)

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const upstreamUrl = new URL(`${getApiBase()}/portal/tenants/${tenantContext.tenantId}/invoices/export.csv`);
-    ["fiscalStatus", "contactId", "dateFrom", "dateTo", "search"].forEach((key) => {
+    ["fiscalStatus", "contactId", "dateFrom", "dateTo", "search", "documentKind", "deliveredFilter", "incompleteOnly"].forEach((key) => {
       const value = url.searchParams.get(key);
       if (value) upstreamUrl.searchParams.set(key, value);
     });

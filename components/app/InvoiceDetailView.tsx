@@ -46,7 +46,13 @@ type AccountantDraft = {
   customerVatCondition: string;
   issuerLegalName: string;
   issuerTaxId: string;
+  issuerTaxIdType: string;
   issuerVatCondition: string;
+  issuerGrossIncomeNumber: string;
+  issuerFiscalAddress: string;
+  issuerCity: string;
+  issuerProvince: string;
+  pointOfSaleSuggested: string;
   suggestedFiscalVoucherType: string;
   accountantNotes: string;
   accountantReferenceNumber: string;
@@ -72,7 +78,13 @@ export function InvoiceDetailView({
     customerVatCondition: initialInvoice.customerVatCondition || "",
     issuerLegalName: initialInvoice.issuerLegalName || "",
     issuerTaxId: initialInvoice.issuerTaxId || "",
+    issuerTaxIdType: initialInvoice.issuerTaxIdType || "NONE",
     issuerVatCondition: initialInvoice.issuerVatCondition || "",
+    issuerGrossIncomeNumber: initialInvoice.issuerGrossIncomeNumber || "",
+    issuerFiscalAddress: initialInvoice.issuerFiscalAddress || "",
+    issuerCity: initialInvoice.issuerCity || "",
+    issuerProvince: initialInvoice.issuerProvince || "",
+    pointOfSaleSuggested: initialInvoice.pointOfSaleSuggested || "",
     suggestedFiscalVoucherType: initialInvoice.suggestedFiscalVoucherType || "NONE",
     accountantNotes: initialInvoice.accountantNotes || "",
     accountantReferenceNumber: initialInvoice.accountantReferenceNumber || ""
@@ -139,10 +151,10 @@ export function InvoiceDetailView({
     const paymentsJson = await paymentsResponse.json().catch(() => null);
 
     if (!invoiceResponse.ok) {
-      throw new Error(String(invoiceJson?.error || "No se pudo refrescar la invoice."));
+      throw new Error(String(invoiceJson?.error || "No se pudo refrescar el comprobante."));
     }
     if (!paymentsResponse.ok) {
-      throw new Error(String(paymentsJson?.error || "No se pudieron refrescar los payments."));
+      throw new Error(String(paymentsJson?.error || "No se pudieron refrescar las cobranzas."));
     }
 
     setInvoice(invoiceJson?.invoice || initialInvoice);
@@ -155,7 +167,13 @@ export function InvoiceDetailView({
       customerVatCondition: invoiceJson?.invoice?.customerVatCondition || "",
       issuerLegalName: invoiceJson?.invoice?.issuerLegalName || "",
       issuerTaxId: invoiceJson?.invoice?.issuerTaxId || "",
+      issuerTaxIdType: invoiceJson?.invoice?.issuerTaxIdType || "NONE",
       issuerVatCondition: invoiceJson?.invoice?.issuerVatCondition || "",
+      issuerGrossIncomeNumber: invoiceJson?.invoice?.issuerGrossIncomeNumber || "",
+      issuerFiscalAddress: invoiceJson?.invoice?.issuerFiscalAddress || "",
+      issuerCity: invoiceJson?.invoice?.issuerCity || "",
+      issuerProvince: invoiceJson?.invoice?.issuerProvince || "",
+      pointOfSaleSuggested: invoiceJson?.invoice?.pointOfSaleSuggested || "",
       suggestedFiscalVoucherType: invoiceJson?.invoice?.suggestedFiscalVoucherType || "NONE",
       accountantNotes: invoiceJson?.invoice?.accountantNotes || "",
       accountantReferenceNumber: invoiceJson?.invoice?.accountantReferenceNumber || ""
@@ -177,10 +195,10 @@ export function InvoiceDetailView({
       }
 
       await refreshInvoiceAndPayments();
-      toast.success(action === "issue" ? "Invoice emitida" : "Invoice anulada");
+      toast.success(action === "issue" ? "Comprobante emitido" : "Comprobante anulado");
     } catch (error) {
       toast.error(
-        action === "issue" ? "No se pudo emitir la invoice" : "No se pudo anular la invoice",
+        action === "issue" ? "No se pudo emitir el comprobante" : "No se pudo anular el comprobante",
         error instanceof Error ? error.message : "unknown_error"
       );
     } finally {
@@ -223,9 +241,9 @@ export function InvoiceDetailView({
         ...EMPTY_PAYMENT_DRAFT,
         amount: ""
       });
-      toast.success("Payment registrado", "La cobranza ya impacta en el saldo de la invoice.");
+      toast.success("Cobranza registrada", "La cobranza ya impacta en el saldo del comprobante.");
     } catch (error) {
-      toast.error("No se pudo registrar el payment", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo registrar la cobranza", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -234,7 +252,7 @@ export function InvoiceDetailView({
   async function createAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedPaymentId) {
-      toast.error("Selecciona un payment");
+      toast.error("Selecciona una cobranza");
       return;
     }
 
@@ -262,7 +280,7 @@ export function InvoiceDetailView({
       await refreshInvoiceAndPayments();
       setSelectedPaymentId("");
       setAllocationAmount("");
-      toast.success("Allocation creada", "El payment ya quedo asignado a esta invoice.");
+      toast.success("Asignacion creada", "La cobranza ya quedo asignada a este comprobante.");
     } catch (error) {
       toast.error("No se pudo crear la allocation", error instanceof Error ? error.message : "unknown_error");
     } finally {
@@ -349,7 +367,7 @@ export function InvoiceDetailView({
               </CardTitle>
               <CardDescription>
                 {invoice.type === "credit_note"
-                    ? "Impacto negativo, referencia a la invoice origen y lifecycle visible desde el mismo modulo."
+                    ? "Impacto negativo, referencia al comprobante origen y trazabilidad visible desde el mismo modulo."
                   : "Items, importes y trazabilidad principal del comprobante interno."}
               </CardDescription>
             </div>
@@ -357,7 +375,7 @@ export function InvoiceDetailView({
           <CardContent className="space-y-5 pt-0">
             {invoice.type === "credit_note" ? (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Esta nota de credito reduce impacto documental y no se cobra como una invoice normal.
+                Esta nota de credito reduce impacto documental y no se cobra como un comprobante normal.
               </div>
             ) : null}
             <div className="grid gap-3 md:grid-cols-4">
@@ -391,7 +409,7 @@ export function InvoiceDetailView({
 
             {!invoice.items?.length ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                No encontramos items en esta invoice.
+                No encontramos items en este comprobante.
               </div>
             ) : null}
 
@@ -433,7 +451,7 @@ export function InvoiceDetailView({
                       {titleCaseLabel(initialPaymentPlan.method)}.
                     </p>
                   ) : (
-                    <p>Esta factura quedara pendiente al emitirse, sin generar un cobro inicial automatico.</p>
+                    <p>Este comprobante quedara pendiente al emitirse, sin generar un cobro inicial automatico.</p>
                   )}
                 </div>
               ) : null}
@@ -441,7 +459,7 @@ export function InvoiceDetailView({
                 <div className="rounded-2xl border border-brand/25 bg-brand/8 p-4 text-sm">
                   {invoice.type === "credit_note"
                     ? "Esta nota de crédito sigue en draft. Puedes ajustar items y luego emitirla desde este mismo detail cuando quede lista."
-                    : "Esta invoice sigue en draft. Puedes editar items y luego emitirla desde este mismo detail cuando quede lista."}
+                    : "Este comprobante sigue en borrador. Puedes editar items y luego emitirlo desde este mismo detalle cuando quede listo."}
                 </div>
               ) : null}
             </CardContent>
@@ -451,7 +469,7 @@ export function InvoiceDetailView({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Contacto y referencia</CardTitle>
-                <CardDescription>Contexto comercial basico de la invoice.</CardDescription>
+                <CardDescription>Contexto comercial basico del comprobante.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
@@ -466,7 +484,7 @@ export function InvoiceDetailView({
               <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Vencimiento" value={formatDateLabel(invoice.dueAt)} />
               {invoice.type === "credit_note" && invoice.parentInvoice?.id ? (
                 <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl">
-                  <Link href={`/app/invoices/${invoice.parentInvoice.id}`}>Ver invoice origen</Link>
+                  <Link href={`/app/invoices/${invoice.parentInvoice.id}`}>Ver comprobante origen</Link>
                 </Button>
               ) : null}
             </CardContent>
@@ -485,7 +503,7 @@ export function InvoiceDetailView({
               >
                 <div>
                   <CardTitle className="text-xl">Notas de crédito relacionadas</CardTitle>
-                  <CardDescription>Visibilidad operativa de ajustes posteriores sobre esta invoice.</CardDescription>
+                  <CardDescription>Visibilidad operativa de ajustes posteriores sobre este comprobante.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
@@ -521,7 +539,7 @@ export function InvoiceDetailView({
                   ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                    Esta invoice todavia no tiene notas de crédito relacionadas.
+                    Este comprobante todavia no tiene notas de credito relacionadas.
                   </div>
                 )}
               </CardContent>
@@ -537,6 +555,17 @@ export function InvoiceDetailView({
             </CardHeader>
             <CardContent className="pt-0">
               <form className="space-y-3" onSubmit={saveAccounting}>
+                {(invoice.missingDataFlags || []).length ? (
+                  <div className="flex flex-wrap gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+                    {(invoice.missingDataFlags || []).map((flag) => (
+                      <Badge key={flag} variant="warning">{titleCaseLabel(flag.replace(/^missing_/, ""))}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 p-3 text-sm text-emerald-200">
+                    Snapshot contable completo.
+                  </div>
+                )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <Input value={invoice.internalDocumentNumber || "-"} disabled />
                   <select
@@ -621,11 +650,56 @@ export function InvoiceDetailView({
                     disabled={busyAction !== null || readOnly}
                   />
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <select
+                    className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={accountantDraft.issuerTaxIdType}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerTaxIdType: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  >
+                    <option value="NONE">Tipo ID emisor: NONE</option>
+                    <option value="DNI">Tipo ID emisor: DNI</option>
+                    <option value="CUIT">Tipo ID emisor: CUIT</option>
+                    <option value="CUIL">Tipo ID emisor: CUIL</option>
+                  </select>
                   <Input
                     placeholder="Condicion IVA del emisor"
                     value={accountantDraft.issuerVatCondition}
                     onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerVatCondition: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                  <Input
+                    placeholder="IIBB del emisor"
+                    value={accountantDraft.issuerGrossIncomeNumber}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerGrossIncomeNumber: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Input
+                    placeholder="Direccion fiscal del emisor"
+                    value={accountantDraft.issuerFiscalAddress}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerFiscalAddress: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                  <Input
+                    placeholder="Ciudad"
+                    value={accountantDraft.issuerCity}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerCity: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                  <Input
+                    placeholder="Provincia"
+                    value={accountantDraft.issuerProvince}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerProvince: event.target.value }))}
+                    disabled={busyAction !== null || readOnly}
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    placeholder="Punto de venta sugerido"
+                    value={accountantDraft.pointOfSaleSuggested}
+                    onChange={(event) => setAccountantDraft((current) => ({ ...current, pointOfSaleSuggested: event.target.value }))}
                     disabled={busyAction !== null || readOnly}
                   />
                   <Input
@@ -655,8 +729,8 @@ export function InvoiceDetailView({
           <Card className="border-white/6 bg-card/90">
             <CardHeader>
               <div>
-                <CardTitle className="text-xl">Registrar payment</CardTitle>
-                <CardDescription>Alta minima de cobranza sobre esta invoice.</CardDescription>
+                <CardTitle className="text-xl">Registrar cobranza</CardTitle>
+                <CardDescription>Alta minima de cobranza sobre este comprobante.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -703,12 +777,12 @@ export function InvoiceDetailView({
                   />
                   <Button type="submit" className="w-full rounded-2xl" disabled={busyAction !== null}>
                     {busyAction === "create_payment" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-                    Registrar payment
+                    Registrar cobranza
                   </Button>
                 </form>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                  Los payments solo se registran sobre invoices emitidas, no anuladas y con saldo pendiente.
+                  Las cobranzas solo se registran sobre comprobantes emitidos, no anulados y con saldo pendiente.
                 </div>
               )}
             </CardContent>
@@ -738,13 +812,13 @@ export function InvoiceDetailView({
                 ))
               ) : (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-sm text-muted">
-                  Esta invoice todavia no muestra allocations registradas.
+                    Este comprobante todavia no muestra asignaciones registradas.
                 </div>
               )}
 
               {!readOnly && invoice.status === "issued" && invoice.type === "invoice" && Number(invoice.outstandingAmount || 0) > 0 ? (
                 <form className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/45 p-4" onSubmit={createAllocation}>
-                  <p className="text-sm font-medium">Asignar payment existente</p>
+                  <p className="text-sm font-medium">Asignar cobranza existente</p>
                   <select
                     className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
                     value={selectedPaymentId}

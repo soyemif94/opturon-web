@@ -11,6 +11,18 @@ import {
 import { appendAuditLog, readSaasData, writeSaasData } from "@/lib/saas/store";
 
 const schema = z.object({
+  legalName: z.string().optional(),
+  taxId: z.string().optional(),
+  taxIdType: z.string().optional(),
+  vatCondition: z.string().optional(),
+  grossIncomeNumber: z.string().optional(),
+  fiscalAddress: z.string().optional(),
+  city: z.string().optional(),
+  province: z.string().optional(),
+  pointOfSaleSuggested: z.string().optional(),
+  defaultSuggestedFiscalVoucherType: z.string().optional(),
+  accountantEmail: z.string().optional(),
+  accountantName: z.string().optional(),
   openingHours: z.string().optional(),
   address: z.string().optional(),
   deliveryZones: z.string().optional(),
@@ -21,6 +33,18 @@ const schema = z.object({
 function emptySettings(tenantId: string) {
   return {
     tenantId,
+    legalName: "",
+    taxId: "",
+    taxIdType: "NONE",
+    vatCondition: "",
+    grossIncomeNumber: "",
+    fiscalAddress: "",
+    city: "",
+    province: "",
+    pointOfSaleSuggested: "",
+    defaultSuggestedFiscalVoucherType: "NONE",
+    accountantEmail: "",
+    accountantName: "",
     openingHours: "",
     address: "",
     deliveryZones: "",
@@ -104,6 +128,18 @@ export async function PATCH(request: NextRequest) {
       }
 
       const normalizedPayload = {
+        legalName: String(parsed.data.legalName || ""),
+        taxId: String(parsed.data.taxId || ""),
+        taxIdType: String(parsed.data.taxIdType || "NONE"),
+        vatCondition: String(parsed.data.vatCondition || ""),
+        grossIncomeNumber: String(parsed.data.grossIncomeNumber || ""),
+        fiscalAddress: String(parsed.data.fiscalAddress || ""),
+        city: String(parsed.data.city || ""),
+        province: String(parsed.data.province || ""),
+        pointOfSaleSuggested: String(parsed.data.pointOfSaleSuggested || ""),
+        defaultSuggestedFiscalVoucherType: String(parsed.data.defaultSuggestedFiscalVoucherType || "NONE"),
+        accountantEmail: String(parsed.data.accountantEmail || ""),
+        accountantName: String(parsed.data.accountantName || ""),
         openingHours: String(parsed.data.openingHours || ""),
         address: String(parsed.data.address || ""),
         deliveryZones: String(parsed.data.deliveryZones || ""),

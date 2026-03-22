@@ -28,7 +28,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       customerVatCondition: body?.customerVatCondition || null,
       issuerLegalName: body?.issuerLegalName || null,
       issuerTaxId: body?.issuerTaxId || null,
+      issuerTaxIdType: body?.issuerTaxIdType,
       issuerVatCondition: body?.issuerVatCondition || null,
+      issuerGrossIncomeNumber: body?.issuerGrossIncomeNumber || null,
+      issuerFiscalAddress: body?.issuerFiscalAddress || null,
+      issuerCity: body?.issuerCity || null,
+      issuerProvince: body?.issuerProvince || null,
+      pointOfSaleSuggested: body?.pointOfSaleSuggested || null,
       suggestedFiscalVoucherType: body?.suggestedFiscalVoucherType,
       accountantNotes: body?.accountantNotes || null,
       accountantReferenceNumber: body?.accountantReferenceNumber || null
