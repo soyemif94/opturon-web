@@ -16,7 +16,7 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
     {
       label: "Ventas del dia",
       value: formatMoney(summary.salesToday),
-      helper: "Cobros cerrados hoy dentro del workspace.",
+      helper: "Cobros cerrados hoy dentro del espacio.",
       icon: HandCoins
     },
     {

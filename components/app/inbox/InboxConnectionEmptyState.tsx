@@ -8,7 +8,7 @@ import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
 const SUPPORT_LINK = getTrackedWhatsAppLink({
   origin: "audit-intake",
-  prefill: "Hola Opturon. Necesito ayuda para conectar WhatsApp Business en mi workspace de Opturon."
+  prefill: "Hola Opturon. Necesito ayuda para conectar WhatsApp Business en mi espacio de Opturon."
 });
 
 export function InboxConnectionEmptyState({ status }: { status: WhatsAppConnectionStatus }) {

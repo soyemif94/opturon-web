@@ -294,7 +294,7 @@ export function AppDashboard({
               {
                 icon: <Sparkles className="h-4 w-4 text-emerald-300" />,
                 title: "Panel de chat",
-                detail: "Historial, composer y sugerencias del bot listas para evolucionar."
+                detail: "Historial, cuadro de respuesta y sugerencias del bot listas para evolucionar."
               },
               {
                 icon: <CalendarClock className="h-4 w-4 text-sky-300" />,

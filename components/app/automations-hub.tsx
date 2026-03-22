@@ -119,7 +119,7 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
       automations.map((automation) => ({
         id: automation.id,
         name: automation.name,
-        description: automation.enabled ? "Automatización activa en este workspace." : "Automatización creada pero todavía inactiva.",
+        description: automation.enabled ? "Automatización activa en este espacio." : "Automatización creada pero todavia inactiva.",
         state: automation.enabled ? "activa" : "inactiva",
         summary: summarizeActions(automation) || "Sin acciones configuradas",
         trigger: summarizeTrigger(automation),

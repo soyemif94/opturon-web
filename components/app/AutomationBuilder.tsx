@@ -89,7 +89,7 @@ export function AutomationBuilder() {
         throw new Error(json?.detail || json?.error || "No pudimos guardar la automatización.");
       }
 
-      toast.success("Automatización creada", "La regla ya quedó guardada en tu workspace.");
+      toast.success("Automatización creada", "La regla ya quedo guardada en tu espacio.");
       router.push("/app/automations");
       router.refresh();
     } catch (error) {

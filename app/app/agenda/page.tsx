@@ -26,7 +26,7 @@ export default async function AppAgendaPage() {
               <CardTitle className="text-xl">Proximas tareas</CardTitle>
               <CardDescription>
                 {isRealTenant
-                  ? "Todavia no hay una agenda persistente conectada para este workspace. Cuando activemos esta capa vas a ver seguimientos y recordatorios reales."
+                  ? "Todavia no hay una agenda persistente conectada para este espacio. Cuando activemos esta capa vas a ver seguimientos y recordatorios reales."
                   : "Vista simple lista para evolucionar a agenda real conectada al inbox."}
               </CardDescription>
             </div>
@@ -34,7 +34,7 @@ export default async function AppAgendaPage() {
           <CardContent className="space-y-3 pt-0">
             {isRealTenant ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/55 p-5 text-sm leading-6 text-muted">
-                Este workspace todavia no tiene tareas ni seguimientos sincronizados. Cuando integremos agenda real por tenant, este espacio va a empezar vacio y a llenarse solo con actividad propia del negocio.
+                Este espacio todavia no tiene tareas ni seguimientos sincronizados. Cuando integremos agenda real por tenant, este espacio va a empezar vacio y a llenarse solo con actividad propia del negocio.
               </div>
             ) : (
               demoTasks.map((task) => (

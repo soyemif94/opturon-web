@@ -37,7 +37,7 @@ export default async function AppIntegrationsPage() {
   return (
     <ClientPageShell
       title="Integraciones"
-      description="Conecta tu WhatsApp Business, revisa el estado real del canal y deja tu workspace listo para responder desde Opturon."
+      description="Conecta tu WhatsApp Business, revisa el estado real del canal y deja tu espacio listo para responder desde Opturon."
       badge="Canales y conexiones"
     >
       <IntegrationsHub whatsapp={whatsapp} templateBlueprints={templateBlueprints} templates={templates} />

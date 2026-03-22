@@ -64,14 +64,14 @@ type IntegrationCard = {
 
 const SUPPORT_LINK = getTrackedWhatsAppLink({
   origin: "audit-intake",
-  prefill: "Hola Opturon. Necesito ayuda para conectar WhatsApp Business en mi workspace."
+  prefill: "Hola Opturon. Necesito ayuda para conectar WhatsApp Business en mi espacio."
 });
 
 const integrations: IntegrationCard[] = [
   {
     id: "instagram",
     name: "Instagram",
-    description: "Centraliza mensajes directos y consultas comerciales en el mismo workspace.",
+    description: "Centraliza mensajes directos y consultas comerciales en el mismo espacio.",
     state: "connecting",
     availability: "en preparacion",
     cta: "Preparar canal",
@@ -276,7 +276,7 @@ export function IntegrationsHub({
       toast.success(
         json?.data?.status === "connected" ? "WhatsApp conectado" : "Conexion validada",
         json?.data?.status === "connected"
-          ? `El canal ${json?.data?.validation?.displayPhoneNumber || manualForm.phoneNumberId} ya quedo asociado a tu workspace.`
+          ? `El canal ${json?.data?.validation?.displayPhoneNumber || manualForm.phoneNumberId} ya quedo asociado a tu espacio.`
           : "La validacion salio bien, pero falta terminar la suscripcion de la app en Meta."
       );
     } catch (error) {
@@ -356,7 +356,7 @@ export function IntegrationsHub({
       toast.success(
         json?.data?.created === false ? "Plantilla ya disponible" : "Plantilla creada",
         json?.data?.created === false
-          ? "La plantilla ya existia para este workspace y quedo reutilizada."
+          ? "La plantilla ya existia para este espacio y quedo reutilizada."
           : "La plantilla se envio a Meta y quedo asociada a tu WhatsApp."
       );
     } catch (error) {
@@ -408,7 +408,7 @@ export function IntegrationsHub({
 
   const readinessItems = [
     {
-      label: "Canal del workspace",
+      label: "Canal del espacio",
       value: meta.channelValue,
       tone: meta.variant
     },
@@ -477,7 +477,7 @@ export function IntegrationsHub({
               <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-4 text-sm text-white/80">
                 <p className="font-semibold text-white">Meta no habilitó el alta embebida para esta app</p>
                 <p className="mt-2 leading-6">
-                  Meta no habilitó Embedded Signup para esta app. Puedes continuar ahora mismo con la conexión manual
+                  Meta no habilito el alta guiada para esta app. Puedes continuar ahora mismo con la conexion manual
                   asistida sin perder el progreso.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -548,7 +548,7 @@ export function IntegrationsHub({
               {
                 icon: BadgeCheck,
                 title: "Validamos la configuracion",
-                detail: "Confirmamos que el numero y el canal queden asociados al workspace correcto antes de operar."
+                detail: "Confirmamos que el numero y el canal queden asociados al espacio correcto antes de operar."
               },
               {
                 icon: MessageSquareText,
@@ -579,7 +579,7 @@ export function IntegrationsHub({
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold">Canales e integraciones</h2>
-            <p className="text-sm text-muted">Conexiones disponibles para centralizar atencion, prospectos y agenda desde un solo workspace.</p>
+            <p className="text-sm text-muted">Conexiones disponibles para centralizar atencion, prospectos y agenda desde un solo espacio.</p>
           </div>
           <Badge variant="muted">Centro de integraciones</Badge>
         </div>
@@ -657,7 +657,7 @@ export function IntegrationsHub({
 
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
               No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el
-              token del canal para asociarlo al workspace correcto.
+              token del canal para asociarlo al espacio correcto.
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -856,7 +856,7 @@ export function IntegrationsHub({
           <CardHeader action={<Badge variant="muted">Checklist</Badge>}>
             <div>
               <CardTitle className="text-xl">Que valida Opturon</CardTitle>
-              <CardDescription>Antes de asociar el canal al tenant, validamos acceso real en Meta para evitar cruces entre workspaces.</CardDescription>
+              <CardDescription>Antes de asociar el canal al tenant, validamos acceso real en Meta para evitar cruces entre espacios.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -864,7 +864,7 @@ export function IntegrationsHub({
               "El token permite leer la WABA indicada.",
               "El Phone Number ID existe y es accesible con ese token.",
               "El numero realmente pertenece a esa WABA.",
-              "El canal no esta ya asociado a otro workspace.",
+              "El canal no esta ya asociado a otro espacio.",
               "Si la suscripcion de la app falla, el canal queda pendiente y no se pierde la validacion."
             ].map((item) => (
               <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
@@ -972,7 +972,7 @@ function templateStatusMeta(status: string): {
   if (normalized === "draft") {
     return {
       label: "Borrador",
-      detail: "La plantilla existe en Opturon, pero todavia no fue enviada a Meta para este workspace.",
+      detail: "La plantilla existe en Opturon, pero todavia no fue enviada a Meta para este espacio.",
       variant: "muted"
     };
   }
@@ -1055,7 +1055,7 @@ function whatsappHubMeta(
       supportLabel: "Necesito ayuda",
       benefits: [
         { title: "Inbox listo", detail: "Tus conversaciones reales ya pueden entrar directo al portal." },
-        { title: "Equipo alineado", detail: "Todo el workspace opera sobre el mismo canal correcto." },
+        { title: "Equipo alineado", detail: "Todo el espacio opera sobre el mismo canal correcto." },
         { title: "Automatizaciones", detail: "Las reglas y respuestas van a quedar apoyadas sobre esta conexion." }
       ]
     };
@@ -1068,8 +1068,8 @@ function whatsappHubMeta(
       variant: "warning" as const,
       dotClass: "bg-amber-300",
       title: "Estamos preparando tu conexion con Meta",
-      description: "Validamos el workspace y dejamos listo el contexto para iniciar WhatsApp Business sin exponer configuracion tecnica innecesaria.",
-      helper: "Este paso deja lista la base para que el Embedded Signup use el tenant correcto y no mezcle canales entre negocios.",
+      description: "Validamos el espacio y dejamos listo el contexto para iniciar WhatsApp Business sin exponer configuracion tecnica innecesaria.",
+      helper: "Este paso deja lista la base para que el alta guiada use el tenant correcto y no mezcle canales entre negocios.",
       nextStep: "En unos segundos te mostramos como continuar la activacion.",
       channelValue: "Preparando",
       webhookValue: "Pendiente",
@@ -1081,7 +1081,7 @@ function whatsappHubMeta(
       secondaryLabel: "Quedarme aca",
       supportLabel: "Hablar con soporte",
       benefits: [
-        { title: "Tenant correcto", detail: "La conexion se prepara con el workspace y la clinica correctos." },
+        { title: "Tenant correcto", detail: "La conexion se prepara con el espacio y la clinica correctos." },
         { title: "Sin datos tecnicos", detail: "No le pedimos al cliente WABA, tokens ni IDs manuales." },
         { title: "Base escalable", detail: "La siguiente etapa puede recibir el resultado real de Meta sin rehacer la UX." }
       ]
@@ -1095,8 +1095,8 @@ function whatsappHubMeta(
       variant: "warning" as const,
       dotClass: "bg-amber-300",
       title: "La conexion ya tiene base tecnica lista",
-      description: "Estamos preparando la ultima parte del flujo de Meta para este workspace. No hace falta que cargues IDs ni configuraciones manuales.",
-      helper: launchMessage || "El siguiente paso es completar el flujo real de Embedded Signup con las credenciales finales del workspace.",
+      description: "Estamos preparando la ultima parte del flujo de Meta para este espacio. No hace falta que cargues IDs ni configuraciones manuales.",
+      helper: launchMessage || "El siguiente paso es completar el flujo real de alta guiada con las credenciales finales del espacio.",
       nextStep: "Cuando habilitemos la conexion automatica, vas a poder terminarla desde este mismo boton.",
       channelValue: whatsapp.channelStatus || "Pendiente",
       webhookValue: "Pendiente",
@@ -1108,7 +1108,7 @@ function whatsappHubMeta(
       secondaryLabel: "Ver inbox",
       supportLabel: "Necesito ayuda",
       benefits: [
-        { title: "Base ya preparada", detail: "El workspace, el clinicId y el callback futuro ya quedaron definidos." },
+        { title: "Base ya preparada", detail: "El espacio, el clinicId y el callback futuro ya quedaron definidos." },
         { title: "UX sin friccion", detail: "El cliente no se enfrenta a errores ni a una modal tecnica confusa." },
         { title: "Escalable", detail: "La misma base sirve para otros tenants sin acoplarse al demo." }
       ]
@@ -1124,7 +1124,7 @@ function whatsappHubMeta(
       title: "Necesitamos revisar la configuracion del canal",
       description: "Detectamos una configuracion pendiente antes de activar tu WhatsApp y preferimos no mostrar un numero incorrecto en el portal.",
       helper: whatsapp.helper,
-      nextStep: "Revisemos la conexion para dejar un unico canal correcto en este workspace.",
+      nextStep: "Revisemos la conexion para dejar un unico canal correcto en este espacio.",
       channelValue: "Configuracion ambigua",
       webhookValue: "Pendiente",
       webhookTone: "danger" as const,
@@ -1149,7 +1149,7 @@ function whatsappHubMeta(
       variant: "danger" as const,
       dotClass: "bg-rose-400",
       title: "No pudimos validar tu canal",
-      description: "Hay una falla real distinta a un workspace sin conectar y conviene revisarla antes de seguir.",
+      description: "Hay una falla real distinta a un espacio sin conectar y conviene revisarla antes de seguir.",
       helper: whatsapp.helper,
       nextStep: "Revisa la conexion o contacta soporte para destrabar la activacion.",
       channelValue: whatsapp.channelStatus || "Error",
@@ -1162,7 +1162,7 @@ function whatsappHubMeta(
       secondaryLabel: "",
       supportLabel: "Contactar soporte",
       benefits: [
-        { title: "Diagnostico claro", detail: "Separamos errores reales de un simple workspace sin canal conectado." },
+        { title: "Diagnostico claro", detail: "Separamos errores reales de un simple espacio sin canal conectado." },
         { title: "Fuente unica", detail: "La pantalla sigue leyendo el mismo estado tenant-scoped que el home y el inbox." },
         { title: "Sin datos falsos", detail: "Nunca mostramos el canal global ni un numero ajeno por error." }
       ]
@@ -1188,7 +1188,7 @@ function whatsappHubMeta(
     secondaryLabel: "Ver inbox",
     supportLabel: "Necesito ayuda",
     benefits: [
-      { title: "Recibir mensajes", detail: "Tus conversaciones van a entrar directo al inbox del workspace." },
+      { title: "Recibir mensajes", detail: "Tus conversaciones van a entrar directo a la bandeja del espacio." },
       { title: "Responder desde Opturon", detail: "El equipo atiende desde un solo lugar, sin cambiar de herramienta." },
       { title: "Automatizar", detail: "El canal conectado habilita respuestas, handoff y seguimiento comercial." }
     ]
@@ -1203,7 +1203,7 @@ function stateMeta(state: IntegrationState): {
   if (state === "connected") {
     return {
       label: "Conectado",
-      detail: "La integracion esta lista para operar y mostrar actividad dentro del workspace.",
+      detail: "La integracion esta lista para operar y mostrar actividad dentro del espacio.",
       variant: "success"
     };
   }

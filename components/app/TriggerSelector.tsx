@@ -4,7 +4,7 @@ const TRIGGERS = [
   { value: "message_received", label: "Mensaje recibido", helper: "Se dispara cuando entra cualquier mensaje nuevo." },
   { value: "keyword", label: "Palabra clave", helper: "Activa la automatización cuando el mensaje contiene una palabra definida." },
   { value: "off_hours", label: "Fuera de horario", helper: "Ideal para responder automáticamente cuando el negocio está cerrado." },
-  { value: "new_contact", label: "Nuevo contacto", helper: "Se dispara con el primer contacto detectado en el workspace." }
+  { value: "new_contact", label: "Nuevo contacto", helper: "Se dispara con el primer contacto detectado en el espacio." }
 ] as const;
 
 export function TriggerSelector({
