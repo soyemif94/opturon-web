@@ -167,7 +167,7 @@ export function InvoicesWorkspace({
             <Button asChild variant="secondary" size="sm" className="rounded-2xl">
               <a href={exportHref}>
                 <Download className="mr-2 h-4 w-4" />
-                Exportar CSV
+                Exportar CSV para Excel
               </a>
             </Button>
             {!readOnly ? (
@@ -268,7 +268,9 @@ export function InvoicesWorkspace({
                     {!readOnly ? <input type="checkbox" checked={selectedIds.includes(invoice.id)} onChange={() => toggleSelection(invoice.id)} /> : null}
                   </div>
                   <div className="space-y-1">
-                    <p className="font-medium">{invoice.internalDocumentNumber || invoice.id.slice(0, 8)}</p>
+                    <Link href={`/app/invoices/${invoice.id}`} className="font-medium text-brandBright hover:underline">
+                      {invoice.internalDocumentNumber || invoice.id.slice(0, 8)}
+                    </Link>
                     <p className="text-xs text-muted">{getInvoiceDocumentKindLabel({ documentKind: invoice.documentKind })}</p>
                   </div>
                   <div className="space-y-2">
@@ -300,14 +302,8 @@ export function InvoicesWorkspace({
                     <p className="mt-1 text-xs">Facturado: {formatDateLabel(invoice.invoicedByAccountantAt)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-                      <Link href={`/app/invoices/${invoice.id}`}>Ver detalle</Link>
-                    </Button>
-                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-                      <a href={`/api/app/invoices/${invoice.id}/download`}>Descargar JSON</a>
-                    </Button>
                     <Button asChild size="sm" className="rounded-2xl">
-                      <a href={`/api/app/invoices/${invoice.id}/download?format=document`}>Descargar documento</a>
+                      <Link href={`/app/invoices/${invoice.id}`}>Abrir comprobante</Link>
                     </Button>
                   </div>
                 </div>

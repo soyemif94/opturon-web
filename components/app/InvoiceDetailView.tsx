@@ -324,16 +324,16 @@ export function InvoiceDetailView({
         <Badge variant={badgeToneByStatus(invoice.status)}>{titleCaseLabel(invoice.status)}</Badge>
         <Badge variant={badgeToneByStatus(invoice.fiscalStatus)}>{titleCaseLabel(invoice.fiscalStatus)}</Badge>
         <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
-        <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-          <a href={`/api/app/invoices/${invoice.id}/download`}>
-            <Download className="mr-2 h-4 w-4" />
-            Descargar JSON
-          </a>
-        </Button>
-        <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+        <Button asChild size="sm" className="rounded-2xl">
           <a href={`/api/app/invoices/${invoice.id}/download?format=document`}>
             <Download className="mr-2 h-4 w-4" />
             Descargar documento
+          </a>
+        </Button>
+        <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+          <a href={`/api/app/invoices/${invoice.id}/download`}>
+            <Download className="mr-2 h-4 w-4" />
+            Descargar JSON tecnico
           </a>
         </Button>
         {!readOnly && invoice.lifecycle?.canIssue ? (
