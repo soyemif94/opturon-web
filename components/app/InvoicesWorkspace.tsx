@@ -157,6 +157,42 @@ export function InvoicesWorkspace({
     }
   }
 
+  async function downloadSelectedInvoices() {
+    if (!selectedIds.length) {
+      toast.error("Selecciona comprobantes", "Marca al menos un comprobante para descargar el lote.");
+      return;
+    }
+
+    setBulkBusy("download_bundle");
+    try {
+      const response = await fetch("/api/app/invoices/bulk-download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceIds: selectedIds })
+      });
+
+      if (!response.ok) {
+        const json = await response.json().catch(() => null);
+        throw new Error(String(json?.error || "No se pudo descargar el lote de comprobantes."));
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "opturon-comprobantes-lote.html";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Lote descargado", `Se preparo el lote con ${selectedIds.length} comprobantes.`);
+    } catch (error) {
+      toast.error("No se pudo descargar el lote", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setBulkBusy(null);
+    }
+  }
+
   return (
     <Card className="border-white/6 bg-card/90">
       <CardHeader
@@ -167,7 +203,7 @@ export function InvoicesWorkspace({
             <Button asChild variant="secondary" size="sm" className="rounded-2xl">
               <a href={exportHref}>
                 <Download className="mr-2 h-4 w-4" />
-                Exportar CSV para Excel
+                Exportar planilla contable
               </a>
             </Button>
             {!readOnly ? (
@@ -230,6 +266,10 @@ export function InvoicesWorkspace({
                 {allVisibleSelected ? "Deseleccionar visibles" : "Seleccionar visibles"}
               </Button>
               <Badge variant="muted">{selectedCount} seleccionados</Badge>
+              <Button type="button" variant="secondary" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void downloadSelectedInvoices()}>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar seleccionadas
+              </Button>
               <Button type="button" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("ready_for_accountant")}>
                 Listo para contador
               </Button>
