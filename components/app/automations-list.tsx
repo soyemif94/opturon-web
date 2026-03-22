@@ -11,6 +11,7 @@ export type AutomationModule = {
   name: string;
   description: string;
   state: AutomationState;
+  enabled?: boolean;
   summary: string;
   trigger: string;
   action: string;
@@ -28,11 +29,27 @@ const ICONS = {
   bot: Bot
 } as const;
 
-export function AutomationsList({ modules }: { modules: AutomationModule[] }) {
+export function AutomationsList({
+  modules,
+  pendingAutomationId,
+  pendingAction,
+  onToggleEnabled,
+  onDelete
+}: {
+  modules: AutomationModule[];
+  pendingAutomationId?: string | null;
+  pendingAction?: "toggle" | "delete" | null;
+  onToggleEnabled?: (module: AutomationModule) => void;
+  onDelete?: (module: AutomationModule) => void;
+}) {
   return (
     <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {modules.map((module) => {
         const Icon = ICONS[module.icon];
+        const isPendingToggle = pendingAutomationId === module.id && pendingAction === "toggle";
+        const isPendingDelete = pendingAutomationId === module.id && pendingAction === "delete";
+        const toggleLabel = module.state === "activa" ? "Activa" : "Inactiva";
+        const toggleActionLabel = module.state === "activa" ? "Desactivar" : "Activar";
 
         return (
           <Card key={module.id} className="border-white/6 bg-card/90">
@@ -63,18 +80,50 @@ export function AutomationsList({ modules }: { modules: AutomationModule[] }) {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button asChild variant="secondary" className="flex-1 rounded-2xl">
-                  <Link href={`/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
-                    <Edit3 className="mr-2 h-4 w-4" />
-                    Editar
-                  </Link>
-                </Button>
-                <Button asChild variant="ghost" className="rounded-2xl px-4">
-                  <Link href={`/app/automations/new?template=${encodeURIComponent(module.id)}`} aria-label={`Crear automatizacion desde ${module.name}`}>
-                    <Zap className="h-4 w-4" />
-                  </Link>
-                </Button>
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Estado</p>
+                    <p className="mt-1 text-sm font-medium">{toggleLabel}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={module.state === "activa" ? "secondary" : "primary"}
+                    size="sm"
+                    className="rounded-2xl"
+                    disabled={!onToggleEnabled || isPendingToggle || isPendingDelete}
+                    onClick={() => onToggleEnabled?.(module)}
+                  >
+                    {isPendingToggle ? "Guardando..." : toggleActionLabel}
+                  </Button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button asChild variant="secondary" className="flex-1 rounded-2xl">
+                    <Link href={`/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
+                      <Edit3 className="mr-2 h-4 w-4" />
+                      Editar
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="rounded-2xl px-4"
+                    disabled={!onDelete || isPendingToggle || isPendingDelete}
+                    onClick={() => onDelete?.(module)}
+                  >
+                    {isPendingDelete ? "Eliminando..." : "Eliminar"}
+                  </Button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button asChild variant="ghost" className="flex-1 rounded-2xl">
+                    <Link href={`/app/automations/new?template=${encodeURIComponent(module.id)}`} aria-label={`Crear automatizacion desde ${module.name}`}>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Duplicar base
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

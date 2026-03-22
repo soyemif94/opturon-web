@@ -1655,6 +1655,37 @@ export async function createPortalAutomation(
   });
 }
 
+export async function patchPortalAutomation(
+  tenantId: string,
+  automationId: string,
+  payload: {
+    enabled: boolean;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      automation: PortalAutomation;
+    };
+  }>(`/portal/tenants/${tenantId}/automations/${automationId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deletePortalAutomation(tenantId: string, automationId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      automation: PortalAutomation;
+    };
+  }>(`/portal/tenants/${tenantId}/automations/${automationId}`, {
+    method: "DELETE"
+  });
+}
+
 export async function getPortalProductDetail(tenantId: string, productId: string) {
   return backendFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}`,

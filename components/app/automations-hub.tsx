@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, UserRound } from "lucide-react";
 import { AutomationsEmptyState } from "@/components/app/automations-empty-state";
 import { AutomationsList, type AutomationModule } from "@/components/app/automations-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "@/components/ui/toast";
 import type { PortalAutomation } from "@/lib/api";
 
 const recommendedModules: AutomationModule[] = [
@@ -120,15 +121,24 @@ function summarizeActions(automation: PortalAutomation) {
 }
 
 export function AutomationsHub({ automations }: { automations: PortalAutomation[] }) {
+  const [items, setItems] = useState(automations);
+  const [pendingAutomationId, setPendingAutomationId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<"toggle" | "delete" | null>(null);
+
+  useEffect(() => {
+    setItems(automations);
+  }, [automations]);
+
   const modules = useMemo<AutomationModule[]>(
     () =>
-      automations.map((automation) => ({
+      items.map((automation) => ({
         id: automation.id,
         name: automation.name,
         description:
           automation.description ||
           (automation.enabled ? "Automatizacion activa en este espacio." : "Automatizacion creada pero todavia inactiva."),
         state: automation.enabled ? "activa" : "inactiva",
+        enabled: automation.enabled,
         summary: summarizeActions(automation) || "Sin acciones configuradas",
         trigger: summarizeTrigger(automation),
         action: summarizeActions(automation) || "Sin acciones configuradas",
@@ -141,7 +151,7 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
                 ? "faq"
                 : "sparkles"
       })),
-    [automations]
+    [items]
   );
 
   const stats = useMemo(() => {
@@ -150,6 +160,62 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
     const recommended = recommendedModules.filter((item) => item.state === "recomendada").length;
     return { active, pending, recommended };
   }, [modules]);
+
+  async function handleToggleEnabled(module: AutomationModule) {
+    const nextEnabled = module.state !== "activa";
+    setPendingAutomationId(module.id);
+    setPendingAction("toggle");
+
+    try {
+      const response = await fetch(`/api/app/automations/${encodeURIComponent(module.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.success || !json?.data?.automation) {
+        throw new Error(String(json?.error || "automation_update_failed"));
+      }
+
+      const updated = json.data.automation as PortalAutomation;
+      setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      toast.success(nextEnabled ? "Automatizacion activada" : "Automatizacion desactivada");
+    } catch (error) {
+      toast.error("No se pudo actualizar la automatizacion", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setPendingAutomationId(null);
+      setPendingAction(null);
+    }
+  }
+
+  async function handleDelete(module: AutomationModule) {
+    const confirmed =
+      typeof window === "undefined" ? false : window.confirm("¿Seguro que querés eliminar esta automatización?");
+    if (!confirmed) {
+      return;
+    }
+
+    setPendingAutomationId(module.id);
+    setPendingAction("delete");
+
+    try {
+      const response = await fetch(`/api/app/automations/${encodeURIComponent(module.id)}`, {
+        method: "DELETE"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.success) {
+        throw new Error(String(json?.error || "automation_delete_failed"));
+      }
+
+      setItems((current) => current.filter((item) => item.id !== module.id));
+      toast.success("Automatizacion eliminada");
+    } catch (error) {
+      toast.error("No se pudo eliminar la automatizacion", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setPendingAutomationId(null);
+      setPendingAction(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -193,7 +259,17 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
         </Card>
       </section>
 
-      {modules.length > 0 ? <AutomationsList modules={modules} /> : <AutomationsEmptyState />}
+      {modules.length > 0 ? (
+        <AutomationsList
+          modules={modules}
+          pendingAutomationId={pendingAutomationId}
+          pendingAction={pendingAction}
+          onToggleEnabled={handleToggleEnabled}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <AutomationsEmptyState />
+      )}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="border-white/6 bg-card/90">
