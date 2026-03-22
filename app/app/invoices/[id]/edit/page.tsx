@@ -29,27 +29,27 @@ export default async function AppInvoiceDraftEditPage({ params }: { params: Prom
     <ClientPageShell
       title={
         invoice?.invoiceNumber
-          ? `Editar ${invoice.type === "credit_note" ? "nota de credito" : "factura"} ${invoice.invoiceNumber}`
-          : "Editar factura draft"
+          ? `Editar ${invoice.type === "credit_note" ? "nota de credito" : "comprobante"} ${invoice.invoiceNumber}`
+          : "Editar comprobante en borrador"
       }
       description={
         invoice?.type === "credit_note"
-          ? "Ajusta la nota de credito draft antes de emitirla desde su detail."
-          : "Ajusta items y datos basicos del borrador antes de emitirlo desde el detail."
+          ? "Ajusta la nota de credito en borrador antes de emitirla desde su detalle."
+          : "Ajusta items y datos basicos del borrador antes de emitirlo desde el detalle."
       }
-      badge={invoice?.type === "credit_note" ? "Editar nota de credito" : "Editar draft"}
+      badge={invoice?.type === "credit_note" ? "Editar nota de credito" : "Editar borrador"}
     >
       {!invoice ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          No pudimos cargar la draft solicitada.
+          No pudimos cargar el borrador solicitado.
         </div>
       ) : readOnly ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Este workspace esta en modo solo lectura y no puede editar drafts.
+          Este espacio esta en modo solo lectura y no puede editar borradores.
         </div>
       ) : invoice.status !== "draft" ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Solo las invoices en estado draft pueden editarse.
+          Solo los comprobantes en estado borrador pueden editarse.
         </div>
       ) : (
         <InvoiceDraftEditor contacts={contacts} invoice={invoice} />

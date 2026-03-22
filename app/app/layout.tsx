@@ -7,13 +7,13 @@ import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 export default async function ClientPortalLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireAppPage();
   const rawTenantLabel = ctx.tenantId
-    ? "Workspace del cliente"
+    ? "Espacio del cliente"
     : (() => {
         const data = readSaasData();
         const tenant = data.tenants.find((item) => item.id === ctx.tenantId) || data.tenants[0];
-        return tenant ? tenant.name : `Tenant: ${ctx.tenantId || "workspace"}`;
+        return tenant ? tenant.name : `Tenant: ${ctx.tenantId || "espacio"}`;
       })();
-  const tenantLabel = /demo tenant/i.test(rawTenantLabel) ? "Workspace del cliente" : rawTenantLabel;
+  const tenantLabel = /demo tenant/i.test(rawTenantLabel) ? "Espacio del cliente" : rawTenantLabel;
   const showDebugInfo = process.env.NEXT_PUBLIC_SHOW_DEBUG_INFO === "true";
   const buildMarker = showDebugInfo
     ? process.env.NEXT_PUBLIC_APP_BUILD_MARKER || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || process.env.VERCEL_DEPLOYMENT_ID || "local-dev"

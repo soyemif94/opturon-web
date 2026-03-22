@@ -52,7 +52,7 @@ export default async function AppSalesPage() {
 
   return (
     <ClientPageShell
-      title="Sales"
+      title="Ventas"
       description="Vista comercial V1 para seguir oportunidades, cierres y ritmo de ventas con una lectura mas clara para el equipo."
       badge="Comercial"
     >

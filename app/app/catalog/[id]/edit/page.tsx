@@ -31,7 +31,7 @@ export default async function CatalogProductEditPage({ params }: { params: Promi
         </div>
       ) : readOnly ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Este workspace esta en modo solo lectura y no puede editar productos.
+          Este espacio esta en modo solo lectura y no puede editar productos.
         </div>
       ) : (
         <ProductEditor product={product} />

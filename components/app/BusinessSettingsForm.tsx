@@ -94,7 +94,7 @@ export function BusinessSettingsForm({
       </p>
       {tenantName || tenantIndustry ? (
         <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Workspace actual</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Espacio actual</p>
           <p className="mt-2 text-base font-semibold">{tenantName || "Tu negocio"}</p>
           <p className="mt-1 text-sm text-muted">{tenantIndustry || "Operacion comercial"}</p>
         </div>

@@ -258,7 +258,7 @@ export function InvoiceDetailView({
 
     const amount = Number(allocationAmount || 0);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Monto invalido", "Ingresa un importe valido para la allocation.");
+      toast.error("Monto invalido", "Ingresa un importe valido para la asignacion.");
       return;
     }
 
@@ -274,7 +274,7 @@ export function InvoiceDetailView({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo crear la allocation."));
+        throw new Error(String(json?.error || "No se pudo crear la asignacion."));
       }
 
       await refreshInvoiceAndPayments();
@@ -282,7 +282,7 @@ export function InvoiceDetailView({
       setAllocationAmount("");
       toast.success("Asignacion creada", "La cobranza ya quedo asignada a este comprobante.");
     } catch (error) {
-      toast.error("No se pudo crear la allocation", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo crear la asignacion", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -349,7 +349,7 @@ export function InvoiceDetailView({
         ) : null}
         {!readOnly && invoice.type === "invoice" && invoice.status === "issued" ? (
           <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-            <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
+            <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de credito</Link>
           </Button>
         ) : null}
         {!readOnly && invoice.lifecycle?.canVoid ? (
@@ -369,7 +369,7 @@ export function InvoiceDetailView({
           <CardHeader>
             <div>
               <CardTitle className="text-xl">
-                {invoice.type === "credit_note" ? "Nota de crédito" : "Documento"} {invoice.internalDocumentNumber || invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                {invoice.type === "credit_note" ? "Nota de credito" : "Documento"} {invoice.internalDocumentNumber || invoice.invoiceNumber || invoice.id.slice(0, 8)}
               </CardTitle>
               <CardDescription>
                 {invoice.type === "credit_note"
@@ -381,7 +381,7 @@ export function InvoiceDetailView({
           <CardContent className="space-y-5 pt-0">
             {invoice.type === "credit_note" ? (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Esta nota de credito reduce impacto documental y no se cobra como un comprobante normal.
+                Esta nota de credito reduce el impacto documental y no se cobra como un comprobante normal.
               </div>
             ) : null}
             <div className="grid gap-3 md:grid-cols-4">
@@ -403,7 +403,7 @@ export function InvoiceDetailView({
                 <div key={item.id} className="grid grid-cols-[minmax(0,1.1fr)_110px_140px_120px_140px] gap-4 border-b border-[color:var(--border)] px-4 py-4 last:border-b-0">
                   <div className="min-w-0">
                     <p className="truncate font-medium">{item.descriptionSnapshot}</p>
-                    <p className="mt-1 text-sm text-muted">{item.productId ? `Producto ${item.productId.slice(0, 8)}` : "Item manual"}</p>
+                    <p className="mt-1 text-sm text-muted">{item.productId ? `Producto ${item.productId.slice(0, 8)}` : "Item cargado manualmente"}</p>
                   </div>
                   <div className="text-sm text-muted">{item.quantity}</div>
                   <div className="text-sm text-muted">{formatMoney(item.unitPrice, invoice.currency)}</div>
@@ -436,7 +436,7 @@ export function InvoiceDetailView({
           <Card className="border-white/6 bg-card/90">
             <CardHeader>
               <div>
-                <CardTitle className="text-xl">Lifecycle</CardTitle>
+                <CardTitle className="text-xl">Ciclo del comprobante</CardTitle>
                 <CardDescription>Estado interno y modo documental del comprobante.</CardDescription>
               </div>
             </CardHeader>
@@ -464,7 +464,7 @@ export function InvoiceDetailView({
               {invoice.lifecycle?.canEdit ? (
                 <div className="rounded-2xl border border-brand/25 bg-brand/8 p-4 text-sm">
                   {invoice.type === "credit_note"
-                    ? "Esta nota de crédito sigue en draft. Puedes ajustar items y luego emitirla desde este mismo detail cuando quede lista."
+                    ? "Esta nota de credito sigue en borrador. Puedes ajustar items y luego emitirla desde este mismo detalle cuando quede lista."
                     : "Este comprobante sigue en borrador. Puedes editar items y luego emitirlo desde este mismo detalle cuando quede listo."}
                 </div>
               ) : null}
@@ -481,7 +481,7 @@ export function InvoiceDetailView({
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
               <InfoRow icon={<UserRound className="h-4 w-4" />} label="Contacto" value={invoice.contact?.name || "Sin contacto"} />
               <InfoRow icon={<UserRound className="h-4 w-4" />} label="Telefono" value={invoice.contact?.phone || "-"} />
-              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Order" value={invoice.orderId || "-"} />
+              <InfoRow icon={<ReceiptText className="h-4 w-4" />} label="Pedido" value={invoice.orderId || "-"} />
               <InfoRow
                 icon={<ReceiptText className="h-4 w-4" />}
                 label={invoice.type === "credit_note" ? "Factura origen" : "Documento padre"}
@@ -502,19 +502,19 @@ export function InvoiceDetailView({
                 action={
                   !readOnly && invoice.status === "issued" ? (
                     <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-                      <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de crédito</Link>
+                      <Link href={`/app/invoices/new?type=credit_note&parentInvoiceId=${invoice.id}`}>Crear nota de credito</Link>
                     </Button>
                   ) : undefined
                 }
               >
                 <div>
-                  <CardTitle className="text-xl">Notas de crédito relacionadas</CardTitle>
+                  <CardTitle className="text-xl">Notas de credito relacionadas</CardTitle>
                   <CardDescription>Visibilidad operativa de ajustes posteriores sobre este comprobante.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <MetricTile label="Cantidad" value={String(relatedCreditNotes.length)} helper="Credit notes asociadas" />
+                  <MetricTile label="Cantidad" value={String(relatedCreditNotes.length)} helper="Notas de credito asociadas" />
                   <MetricTile label="Total acreditado" value={formatMoney(creditedTotal, invoice.currency)} helper="Acumulado visible" />
                 </div>
 
@@ -797,7 +797,7 @@ export function InvoiceDetailView({
           <Card className="border-white/6 bg-card/90">
             <CardHeader>
               <div>
-                <CardTitle className="text-xl">Allocations</CardTitle>
+                <CardTitle className="text-xl">Asignaciones</CardTitle>
                 <CardDescription>Asignaciones de cobro y camino simple para aplicar pagos existentes.</CardDescription>
               </div>
             </CardHeader>

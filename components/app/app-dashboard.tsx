@@ -101,8 +101,8 @@ export function AppDashboard({
               />
               <SummaryRow
                 icon={<PlugZap className="h-4 w-4 text-sky-300" />}
-                title="WhatsApp connect"
-                detail="Punto preparado para Embedded Signup y activacion del canal."
+                title="Conexion de WhatsApp"
+                detail="Punto preparado para el alta guiada y la activacion del canal."
               />
             </div>
           </div>

@@ -63,7 +63,7 @@ export function ConversationRow({
               <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
               <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
               <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
-              {row.priority === "hot" ? <InboxBadge className="text-[11px]">Hot</InboxBadge> : null}
+              {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
             </div>
             <p className="mt-0.5 text-xs text-muted">{meta}</p>
           </div>
@@ -90,7 +90,7 @@ export function ConversationRow({
           disabled={disabled}
           className="rounded-full border border-[color:var(--border)] px-2.5 py-1 text-xs text-muted hover:text-text disabled:opacity-40"
         >
-          Marcar hot
+          Marcar prioridad
         </button>
         <button
           type="button"

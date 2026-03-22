@@ -50,7 +50,7 @@ const navItems: Array<{
   },
   {
     href: "/app/inbox",
-    label: "Inbox",
+    label: "Bandeja",
     description: "Conversaciones, chat y contexto del contacto",
     icon: MessageSquareText,
     module: "inbox",
@@ -66,15 +66,15 @@ const navItems: Array<{
   },
   {
     href: "/app/sales",
-    label: "Sales",
-    description: "KPIs, oportunidades y lectura comercial del workspace",
+    label: "Ventas",
+    description: "KPIs, oportunidades y lectura comercial del espacio",
     icon: TrendingUp,
     module: "sales",
     match: (pathname: string) => pathname.startsWith("/app/sales")
   },
   {
     href: "/app/loyalty",
-    label: "Loyalty",
+    label: "Fidelizacion",
     description: "Puntos, recompensas y retencion por cliente",
     icon: Gift,
     module: "loyalty",
@@ -98,16 +98,16 @@ const navItems: Array<{
   },
   {
     href: "/app/invoices",
-    label: "Invoices",
-    description: "Documentos internos, saldo y lifecycle de facturacion",
+    label: "Comprobantes",
+    description: "Documentos internos, saldo y ciclo de pre-facturacion",
     icon: ReceiptText,
     module: "invoices",
     match: (pathname: string) => pathname.startsWith("/app/invoices")
   },
   {
     href: "/app/payments",
-    label: "Payments",
-    description: "Cobros registrados, estado y asignacion sobre invoices",
+    label: "Cobros",
+    description: "Cobros registrados, estado y asignacion sobre comprobantes",
     icon: PhoneCall,
     module: "payments",
     match: (pathname: string) => pathname.startsWith("/app/payments")
@@ -295,13 +295,13 @@ export function AppShell({
                 <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
                   Portal cliente
                 </Badge>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight">Opturon Workspace</h2>
+                <h2 className="mt-4 text-2xl font-semibold tracking-tight">Espacio de trabajo Opturon</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
                   Conversaciones, automatizaciones y canal WhatsApp en una vista simple para el negocio.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
-                  <Badge variant="success">Workspace activo</Badge>
+                  <Badge variant="success">Espacio activo</Badge>
                   {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
                 </div>
                 {buildLabel ? (
@@ -422,12 +422,12 @@ export function AppShell({
               {topbar || (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Client portal</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal del cliente</p>
                     <h1 className="mt-1 text-2xl font-semibold tracking-tight">Gestiona conversaciones, automatizaciones y crecimiento</h1>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <ThemeToggleButton />
-                    <Badge variant="muted">Workspace cliente</Badge>
+                    <Badge variant="muted">Espacio del cliente</Badge>
                     <Badge variant="success">Portal activo</Badge>
                     <Badge variant="outline" className="gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" />

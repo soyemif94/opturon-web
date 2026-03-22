@@ -367,11 +367,11 @@ export function CommandPalette({
       ...(canAccessAppModule(runtime, "inbox") ? [{
         id: "nav-inbox",
         group: (mode === "inbox" || mode === "conversation" ? "inbox" : "navigation") as CommandGroup,
-        label: "Ir a Inbox",
+        label: "Ir a Bandeja",
         description: "/app/inbox",
         icon: <MessageSquare className="h-4 w-4" />,
         shortcut: "G I",
-        preview: () => ({ title: "Ir a Inbox", description: "Vista principal de conversaciones." }),
+        preview: () => ({ title: "Ir a Bandeja", description: "Vista principal de conversaciones." }),
         run: async () => router.push("/app/inbox")
       }] : []),
       ...(canAccessAppModule(runtime, "catalog") ? [{
@@ -396,19 +396,19 @@ export function CommandPalette({
       ...(canAccessAppModule(runtime, "sales") ? [{
         id: "nav-sales",
         group: "navigation" as const,
-        label: "Ir a Sales",
+        label: "Ir a Ventas",
         description: "/app/sales",
         icon: <TrendingUp className="h-4 w-4" />,
-        preview: () => ({ title: "Ir a Sales", description: "KPIs y lectura comercial del workspace." }),
+        preview: () => ({ title: "Ir a Ventas", description: "KPIs y lectura comercial del espacio." }),
         run: async () => router.push("/app/sales")
       }] : []),
       ...(canAccessAppModule(runtime, "loyalty") ? [{
         id: "nav-loyalty",
         group: "navigation" as const,
-        label: "Ir a Loyalty",
+        label: "Ir a Fidelizacion",
         description: "/app/loyalty",
         icon: <Gift className="h-4 w-4" />,
-        preview: () => ({ title: "Ir a Loyalty", description: "Puntos, recompensas y canjes manuales." }),
+        preview: () => ({ title: "Ir a Fidelizacion", description: "Puntos, recompensas y canjes manuales." }),
         run: async () => router.push("/app/loyalty")
       }] : []),
       ...(canAccessAppModule(runtime, "faqs") ? [{ id: "nav-faq", group: "navigation" as const, label: "Ir a FAQ", description: "/app/faqs", run: async () => router.push("/app/faqs") }] : []),
@@ -454,21 +454,21 @@ export function CommandPalette({
         {
           id: "inbox-filter-hot",
           group: "inbox",
-          label: "Filter Hot",
-          preview: () => ({ title: "Filtrar Hot", impact: "Mostrara solo conversaciones prioritarias." }),
+          label: "Filtrar prioritarias",
+          preview: () => ({ title: "Filtrar prioritarias", impact: "Mostrara solo conversaciones prioritarias." }),
           run: async () => inbox?.controls.applyFilter?.("hot")
         },
         {
           id: "inbox-filter-unreplied",
           group: "inbox",
-          label: "Filter Unreplied",
+          label: "Filtrar sin responder",
           preview: () => ({ title: "Filtrar sin responder", impact: "Mostrara solo conversaciones pendientes." }),
           run: async () => inbox?.controls.applyFilter?.("sin_responder")
         },
         {
           id: "inbox-filter-assigned",
           group: "inbox",
-          label: "Filter Assigned to me",
+          label: "Filtrar asignadas a mi",
           preview: () => ({ title: "Filtrar asignadas", impact: "Mostrara conversaciones asignadas al usuario actual." }),
           run: async () => inbox?.controls.applyFilter?.("asignadas")
         },
@@ -537,7 +537,7 @@ export function CommandPalette({
         {
           id: "conv-reassign",
           group: "conversation",
-          label: "Reassign...",
+          label: "Reasignar...",
           description: "Asignar por ID de usuario",
           disabled: !canEdit,
           preview: () => ({ title: "Reasignar conversacion", description: "Solicitara un ID de usuario destino." }),
@@ -551,10 +551,10 @@ export function CommandPalette({
         {
           id: "conv-hot-toggle",
           group: "conversation",
-          label: inbox?.state.isHot ? "Unmark Hot" : "Mark Hot",
+          label: inbox?.state.isHot ? "Quitar prioridad" : "Marcar prioridad",
           disabled: !canEdit,
           preview: () => ({
-            title: inbox?.state.isHot ? "Quitar prioridad Hot" : "Marcar prioridad Hot",
+            title: inbox?.state.isHot ? "Quitar prioridad" : "Marcar prioridad",
             impact: "Actualiza la prioridad de la conversacion en la bandeja."
           }),
           run: async () => {
@@ -590,7 +590,7 @@ export function CommandPalette({
         {
           id: "conv-unread-toggle",
           group: "conversation",
-          label: (inbox?.state.unreadCount ?? 0) > 0 ? "Mark as read" : "Mark as unread",
+          label: (inbox?.state.unreadCount ?? 0) > 0 ? "Marcar como leida" : "Marcar como no leida",
           disabled: !canEdit,
           preview: () => ({
             title: (inbox?.state.unreadCount ?? 0) > 0 ? "Marcar como leida" : "Marcar como no leida",
@@ -612,7 +612,7 @@ export function CommandPalette({
         {
           id: "msg-products",
           group: "messaging",
-          label: "Insert product...",
+          label: "Insertar producto...",
           disabled: !canEdit,
           preview: () => ({ title: "Insertar producto", description: "Abrira el catalogo para seleccionar producto." }),
           run: async () => setSubview("products")
@@ -620,7 +620,7 @@ export function CommandPalette({
         {
           id: "msg-request-email",
           group: "messaging",
-          label: "Request email",
+          label: "Solicitar email",
           disabled: !canEdit,
           preview: () => ({ title: "Solicitar email", body: "Para avanzar, compartime un email de contacto." }),
           run: async () => {}
@@ -628,7 +628,7 @@ export function CommandPalette({
         {
           id: "msg-request-address",
           group: "messaging",
-          label: "Request address",
+          label: "Solicitar direccion",
           disabled: !canEdit,
           preview: () => ({ title: "Solicitar direccion", body: "Podrias compartir direccion completa para validar envio?" }),
           run: async () => {}
@@ -636,7 +636,7 @@ export function CommandPalette({
         {
           id: "msg-request-budget",
           group: "messaging",
-          label: "Request budget",
+          label: "Solicitar presupuesto",
           disabled: !canEdit,
           preview: () => ({ title: "Solicitar presupuesto", body: "Que presupuesto estimado tenes para esta compra?" }),
           run: async () => {}
@@ -644,7 +644,7 @@ export function CommandPalette({
         {
           id: "contact-note",
           group: "contact",
-          label: "Add note...",
+          label: "Agregar nota...",
           disabled: !canEdit,
           preview: () => ({ title: "Agregar nota", description: "Abrira un input rapido para nota interna." }),
           run: async () => {
@@ -657,7 +657,7 @@ export function CommandPalette({
         {
           id: "contact-task",
           group: "contact",
-          label: "Create task...",
+          label: "Crear tarea...",
           disabled: !canEdit,
           preview: () => ({ title: "Crear tarea", description: "Abrira input rapido de tarea." }),
           run: async () => {
@@ -915,14 +915,14 @@ export function CommandPalette({
               onClick={() => setSubview("root")}
               className="mb-2 rounded-xl border border-[color:var(--border)] px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50"
             >
-              Back
+              Volver
             </button>
           ) : null}
           <Input
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={subview === "root" ? "Buscar comandos..." : "Buscar en subvista..."}
+            placeholder={subview === "root" ? "Buscar comandos..." : "Buscar en esta vista..."}
             className="h-11 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
           />
         </div>

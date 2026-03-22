@@ -324,7 +324,7 @@ export function InvoiceDraftEditor({
       if (!nextInvoice?.id) {
         throw new Error("invoice_response_missing_id");
       }
-      toast.success(invoice ? "Draft actualizada" : "Draft creada");
+      toast.success(invoice ? "Borrador actualizado" : "Borrador creado");
       router.push(`/app/invoices/${nextInvoice.id}`);
       router.refresh();
     } catch (error) {
@@ -338,10 +338,10 @@ export function InvoiceDraftEditor({
     <form className="space-y-6" onSubmit={submitDraft}>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de crédito draft" : "Draft editable"}</Badge>}>
+          <CardHeader action={<Badge variant={isCreditNote ? "outline" : "warning"}>{isCreditNote ? "Nota de crédito en borrador" : "Borrador editable"}</Badge>}>
             <div>
               <CardTitle className="text-xl">
-                {invoice ? (isCreditNote ? "Editar nota de crédito draft" : "Editar factura draft") : isCreditNote ? "Crear nota de crédito draft" : "Crear factura draft"}
+                {invoice ? (isCreditNote ? "Editar nota de crédito en borrador" : "Editar comprobante en borrador") : isCreditNote ? "Crear nota de crédito en borrador" : "Crear comprobante en borrador"}
               </CardTitle>
               <CardDescription>
                 {isCreditNote
@@ -588,7 +588,7 @@ export function InvoiceDraftEditor({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Resumen</CardTitle>
-                <CardDescription>Totales recalculados en frontend para preparar el guardado del draft.</CardDescription>
+                <CardDescription>Totales recalculados en pantalla para preparar el guardado del borrador.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -615,7 +615,7 @@ export function InvoiceDraftEditor({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Siguiente paso</CardTitle>
-                <CardDescription>Despues de guardar, la draft queda lista para emitirse desde el detail.</CardDescription>
+                <CardDescription>Despues de guardar, el borrador queda listo para emitirse desde el detalle.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0 text-sm text-muted">
@@ -624,11 +624,11 @@ export function InvoiceDraftEditor({
                   <ReceiptText className="h-4 w-4" />
                   <span>Workflow</span>
                 </div>
-                <p>{isCreditNote ? "Guardar draft - revisar origen e impacto - emitir cuando la nota de credito ya este lista." : "Guardar draft - revisar detalle - emitir cuando el documento ya este listo."}</p>
+                <p>{isCreditNote ? "Guardar borrador - revisar origen e impacto - emitir cuando la nota de credito ya este lista." : "Guardar borrador - revisar detalle - emitir cuando el documento ya este listo."}</p>
               </div>
               <Button type="submit" className="w-full rounded-2xl" disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear nota de crédito draft" : "Crear draft"}
+                {saving ? "Guardando..." : invoice ? "Guardar cambios" : isCreditNote ? "Crear nota de crédito en borrador" : "Crear borrador"}
               </Button>
             </CardContent>
           </Card>

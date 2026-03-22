@@ -10,14 +10,14 @@ export default async function AppSettingsPage() {
   return (
     <ClientPageShell
       title="Configuracion"
-      description="Gestiona preferencias del workspace, accesos del equipo y ajustes generales del portal desde un solo lugar."
-      badge="Workspace"
+      description="Gestiona preferencias del espacio, accesos del equipo y ajustes generales del portal desde un solo lugar."
+      badge="Espacio"
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_340px]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="muted">Centro de configuracion</Badge>}>
             <div>
-              <CardTitle className="text-xl">Ajustes del workspace</CardTitle>
+              <CardTitle className="text-xl">Ajustes del espacio</CardTitle>
               <CardDescription>
                 Organiza los datos del negocio, accesos del equipo y preferencias generales que impactan en la operacion diaria del portal.
               </CardDescription>
@@ -33,14 +33,14 @@ export default async function AppSettingsPage() {
             <SettingsLinkCard
               href="/app/users"
               icon={<Users className="h-4 w-4 text-brandBright" />}
-              title="Usuarios del workspace"
+              title="Usuarios del espacio"
               description="Revisa quien accede al portal y como se distribuye el trabajo dentro del equipo."
             />
             <div className="grid gap-4 md:grid-cols-2">
               <SettingsStaticCard
                 icon={<Bell className="h-4 w-4 text-brandBright" />}
                 title="Preferencias"
-                description="Ajustes generales del portal y futuras opciones de notificaciones del workspace."
+                description="Ajustes generales del portal y futuras opciones de notificaciones del espacio."
               />
               <SettingsStaticCard
                 icon={<Shield className="h-4 w-4 text-brandBright" />}
@@ -55,14 +55,14 @@ export default async function AppSettingsPage() {
           <CardHeader action={<Badge variant="warning">Vista general</Badge>}>
             <div>
               <CardTitle className="text-xl">Que puedes gestionar aqui</CardTitle>
-              <CardDescription>Resumen simple para entender que configuraciones afectan el funcionamiento del workspace.</CardDescription>
+              <CardDescription>Resumen simple para entender que configuraciones afectan el funcionamiento del espacio.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             {[
               "Los datos del negocio mejoran la calidad de respuesta en el canal y en las automatizaciones.",
               "Los usuarios del portal ayudan a ordenar responsabilidades y el trabajo del equipo.",
-              "Las preferencias del workspace permiten adaptar el portal al funcionamiento real del negocio.",
+              "Las preferencias del espacio permiten adaptar el portal al funcionamiento real del negocio.",
               "Esta seccion queda lista para crecer a roles, seguridad y configuraciones mas avanzadas."
             ].map((item) => (
               <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">

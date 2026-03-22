@@ -94,7 +94,7 @@ export function ContactEditor({ contact }: { contact: PortalContactDetail }) {
           <Input placeholder="Email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} disabled={saving} />
           <Input placeholder="Telefono" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} disabled={saving} />
           <Input placeholder="WhatsApp" value={draft.whatsappPhone} onChange={(event) => setDraft((current) => ({ ...current, whatsappPhone: event.target.value }))} disabled={saving} />
-          <Input placeholder="Tax ID / Documento" value={draft.taxId} onChange={(event) => setDraft((current) => ({ ...current, taxId: event.target.value }))} disabled={saving} />
+          <Input placeholder="CUIT, CUIL o documento" value={draft.taxId} onChange={(event) => setDraft((current) => ({ ...current, taxId: event.target.value }))} disabled={saving} />
           <Input
             placeholder="Condicion fiscal"
             value={draft.taxCondition}

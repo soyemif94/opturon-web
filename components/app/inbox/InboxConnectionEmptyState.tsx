@@ -72,8 +72,8 @@ export function InboxConnectionEmptyState({ status }: { status: WhatsAppConnecti
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado actual</p>
               <p className="mt-3 text-sm leading-7 text-muted">
                 {isAmbiguous
-                  ? "Detectamos mas de un canal posible para este workspace y por eso dejamos el inbox en modo seguro hasta revisar la conexion."
-                  : "Todavia no encontramos un canal de WhatsApp Business conectado para este workspace."}
+                  ? "Detectamos mas de un canal posible para este espacio y por eso dejamos la bandeja en modo seguro hasta revisar la conexion."
+                  : "Todavia no encontramos un canal de WhatsApp Business conectado para este espacio."}
               </p>
             </div>
           </div>

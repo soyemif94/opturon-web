@@ -54,7 +54,7 @@ export default async function AppLoyaltyPage() {
 
   return (
     <ClientPageShell
-      title="Loyalty"
+      title="Fidelizacion"
       description="Programa de puntos V1 para premiar recurrencia, operar canjes manuales y dejar trazabilidad por cliente dentro del mismo portal."
       badge="Retencion"
     >

@@ -64,7 +64,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       ]);
       whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult?.data || null });
       tenantName = contextResult.data.clinic?.name || tenantName;
-      tenantIndustry = "Workspace conectado";
+      tenantIndustry = "Espacio conectado";
       const portalConversations = Array.isArray(conversationsResult.data?.conversations)
         ? conversationsResult.data.conversations
         : [];
@@ -197,13 +197,13 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           {
             label: "Mensajes automatizados",
             value: String(botResponses),
-            helper: "Mensajes automatizados visibles para este workspace.",
+            helper: "Mensajes automatizados visibles para este espacio.",
             icon: "bot"
           },
           {
             label: "Tiempo medio de respuesta",
             value: `${avgResponseMinutes} min`,
-            helper: "Promedio calculado sobre las conversaciones visibles del workspace.",
+            helper: "Promedio calculado sobre las conversaciones visibles del espacio.",
             icon: "response"
           }
         ]}
@@ -222,7 +222,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           {
             id: "activity-bot",
             title: "Portal listo para atender mensajes",
-            detail: "El inbox ya soporta sugerencias, quick replies y acciones sobre conversaciones.",
+            detail: "La bandeja ya soporta sugerencias, respuestas rapidas y acciones sobre conversaciones.",
             timeLabel: "Ahora",
             tone: "success"
           },
@@ -232,7 +232,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
             detail: hasWhatsAppChannel
               ? "La cuenta ya puede usar inbox y automatizaciones sobre el canal conectado."
               : whatsapp.state === "ambiguous_configuration"
-                ? "Detectamos una configuracion pendiente antes de activar el canal del workspace."
+                ? "Detectamos una configuracion pendiente antes de activar el canal del espacio."
                 : "Conectar WhatsApp habilitara conversaciones reales y la activacion del canal desde el portal.",
             timeLabel: "Hoy",
             tone: hasWhatsAppChannel ? "success" : "warning"

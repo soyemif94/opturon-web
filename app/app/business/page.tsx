@@ -42,7 +42,7 @@ export default async function BusinessPage() {
         ...(settingsResult?.data.settings || {}),
         tenantId: ctx.tenantId || settingsResult?.data.settings?.tenantId || ""
       };
-      const clinicName = tenantContext?.data?.clinic?.name || settingsResult?.data.settings?.clinicName || "Workspace del cliente";
+      const clinicName = tenantContext?.data?.clinic?.name || settingsResult?.data.settings?.clinicName || "Espacio del cliente";
 
       return (
         <ClientPageShell
@@ -54,15 +54,15 @@ export default async function BusinessPage() {
             <BusinessSettingsForm
               initialSettings={realTenantSettings}
               tenantName={clinicName}
-              tenantIndustry="Configuracion operativa del workspace"
+              tenantIndustry="Configuracion operativa del espacio"
             />
 
             <div className="space-y-4">
               <div className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado del perfil fiscal</p>
-                <p className="mt-3 text-xl font-semibold">Fuente central del emisor conectada al workspace</p>
+                <p className="mt-3 text-xl font-semibold">Fuente central del emisor conectada al espacio</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Los datos del negocio se guardan sobre la clinica real del workspace y alimentan por default la pre-facturacion contable.
+                  Los datos del negocio se guardan sobre la clinica real del espacio y alimentan por defecto la pre-facturacion contable.
                 </p>
               </div>
             </div>

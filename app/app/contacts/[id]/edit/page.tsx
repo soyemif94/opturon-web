@@ -31,7 +31,7 @@ export default async function AppContactEditPage({ params }: { params: Promise<{
         </div>
       ) : readOnly ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
-          Este workspace esta en modo solo lectura y no puede editar contactos.
+          Este espacio esta en modo solo lectura y no puede editar contactos.
         </div>
       ) : (
         <ContactEditor contact={contact} />

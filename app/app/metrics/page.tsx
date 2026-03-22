@@ -76,9 +76,9 @@ export default async function AppMetricsPage() {
 
   const cards = [
     { label: "Conversaciones", value: String(activeConversations), helper: "Conversaciones activas que el equipo puede seguir desde el portal." },
-    { label: "Prospectos", value: String(prospects), helper: "Contactos visibles hoy dentro del workspace del tenant." },
-    { label: "Respuestas del bot", value: String(botResponses), helper: "Mensajes automatizados visibles en la fuente activa de este workspace." },
-    { label: "Respuestas humanas", value: String(humanResponses), helper: "Mensajes enviados por el equipo desde el workspace." },
+    { label: "Prospectos", value: String(prospects), helper: "Contactos visibles hoy dentro del espacio del negocio." },
+    { label: "Respuestas del bot", value: String(botResponses), helper: "Mensajes automatizados visibles en la fuente activa de este espacio." },
+    { label: "Respuestas humanas", value: String(humanResponses), helper: "Mensajes enviados por el equipo desde el espacio." },
     { label: "Interacciones totales", value: String(totalInteractions), helper: "Volumen total visible para este tenant en el periodo actual." },
     { label: "Cobertura del bot", value: `${botCoverage}%`, helper: "Porcentaje de interacciones donde el bot ya intervino." },
     { label: "Responsables activos", value: String(activeResponsible), helper: topResponsibleLabel }
