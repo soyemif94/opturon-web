@@ -1041,12 +1041,16 @@ export type PortalSalesPerformanceRow = {
   closedSales: number;
   openOpportunities: number;
   closedRevenue: number;
+  humanResponses: number;
 };
 
 export type PortalSalesMetrics = {
   closedSalesCount: number;
   openOpportunitiesCount: number;
   activeSalesConversations: number;
+  humanResponsesCount: number;
+  automatedResponsesCount: number;
+  totalConversationMessagesCount: number;
   responsiblePerformance: PortalSalesPerformanceRow[];
 };
 

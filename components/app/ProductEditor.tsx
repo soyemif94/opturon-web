@@ -16,6 +16,7 @@ type ProductDraft = {
   description: string;
   sku: string;
   price: string;
+  stock: string;
   currency: string;
   vatRate: string;
   status: string;
@@ -27,6 +28,7 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     description: product.description || "",
     sku: product.sku || "",
     price: String(product.price ?? product.unitPrice ?? 0),
+    stock: String(product.stock ?? 0),
     currency: product.currency || "ARS",
     vatRate: String(product.vatRate ?? product.taxRate ?? 0),
     status: product.status || "active"
@@ -44,6 +46,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const name = draft.name.trim();
     const sku = draft.sku.trim();
     const price = Number(draft.price);
+    const stock = Number(draft.stock || 0);
     const vatRate = Number(draft.vatRate || 0);
 
     if (!name) {
@@ -62,6 +65,10 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
       toast.error("IVA invalido", "Ingresa una alicuota valida mayor o igual a cero.");
       return;
     }
+    if (!Number.isFinite(stock) || stock < 0) {
+      toast.error("Stock invalido", "Ingresa un stock valido mayor o igual a cero.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -73,6 +80,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           description: draft.description.trim() || null,
           sku: sku || null,
           price,
+          stock,
           currency: draft.currency.trim().toUpperCase() || "ARS",
           vatRate,
           status: draft.status
@@ -112,6 +120,15 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Precio"
             value={draft.price}
             onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))}
+            disabled={saving}
+          />
+          <Input
+            type="number"
+            step="1"
+            min="0"
+            placeholder="Stock disponible"
+            value={draft.stock}
+            onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))}
             disabled={saving}
           />
           <Input placeholder="Moneda" maxLength={3} value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving} />

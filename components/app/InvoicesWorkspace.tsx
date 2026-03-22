@@ -303,8 +303,11 @@ export function InvoicesWorkspace({
                     <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                       <Link href={`/app/invoices/${invoice.id}`}>Ver detalle</Link>
                     </Button>
+                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                      <a href={`/api/app/invoices/${invoice.id}/download`}>Descargar JSON</a>
+                    </Button>
                     <Button asChild size="sm" className="rounded-2xl">
-                      <a href={`/api/app/invoices/${invoice.id}/document`}>Descargar</a>
+                      <a href={`/api/app/invoices/${invoice.id}/download?format=document`}>Descargar documento</a>
                     </Button>
                   </div>
                 </div>

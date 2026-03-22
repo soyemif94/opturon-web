@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientPageShell } from "@/components/app/client-page-shell";
-import { getPortalContacts, getPortalConversations, isBackendConfigured } from "@/lib/api";
+import { getPortalContacts, getPortalConversations, getPortalSalesMetrics, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
 
@@ -17,27 +17,39 @@ export default async function AppMetricsPage() {
   let botResponses = 0;
   let humanResponses = 0;
   let totalInteractions = 0;
+  let activeResponsible = 0;
+  let topResponsibleLabel = "Todavia no hay seguimiento asignado";
 
   if (ctx.tenantId && backendReady) {
     try {
-      const [conversationsResult, contactsResult] = await Promise.all([
+      const [conversationsResult, contactsResult, salesMetricsResult] = await Promise.all([
         getPortalConversations(ctx.tenantId),
-        getPortalContacts(ctx.tenantId)
+        getPortalContacts(ctx.tenantId),
+        getPortalSalesMetrics(ctx.tenantId)
       ]);
       const conversations = Array.isArray(conversationsResult.data?.conversations) ? conversationsResult.data.conversations : [];
       const contacts = Array.isArray(contactsResult.data?.contacts) ? contactsResult.data.contacts : [];
+      const metrics = salesMetricsResult.data?.metrics;
+      const responsiblePerformance = Array.isArray(metrics?.responsiblePerformance) ? metrics.responsiblePerformance : [];
 
       activeConversations = conversations.length;
       prospects = contacts.length;
-      totalInteractions = conversations.length;
-      botResponses = 0;
-      humanResponses = 0;
+      totalInteractions = Number(metrics?.totalConversationMessagesCount || 0);
+      botResponses = Number(metrics?.automatedResponsesCount || 0);
+      humanResponses = Number(metrics?.humanResponsesCount || 0);
+      activeResponsible = responsiblePerformance.length;
+      if (responsiblePerformance.length) {
+        const topResponsible = responsiblePerformance[0];
+        topResponsibleLabel = `${topResponsible.responsibleName}: ${topResponsible.humanResponses} respuestas humanas`;
+      }
     } catch {
       activeConversations = 0;
       prospects = 0;
       totalInteractions = 0;
       botResponses = 0;
       humanResponses = 0;
+      activeResponsible = 0;
+      topResponsibleLabel = "No se pudieron cargar responsables";
     }
   } else if (useLocalDemoData) {
     const metrics = localData?.tenantMetrics.find((item) => item.tenantId === tenantId);
@@ -47,12 +59,16 @@ export default async function AppMetricsPage() {
     totalInteractions = tenantMessages.length;
     activeConversations = Number(metrics?.activeConversations || 0);
     prospects = (localData?.deals || []).filter((item) => item.tenantId === tenantId).length;
+    activeResponsible = 0;
+    topResponsibleLabel = "Disponible solo con backend real";
   } else {
     activeConversations = 0;
     prospects = 0;
     totalInteractions = 0;
     botResponses = 0;
     humanResponses = 0;
+    activeResponsible = 0;
+    topResponsibleLabel = "Sin datos";
   }
 
   const botCoverage = totalInteractions > 0 ? Math.round((botResponses / totalInteractions) * 100) : 0;
@@ -64,7 +80,8 @@ export default async function AppMetricsPage() {
     { label: "Respuestas del bot", value: String(botResponses), helper: "Mensajes automatizados visibles en la fuente activa de este workspace." },
     { label: "Respuestas humanas", value: String(humanResponses), helper: "Mensajes enviados por el equipo desde el workspace." },
     { label: "Interacciones totales", value: String(totalInteractions), helper: "Volumen total visible para este tenant en el periodo actual." },
-    { label: "Cobertura del bot", value: `${botCoverage}%`, helper: "Porcentaje de interacciones donde el bot ya intervino." }
+    { label: "Cobertura del bot", value: `${botCoverage}%`, helper: "Porcentaje de interacciones donde el bot ya intervino." },
+    { label: "Responsables activos", value: String(activeResponsible), helper: topResponsibleLabel }
   ];
 
   return (

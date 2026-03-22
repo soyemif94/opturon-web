@@ -26,6 +26,9 @@ export default async function AppSalesPage() {
     closedSalesCount: 0,
     openOpportunitiesCount: 0,
     activeSalesConversations: 0,
+    humanResponsesCount: 0,
+    automatedResponsesCount: 0,
+    totalConversationMessagesCount: 0,
     responsiblePerformance: []
   };
   let opportunities: PortalSalesOpportunity[] = [];

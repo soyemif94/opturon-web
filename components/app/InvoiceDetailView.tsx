@@ -325,7 +325,13 @@ export function InvoiceDetailView({
         <Badge variant={badgeToneByStatus(invoice.fiscalStatus)}>{titleCaseLabel(invoice.fiscalStatus)}</Badge>
         <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
         <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-          <a href={`/api/app/invoices/${invoice.id}/document`}>
+          <a href={`/api/app/invoices/${invoice.id}/download`}>
+            <Download className="mr-2 h-4 w-4" />
+            Descargar JSON
+          </a>
+        </Button>
+        <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+          <a href={`/api/app/invoices/${invoice.id}/download?format=document`}>
             <Download className="mr-2 h-4 w-4" />
             Descargar documento
           </a>
@@ -363,7 +369,7 @@ export function InvoiceDetailView({
           <CardHeader>
             <div>
               <CardTitle className="text-xl">
-                {invoice.type === "credit_note" ? "Nota de crédito" : "Documento"} {invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                {invoice.type === "credit_note" ? "Nota de crédito" : "Documento"} {invoice.internalDocumentNumber || invoice.invoiceNumber || invoice.id.slice(0, 8)}
               </CardTitle>
               <CardDescription>
                 {invoice.type === "credit_note"
