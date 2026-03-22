@@ -39,6 +39,7 @@ export function AutomationBuilder() {
   const preset = TEMPLATE_PRESETS[template] || null;
 
   const [name, setName] = useState(preset?.name || "");
+  const [description, setDescription] = useState("");
   const [triggerType, setTriggerType] = useState<TriggerType>(preset?.trigger || "message_received");
   const [keyword, setKeyword] = useState(preset?.keyword || "");
   const [actions, setActions] = useState<ActionType[]>(preset?.actions || ["send_message"]);
@@ -64,6 +65,7 @@ export function AutomationBuilder() {
     try {
       const payload = {
         name,
+        description,
         trigger: {
           type: triggerType,
           keyword: triggerType === "keyword" ? keyword : null
@@ -121,6 +123,16 @@ export function AutomationBuilder() {
             />
           </label>
 
+          <label className="grid gap-2 text-sm">
+            <span className="font-medium">Descripción interna</span>
+            <textarea
+              className="min-h-[104px] w-full rounded-lg border border-[color:var(--border)] bg-bg p-3"
+              placeholder="Explica para qué sirve esta automatización y cuándo debería intervenir."
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </label>
+
           <TriggerSelector value={triggerType} keyword={keyword} onChange={(value) => setTriggerType(value as TriggerType)} onKeywordChange={setKeyword} />
           <ActionBuilder
             selected={actions}
@@ -157,6 +169,10 @@ export function AutomationBuilder() {
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
             <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Trigger</p>
             <p className="mt-2 text-sm font-medium">{helper}</p>
+          </div>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Descripción</p>
+            <p className="mt-2 text-sm font-medium text-muted">{description || "Todavía no agregaste contexto para el equipo."}</p>
           </div>
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
             <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Acciones seleccionadas</p>

@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";

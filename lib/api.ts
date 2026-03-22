@@ -1157,6 +1157,7 @@ export type PortalAutomation = {
   clinicId: string;
   externalTenantId: string | null;
   name: string;
+  description?: string | null;
   trigger: {
     type: string;
     keyword?: string | null;
@@ -1636,6 +1637,7 @@ export async function createPortalAutomation(
   tenantId: string,
   payload: {
     name: string;
+    description?: string | null;
     trigger: { type: string; keyword?: string | null };
     actions: Array<{ type: string; message?: string | null; tag?: string | null }>;
     enabled?: boolean;

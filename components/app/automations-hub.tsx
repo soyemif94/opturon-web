@@ -105,12 +105,18 @@ function summarizeTrigger(automation: PortalAutomation) {
 function summarizeActions(automation: PortalAutomation) {
   return automation.actions
     .map((action) => {
-      if (action.type === "send_message") return "Enviar mensaje";
-      if (action.type === "assign_human") return "Derivar a humano";
-      if (action.type === "tag_contact") return "Etiquetar contacto";
+      if (action.type === "send_message") {
+        const preview = String(action.message || "").trim();
+        return preview ? `Mensaje: ${preview}` : "Enviar mensaje";
+      }
+      if (action.type === "assign_human") return "Derivar a una persona del equipo";
+      if (action.type === "tag_contact") {
+        const tag = String(action.tag || "").trim();
+        return tag ? `Etiqueta: ${tag}` : "Etiquetar contacto";
+      }
       return action.type;
     })
-    .join(" · ");
+    .join(" | ");
 }
 
 export function AutomationsHub({ automations }: { automations: PortalAutomation[] }) {
@@ -119,7 +125,9 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
       automations.map((automation) => ({
         id: automation.id,
         name: automation.name,
-        description: automation.enabled ? "Automatización activa en este espacio." : "Automatización creada pero todavia inactiva.",
+        description:
+          automation.description ||
+          (automation.enabled ? "Automatizacion activa en este espacio." : "Automatizacion creada pero todavia inactiva."),
         state: automation.enabled ? "activa" : "inactiva",
         summary: summarizeActions(automation) || "Sin acciones configuradas",
         trigger: summarizeTrigger(automation),

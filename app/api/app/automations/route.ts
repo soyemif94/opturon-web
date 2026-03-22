@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as
     | {
         name?: string;
+        description?: string;
         trigger?: { type?: string; keyword?: string | null };
         actions?: Array<{ type?: string; message?: string | null; tag?: string | null }>;
         enabled?: boolean;
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await createPortalAutomation(auth.ctx.tenantId, {
       name: String(body?.name || "").trim(),
+      description: body?.description ? String(body.description).trim() : null,
       trigger: {
         type: String(body?.trigger?.type || "").trim(),
         keyword: body?.trigger?.keyword ? String(body.trigger.keyword).trim() : null
