@@ -50,6 +50,12 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
     : [];
   let tenantName = tenant?.name || "Tu empresa";
   let tenantIndustry = tenant?.industry || "Negocio digital";
+  let onboardingState = {
+    hasChannel: false,
+    hasProducts: false,
+    hasMessages: false,
+    botEnabled: false
+  };
   let botResponses = useLocalDemoData ? (localData?.messages || []).filter((item) => item.tenantId === tenantId && item.direction === "system").length : 0;
   let humanResponses = useLocalDemoData ? (localData?.messages || []).filter((item) => item.tenantId === tenantId && item.direction === "outbound").length : 0;
 
@@ -79,6 +85,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         lastInteractionAt: contact.lastInteractionAt
       }));
       businessSettings = businessResult?.data?.settings || businessSettings;
+      onboardingState = contextResult.data.onboarding || onboardingState;
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
       conversations = [];
@@ -86,61 +93,50 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
     }
   }
 
+  if (useLocalDemoData) {
+    onboardingState = {
+      hasChannel: true,
+      hasProducts: false,
+      hasMessages: conversations.length > 0,
+      botEnabled: true
+    };
+  }
+
   const hasWhatsAppChannel = hasOperationalWhatsAppChannel(whatsapp);
   const outboundMessages = humanResponses + botResponses;
   const avgResponseMinutes = conversations.length > 0 ? Math.round(conversations.reduce((acc, item) => acc + item.slaMinutes, 0) / conversations.length) : 0;
   const latestConversation = conversations[0];
   const latestDetail = useLocalDemoData && latestConversation ? getInboxConversationDetail(tenantId, latestConversation.id) : null;
-  const hasBusinessProfile = isBusinessProfileComplete(businessSettings);
-  const hasTriedInbox = conversations.length > 0;
   const onboardingSteps = [
     {
       id: "whatsapp",
-      title: "Conectar WhatsApp",
-      description: "Activa tu canal principal para recibir y responder mensajes desde Opturon.",
+      label: "Conectar WhatsApp",
       href: "/app/integrations",
-      ctaLabel:
-        whatsapp.state === "connected"
-          ? "Abrir inbox"
-          : whatsapp.state === "ambiguous_configuration"
-            ? "Revisar conexion"
-            : "Conectar WhatsApp",
-      status: hasWhatsAppChannel ? ("complete" as const) : ("pending" as const)
+      ctaLabel: onboardingState.hasChannel ? "Ver canal" : "Conectar",
+      status: onboardingState.hasChannel ? ("done" as const) : ("pending" as const)
     },
-    ...(canManage
-      ? [
-          {
-            id: "business",
-            title: "Completar perfil del negocio",
-            description: "Carga datos basicos para que el portal y el equipo trabajen con mejor contexto.",
-            href: "/app/business",
-            ctaLabel: hasBusinessProfile ? "Editar perfil" : "Completar perfil",
-            status: hasBusinessProfile ? ("complete" as const) : ("pending" as const)
-          }
-        ]
-      : []),
     {
-      id: "inbox",
-      title: "Probar conversaciones",
-      description: "Abre el inbox y verifica que las conversaciones reales ya entren correctamente.",
-      href: "/app/inbox",
-      ctaLabel: hasTriedInbox ? "Abrir inbox" : "Probar inbox",
-      status: hasTriedInbox ? ("complete" as const) : ("pending" as const)
+      id: "products",
+      label: "Cargar productos",
+      href: "/app/catalog",
+      ctaLabel: onboardingState.hasProducts ? "Ver catálogo" : "Cargar productos",
+      status: onboardingState.hasProducts ? ("done" as const) : ("pending" as const)
     },
-    ...(canManage
-      ? [
-          {
-            id: "automations",
-            title: "Configurar automatizaciones",
-            description: "Deja listas las respuestas y reglas basicas para empezar a automatizar tu atencion.",
-            href: "/app/automations",
-            ctaLabel: "Configurar",
-            status: "pending" as const
-          }
-        ]
-      : [])
+    {
+      id: "bot",
+      label: "Probar el bot",
+      href: "/app/inbox",
+      ctaLabel: onboardingState.hasMessages ? "Abrir inbox" : "Probar ahora",
+      status: onboardingState.hasMessages ? ("done" as const) : ("pending" as const)
+    },
+    {
+      id: "automation",
+      label: "Activar atención automática",
+      href: "/app/automations",
+      ctaLabel: onboardingState.botEnabled ? "Ver automatizaciones" : "Activar",
+      status: onboardingState.botEnabled ? ("done" as const) : ("pending" as const)
+    }
   ];
-  const completedCount = onboardingSteps.filter((step) => step.status === "complete").length;
   const dashboardContacts = contacts.slice(0, 5).map((contact) => ({
     id: contact.id,
     name: contact.name,
@@ -156,7 +152,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
 
   return (
     <div className="space-y-8">
-      <ClientOnboardingChecklist steps={onboardingSteps} completedCount={completedCount} />
+      <ClientOnboardingChecklist steps={onboardingSteps} />
       <AppDashboard
         tenantName={tenantName}
         tenantIndustry={tenantIndustry}
@@ -256,29 +252,6 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       />
     </div>
   );
-}
-
-function isBusinessProfileComplete(
-  settings:
-    | PortalBusinessSettings
-    | {
-        openingHours?: string;
-        address?: string;
-        deliveryZones?: string;
-        paymentMethods?: string;
-        policies?: string;
-      }
-    | null
-) {
-  if (!settings) return false;
-
-  return [
-    settings.openingHours,
-    settings.address,
-    settings.deliveryZones,
-    settings.paymentMethods,
-    settings.policies
-  ].some((value) => String(value || "").trim().length > 0);
 }
 
 function relativeLabel(dateString: string) {
