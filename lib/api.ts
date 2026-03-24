@@ -251,6 +251,15 @@ export type PortalTenantContext = {
     wabaId: string | null;
     status: string | null;
   } | null;
+  onboarding?: {
+    hasChannel: boolean;
+    hasProducts: boolean;
+    hasMessages: boolean;
+    botEnabled: boolean;
+    productsCount: number;
+    conversationsCount: number;
+    automationsCount: number;
+  };
   reason: string;
 };
 
