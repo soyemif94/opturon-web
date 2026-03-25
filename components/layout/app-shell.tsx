@@ -24,7 +24,8 @@ import {
   Receipt,
   Settings2,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  WalletCards
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
@@ -111,6 +112,14 @@ const navItems: Array<{
     icon: PhoneCall,
     module: "payments",
     match: (pathname: string) => pathname.startsWith("/app/payments")
+  },
+  {
+    href: "/app/cash",
+    label: "Caja",
+    description: "Apertura, control operativo y cierre de cajas del comercio",
+    icon: WalletCards,
+    module: "cash",
+    match: (pathname: string) => pathname.startsWith("/app/cash")
   },
   {
     href: "/app/automations",

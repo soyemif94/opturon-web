@@ -1,22 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDownLeft, Landmark, Loader2, ReceiptText, RotateCcw, Search, Wallet } from "lucide-react";
+import { ArrowDownLeft, Landmark, Loader2, Pencil, Plus, ReceiptText, RotateCcw, Save, Search, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
-import type { PortalInvoice, PortalPayment } from "@/lib/api";
+import type { PortalInvoice, PortalOrder, PortalPayment, PortalPaymentDestination, PortalPaymentDestinationType } from "@/lib/api";
 import {
   badgeToneByStatus,
   formatDateLabel,
   formatMoney,
   getPaymentDestinationLabel,
-  normalizePaymentDestinationValue,
   normalizePaymentMethodValue,
-  PAYMENT_DESTINATION_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   titleCaseLabel
 } from "@/lib/billing";
@@ -34,6 +32,23 @@ const EMPTY_FILTERS: PaymentFilterState = {
   method: "all",
   contactId: "all"
 };
+
+type DestinationFormState = {
+  name: string;
+  type: PortalPaymentDestinationType;
+};
+
+const EMPTY_DESTINATION_FORM: DestinationFormState = {
+  name: "",
+  type: "wallet"
+};
+
+const DESTINATION_TYPE_OPTIONS: Array<{ value: PortalPaymentDestinationType; label: string }> = [
+  { value: "wallet", label: "Billetera" },
+  { value: "bank", label: "Banco" },
+  { value: "cash_box", label: "Caja" },
+  { value: "other", label: "Otro" }
+];
 
 const BUSINESS_TIME_ZONE = "America/Argentina/Buenos_Aires";
 const WEEKDAY_INDEX: Record<string, number> = {
@@ -105,24 +120,25 @@ function isDayInRange(dayNumber: number | null, startDayNumber: number, endDayNu
   return dayNumber !== null && dayNumber >= startDayNumber && dayNumber <= endDayNumber;
 }
 
-function paymentDestinationValue(payment: PortalPayment) {
+function paymentDestinationLabel(payment: PortalPayment) {
   const metadata = payment.metadata && typeof payment.metadata === "object" ? payment.metadata : null;
-  const explicitDestination =
-    typeof metadata?.destinationAccount === "string"
-      ? metadata.destinationAccount
-      : typeof metadata?.destination === "string"
-        ? metadata.destination
-        : null;
+  if (typeof metadata?.destinationName === "string" && metadata.destinationName.trim()) {
+    return metadata.destinationName.trim();
+  }
 
-  if (explicitDestination) {
-    return normalizePaymentDestinationValue(explicitDestination);
+  if (typeof metadata?.destinationAccount === "string" && metadata.destinationAccount.trim()) {
+    return getPaymentDestinationLabel(metadata.destinationAccount.trim());
+  }
+
+  if (typeof metadata?.destination === "string" && metadata.destination.trim()) {
+    return getPaymentDestinationLabel(metadata.destination.trim());
   }
 
   if (payment.method === "cash") {
-    return "cash_drawer";
+    return "Caja";
   }
 
-  return "unclassified";
+  return "Sin clasificar";
 }
 
 function paymentEffectiveDate(payment: PortalPayment) {
@@ -133,6 +149,10 @@ function invoiceEffectiveDate(invoice: PortalInvoice) {
   return invoice.issuedAt || invoice.createdAt;
 }
 
+function orderEffectiveDate(order: PortalOrder) {
+  return order.createdAt;
+}
+
 function sumPayments(payments: PortalPayment[]) {
   return payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
@@ -141,19 +161,74 @@ function sumInvoices(invoices: PortalInvoice[]) {
   return invoices.reduce((sum, invoice) => sum + Number(invoice.totalAmount || 0), 0);
 }
 
+function destinationTypeLabel(type: string | null | undefined) {
+  switch (type) {
+    case "wallet":
+      return "Billetera";
+    case "bank":
+      return "Banco";
+    case "cash_box":
+      return "Caja";
+    case "other":
+      return "Otro";
+    default:
+      return "Sin tipo";
+  }
+}
+
+function orderDestinationName(order: PortalOrder) {
+  return order.paymentDestination?.name || order.paymentDestinationNameSnapshot || null;
+}
+
+function orderDestinationType(order: PortalOrder) {
+  return order.paymentDestination?.type || order.paymentDestinationTypeSnapshot || null;
+}
+
+function orderDestinationKey(order: PortalOrder) {
+  return order.paymentDestination?.id || order.paymentDestinationId || orderDestinationName(order) || null;
+}
+
+function labelForOrderCustomer(order: PortalOrder) {
+  if (order.customerType === "final_consumer") return "Consumidor final";
+  return order.customerName || order.contact?.name || "Cliente sin nombre";
+}
+
+function labelForOrderSeller(order: PortalOrder) {
+  if (order.source === "bot" && !order.seller?.name && !order.sellerNameSnapshot) return "Bot";
+  return order.seller?.name || order.sellerNameSnapshot || "Sin asignar";
+}
+
+function labelForOrderDestination(order: PortalOrder) {
+  const name = orderDestinationName(order);
+  const type = orderDestinationType(order);
+  if (!name) return "Sin destino";
+  return `${name}${type ? ` · ${destinationTypeLabel(type)}` : ""}`;
+}
+
 export function PaymentsWorkspace({
   initialPayments,
   initialInvoices,
+  initialOrders,
+  initialPaymentDestinations,
   readOnly = false
 }: {
   initialPayments: PortalPayment[];
   initialInvoices: PortalInvoice[];
+  initialOrders: PortalOrder[];
+  initialPaymentDestinations: PortalPaymentDestination[];
   readOnly?: boolean;
 }) {
   const [payments, setPayments] = useState(Array.isArray(initialPayments) ? initialPayments : []);
   const [invoices, setInvoices] = useState(Array.isArray(initialInvoices) ? initialInvoices : []);
+  const [orders, setOrders] = useState(Array.isArray(initialOrders) ? initialOrders : []);
+  const [paymentDestinations, setPaymentDestinations] = useState(Array.isArray(initialPaymentDestinations) ? initialPaymentDestinations : []);
   const [filters, setFilters] = useState<PaymentFilterState>(EMPTY_FILTERS);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [showInactiveDestinations, setShowInactiveDestinations] = useState(true);
+  const [destinationForm, setDestinationForm] = useState<DestinationFormState>(EMPTY_DESTINATION_FORM);
+  const [destinationBusy, setDestinationBusy] = useState<string | null>(null);
+  const [editingDestinationId, setEditingDestinationId] = useState<string | null>(null);
+  const [editingDestinationDraft, setEditingDestinationDraft] = useState<DestinationFormState>(EMPTY_DESTINATION_FORM);
 
   const timeContext = useMemo(() => getTodayContext(), []);
 
@@ -170,6 +245,11 @@ export function PaymentsWorkspace({
   const issuedInvoices = useMemo(
     () => invoices.filter((invoice) => invoice.type === "invoice" && invoice.status === "issued"),
     [invoices]
+  );
+
+  const activeOrdersWithDestination = useMemo(
+    () => orders.filter((order) => order.orderStatus !== "cancelled" && Boolean(orderDestinationName(order))),
+    [orders]
   );
 
   const contactOptions = useMemo(() => {
@@ -198,7 +278,7 @@ export function PaymentsWorkspace({
         payment.contact?.name,
         payment.contact?.phone,
         payment.invoiceId,
-        getPaymentDestinationLabel(paymentDestinationValue(payment)),
+        paymentDestinationLabel(payment),
         payment.allocations?.map((allocation) => allocation.invoice?.invoiceNumber || allocation.invoiceId).join(" ")
       ]
         .filter(Boolean)
@@ -268,21 +348,56 @@ export function PaymentsWorkspace({
   }, [issuedCreditNotes, issuedInvoices, recordedPayments, timeContext]);
 
   const destinationBreakdown = useMemo(() => {
-    const totals = new Map<string, number>();
+    const totals = new Map<
+      string,
+      {
+        key: string;
+        label: string;
+        type: string | null;
+        ordersCount: number;
+        totalAmount: number;
+      }
+    >();
 
-    recordedPayments
-      .filter((payment) => getBusinessMonthKey(paymentEffectiveDate(payment)) === timeContext.monthKey)
-      .forEach((payment) => {
-        const destination = paymentDestinationValue(payment);
-        totals.set(destination, (totals.get(destination) || 0) + Number(payment.amount || 0));
+    activeOrdersWithDestination
+      .filter((order) => getBusinessMonthKey(orderEffectiveDate(order)) === timeContext.monthKey)
+      .forEach((order) => {
+        const key = orderDestinationKey(order);
+        const label = orderDestinationName(order);
+        if (!key || !label) return;
+
+        const current = totals.get(key) || {
+          key,
+          label,
+          type: orderDestinationType(order),
+          ordersCount: 0,
+          totalAmount: 0
+        };
+
+        current.ordersCount += 1;
+        current.totalAmount += Number(order.total || 0);
+        totals.set(key, current);
       });
 
-    return PAYMENT_DESTINATION_OPTIONS.map((option) => ({
-      value: option.value,
-      label: option.label,
-      totalAmount: totals.get(option.value) || 0
-    })).filter((item) => item.totalAmount > 0);
-  }, [recordedPayments, timeContext.monthKey]);
+    return Array.from(totals.values()).sort((left, right) => right.totalAmount - left.totalAmount);
+  }, [activeOrdersWithDestination, timeContext.monthKey]);
+
+  const recentOrdersByDestination = useMemo(
+    () =>
+      [...activeOrdersWithDestination]
+        .sort((left, right) => {
+          const leftDate = coerceDate(orderEffectiveDate(left))?.getTime() || 0;
+          const rightDate = coerceDate(orderEffectiveDate(right))?.getTime() || 0;
+          return rightDate - leftDate;
+        })
+        .slice(0, 10),
+    [activeOrdersWithDestination]
+  );
+
+  const visibleDestinations = useMemo(
+    () => paymentDestinations.filter((destination) => showInactiveDestinations || destination.isActive),
+    [paymentDestinations, showInactiveDestinations]
+  );
 
   const recentCreditNotes = useMemo(
     () =>
@@ -296,13 +411,17 @@ export function PaymentsWorkspace({
     [issuedCreditNotes]
   );
 
-  async function refreshWorkspace() {
-    const [paymentsResponse, invoicesResponse] = await Promise.all([
+  async function refreshWorkspace(includeInactive = showInactiveDestinations) {
+    const [paymentsResponse, invoicesResponse, ordersResponse, destinationsResponse] = await Promise.all([
       fetch("/api/app/payments", { cache: "no-store" }),
-      fetch("/api/app/invoices", { cache: "no-store" })
+      fetch("/api/app/invoices", { cache: "no-store" }),
+      fetch("/api/app/orders", { cache: "no-store" }),
+      fetch(`/api/app/payment-destinations?includeInactive=${includeInactive ? "1" : "0"}`, { cache: "no-store" })
     ]);
     const paymentsJson = await paymentsResponse.json().catch(() => null);
     const invoicesJson = await invoicesResponse.json().catch(() => null);
+    const ordersJson = await ordersResponse.json().catch(() => null);
+    const destinationsJson = await destinationsResponse.json().catch(() => null);
 
     if (!paymentsResponse.ok) {
       throw new Error(String(paymentsJson?.error || "No se pudieron refrescar los cobros."));
@@ -310,9 +429,17 @@ export function PaymentsWorkspace({
     if (!invoicesResponse.ok) {
       throw new Error(String(invoicesJson?.error || "No se pudieron refrescar las facturas."));
     }
+    if (!ordersResponse.ok) {
+      throw new Error(String(ordersJson?.error || "No se pudieron refrescar los pedidos."));
+    }
+    if (!destinationsResponse.ok) {
+      throw new Error(String(destinationsJson?.error || "No se pudieron refrescar los destinos."));
+    }
 
     setPayments(Array.isArray(paymentsJson?.payments) ? paymentsJson.payments : []);
     setInvoices(Array.isArray(invoicesJson?.invoices) ? invoicesJson.invoices : []);
+    setOrders(Array.isArray(ordersJson?.orders) ? ordersJson.orders : []);
+    setPaymentDestinations(Array.isArray(destinationsJson?.paymentDestinations) ? destinationsJson.paymentDestinations : []);
   }
 
   async function voidPayment(paymentId: string) {
@@ -334,6 +461,82 @@ export function PaymentsWorkspace({
       toast.error("No se pudo anular el cobro", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
+    }
+  }
+
+  async function createDestination() {
+    const name = destinationForm.name.trim();
+    if (!name) {
+      toast.error("Nombre obligatorio", "Indica un nombre para el destino de cobro.");
+      return;
+    }
+
+    setDestinationBusy("create");
+    try {
+      const response = await fetch("/api/app/payment-destinations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          type: destinationForm.type,
+          isActive: true
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "No se pudo crear el destino."));
+      }
+
+      setDestinationForm(EMPTY_DESTINATION_FORM);
+      await refreshWorkspace(true);
+      toast.success("Destino creado");
+    } catch (error) {
+      toast.error("No se pudo crear el destino", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setDestinationBusy(null);
+    }
+  }
+
+  function startEditingDestination(destination: PortalPaymentDestination) {
+    setEditingDestinationId(destination.id);
+    setEditingDestinationDraft({
+      name: destination.name,
+      type: destination.type
+    });
+  }
+
+  async function saveDestination(destination: PortalPaymentDestination, nextActive = destination.isActive) {
+    const name = editingDestinationId === destination.id ? editingDestinationDraft.name.trim() : destination.name;
+    const type = editingDestinationId === destination.id ? editingDestinationDraft.type : destination.type;
+
+    if (!name) {
+      toast.error("Nombre obligatorio", "El destino no puede quedar sin nombre.");
+      return;
+    }
+
+    setDestinationBusy(destination.id);
+    try {
+      const response = await fetch(`/api/app/payment-destinations/${destination.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          type,
+          isActive: nextActive
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "No se pudo actualizar el destino."));
+      }
+
+      setEditingDestinationId(null);
+      await refreshWorkspace(true);
+      toast.success(nextActive ? "Destino actualizado" : "Destino desactivado");
+    } catch (error) {
+      toast.error("No se pudo actualizar el destino", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setDestinationBusy(null);
     }
   }
 
@@ -384,25 +587,159 @@ export function PaymentsWorkspace({
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">{visibleDestinations.length} visibles</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Destinos de cobro</CardTitle>
+              <CardDescription>Configura caja, banco o billetera desde el panel y desactiva sin perder historico.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            {!readOnly ? (
+              <div className="grid gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4 md:grid-cols-[minmax(0,1fr)_180px_120px]">
+                <Input
+                  placeholder="Ej. Mercado Pago o Caja 1"
+                  value={destinationForm.name}
+                  onChange={(event) => setDestinationForm((current) => ({ ...current, name: event.target.value }))}
+                />
+                <select
+                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={destinationForm.type}
+                  onChange={(event) =>
+                    setDestinationForm((current) => ({
+                      ...current,
+                      type: event.target.value as PortalPaymentDestinationType
+                    }))
+                  }
+                >
+                  {DESTINATION_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <Button onClick={() => void createDestination()} disabled={destinationBusy !== null}>
+                  {destinationBusy === "create" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                  Crear
+                </Button>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted">Las cajas quedan modeladas como un destino mas, con tipo propio para la fase futura de caja.</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const nextValue = !showInactiveDestinations;
+                  setShowInactiveDestinations(nextValue);
+                  void refreshWorkspace(nextValue).catch(() => null);
+                }}
+              >
+                {showInactiveDestinations ? "Ocultar inactivos" : "Ver inactivos"}
+              </Button>
+            </div>
+
+            {visibleDestinations.length ? (
+              visibleDestinations.map((destination) => {
+                const isEditing = editingDestinationId === destination.id;
+                const rowName = isEditing ? editingDestinationDraft.name : destination.name;
+                const rowType = isEditing ? editingDestinationDraft.type : destination.type;
+
+                return (
+                  <div
+                    key={destination.id}
+                    className="grid gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4 md:grid-cols-[minmax(0,1fr)_180px_160px]"
+                  >
+                    <Input
+                      value={rowName}
+                      disabled={!isEditing}
+                      onChange={(event) => setEditingDestinationDraft((current) => ({ ...current, name: event.target.value }))}
+                    />
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={rowType}
+                      disabled={!isEditing}
+                      onChange={(event) =>
+                        setEditingDestinationDraft((current) => ({
+                          ...current,
+                          type: event.target.value as PortalPaymentDestinationType
+                        }))
+                      }
+                    >
+                      {DESTINATION_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={destination.isActive ? "success" : "muted"}>
+                        {destination.isActive ? "Activo" : "Inactivo"}
+                      </Badge>
+                      {!readOnly ? (
+                        <>
+                          {isEditing ? (
+                            <Button
+                              size="sm"
+                              onClick={() => void saveDestination(destination, destination.isActive)}
+                              disabled={destinationBusy !== null}
+                            >
+                              {destinationBusy === destination.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                              )}
+                              Guardar
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="secondary" onClick={() => startEditingDestination(destination)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant={destination.isActive ? "destructive" : "secondary"}
+                            onClick={() => void saveDestination(destination, !destination.isActive)}
+                            disabled={destinationBusy !== null}
+                          >
+                            {destination.isActive ? "Desactivar" : "Activar"}
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <EmptyState
+                title="Todavia no hay destinos configurados"
+                description="Crea Mercado Pago, Banco Nacion o Caja 1 para empezar a imputar pedidos reales."
+              />
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="muted">Mes actual</Badge>}>
             <div>
-              <CardTitle className="text-xl">Destino del dinero</CardTitle>
-              <CardDescription>Totales cobrados por caja, banco, billetera o movimientos sin clasificar todavia.</CardDescription>
+              <CardTitle className="text-xl">Pedidos imputados por destino</CardTitle>
+              <CardDescription>Esta lectura ya usa destinos reales guardados en pedidos, no etiquetas visuales hardcodeadas.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             {destinationBreakdown.length ? (
               destinationBreakdown.map((destination) => (
                 <div
-                  key={destination.value}
+                  key={destination.key}
                   className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface/60 px-4 py-3"
                 >
                   <div>
                     <p className="font-medium">{destination.label}</p>
                     <p className="text-sm text-muted">
-                      {destination.value === "unclassified" ? "Movimientos historicos sin destino informado" : "Ingresos registrados"}
+                      {destinationTypeLabel(destination.type)} · {destination.ordersCount} pedido(s) imputado(s)
                     </p>
                   </div>
                   <p className="text-right font-semibold">{formatMoney(destination.totalAmount)}</p>
@@ -410,8 +747,44 @@ export function PaymentsWorkspace({
               ))
             ) : (
               <EmptyState
-                title="Todavia no hay destinos con movimientos"
-                description="Cuando entren cobros en caja, banco o billetera, el desglose aparecera aqui."
+                title="Todavia no hay pedidos imputados"
+                description="Cuando un pedido tenga destino de cobro, vas a ver su total agrupado aca."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">{recentOrdersByDestination.length} visibles</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Pedidos asociados a destinos</CardTitle>
+              <CardDescription>Base minima para caja futura: cada pedido puede dejar trazado a donde debia entrar la plata.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {recentOrdersByDestination.length ? (
+              recentOrdersByDestination.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/60 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{labelForOrderCustomer(order)}</p>
+                    <p className="mt-1 truncate text-sm text-muted">{labelForOrderDestination(order)}</p>
+                    <p className="mt-1 truncate text-sm text-muted">Vendedor: {labelForOrderSeller(order)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatMoney(order.total, order.currency)}</p>
+                    <p className="mt-1 text-sm text-muted">{formatDateLabel(orderEffectiveDate(order))}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                title="No hay pedidos con destino cargado"
+                description="Selecciona un destino al crear un pedido manual para que aparezca en este panel."
               />
             )}
           </CardContent>
@@ -463,7 +836,7 @@ export function PaymentsWorkspace({
         <CardHeader action={<Badge variant="muted">{filteredPayments.length} visibles</Badge>}>
           <div>
             <CardTitle className="text-xl">Movimientos de cobro</CardTitle>
-            <CardDescription>Lectura operativa de ingresos, saldo libre y destino del dinero sin sumar backoffice pesado.</CardDescription>
+            <CardDescription>Los cobros siguen leyendo pagos reales y ahora conviven con destinos persistidos para pedidos.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
@@ -542,7 +915,7 @@ export function PaymentsWorkspace({
                   >
                     <PaymentAmountStack payment={payment} />
                     <div className="flex items-center text-sm text-muted">{titleCaseLabel(payment.method)}</div>
-                    <div className="flex items-center text-sm text-muted">{getPaymentDestinationLabel(paymentDestinationValue(payment))}</div>
+                    <div className="flex items-center text-sm text-muted">{paymentDestinationLabel(payment)}</div>
                     <div className="flex items-center">
                       <Badge variant={badgeToneByStatus(payment.status)}>{titleCaseLabel(payment.status)}</Badge>
                     </div>

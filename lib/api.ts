@@ -833,12 +833,19 @@ export type PortalOrder = {
   id: string;
   clinicId: string;
   contactId: string | null;
-  customerName: string;
-  customerPhone: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerType: "registered_contact" | "final_consumer";
   notes: string | null;
   subtotal: number;
   total: number;
   currency: string;
+  source: string | null;
+  sellerUserId: string | null;
+  sellerNameSnapshot?: string | null;
+  paymentDestinationId?: string | null;
+  paymentDestinationNameSnapshot?: string | null;
+  paymentDestinationTypeSnapshot?: "bank" | "wallet" | "cash_box" | "other" | null;
   paymentStatus: string;
   orderStatus: string;
   createdAt: string;
@@ -848,7 +855,79 @@ export type PortalOrder = {
     name: string | null;
     phone: string | null;
   } | null;
+  seller?: {
+    id: string | null;
+    name: string | null;
+    role: string | null;
+  } | null;
+  paymentDestination?: {
+    id: string | null;
+    name: string | null;
+    type: "bank" | "wallet" | "cash_box" | "other" | null;
+    isActive: boolean | null;
+  } | null;
   items: PortalOrderItem[];
+};
+
+export type PortalPaymentDestinationType = "bank" | "wallet" | "cash_box" | "other";
+
+export type PortalPaymentDestination = {
+  id: string;
+  clinicId: string;
+  name: string;
+  type: PortalPaymentDestinationType;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type PortalCashSessionOrder = {
+  id: string;
+  customerName: string;
+  totalAmount: number;
+  currency: string;
+  createdAt: string | null;
+  sellerName: string;
+};
+
+export type PortalCashSession = {
+  id: string;
+  clinicId: string;
+  paymentDestinationId: string;
+  openedByUserId: string;
+  openedByNameSnapshot: string | null;
+  openedAt: string | null;
+  openingAmount: number;
+  status: "open" | "closed";
+  closedByUserId: string | null;
+  closedByNameSnapshot: string | null;
+  closedAt: string | null;
+  countedAmount: number | null;
+  expectedAmount: number | null;
+  differenceAmount: number | null;
+  notes: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  paymentDestination?: {
+    id: string;
+    name: string;
+    type: PortalPaymentDestinationType;
+    isActive: boolean;
+  } | null;
+  metrics?: {
+    ordersCount: number;
+    salesAmount: number;
+    expectedAmountCurrent: number;
+    recentOrders: PortalCashSessionOrder[];
+  };
+  lifecycle?: {
+    canClose: boolean;
+    canReopen: boolean;
+  };
+};
+
+export type PortalCashBoxOverview = PortalPaymentDestination & {
+  currentSession: PortalCashSession | null;
 };
 
 export type PortalProduct = {
@@ -1203,15 +1282,20 @@ export async function getPortalOrderDetail(tenantId: string, orderId: string) {
 export async function createPortalOrder(
   tenantId: string,
   payload: {
-    customerName: string;
-    customerPhone: string;
+    customerType?: "registered_contact" | "final_consumer";
+    contactId?: string | null;
+    customerName?: string | null;
+    customerPhone?: string | null;
     notes?: string;
     currency?: string;
+    source?: string;
+    sellerUserId?: string | null;
+    paymentDestinationId?: string | null;
     orderStatus?: string;
     items: Array<{
       productId?: string | null;
-      nameSnapshot: string;
-      priceSnapshot: number;
+      nameSnapshot?: string;
+      priceSnapshot?: number;
       quantity: number;
       variant?: string | null;
     }>;
@@ -1224,6 +1308,102 @@ export async function createPortalOrder(
       body: JSON.stringify(payload)
     },
     false
+  );
+}
+
+export async function getPortalPaymentDestinations(
+  tenantId: string,
+  options?: { includeInactive?: boolean }
+) {
+  const query = options?.includeInactive ? "?includeInactive=1" : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      paymentDestinations: PortalPaymentDestination[];
+    };
+  }>(`/portal/tenants/${tenantId}/payment-destinations${query}`, undefined, false);
+}
+
+export async function createPortalPaymentDestination(
+  tenantId: string,
+  payload: {
+    name: string;
+    type: PortalPaymentDestinationType;
+    isActive?: boolean;
+  }
+) {
+  return backendPortalFetch<{ success: boolean; data: PortalPaymentDestination }>(
+    `/portal/tenants/${tenantId}/payment-destinations`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function patchPortalPaymentDestination(
+  tenantId: string,
+  destinationId: string,
+  payload: {
+    name?: string;
+    type?: PortalPaymentDestinationType;
+    isActive?: boolean;
+  }
+) {
+  return backendPortalFetch<{ success: boolean; data: PortalPaymentDestination }>(
+    `/portal/tenants/${tenantId}/payment-destinations/${destinationId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function getPortalCashOverview(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      cashBoxes: PortalCashBoxOverview[];
+      recentClosedSessions: PortalCashSession[];
+    };
+  }>(`/portal/tenants/${tenantId}/cash-sessions`, undefined, false);
+}
+
+export async function openPortalCashSession(
+  tenantId: string,
+  payload: {
+    paymentDestinationId: string;
+    openingAmount: number;
+    openedByUserId: string;
+    notes?: string | null;
+  }
+) {
+  return backendPortalFetch<{ success: boolean; data: PortalCashSession }>(
+    `/portal/tenants/${tenantId}/cash-sessions`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function closePortalCashSession(
+  tenantId: string,
+  sessionId: string,
+  payload: {
+    countedAmount: number;
+    closedByUserId: string;
+    notes?: string | null;
+  }
+) {
+  return backendPortalFetch<{ success: boolean; data: PortalCashSession }>(
+    `/portal/tenants/${tenantId}/cash-sessions/${sessionId}/close`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
   );
 }
 

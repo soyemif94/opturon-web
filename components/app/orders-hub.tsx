@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ClipboardList, Package, Receipt, ShoppingBag } from "lucide-react";
-import type { PortalOrder } from "@/lib/api";
+import type { PortalContact, PortalOrder, PortalPaymentDestination } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,17 +38,27 @@ type CatalogProduct = {
   active?: boolean;
 };
 
+type AssignableSeller = {
+  id: string;
+  name: string;
+  role: string | null;
+};
+
 type OrderFormState = {
-  customerName: string;
-  customerPhone: string;
+  customerType: "registered_contact" | "final_consumer";
+  contactId: string;
+  sellerUserId: string;
+  paymentDestinationId: string;
   notes: string;
   productId: string;
   quantity: string;
 };
 
 const initialForm: OrderFormState = {
-  customerName: "",
-  customerPhone: "",
+  customerType: "registered_contact",
+  contactId: "",
+  sellerUserId: "",
+  paymentDestinationId: "",
   notes: "",
   productId: "",
   quantity: "1"
@@ -59,7 +69,12 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   const [selectedOrder, setSelectedOrder] = useState<PortalOrder | null>(initialOrders[0] || null);
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [contacts, setContacts] = useState<PortalContact[]>([]);
+  const [sellers, setSellers] = useState<AssignableSeller[]>([]);
+  const [paymentDestinations, setPaymentDestinations] = useState<PortalPaymentDestination[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [contactsLoading, setContactsLoading] = useState(true);
+  const [metaLoading, setMetaLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
@@ -73,6 +88,11 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   const selectedProduct = useMemo(
     () => activeProducts.find((product) => product.id === form.productId) || null,
     [activeProducts, form.productId]
+  );
+
+  const selectedContact = useMemo(
+    () => contacts.find((contact) => contact.id === form.contactId) || null,
+    [contacts, form.contactId]
   );
 
   const visibleTotal = useMemo(() => {
@@ -134,23 +154,81 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     }
   }
 
+  async function loadContacts() {
+    setContactsLoading(true);
+    try {
+      const response = await fetch("/api/app/contacts", { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.details || json?.error || "No se pudo cargar la lista de clientes.");
+      }
+
+      const nextContacts = Array.isArray(json?.contacts) ? (json.contacts as PortalContact[]) : [];
+      setContacts(nextContacts);
+      setForm((current) => {
+        if (!nextContacts.length) return { ...current, contactId: "" };
+        if (current.contactId && nextContacts.some((contact) => contact.id === current.contactId)) return current;
+        return { ...current, contactId: nextContacts[0]?.id || "" };
+      });
+      return nextContacts;
+    } finally {
+      setContactsLoading(false);
+    }
+  }
+
+  async function loadOrderMeta() {
+    setMetaLoading(true);
+    try {
+      const response = await fetch("/api/app/orders/meta", { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.details || json?.error || "No se pudo cargar el equipo de ventas.");
+      }
+
+      const nextSellers = Array.isArray(json?.sellers) ? (json.sellers as AssignableSeller[]) : [];
+      const nextPaymentDestinations = Array.isArray(json?.paymentDestinations)
+        ? (json.paymentDestinations as PortalPaymentDestination[])
+        : [];
+      const currentUserId = typeof json?.currentUserId === "string" ? json.currentUserId : "";
+      setSellers(nextSellers);
+      setPaymentDestinations(nextPaymentDestinations);
+      setForm((current) => {
+        const defaultSellerId =
+          (currentUserId && nextSellers.some((seller) => seller.id === currentUserId) ? currentUserId : "") || nextSellers[0]?.id || "";
+        return {
+          ...current,
+          sellerUserId: current.sellerUserId && nextSellers.some((seller) => seller.id === current.sellerUserId)
+            ? current.sellerUserId
+            : defaultSellerId,
+          paymentDestinationId:
+            current.paymentDestinationId && nextPaymentDestinations.some((destination) => destination.id === current.paymentDestinationId)
+              ? current.paymentDestinationId
+              : ""
+        };
+      });
+      return { nextSellers, nextPaymentDestinations };
+    } finally {
+      setMetaLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadProducts() {
+    async function loadDependencies() {
       try {
-        await reloadProducts();
+        await Promise.all([reloadProducts(), loadContacts(), loadOrderMeta()]);
       } catch (error) {
         if (!cancelled) {
           setFeedback({
             tone: "danger",
-            text: error instanceof Error ? error.message : "No se pudo cargar el catalogo para pedidos."
+            text: error instanceof Error ? error.message : "No se pudo cargar la configuracion del formulario de pedidos."
           });
         }
       }
     }
 
-    void loadProducts();
+    void loadDependencies();
     return () => {
       cancelled = true;
     };
@@ -163,12 +241,12 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       throw new Error(json?.error || "No se pudo actualizar el listado de pedidos.");
     }
 
-    const nextOrders = Array.isArray(json?.orders) ? json.orders : [];
+    const nextOrders = Array.isArray(json?.orders) ? (json.orders as PortalOrder[]) : [];
     setOrders(nextOrders);
 
     const preferredOrder =
-      nextOrders.find((order: PortalOrder) => order.id === preferredOrderId) ||
-      nextOrders.find((order: PortalOrder) => order.id === selectedOrder?.id) ||
+      nextOrders.find((order) => order.id === preferredOrderId) ||
+      nextOrders.find((order) => order.id === selectedOrder?.id) ||
       nextOrders[0] ||
       null;
 
@@ -187,7 +265,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
         throw new Error(json?.error || "No se pudo cargar el detalle del pedido.");
       }
 
-      setSelectedOrder(json.order || null);
+      setSelectedOrder((json.order as PortalOrder) || null);
     } catch (error) {
       setFeedback({
         tone: "danger",
@@ -203,8 +281,12 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     setFeedback(null);
 
     const itemQuantity = Number.parseInt(form.quantity, 10);
-    if (!form.customerName.trim() || !form.customerPhone.trim()) {
-      setFeedback({ tone: "warning", text: "Completa cliente y telefono para crear el pedido." });
+    if (form.customerType === "registered_contact" && !form.contactId.trim()) {
+      setFeedback({ tone: "warning", text: "Selecciona un cliente existente para registrar el pedido." });
+      return;
+    }
+    if (!form.sellerUserId.trim()) {
+      setFeedback({ tone: "warning", text: "Selecciona el vendedor responsable del pedido." });
       return;
     }
     if (!form.productId || !selectedProduct) {
@@ -233,8 +315,11 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName: form.customerName.trim(),
-          customerPhone: form.customerPhone.trim(),
+          customerType: form.customerType,
+          contactId: form.customerType === "registered_contact" ? form.contactId : null,
+          sellerUserId: form.sellerUserId,
+          paymentDestinationId: form.paymentDestinationId || null,
+          source: "manual",
           notes: form.notes.trim(),
           items: [
             {
@@ -250,13 +335,23 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
         throw new Error(humanizeOrderError(json) || "No se pudo crear el pedido.");
       }
 
-      await reloadOrders(json?.order?.id);
+      const createdOrder = (json?.order as PortalOrder | null) || null;
+      await reloadOrders(createdOrder?.id || undefined);
+      if (createdOrder?.id) {
+        await loadOrderDetail(createdOrder.id);
+      } else if (createdOrder) {
+        setSelectedOrder(createdOrder);
+      }
       await reloadProducts(form.productId);
       setForm((current) => ({
         ...initialForm,
+        customerType: current.customerType,
+        contactId: current.customerType === "registered_contact" ? current.contactId : "",
+        sellerUserId: current.sellerUserId,
+        paymentDestinationId: current.paymentDestinationId,
         productId: current.productId
       }));
-      setFeedback({ tone: "success", text: "Pedido creado correctamente con un producto real del catalogo." });
+      setFeedback({ tone: "success", text: "Pedido creado correctamente y detalle actualizado con datos reales." });
     } catch (error) {
       setFeedback({
         tone: "danger",
@@ -351,14 +446,15 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold">{order.customerName}</p>
+                          <p className="text-base font-semibold">{labelForOrderCustomer(order)}</p>
                           <Badge variant={badgeForOrderStatus(order.orderStatus)}>{labelForOrderStatus(order.orderStatus)}</Badge>
                           <Badge variant={badgeForPaymentStatus(order.paymentStatus)}>{labelForPaymentStatus(order.paymentStatus)}</Badge>
+                          {order.customerType === "final_consumer" ? <Badge variant="muted">Consumidor final</Badge> : null}
                         </div>
-                        <p className="mt-2 text-sm text-muted">{order.customerPhone}</p>
+                        <p className="mt-2 text-sm text-muted">{labelForOrderPhone(order)}</p>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
                           <span>{order.items.length} item(s)</span>
-                          <span>•</span>
+                          <span>·</span>
                           <span>{formatDate(order.createdAt)}</span>
                         </div>
                       </div>
@@ -379,29 +475,93 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
             <CardHeader action={<Badge variant="muted">Alta desde catalogo</Badge>}>
               <div>
                 <CardTitle className="text-xl">Registrar pedido</CardTitle>
-                <CardDescription>Selecciona un producto real del catalogo, indica cantidad y crea el pedido con snapshots consistentes.</CardDescription>
+                <CardDescription>Selecciona un producto real del catalogo, define cliente y vendedor, y crea el pedido con detalle confiable.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
               <form className="space-y-4" onSubmit={createOrder}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Cliente</label>
-                    <Input
-                      value={form.customerName}
-                      onChange={(event) => setForm((current) => ({ ...current, customerName: event.target.value }))}
-                      placeholder="Ej. Maria Gomez"
-                    />
+                    <label className="text-sm font-medium">Tipo de cliente</label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={form.customerType}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          customerType: event.target.value as OrderFormState["customerType"],
+                          contactId: event.target.value === "registered_contact" ? current.contactId : ""
+                        }))
+                      }
+                    >
+                      <option value="registered_contact">Cliente existente</option>
+                      <option value="final_consumer">Consumidor final</option>
+                    </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Telefono</label>
-                    <Input
-                      value={form.customerPhone}
-                      onChange={(event) => setForm((current) => ({ ...current, customerPhone: event.target.value }))}
-                      placeholder="Ej. +54 9 291 555 1234"
-                    />
+                    <label className="text-sm font-medium">Vendedor responsable</label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={form.sellerUserId}
+                      onChange={(event) => setForm((current) => ({ ...current, sellerUserId: event.target.value }))}
+                      disabled={metaLoading || sellers.length === 0}
+                    >
+                      <option value="">{metaLoading ? "Cargando equipo..." : "Selecciona un vendedor"}</option>
+                      {sellers.map((seller) => (
+                        <option key={seller.id} value={seller.id}>
+                          {seller.name}{seller.role ? ` · ${labelForSellerRole(seller.role)}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Destino de cobro</label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={form.paymentDestinationId}
+                      onChange={(event) => setForm((current) => ({ ...current, paymentDestinationId: event.target.value }))}
+                      disabled={metaLoading}
+                    >
+                      <option value="">Sin definir por ahora</option>
+                      {paymentDestinations.map((destination) => (
+                        <option key={destination.id} value={destination.id}>
+                          {destination.name}{` · ${labelForPaymentDestinationType(destination.type)}`}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-sm text-muted">
+                      En esta fase puede quedar vacio si el pedido todavia no esta cobrado. Si ya sabes a donde entra la plata, dejalo imputado ahora.
+                    </p>
                   </div>
                 </div>
+
+                {form.customerType === "registered_contact" ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Cliente existente</label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={form.contactId}
+                      onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
+                      disabled={contactsLoading || contacts.length === 0}
+                    >
+                      <option value="">{contactsLoading ? "Cargando clientes..." : "Selecciona un cliente"}</option>
+                      {contacts.map((contact) => (
+                        <option key={contact.id} value={contact.id}>
+                          {contact.name}{contact.phone ? ` · ${contact.phone}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-sm text-muted">
+                      {selectedContact
+                        ? "El pedido tomará el nombre y teléfono del contacto seleccionado."
+                        : "El pedido quedará vinculado a un contacto real del workspace."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm leading-7 text-muted">
+                    El pedido se registrará como <span className="font-medium text-text">Consumidor final</span> sin exigir nombre ni teléfono.
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Notas</label>
@@ -442,7 +602,6 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                       />
                     </div>
                   </div>
-
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <DetailStat label="Precio unitario" value={selectedProduct ? formatCurrency(resolveProductPrice(selectedProduct), selectedProduct.currency || "ARS") : "Pendiente"} />
                     <DetailStat label="Stock catalogo" value={selectedProduct ? String(resolveProductStock(selectedProduct)) : "Pendiente"} />
@@ -474,7 +633,16 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                   </p>
                   <Button
                     type="submit"
-                    disabled={readOnly || saving || !backendReady || !selectedProduct || hasInvalidQuantity || createBlockedByStock}
+                    disabled={
+                      readOnly ||
+                      saving ||
+                      !backendReady ||
+                      !selectedProduct ||
+                      hasInvalidQuantity ||
+                      createBlockedByStock ||
+                      !form.sellerUserId ||
+                      (form.customerType === "registered_contact" && !form.contactId)
+                    }
                   >
                     {saving ? "Guardando..." : "Crear pedido"}
                   </Button>
@@ -498,8 +666,12 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
               ) : (
                 <>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <DetailStat label="Cliente" value={selectedOrder.customerName} />
-                    <DetailStat label="Telefono" value={selectedOrder.customerPhone} />
+                    <DetailStat label="Cliente" value={labelForOrderCustomer(selectedOrder)} />
+                    <DetailStat label="Telefono" value={labelForOrderPhone(selectedOrder)} />
+                    <DetailStat label="Tipo de cliente" value={labelForCustomerType(selectedOrder.customerType)} />
+                    <DetailStat label="Vendedor" value={labelForOrderSeller(selectedOrder)} />
+                    <DetailStat label="Destino de cobro" value={labelForPaymentDestination(selectedOrder)} />
+                    <DetailStat label="Origen" value={labelForOrderSource(selectedOrder)} />
                     <DetailStat label="Total" value={formatCurrency(selectedOrder.total, selectedOrder.currency)} />
                     <DetailStat label="Creado" value={formatDate(selectedOrder.createdAt)} />
                   </div>
@@ -662,6 +834,65 @@ function labelForPaymentStatus(status: string) {
   }
 }
 
+function labelForCustomerType(type: string | null | undefined) {
+  return type === "final_consumer" ? "Consumidor final" : "Cliente existente";
+}
+
+function labelForOrderCustomer(order: PortalOrder) {
+  return order.customerType === "final_consumer" ? "Consumidor final" : order.customerName || order.contact?.name || "Cliente sin nombre";
+}
+
+function labelForOrderPhone(order: PortalOrder) {
+  return order.customerPhone || order.contact?.phone || (order.customerType === "final_consumer" ? "No informado" : "Sin telefono");
+}
+
+function labelForSellerRole(role: string | null | undefined) {
+  switch (role) {
+    case "seller":
+      return "vendedor";
+    default:
+      return role || "equipo";
+  }
+}
+
+function labelForOrderSeller(order: PortalOrder) {
+  if (order.source === "bot" && !order.seller?.name && !order.sellerNameSnapshot) {
+    return "Bot";
+  }
+  return order.seller?.name || order.sellerNameSnapshot || "Sin asignar";
+}
+
+function labelForOrderSource(order: PortalOrder) {
+  if (order.source === "bot") return "Bot";
+  if (order.source === "manual") return "Panel";
+  if (order.source === "automation") return "Automatizacion";
+  if (order.source === "inbox") return "Inbox";
+  if (order.source === "api") return "API";
+  return order.source || "Sin definir";
+}
+
+function labelForPaymentDestinationType(type: string | null | undefined) {
+  switch (type) {
+    case "bank":
+      return "Banco";
+    case "wallet":
+      return "Billetera";
+    case "cash_box":
+      return "Caja";
+    case "other":
+      return "Otro";
+    default:
+      return "Sin tipo";
+  }
+}
+
+function labelForPaymentDestination(order: PortalOrder) {
+  const name = order.paymentDestination?.name || order.paymentDestinationNameSnapshot;
+  const type = order.paymentDestination?.type || order.paymentDestinationTypeSnapshot;
+  if (!name) return "Sin definir";
+  return `${name}${type ? ` · ${labelForPaymentDestinationType(type)}` : ""}`;
+}
+
 function formatCurrency(value: number, currency = "ARS") {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -686,9 +917,20 @@ function humanizeOrderError(payload: any) {
   }
 
   switch (payload.error) {
+    case "missing_contact_id":
+      return "Selecciona un cliente existente para registrar el pedido.";
+    case "missing_seller_user_id":
+      return "Selecciona el vendedor responsable del pedido.";
+    case "seller_user_not_found":
+      return "El vendedor seleccionado ya no esta disponible.";
+    case "payment_destination_not_found":
+      return "El destino de cobro seleccionado ya no existe.";
+    case "payment_destination_inactive":
+      return "El destino de cobro seleccionado esta inactivo.";
     case "order_item_insufficient_stock":
       return "No hay stock suficiente para el producto seleccionado.";
     case "order_item_product_inactive":
+    case "order_item_product_archived":
       return "El producto seleccionado esta inactivo.";
     case "order_item_product_not_found":
       return "El producto seleccionado ya no existe.";
