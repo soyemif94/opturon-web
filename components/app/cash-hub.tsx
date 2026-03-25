@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Loader2, LockKeyhole, Store, UnlockKeyhole, Wallet } from "lucide-react";
 import type { PortalCashBoxOverview, PortalCashSession } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { CashCalculator } from "@/components/app/cash-calculator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -461,19 +462,7 @@ export function CashHub({
         </CardContent>
       </Card>
 
-      <Card className="border-white/6 bg-card/90">
-        <CardHeader action={<Badge variant="outline">Pendiente</Badge>}>
-          <div>
-            <CardTitle className="text-xl">Mini calculadora</CardTitle>
-            <CardDescription>No la agregue en esta fase para no mezclar control de caja con utilidades secundarias.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-            Priorice apertura, control, cierre y diferencia real. La calculadora puede entrar despues como accesorio sin tocar el modelo de caja.
-          </div>
-        </CardContent>
-      </Card>
+      <CashCalculator />
     </div>
   );
 }
