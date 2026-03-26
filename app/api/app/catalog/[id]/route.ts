@@ -67,6 +67,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body?.currency !== undefined) payload.currency = String(body.currency || "ARS");
     if (body?.stock !== undefined || body?.stockQty !== undefined) payload.stock = Number(body.stock ?? body.stockQty);
     if (body?.sku !== undefined) payload.sku = body.sku || null;
+    if (body?.categoryId !== undefined) payload.categoryId = body.categoryId || null;
     if (body?.status !== undefined) payload.status = String(body.status);
     if (body?.active !== undefined && body?.status === undefined) payload.status = body.active ? "active" : "inactive";
 

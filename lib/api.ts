@@ -944,9 +944,20 @@ export type PortalProduct = {
   status: string;
   active?: boolean;
   sku: string | null;
+  categoryId?: string | null;
+  categoryName?: string | null;
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PortalProductCategory = {
+  id: string;
+  clinicId: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type PortalInvoiceItem = {
@@ -1883,6 +1894,19 @@ export async function getPortalProductDetail(tenantId: string, productId: string
   );
 }
 
+export async function getPortalProductCategories(tenantId: string, options?: { includeInactive?: boolean }) {
+  const params = new URLSearchParams();
+  if (options?.includeInactive) params.set("includeInactive", "true");
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      categories: PortalProductCategory[];
+    };
+  }>(`/portal/tenants/${tenantId}/product-categories${suffix}`, undefined, false);
+}
+
 export async function createPortalProduct(
   tenantId: string,
   payload: {
@@ -1894,12 +1918,30 @@ export async function createPortalProduct(
     taxRate?: number;
     stock?: number;
     sku?: string | null;
+    categoryId?: string | null;
     status?: string;
     metadata?: Record<string, unknown>;
   }
 ) {
   return backendFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function createPortalProductCategory(
+  tenantId: string,
+  payload: {
+    name: string;
+    isActive?: boolean;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalProductCategory }>(
+    `/portal/tenants/${tenantId}/product-categories`,
     {
       method: "POST",
       body: JSON.stringify(payload)
@@ -1920,12 +1962,31 @@ export async function patchPortalProduct(
     taxRate?: number;
     stock?: number;
     sku?: string | null;
+    categoryId?: string | null;
     status?: string;
     metadata?: Record<string, unknown>;
   }
 ) {
   return backendFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function patchPortalProductCategory(
+  tenantId: string,
+  categoryId: string,
+  payload: {
+    name?: string;
+    isActive?: boolean;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalProductCategory }>(
+    `/portal/tenants/${tenantId}/product-categories/${categoryId}`,
     {
       method: "PATCH",
       body: JSON.stringify(payload)

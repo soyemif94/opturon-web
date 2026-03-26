@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, type FormEvent, useMemo, useState } from "react";
+import { type ComponentType, type FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Boxes, CheckSquare, ChevronDown, ChevronUp, Package, PencilLine, ScanLine, Search, Trash2, Upload, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,16 @@ type Product = {
   stockQty?: number | null;
   status?: string | null;
   active?: boolean;
+  categoryId?: string | null;
+  categoryName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+};
+
+type ProductCategory = {
+  id: string;
+  name: string;
+  isActive: boolean;
 };
 
 type Draft = {
@@ -33,6 +41,7 @@ type Draft = {
   price: string;
   stock: string;
   currency: string;
+  categoryId: string;
 };
 
 type BulkPreviewRow = {
@@ -80,7 +89,8 @@ const EMPTY_DRAFT: Draft = {
   sku: "",
   price: "",
   stock: "0",
-  currency: "ARS"
+  currency: "ARS",
+  categoryId: ""
 };
 
 const BULK_EXAMPLE = [
@@ -91,6 +101,7 @@ const BULK_EXAMPLE = [
 
 export function CatalogManager({ initialProducts, readOnly = false }: { initialProducts: Product[]; readOnly?: boolean }) {
   const [products, setProducts] = useState(Array.isArray(initialProducts) ? initialProducts : []);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialProducts[0]?.id || null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -106,6 +117,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [listExpanded, setListExpanded] = useState(true);
+  const [categoryName, setCategoryName] = useState("");
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [categoryUpdatingId, setCategoryUpdatingId] = useState<string | null>(null);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedId) || null,
@@ -146,9 +162,30 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       sku: product?.sku || "",
       price: product ? String(resolvePrice(product)) : "",
       stock: product ? String(resolveStock(product)) : "0",
-      currency: product?.currency || "ARS"
+      currency: product?.currency || "ARS",
+      categoryId: product?.categoryId || ""
     };
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategories() {
+      try {
+        const response = await fetch("/api/app/catalog/categories?includeInactive=true", { cache: "no-store" });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(String(json?.error || "No se pudieron cargar las categorias."));
+        if (!cancelled) setCategories(Array.isArray(json?.categories) ? json.categories : []);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    }
+
+    void loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function reloadProducts(preferredId?: string | null) {
     const response = await fetch("/api/app/catalog", { cache: "no-store" });
@@ -244,7 +281,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           price,
           vatRate: 0,
           stock,
-          currency: draft.currency.trim() || "ARS"
+          currency: draft.currency.trim() || "ARS",
+          categoryId: draft.categoryId || null
         })
       });
       const json = await response.json().catch(() => null);
@@ -272,6 +310,100 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   function startCreate() {
     setDraft(EMPTY_DRAFT);
     setFeedback(null);
+  }
+
+  async function createCategory() {
+    if (readOnly) return;
+    const name = categoryName.trim();
+    if (!name) {
+      setFeedback({ tone: "warning", text: "La categoria necesita un nombre." });
+      return;
+    }
+
+    setCategorySaving(true);
+    try {
+      const response = await fetch("/api/app/catalog/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, isActive: true })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo crear la categoria."));
+      setCategories((current) => [...current, json.category].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategoryName("");
+      setFeedback({ tone: "success", text: `Categoria creada: ${json.category.name}.` });
+      toast.success("Categoria creada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo crear la categoria.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al crear categoria", message);
+    } finally {
+      setCategorySaving(false);
+    }
+  }
+
+  async function toggleCategory(category: ProductCategory) {
+    if (readOnly) return;
+    setCategoryUpdatingId(category.id);
+    try {
+      const response = await fetch(`/api/app/catalog/categories/${category.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: category.name, isActive: !category.isActive })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo actualizar la categoria."));
+      setCategories((current) => current.map((item) => (item.id === category.id ? json.category : item)));
+      toast.success(category.isActive ? "Categoria desactivada" : "Categoria activada");
+    } catch (error) {
+      toast.error("Error al actualizar categoria", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setCategoryUpdatingId(null);
+    }
+  }
+
+  function startCategoryEdit(category: ProductCategory) {
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+  }
+
+  function cancelCategoryEdit() {
+    setEditingCategoryId(null);
+    setEditingCategoryName("");
+  }
+
+  async function saveCategoryRename(category: ProductCategory) {
+    if (readOnly) return;
+    const name = editingCategoryName.trim();
+    if (!name) {
+      setFeedback({ tone: "warning", text: "La categoria necesita un nombre." });
+      return;
+    }
+
+    setCategoryUpdatingId(category.id);
+    try {
+      const response = await fetch(`/api/app/catalog/categories/${category.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, isActive: category.isActive })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo renombrar la categoria."));
+      setCategories((current) =>
+        current
+          .map((item) => (item.id === category.id ? json.category : item))
+          .sort((left, right) => left.name.localeCompare(right.name))
+      );
+      setProducts((current) =>
+        current.map((item) => (item.categoryId === category.id ? { ...item, categoryName: json.category.name } : item))
+      );
+      cancelCategoryEdit();
+      toast.success("Categoria actualizada");
+    } catch (error) {
+      toast.error("Error al renombrar categoria", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setCategoryUpdatingId(null);
+    }
   }
 
   function buildBulkPreview(text: string) {
@@ -634,6 +766,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
                             {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
                           </Badge>
+                          {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
                           <Badge variant={getStockState(resolveStock(product)).variant}>
                             {getStockState(resolveStock(product)).label}
                           </Badge>
@@ -676,6 +809,96 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
         <div className="space-y-6">
           <Card className="border-white/6 bg-card/90">
+            <CardHeader action={<Badge variant="muted">Categorias</Badge>}>
+              <div>
+                <CardTitle className="text-xl">Categorias del catalogo</CardTitle>
+                <CardDescription>Organiza productos por familia para que el catalogo y el bot puedan guiarlos mejor.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  value={categoryName}
+                  onChange={(event) => setCategoryName(event.target.value)}
+                  placeholder="Ej. Fundas"
+                  disabled={readOnly || categorySaving}
+                />
+                <Button type="button" onClick={() => void createCategory()} disabled={readOnly || categorySaving}>
+                  {categorySaving ? "Guardando..." : "Crear categoria"}
+                </Button>
+              </div>
+              {categories.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                  Todavia no hay categorias. Si no cargas ninguna, el bot mantiene el flujo general actual.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <div key={category.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3">
+                      <div className="min-w-0 flex-1">
+                        {editingCategoryId === category.id ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Input
+                              value={editingCategoryName}
+                              onChange={(event) => setEditingCategoryName(event.target.value)}
+                              disabled={readOnly || categoryUpdatingId === category.id}
+                              className="max-w-sm"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={readOnly || categoryUpdatingId === category.id}
+                              onClick={() => void saveCategoryRename(category)}
+                            >
+                              Guardar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={readOnly || categoryUpdatingId === category.id}
+                              onClick={cancelCategoryEdit}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{category.name}</span>
+                            <Badge variant={category.isActive ? "success" : "muted"}>{category.isActive ? "Activa" : "Inactiva"}</Badge>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {editingCategoryId === category.id ? null : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={readOnly || categoryUpdatingId === category.id}
+                            onClick={() => startCategoryEdit(category)}
+                          >
+                            Renombrar
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={readOnly || categoryUpdatingId === category.id}
+                          onClick={() => void toggleCategory(category)}
+                        >
+                          {categoryUpdatingId === category.id ? "Guardando..." : category.isActive ? "Desactivar" : "Activar"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/6 bg-card/90">
             <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : "Alta rapida"}</Badge>}>
               <div>
                 <CardTitle className="text-xl">Carga de productos</CardTitle>
@@ -707,6 +930,22 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       <label className="text-sm font-medium">Moneda</label>
                       <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="ARS" maxLength={3} disabled={readOnly} />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Categoria</label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={draft.categoryId}
+                      onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
+                      disabled={readOnly}
+                    >
+                      <option value="">Sin categoria</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}{category.isActive ? "" : " · Inactiva"}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
@@ -832,6 +1071,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <div className="grid gap-3 md:grid-cols-2">
                     <DetailStat label="Precio" value={formatCurrency(resolvePrice(selectedProduct), selectedProduct.currency || "ARS")} />
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
+                    <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>

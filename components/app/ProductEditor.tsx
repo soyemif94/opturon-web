@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import type { PortalProduct } from "@/lib/api";
+import type { PortalProduct, PortalProductCategory } from "@/lib/api";
 
 type ProductDraft = {
   name: string;
@@ -20,6 +20,7 @@ type ProductDraft = {
   currency: string;
   vatRate: string;
   status: string;
+  categoryId: string;
 };
 
 function buildInitialState(product: PortalProduct): ProductDraft {
@@ -31,7 +32,8 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     stock: String(product.stock ?? 0),
     currency: product.currency || "ARS",
     vatRate: String(product.vatRate ?? product.taxRate ?? 0),
-    status: product.status || "active"
+    status: product.status || "active",
+    categoryId: product.categoryId || ""
   };
 }
 
@@ -39,6 +41,29 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
   const router = useRouter();
   const [draft, setDraft] = useState<ProductDraft>(buildInitialState(product));
   const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState<PortalProductCategory[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategories() {
+      try {
+        const response = await fetch("/api/app/catalog/categories?includeInactive=true", { cache: "no-store" });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(String(json?.error || "No se pudieron cargar las categorias."));
+        if (!cancelled) {
+          setCategories(Array.isArray(json?.categories) ? json.categories : []);
+        }
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    }
+
+    void loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submitProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,6 +104,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           name,
           description: draft.description.trim() || null,
           sku: sku || null,
+          categoryId: draft.categoryId || null,
           price,
           stock,
           currency: draft.currency.trim().toUpperCase() || "ARS",
@@ -149,6 +175,19 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           >
             <option value="active">Activo</option>
             <option value="archived">Archivado</option>
+          </select>
+          <select
+            className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+            value={draft.categoryId}
+            onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
+            disabled={saving}
+          >
+            <option value="">Sin categoria</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}{category.isActive ? "" : " · Inactiva"}
+              </option>
+            ))}
           </select>
           <Textarea
             className="md:col-span-2"

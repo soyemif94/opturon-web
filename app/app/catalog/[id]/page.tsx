@@ -66,6 +66,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <DetailTile label="IVA" value={`${Number(product.vatRate ?? product.taxRate ?? 0)}%`} />
             <DetailTile label="Moneda" value={product.currency || "ARS"} />
             <DetailTile label="Stock" value={String(product.stock ?? 0)} />
+            <DetailTile label="Categoria" value={product.categoryName || "Sin categoria"} />
             <DetailTile label="Estado" value={titleCaseLabel(product.status)} />
             <DetailTile label="Creado" value={formatDateTimeLabel(product.createdAt)} />
             <DetailTile label="Actualizado" value={formatDateTimeLabel(product.updatedAt)} />

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  createPortalProduct,
+  createPortalProductCategory,
   getBackendErrorBody,
   getBackendErrorStatus,
-  getPortalProducts,
+  getPortalProductCategories,
   isBackendConfigured,
-  type PortalProduct
+  type PortalProductCategory
 } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 
@@ -14,11 +14,9 @@ function noStore(response: NextResponse) {
   return response;
 }
 
-function serializeProduct(product: PortalProduct) {
+function serializeCategory(category: PortalProductCategory) {
   return {
-    ...product,
-    stockQty: product.stock,
-    active: product.status === "active"
+    ...category
   };
 }
 
@@ -36,13 +34,15 @@ export async function GET(request: NextRequest) {
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
-    const result = await getPortalProducts(tenantContext.tenantId);
-    const products = Array.isArray(result.data?.products) ? result.data.products.map(serializeProduct) : [];
+    const result = await getPortalProductCategories(tenantContext.tenantId, {
+      includeInactive: url.searchParams.get("includeInactive") === "true"
+    });
+    const categories = Array.isArray(result.data?.categories) ? result.data.categories.map(serializeCategory) : [];
     return noStore(
       NextResponse.json({
         readOnly: tenantContext.readOnly,
         tenantId: tenantContext.tenantId,
-        products
+        categories
       })
     );
   } catch (error) {
@@ -67,23 +67,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => null);
-    const result = await createPortalProduct(tenantContext.tenantId, {
+    const result = await createPortalProductCategory(tenantContext.tenantId, {
       name: String(body?.name || "").trim(),
-      description: body?.description || null,
-      price: Number(body?.price || 0),
-      currency: String(body?.currency || "ARS"),
-      stock: Number(body?.stock ?? body?.stockQty ?? 0),
-      sku: body?.sku || null,
-      categoryId: body?.categoryId || null,
-      status:
-        typeof body?.status === "string"
-          ? body.status
-          : body?.active === false
-            ? "inactive"
-            : "active"
+      isActive: body?.isActive !== false
     });
 
-    return noStore(NextResponse.json({ ok: true, product: serializeProduct(result.data) }, { status: 201 }));
+    return noStore(NextResponse.json({ ok: true, category: serializeCategory(result.data) }, { status: 201 }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);
     return noStore(
