@@ -117,6 +117,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [listExpanded, setListExpanded] = useState(true);
   const [categoryName, setCategoryName] = useState("");
   const [categorySaving, setCategorySaving] = useState(false);
@@ -145,12 +146,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   );
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return products;
-    return products.filter((product) => {
+    const categoryFiltered = categoryFilter
+      ? products.filter((product) => String(product.categoryId || "") === categoryFilter)
+      : products;
+    if (!query) return categoryFiltered;
+    return categoryFiltered.filter((product) => {
       const haystack = [product.name, product.sku, product.description].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [products, search]);
+  }, [products, search, categoryFilter]);
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
   const allVisibleSelected = filteredProducts.length > 0 && filteredProducts.every((product) => selectedIds.includes(product.id));
@@ -690,6 +694,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="muted">{filteredProducts.length} visibles</Badge>
+                {categoryFilter ? <Badge variant="outline">Categoria filtrada</Badge> : null}
                 <Button type="button" variant="ghost" size="sm" onClick={() => setListExpanded((current) => !current)}>
                   {listExpanded ? "Colapsar" : "Expandir"}
                   {listExpanded ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
@@ -703,14 +708,28 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-              <Input
-                className="pl-10"
-                placeholder="Buscar por nombre o codigo SKU"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+            <div className="flex flex-col gap-3 lg:flex-row">
+              <select
+                className="h-10 min-w-[220px] rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="">Todas las categorias</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}{category.isActive ? "" : " · Inactiva"}
+                  </option>
+                ))}
+              </select>
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                <Input
+                  className="pl-10"
+                  placeholder="Buscar por nombre o codigo SKU"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
             </div>
             {products.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
@@ -743,7 +762,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                No encontramos productos para esa busqueda. Prueba con otro nombre o SKU.
+                {categoryFilter
+                  ? "No encontramos productos en esa categoria con el criterio actual. Proba otra categoria o ajusta la busqueda."
+                  : "No encontramos productos para esa busqueda. Prueba con otro nombre o SKU."}
               </div>
             ) : (
               filteredProducts.map((product) => (
