@@ -145,6 +145,20 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       }),
     [products]
   );
+  const categoryProductCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const product of products) {
+      const categoryId = String(product.categoryId || "").trim();
+      if (!categoryId) continue;
+      counts.set(categoryId, (counts.get(categoryId) || 0) + 1);
+    }
+    return counts;
+  }, [products]);
+  const activeCategory = useMemo(
+    () => categories.find((category) => category.id === categoryFilter) || null,
+    [categories, categoryFilter]
+  );
+  const activeCategoryProductCount = activeCategory ? categoryProductCounts.get(activeCategory.id) || 0 : products.length;
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
     const categoryFiltered = categoryFilter
@@ -160,6 +174,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
   const allVisibleSelected = filteredProducts.length > 0 && filteredProducts.every((product) => selectedIds.includes(product.id));
   const selectedVisibleCount = filteredProducts.filter((product) => selectedIds.includes(product.id)).length;
+  const hasActiveSearch = search.trim().length > 0;
+  const isFilteredCategoryEmpty = Boolean(activeCategory && activeCategoryProductCount === 0);
 
   function hydrateDraft(product?: Product | null): Draft {
     return {
@@ -171,6 +187,32 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       currency: product?.currency || "ARS",
       categoryId: product?.categoryId || ""
     };
+  }
+
+  function openQuickCreate(prefillCategoryId?: string | null) {
+    setMode("single");
+    setDraft((current) => {
+      const nextCategoryId = prefillCategoryId || "";
+      const hasContent = Boolean(
+        current.name.trim() ||
+        current.description.trim() ||
+        current.sku.trim() ||
+        current.price.trim() ||
+        (current.stock.trim() && current.stock.trim() !== "0")
+      );
+
+      if (!hasContent) {
+        return {
+          ...EMPTY_DRAFT,
+          categoryId: nextCategoryId
+        };
+      }
+
+      return {
+        ...current,
+        categoryId: current.categoryId || nextCategoryId
+      };
+    });
   }
 
   useEffect(() => {
@@ -313,8 +355,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
   }
 
-  function startCreate() {
-    setDraft(EMPTY_DRAFT);
+  function startCreate(prefillCategoryId?: string | null) {
+    setDraft({
+      ...EMPTY_DRAFT,
+      categoryId: prefillCategoryId || ""
+    });
     setFeedback(null);
   }
 
@@ -764,10 +809,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
               >
-                <option value="">Todas las categorias</option>
+                <option value="">Todas las categorias ({products.length})</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.name}{category.isActive ? "" : " · Inactiva"}
+                    {category.name} ({categoryProductCounts.get(category.id) || 0}){category.isActive ? "" : " · Inactiva"}
                   </option>
                 ))}
               </select>
@@ -781,6 +826,39 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 />
               </div>
             </div>
+            {activeCategory ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Categoria activa</Badge>
+                    <span className="text-sm font-medium">{activeCategory.name}</span>
+                    <Badge variant={activeCategory.isActive ? "success" : "muted"}>
+                      {activeCategory.isActive ? "Activa" : "Inactiva"}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted">
+                    {filteredProducts.length} visibles de {activeCategoryProductCount} producto{activeCategoryProductCount === 1 ? "" : "s"} en esta categoria.
+                  </p>
+                </div>
+                {!readOnly ? (
+                  <Button type="button" variant="secondary" size="sm" onClick={() => openQuickCreate(activeCategory.id)}>
+                    Agregar producto en {activeCategory.name}
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="muted">Vista general</Badge>
+                    <span className="text-sm font-medium">Todas las categorias</span>
+                  </div>
+                  <p className="text-sm text-muted">
+                    {filteredProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catalogo actual.
+                  </p>
+                </div>
+              </div>
+            )}
             {products.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -812,9 +890,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                {categoryFilter
-                  ? "No encontramos productos en esa categoria con el criterio actual. Proba otra categoria o ajusta la busqueda."
-                  : "No encontramos productos para esa busqueda. Prueba con otro nombre o SKU."}
+                {activeCategory && !hasActiveSearch && isFilteredCategoryEmpty
+                  ? `La categoria ${activeCategory.name} todavia no tiene productos. Agrega uno nuevo en esta categoria para empezar a organizar el catalogo.`
+                  : activeCategory && hasActiveSearch
+                    ? `No encontramos coincidencias para "${search.trim()}" dentro de ${activeCategory.name}. Ajusta la busqueda o revisa otra categoria.`
+                    : !activeCategory && hasActiveSearch
+                      ? `No encontramos productos para "${search.trim()}". Prueba con otro nombre o SKU.`
+                      : "No encontramos productos para el criterio actual."}
               </div>
             ) : (
               filteredProducts.map((product) => (
@@ -936,9 +1018,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{category.name}</span>
                             <Badge variant={category.isActive ? "success" : "muted"}>{category.isActive ? "Activa" : "Inactiva"}</Badge>
+                            <Badge variant={(categoryProductCounts.get(category.id) || 0) > 0 ? "muted" : "outline"}>
+                              {categoryProductCounts.get(category.id) || 0} producto{(categoryProductCounts.get(category.id) || 0) === 1 ? "" : "s"}
+                            </Badge>
+                            {(categoryProductCounts.get(category.id) || 0) === 0 ? (
+                              <span className="text-xs text-muted">Categoria vacia</span>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -991,7 +1079,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant={mode === "single" ? "primary" : "secondary"} size="sm" onClick={() => setMode("single")} disabled={readOnly}>
+                <Button
+                  type="button"
+                  variant={mode === "single" ? "primary" : "secondary"}
+                  size="sm"
+                  onClick={() => openQuickCreate(categoryFilter || null)}
+                  disabled={readOnly}
+                >
                   Alta rapida
                 </Button>
                 <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={() => setMode("bulk")} disabled={readOnly}>
@@ -1046,7 +1140,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Button type="button" variant="ghost" onClick={startCreate} disabled={readOnly}>
+                    <Button type="button" variant="ghost" onClick={() => startCreate(categoryFilter || null)} disabled={readOnly}>
                       Limpiar
                     </Button>
                     <Button type="submit" disabled={readOnly || saving}>
