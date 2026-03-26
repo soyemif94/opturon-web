@@ -61,31 +61,43 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
 
   if (ctx.tenantId && isBackendReady) {
     try {
-      const [contextResult, conversationsResult, contactsResult, onboardingResult, businessResult] = await Promise.all([
-        getPortalTenantContext(ctx.tenantId),
-        getPortalConversations(ctx.tenantId),
-        getPortalContacts(ctx.tenantId),
-        getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null),
-        getPortalBusinessSettings(ctx.tenantId).catch(() => null)
-      ]);
-      whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult?.data || null });
+      const contextResult = await getPortalTenantContext(ctx.tenantId);
+      onboardingState = contextResult.data.onboarding || onboardingState;
+      whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: null });
       tenantName = contextResult.data.clinic?.name || tenantName;
       tenantIndustry = "Espacio conectado";
-      const portalConversations = Array.isArray(conversationsResult.data?.conversations)
-        ? conversationsResult.data.conversations
-        : [];
-      const portalContacts = Array.isArray(contactsResult.data?.contacts) ? contactsResult.data.contacts : [];
 
-      conversations = portalConversations;
-      contacts = portalContacts.map((contact) => ({
-        id: contact.id,
-        name: contact.name,
-        phone: contact.phone || "",
-        tags: contact.optedOut ? ["sin contacto"] : ["prospecto"],
-        lastInteractionAt: contact.lastInteractionAt
-      }));
-      businessSettings = businessResult?.data?.settings || businessSettings;
-      onboardingState = contextResult.data.onboarding || onboardingState;
+      const [conversationsResult, contactsResult, onboardingResult, businessResult] = await Promise.allSettled([
+        getPortalConversations(ctx.tenantId),
+        getPortalContacts(ctx.tenantId),
+        getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId),
+        getPortalBusinessSettings(ctx.tenantId)
+      ]);
+
+      if (conversationsResult.status === "fulfilled") {
+        conversations = Array.isArray(conversationsResult.value.data?.conversations)
+          ? conversationsResult.value.data.conversations
+          : [];
+      }
+
+      if (contactsResult.status === "fulfilled") {
+        const portalContacts = Array.isArray(contactsResult.value.data?.contacts) ? contactsResult.value.data.contacts : [];
+        contacts = portalContacts.map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone || "",
+          tags: contact.optedOut ? ["sin contacto"] : ["prospecto"],
+          lastInteractionAt: contact.lastInteractionAt
+        }));
+      }
+
+      if (onboardingResult.status === "fulfilled") {
+        whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult.value?.data || null });
+      }
+
+      if (businessResult.status === "fulfilled") {
+        businessSettings = businessResult.value?.data?.settings || businessSettings;
+      }
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
       conversations = [];

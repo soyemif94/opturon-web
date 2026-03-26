@@ -80,15 +80,11 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
 
-  const activeProducts = useMemo(
-    () => products.filter((product) => resolveProductStatus(product) === "active"),
-    [products]
-  );
-
   const selectedProduct = useMemo(
-    () => activeProducts.find((product) => product.id === form.productId) || null,
-    [activeProducts, form.productId]
+    () => products.find((product) => product.id === form.productId) || null,
+    [products, form.productId]
   );
+  const selectedProductIsActive = selectedProduct ? resolveProductStatus(selectedProduct) === "active" : false;
 
   const selectedContact = useMemo(
     () => contacts.find((contact) => contact.id === form.contactId) || null,
@@ -102,15 +98,18 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   }, [form.quantity, selectedProduct]);
   const requestedQuantity = Number.parseInt(form.quantity, 10);
   const selectedProductStock = selectedProduct ? resolveProductStock(selectedProduct) : 0;
+  const selectedProductPrice = selectedProduct ? resolveProductPrice(selectedProduct) : 0;
   const selectedStockState = getStockState(selectedProductStock);
   const hasInvalidQuantity = !Number.isInteger(requestedQuantity) || requestedQuantity <= 0;
+  const hasInactiveProduct = Boolean(selectedProduct) && !selectedProductIsActive;
+  const hasNoPrice = Boolean(selectedProduct) && selectedProductPrice <= 0;
   const hasNoStock = Boolean(selectedProduct) && selectedProductStock <= 0;
   const hasInsufficientStock =
     Boolean(selectedProduct) &&
     Number.isInteger(requestedQuantity) &&
     requestedQuantity > 0 &&
     requestedQuantity > selectedProductStock;
-  const createBlockedByStock = hasNoStock || hasInsufficientStock;
+  const createBlockedByStock = hasInactiveProduct || hasNoPrice || hasNoStock || hasInsufficientStock;
 
   const stats = useMemo(() => {
     const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
@@ -138,15 +137,14 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       setProducts(nextProducts);
       setForm((current) => {
         const desiredId = preferredProductId || current.productId;
-        const currentStillAvailable =
-          desiredId && nextProducts.some((product: CatalogProduct) => resolveProductStatus(product) === "active" && product.id === desiredId);
+        const currentStillAvailable = desiredId && nextProducts.some((product: CatalogProduct) => product.id === desiredId);
 
         if (currentStillAvailable) {
           return { ...current, productId: desiredId };
         }
 
         const firstActive = nextProducts.find((product: CatalogProduct) => resolveProductStatus(product) === "active");
-        return { ...current, productId: firstActive ? firstActive.id : "" };
+        return { ...current, productId: firstActive ? firstActive.id : nextProducts[0]?.id || "" };
       });
       return nextProducts;
     } finally {
@@ -290,7 +288,18 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       return;
     }
     if (!form.productId || !selectedProduct) {
-      setFeedback({ tone: "warning", text: "Selecciona un producto activo del catalogo." });
+      setFeedback({ tone: "warning", text: "Selecciona un producto del catalogo." });
+      return;
+    }
+    if (!selectedProductIsActive) {
+      setFeedback({ tone: "warning", text: "El producto seleccionado esta inactivo. Activalo en catalogo para usarlo en pedidos." });
+      return;
+    }
+    if (selectedProductPrice <= 0) {
+      setFeedback({
+        tone: "warning",
+        text: `El producto ${selectedProduct.name} no tiene un precio valido cargado en el catalogo.`
+      });
       return;
     }
     if (!Number.isInteger(itemQuantity) || itemQuantity <= 0) {
@@ -582,12 +591,12 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                         className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
                         value={form.productId}
                         onChange={(event) => setForm((current) => ({ ...current, productId: event.target.value }))}
-                        disabled={productsLoading || activeProducts.length === 0}
+                        disabled={productsLoading || products.length === 0}
                       >
                         <option value="">{productsLoading ? "Cargando catalogo..." : "Selecciona un producto"}</option>
-                        {activeProducts.map((product) => (
+                        {products.map((product) => (
                           <option key={product.id} value={product.id}>
-                            {product.name}{product.sku ? ` · ${product.sku}` : ""}
+                            {product.name}{product.sku ? ` · ${product.sku}` : ""}{resolveProductStatus(product) === "active" ? "" : " · Inactivo"}
                           </option>
                         ))}
                       </select>
@@ -620,7 +629,11 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                   ) : null}
                   {selectedProduct && createBlockedByStock ? (
                     <p className="mt-3 text-sm text-amber-300">
-                      {hasNoStock
+                      {hasInactiveProduct
+                        ? "Este producto esta inactivo en catalogo y no se puede usar para registrar pedidos."
+                        : hasNoPrice
+                        ? "Este producto no tiene un precio valido cargado en este momento."
+                        : hasNoStock
                         ? "Este producto no tiene stock disponible en este momento."
                         : `La cantidad solicitada supera el stock disponible (${selectedProductStock}).`}
                     </p>
