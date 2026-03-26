@@ -2019,6 +2019,7 @@ export async function createPortalProductsBulk(
       price: number;
       stock: number;
       description?: string | null;
+      categoryName?: string | null;
       currency?: string;
     }>;
   }

@@ -52,6 +52,7 @@ type BulkPreviewRow = {
   price: number | null;
   stock: number | null;
   description: string;
+  categoryName: string;
   valid: boolean;
   error?: string;
 };
@@ -94,8 +95,8 @@ const EMPTY_DRAFT: Draft = {
 };
 
 const BULK_EXAMPLE = [
-  "Combo almuerzo | COMBO-01 | 12500 | 100 | Combo con hamburguesa, papas y bebida",
-  "Pizza muzzarella | PIZZA-02 | 9800 | 40 | Pizza grande de 8 porciones",
+  "Combo almuerzo | COMBO-01 | 12500 | 100 | Combo con hamburguesa, papas y bebida | Combos",
+  "Pizza muzzarella | PIZZA-02 | 9800 | 40 | Pizza grande de 8 porciones | Pizzas",
   "Agua 500ml | AGUA-01 | 1500 | 200 | Botella individual"
 ].join("\n");
 
@@ -451,6 +452,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             price: row.price,
             stock: row.stock,
             description: row.description || null,
+            categoryName: row.categoryName || null,
             currency: "ARS"
           }))
         })
@@ -974,10 +976,44 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Pega varias lineas</label>
-                    <Textarea className="min-h-[180px]" value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={BULK_EXAMPLE} disabled={readOnly} />
-                    <p className="text-xs leading-6 text-muted">
-                      Formato por linea: <span className="font-mono">nombre | sku | precio | stock | descripcion</span>. SKU y descripcion pueden quedar vacios. Moneda se guarda como ARS y estado como activo.
-                    </p>
+                    <Textarea
+                      className="min-h-[180px]"
+                      value={bulkText}
+                      onChange={(event) => setBulkText(event.target.value)}
+                      placeholder="nombre | sku | precio | stock | descripcion | categoria"
+                      disabled={readOnly}
+                    />
+                    <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                      <p className="text-sm font-semibold">Formato por linea</p>
+                      <p className="mt-2 font-mono text-xs leading-6 text-text">
+                        nombre | sku | precio | stock | descripcion | categoria
+                      </p>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Campos opcionales</p>
+                          <div className="mt-2 space-y-1 text-sm text-muted">
+                            <p>- sku</p>
+                            <p>- descripcion</p>
+                            <p>- categoria</p>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Regla de categoria</p>
+                          <p className="mt-2 text-sm leading-6 text-muted">
+                            Si la categoria no existe, se crea automaticamente.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 rounded-2xl border border-dashed border-[color:var(--border)] bg-card/70 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Ejemplo</p>
+                        <p className="mt-2 font-mono text-xs leading-6 text-text">
+                          Funda silicona iPhone 11 | FUNDA-01 | 6000 | 10 | Silicona flexible | Fundas
+                        </p>
+                      </div>
+                      <p className="mt-3 text-xs leading-6 text-muted">
+                        Tambien sigue funcionando el formato viejo de 5 columnas sin categoria.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -1002,17 +1038,38 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                         </Badge>
                       </div>
 
+                      <div className="mt-4 hidden grid-cols-[auto_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-3 px-3 text-[11px] uppercase tracking-[0.14em] text-muted md:grid">
+                        <span>Fila</span>
+                        <span>Producto</span>
+                        <span>Precio / Stock</span>
+                        <span>Categoria</span>
+                        <span>Descripcion</span>
+                      </div>
                       <div className="mt-4 space-y-3">
                         {bulkPreview.map((row) => (
                           <div key={`${row.sourceRow}-${row.raw}`} className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant={row.valid ? "success" : "danger"}>Fila {row.sourceRow}</Badge>
-                              <p className="font-medium">{row.name || "Sin nombre"}</p>
-                              {row.sku ? <Badge variant="muted">{row.sku}</Badge> : null}
+                            <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)] md:items-start">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={row.valid ? "success" : "danger"}>Fila {row.sourceRow}</Badge>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium">{row.name || "Sin nombre"}</p>
+                                {row.sku ? <p className="mt-1 text-xs text-muted">SKU: {row.sku}</p> : null}
+                              </div>
+                              <div className="text-sm text-muted">
+                                <p>{formatCurrency(row.price || 0)}</p>
+                                <p className="mt-1">Stock {row.stock}</p>
+                              </div>
+                              <div className="text-sm text-muted">
+                                {row.categoryName || "Sin categoria"}
+                              </div>
+                              <div className="text-sm text-muted">
+                                {row.description || "Sin descripcion"}
+                              </div>
                             </div>
                             {row.valid ? (
-                              <p className="mt-2 text-sm text-muted">
-                                {formatCurrency(row.price || 0)} - Stock {row.stock} - {row.description || "Sin descripcion"}
+                              <p className="mt-3 text-xs text-emerald-300 md:hidden">
+                                Categoria: {row.categoryName || "Sin categoria"}
                               </p>
                             ) : (
                               <p className="mt-2 text-sm text-red-300">{row.error}</p>
@@ -1106,7 +1163,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
   const raw = rawLine.trim();
   const columns = rawLine.split("|").map((part) => part.trim());
-  const [name = "", sku = "", priceRaw = "", stockRaw = "", description = ""] = columns;
+  const [name = "", sku = "", priceRaw = "", stockRaw = "", description = "", categoryName = ""] = columns;
 
   if (columns.length < 4) {
     return {
@@ -1117,12 +1174,13 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
       price: null,
       stock: null,
       description,
+      categoryName,
       valid: false,
-      error: "Faltan columnas. Usa: nombre | sku | precio | stock | descripcion"
+      error: "Faltan columnas. Usa: nombre | sku | precio | stock | descripcion | categoria"
     };
   }
 
-  if (columns.length > 5) {
+  if (columns.length > 6) {
     return {
       sourceRow,
       raw,
@@ -1131,8 +1189,9 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
       price: null,
       stock: null,
       description,
+      categoryName,
       valid: false,
-      error: "La fila tiene mas de 5 columnas."
+      error: "La fila tiene mas de 6 columnas."
     };
   }
 
@@ -1148,6 +1207,7 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
       price: null,
       stock: null,
       description,
+      categoryName,
       valid: false,
       error: "Nombre obligatorio."
     };
@@ -1162,6 +1222,7 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
       price: null,
       stock: null,
       description,
+      categoryName,
       valid: false,
       error: "Precio invalido."
     };
@@ -1176,6 +1237,7 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
       price,
       stock: null,
       description,
+      categoryName,
       valid: false,
       error: "Stock invalido."
     };
@@ -1189,6 +1251,7 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
     price,
     stock,
     description,
+    categoryName,
     valid: true
   };
 }
