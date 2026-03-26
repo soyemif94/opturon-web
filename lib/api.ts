@@ -1995,6 +1995,22 @@ export async function patchPortalProductCategory(
   );
 }
 
+export async function deletePortalProductCategory(tenantId: string, categoryId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      categoryId: string;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/product-categories/${categoryId}`,
+    {
+      method: "DELETE"
+    },
+    false
+  );
+}
+
 export async function patchPortalProductStatus(
   tenantId: string,
   productId: string,

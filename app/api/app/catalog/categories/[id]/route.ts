@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendErrorStatus, isBackendConfigured, patchPortalProductCategory } from "@/lib/api";
+import {
+  deletePortalProductCategory,
+  getBackendErrorBody,
+  getBackendErrorStatus,
+  isBackendConfigured,
+  patchPortalProductCategory
+} from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
@@ -30,6 +36,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         {
           error: error instanceof Error ? error.message : "backend_update_failed"
         },
+        { status: getBackendErrorStatus(error) || 502 }
+      )
+    );
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
+  if (tenantContext.error) return tenantContext.error;
+  if (!isBackendConfigured()) {
+    return noStore(NextResponse.json({ error: "catalog_backend_unavailable" }, { status: 503 }));
+  }
+
+  const { id } = await params;
+
+  try {
+    const result = await deletePortalProductCategory(tenantContext.tenantId, id);
+    return noStore(NextResponse.json({ ok: true, categoryId: result.data.categoryId }));
+  } catch (error) {
+    const backendBody = getBackendErrorBody(error);
+    return noStore(
+      NextResponse.json(
+        backendBody && typeof backendBody === "object"
+          ? backendBody
+          : {
+              error: error instanceof Error ? error.message : "backend_delete_failed"
+            },
         { status: getBackendErrorStatus(error) || 502 }
       )
     );

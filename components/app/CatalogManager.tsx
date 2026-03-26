@@ -124,6 +124,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [categoryUpdatingId, setCategoryUpdatingId] = useState<string | null>(null);
+  const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedId) || null,
@@ -408,6 +409,55 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       toast.error("Error al renombrar categoria", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setCategoryUpdatingId(null);
+    }
+  }
+
+  async function deleteCategory(category: ProductCategory) {
+    if (readOnly) return;
+
+    const confirmed = window.confirm(`Se eliminara la categoria "${category.name}". Esta accion no se puede deshacer.`);
+    if (!confirmed) return;
+
+    setCategoryDeletingId(category.id);
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`/api/app/catalog/categories/${category.id}`, {
+        method: "DELETE"
+      });
+      const json = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (json?.error === "product_category_delete_blocked") {
+          const count = Number(json?.details?.associatedProductsCount || 0);
+          const message =
+            count > 0
+              ? `No se puede eliminar "${category.name}" porque todavia tiene ${count} producto${count === 1 ? "" : "s"} asociado${count === 1 ? "" : "s"}.`
+              : `No se puede eliminar "${category.name}" porque todavia tiene productos asociados.`;
+          throw new Error(message);
+        }
+
+        throw new Error(String(json?.error || "No se pudo eliminar la categoria."));
+      }
+
+      setCategories((current) => current.filter((item) => item.id !== category.id));
+      if (categoryFilter === category.id) {
+        setCategoryFilter("");
+      }
+      if (draft.categoryId === category.id) {
+        setDraft((current) => ({ ...current, categoryId: "" }));
+      }
+      if (editingCategoryId === category.id) {
+        cancelCategoryEdit();
+      }
+      setFeedback({ tone: "success", text: `Categoria eliminada: ${category.name}.` });
+      toast.success("Categoria eliminada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo eliminar la categoria.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al eliminar categoria", message);
+    } finally {
+      setCategoryDeletingId(null);
     }
   }
 
@@ -898,7 +948,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                             type="button"
                             variant="ghost"
                             size="sm"
-                            disabled={readOnly || categoryUpdatingId === category.id}
+                            disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
                             onClick={() => startCategoryEdit(category)}
                           >
                             Renombrar
@@ -908,11 +958,22 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           type="button"
                           variant="secondary"
                           size="sm"
-                          disabled={readOnly || categoryUpdatingId === category.id}
+                          disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
                           onClick={() => void toggleCategory(category)}
                         >
                           {categoryUpdatingId === category.id ? "Guardando..." : category.isActive ? "Desactivar" : "Activar"}
                         </Button>
+                        {editingCategoryId === category.id ? null : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
+                            onClick={() => void deleteCategory(category)}
+                          >
+                            {categoryDeletingId === category.id ? "Eliminando..." : "Eliminar"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
