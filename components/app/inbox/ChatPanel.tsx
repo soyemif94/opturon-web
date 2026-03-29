@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Hand, PauseCircle, PhoneCall, Sparkles, UserRound } from "lucide-react";
 import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
@@ -59,7 +59,9 @@ export function ChatPanel({
   onTakeConversation,
   onArchive
 }: ChatPanelProps) {
+  const COLLAPSED_TIMELINE_ITEMS = 12;
   const endRef = useRef<HTMLDivElement | null>(null);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const timeline = useMemo(() => {
     if (!detail) return [] as Array<{ kind: "message" | "event"; id: string; payload: any }>;
@@ -72,7 +74,13 @@ export function ChatPanel({
     });
   }, [detail]);
 
-  const lastTimelineKey = timeline[timeline.length - 1]?.id || null;
+  const hasCollapsibleHistory = timeline.length > COLLAPSED_TIMELINE_ITEMS;
+  const visibleTimeline = historyExpanded || !hasCollapsibleHistory ? timeline : timeline.slice(-COLLAPSED_TIMELINE_ITEMS);
+  const lastTimelineKey = visibleTimeline[visibleTimeline.length - 1]?.id || null;
+
+  useEffect(() => {
+    setHistoryExpanded(false);
+  }, [detail?.conversation.id]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -173,7 +181,25 @@ export function ChatPanel({
                 <span>Acciones rapidas disponibles para responder, pausar el bot o derivar la conversacion.</span>
               </div>
             </div>
-            {timeline.map((item) =>
+            {hasCollapsibleHistory ? (
+              <div className="rounded-[18px] border border-[color:var(--border)] bg-card/45 px-3 py-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[11px] text-muted">
+                    {historyExpanded
+                      ? `Mostrando el historial completo (${timeline.length} mensajes).`
+                      : `Mostrando los ultimos ${visibleTimeline.length} mensajes de ${timeline.length}.`}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryExpanded((current) => !current)}
+                    className="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs font-medium text-muted transition hover:text-text"
+                  >
+                    {historyExpanded ? "Contraer historial" : "Ver historial completo"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {visibleTimeline.map((item) =>
               item.kind === "message" ? (
                 <MessageBubble
                   key={item.id}
