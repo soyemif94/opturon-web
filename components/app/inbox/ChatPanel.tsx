@@ -80,16 +80,16 @@ export function ChatPanel({
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-surface/92 p-4 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
         {detail ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="truncate text-xl font-semibold">{detail.contact?.name || "Conversacion"}</h2>
+                  <h2 className="truncate text-lg font-semibold">{detail.contact?.name || "Conversacion"}</h2>
                   <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
                 </div>
-                <p className="mt-1 text-sm text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
+                <p className="mt-0.5 text-xs text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <InboxBadge>
@@ -137,16 +137,16 @@ export function ChatPanel({
         )}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_24%)] p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_24%)] p-3">
         {loading && !detail ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
                 key={`message-loading-${idx}`}
-                className={`max-w-[70%] rounded-2xl px-4 py-3 ${idx % 2 === 0 ? "border border-[color:var(--border)] bg-card" : "ml-auto bg-muted"}`}
+                className={`max-w-[70%] rounded-2xl px-3 py-2.5 ${idx % 2 === 0 ? "border border-[color:var(--border)] bg-card" : "ml-auto bg-muted"}`}
               >
                 <div className="h-3 w-32 animate-pulse rounded bg-surface" />
-                <div className="mt-2 h-3 w-20 animate-pulse rounded bg-surface" />
+                <div className="mt-1.5 h-3 w-20 animate-pulse rounded bg-surface" />
               </div>
             ))}
           </div>
@@ -161,14 +161,14 @@ export function ChatPanel({
         ) : null}
 
         {detail ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {loading ? (
-              <div className="rounded-[20px] border border-[color:var(--border)] bg-card/55 px-4 py-3 text-xs text-muted">
+              <div className="rounded-[18px] border border-[color:var(--border)] bg-card/55 px-3 py-2 text-[11px] text-muted">
                 Actualizando conversacion...
               </div>
             ) : null}
-            <div className="rounded-[24px] border border-[color:var(--border)] bg-card/60 p-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            <div className="rounded-[20px] border border-[color:var(--border)] bg-card/60 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
                 <Sparkles className="h-3.5 w-3.5 text-brandBright" />
                 <span>Acciones rapidas disponibles para responder, pausar el bot o derivar la conversacion.</span>
               </div>
@@ -192,7 +192,7 @@ export function ChatPanel({
       </div>
 
       {detail ? (
-        <div className="space-y-2 px-3 pb-3">
+        <div className="space-y-1.5 px-2.5 pb-2.5">
           <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />
           <Composer
             value={composer}

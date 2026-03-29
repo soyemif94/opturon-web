@@ -31,8 +31,8 @@ export function Composer({
   }, [quickReplies, templateSearch]);
 
   return (
-    <div className="sticky bottom-0 rounded-[24px] border border-[color:var(--border)] bg-card/95 p-3 shadow-[0_-12px_30px_rgba(0,0,0,0.12)] backdrop-blur">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="sticky bottom-0 rounded-[22px] border border-[color:var(--border)] bg-card/95 p-2.5 shadow-[0_-10px_24px_rgba(0,0,0,0.10)] backdrop-blur">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="relative">
             <button
@@ -71,16 +71,16 @@ export function Composer({
               </div>
             ) : null}
           </div>
-          <span className="text-xs text-muted">Enter envia · Shift+Enter salto de linea</span>
+          <span className="text-[11px] text-muted">Enter envia · Shift+Enter salto de linea</span>
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-2.5">
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          rows={3}
-          className="w-full rounded-[20px] border border-[color:var(--border)] bg-bg px-3 py-2.5 text-sm outline-none focus:border-brand/40"
+          rows={2}
+          className="w-full rounded-[18px] border border-[color:var(--border)] bg-bg px-3 py-2 text-sm outline-none focus:border-brand/40"
           placeholder="Escribe una respuesta para el cliente..."
           disabled={disabled}
           onKeyDown={(event) => {
@@ -94,7 +94,7 @@ export function Composer({
           type="button"
           onClick={onSend}
           disabled={disabled || !value.trim()}
-          className="self-end rounded-[20px] bg-brand px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+          className="self-end rounded-[18px] bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           Enviar
         </button>
