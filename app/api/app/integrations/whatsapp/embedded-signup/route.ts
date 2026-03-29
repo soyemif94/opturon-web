@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createPortalWhatsAppEmbeddedSignupBootstrap,
+  getBackendErrorBody,
+  getBackendErrorStatus,
   getPortalWhatsAppEmbeddedSignupStatus,
   getPortalTenantContext,
   isBackendConfigured
@@ -120,11 +122,11 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     return NextResponse.json(
-      {
+      getBackendErrorBody(error) || {
         error: "embedded_signup_bootstrap_failed",
         detail: error instanceof Error ? error.message : "No pudimos preparar la conexion con Meta."
       },
-      { status: 502 }
+      { status: getBackendErrorStatus(error) || 502 }
     );
   }
 }
