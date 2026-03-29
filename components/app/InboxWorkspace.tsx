@@ -647,8 +647,8 @@ export function InboxWorkspace({
   const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
 
   return (
-    <div className="space-y-4 text-sm">
-      <header>
+    <div className="flex min-h-[calc(100vh-180px)] flex-col gap-3 text-sm xl:min-h-[calc(100vh-132px)]">
+      <header className="shrink-0">
         <h1 className="text-base font-semibold">Inbox</h1>
         <p className="text-xs text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>
       </header>
@@ -663,6 +663,8 @@ export function InboxWorkspace({
         <InboxConnectionEmptyState status={channelState} />
       ) : (
         <InboxLayout
+          hasDetail={Boolean(selectedId)}
+          onBackToList={selectedId ? () => setSelectedId(undefined) : undefined}
           left={
             <ConversationList
               rows={rows}

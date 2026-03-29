@@ -15,6 +15,7 @@ import {
   House,
   MessageSquareText,
   LogOut,
+  Menu,
   MoonStar,
   SunMedium,
   Package,
@@ -27,6 +28,7 @@ import {
   TrendingUp,
   WalletCards
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
@@ -233,6 +235,7 @@ export function AppShell({
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     setSidebarStatus(whatsappStatus);
@@ -293,8 +296,8 @@ export function AppShell({
   const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
-    <section className="w-full bg-[color:var(--bg)] px-5 py-5 text-[color:var(--text)]">
-      <div className="flex min-h-[calc(100vh-40px)] w-full gap-5">
+    <section className="min-h-screen w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
+      <div className="flex min-h-[calc(100vh-24px)] w-full items-stretch gap-3 md:min-h-[calc(100vh-40px)] md:gap-5">
         <aside className="hidden w-[304px] shrink-0 xl:block">
           <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
@@ -419,9 +422,10 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1">
           <div
             className={cn(
+              "flex min-h-full min-w-0 flex-1 flex-col",
               isInboxRoute
                 ? "min-h-[calc(100vh-40px)]"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
@@ -430,9 +434,21 @@ export function AppShell({
             <header className="border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
               {topbar || (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal del cliente</p>
-                    <h1 className="mt-1 text-2xl font-semibold tracking-tight">Gestiona conversaciones, automatizaciones y crecimiento</h1>
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMobileNavOpen(true)}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-card/70 text-muted transition-colors hover:text-text xl:hidden"
+                      aria-label="Abrir menu de navegacion"
+                    >
+                      <Menu className="h-4.5 w-4.5" />
+                    </button>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal del cliente</p>
+                      <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
+                        Gestiona conversaciones, automatizaciones y crecimiento
+                      </h1>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <ThemeToggleButton />
@@ -457,32 +473,9 @@ export function AppShell({
               </div>
             ) : null}
 
-            <div className="border-b border-[color:var(--border)] bg-card/50 px-4 py-3 xl:hidden">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {visibleNavItems.map((item) => {
-                  const active = item.match(pathname);
-
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      className={cn(
-                        "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        active
-                          ? "border-brand/35 bg-brand/10 text-text"
-                          : "border-[color:var(--border)] bg-surface/70 text-muted hover:text-text"
-                      )}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-
             <main
               className={cn(
-                "min-h-[calc(100vh-140px)]",
+                "min-h-0 flex-1",
                 isInboxRoute
                   ? "bg-transparent p-0"
                   : "bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
@@ -493,6 +486,79 @@ export function AppShell({
           </div>
         </div>
       </div>
+
+      <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <DialogContent className="left-0 top-0 h-screen max-w-[320px] translate-x-0 translate-y-0 rounded-none border-l-0 border-t-0 border-b-0 border-r border-[color:var(--border)] bg-card/98 p-0 shadow-[0_28px_80px_rgba(0,0,0,0.38)]">
+          <div className="flex h-full flex-col">
+            <DialogHeader className="border-b border-[color:var(--border)] px-5 py-4">
+              <DialogTitle>Menu del portal</DialogTitle>
+              <DialogDescription>Navega por todos los modulos del espacio desde telefono o tablet.</DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="mb-4 rounded-[20px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.94))] p-4">
+                <p className="text-sm font-semibold">Espacio de trabajo Opturon</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
+                  <Badge variant="success">Portal activo</Badge>
+                  {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
+                </div>
+              </div>
+
+              <nav className="space-y-2">
+                {visibleNavItems.map((item) => {
+                  const active = item.match(pathname);
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => setMobileNavOpen(false)}
+                      className={cn(
+                        "group flex items-start gap-3 rounded-2xl border px-4 py-3 transition-all duration-200",
+                        active
+                          ? "border-brand/35 bg-brand/10 text-text shadow-[0_0_0_1px_rgba(192,80,0,0.12)]"
+                          : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/70 hover:text-text"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors",
+                          active
+                            ? "border-brand/30 bg-brand/15 text-brandBright"
+                            : "border-[color:var(--border)] bg-surface text-muted group-hover:text-text"
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-3">
+                          <span className="font-medium">{item.label}</span>
+                          <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-muted">{item.description}</span>
+                      </span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+
+            <div className="border-t border-[color:var(--border)] px-4 py-4">
+              <button
+                type="button"
+                onClick={() => void signOut({ callbackUrl: "/login" })}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm font-medium text-muted transition-colors hover:text-text"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesion
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

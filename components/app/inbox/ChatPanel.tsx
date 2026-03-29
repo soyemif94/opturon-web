@@ -79,7 +79,7 @@ export function ChatPanel({
   }, [detail?.conversation.id, lastTimelineKey]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
       <header className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
         {detail ? (
           <div className="space-y-3">
