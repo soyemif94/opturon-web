@@ -197,17 +197,17 @@ export function InvoicesWorkspace({
     <Card className="border-white/6 bg-card/90">
       <CardHeader
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Badge variant="warning">{NO_FISCAL_LEGEND}</Badge>
             <Badge variant="muted">{filteredInvoices.length} visibles</Badge>
-            <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+            <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto">
               <a href={exportHref}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar planilla contable
               </a>
             </Button>
             {!readOnly ? (
-              <Button asChild size="sm" className="rounded-2xl">
+              <Button asChild size="sm" className="w-full rounded-2xl sm:w-auto">
                 <Link href="/app/invoices/new">Nuevo borrador</Link>
               </Button>
             ) : null}
@@ -220,7 +220,7 @@ export function InvoicesWorkspace({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_180px_180px_180px_180px_140px_140px]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_180px_180px_180px_180px_140px_140px]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input className="pl-10" placeholder="Buscar por documento, cliente, CUIT o emisor" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} />
@@ -255,31 +255,31 @@ export function InvoicesWorkspace({
           <Input type="date" value={filters.dateTo} onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))} />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
           <label className="flex items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={filters.incompleteOnly} onChange={(event) => setFilters((current) => ({ ...current, incompleteOnly: event.target.checked }))} />
             Solo incompletos
           </label>
           {!readOnly ? (
             <>
-              <Button type="button" variant="secondary" size="sm" className="rounded-2xl" onClick={toggleSelectAllVisible}>
+              <Button type="button" variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto" onClick={toggleSelectAllVisible}>
                 {allVisibleSelected ? "Deseleccionar visibles" : "Seleccionar visibles"}
               </Button>
               <Badge variant="muted">{selectedCount} seleccionados</Badge>
-              <Button type="button" variant="secondary" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void downloadSelectedInvoices()}>
+              <Button type="button" variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto" disabled={!selectedCount || !!bulkBusy} onClick={() => void downloadSelectedInvoices()}>
                 <Download className="mr-2 h-4 w-4" />
                 Descargar seleccionadas
               </Button>
-              <Button type="button" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("ready_for_accountant")}>
+              <Button type="button" size="sm" className="w-full rounded-2xl sm:w-auto" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("ready_for_accountant")}>
                 Listo para contador
               </Button>
-              <Button type="button" variant="secondary" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("delivered_to_accountant")}>
+              <Button type="button" variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("delivered_to_accountant")}>
                 Entregado
               </Button>
-              <Button type="button" variant="secondary" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("invoiced_by_accountant")}>
+              <Button type="button" variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("invoiced_by_accountant")}>
                 Facturado
               </Button>
-              <Button type="button" variant="secondary" size="sm" className="rounded-2xl" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("draft")}>
+              <Button type="button" variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto" disabled={!selectedCount || !!bulkBusy} onClick={() => void runBulkStatus("draft")}>
                 Volver a borrador
               </Button>
             </>
@@ -289,7 +289,47 @@ export function InvoicesWorkspace({
         {!filteredInvoices.length ? (
           <EmptyState title="No hay comprobantes para este filtro" description="Prueba con otro estado contable, cliente, tipo de documento o flags de faltantes." />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
+          <>
+            <div className="space-y-3 md:hidden">
+              {filteredInvoices.map((invoice) => (
+                <div key={invoice.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/app/invoices/${invoice.id}`} className="font-medium text-brandBright hover:underline">
+                        {invoice.internalDocumentNumber || invoice.id.slice(0, 8)}
+                      </Link>
+                      <p className="mt-1 text-xs text-muted">{getInvoiceDocumentKindLabel({ documentKind: invoice.documentKind })}</p>
+                    </div>
+                    {!readOnly ? <input type="checkbox" checked={selectedIds.includes(invoice.id)} onChange={() => toggleSelection(invoice.id)} /> : null}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant={badgeToneByStatus(invoice.fiscalStatus)}>{titleCaseLabel(invoice.fiscalStatus)}</Badge>
+                    <Badge variant={badgeToneByStatus(invoice.receivableStatus)}>{titleCaseLabel(invoice.receivableStatus)}</Badge>
+                    {(invoice.missingDataFlags || []).length === 0 ? <Badge variant="success">Completo</Badge> : null}
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm text-muted">
+                    <p className="font-medium text-text">{invoice.customerLegalName || invoice.contact?.name || "Sin cliente"}</p>
+                    <p>{invoice.customerTaxId || "Sin CUIT/DNI"}</p>
+                    <p>Total: {formatMoney(invoice.totalAmount, invoice.currency)}</p>
+                    <p>Cobrado: {formatMoney(invoice.paidAmount, invoice.currency)}</p>
+                    <p>Fecha: {formatDateLabel(invoice.issuedAt || invoice.createdAt)}</p>
+                  </div>
+                  {(invoice.missingDataFlags || []).length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(invoice.missingDataFlags || []).slice(0, 3).map((flag) => (
+                        <Badge key={flag} variant="danger">{titleCaseLabel(flag.replace(/^missing_/, ""))}</Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="mt-4">
+                    <Button asChild size="sm" className="w-full rounded-2xl">
+                      <Link href={`/app/invoices/${invoice.id}`}>Abrir comprobante</Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto rounded-2xl border border-[color:var(--border)] md:block">
             <div className="min-w-[1900px]">
               <div className="grid grid-cols-[60px_160px_180px_minmax(260px,1.2fr)_150px_170px_180px_180px_220px] gap-5 border-b border-[color:var(--border)] bg-surface/70 px-5 py-3 text-xs uppercase tracking-[0.16em] text-muted">
                 <span></span>
@@ -349,7 +389,8 @@ export function InvoicesWorkspace({
                 </div>
               ))}
             </div>
-          </div>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

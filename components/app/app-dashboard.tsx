@@ -69,15 +69,15 @@ export function AppDashboard({
       ) : null}
 
       <section className="overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(192,80,0,0.16),rgba(19,19,19,0.96)_42%,rgba(13,13,13,0.98))]">
-        <div className="grid gap-8 p-6 lg:grid-cols-[minmax(0,1.5fr)_360px] lg:p-8">
+        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_360px] lg:gap-8 lg:p-8">
           <div>
             <Badge variant="warning" className="mb-4 border-brand/30 bg-brand/10 text-brandBright">
               Portal cliente
             </Badge>
-            <h2 className="max-w-3xl text-3xl font-semibold tracking-tight lg:text-4xl">
+            <h2 className="max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
               Todo lo importante de tu negocio, tus conversaciones y tu canal WhatsApp en un solo lugar.
             </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-muted lg:text-base">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted lg:mt-4 lg:text-base lg:leading-7">
               {tenantName} puede seguir conversaciones, ver metricas, ordenar contactos y preparar la conexion de su WhatsApp sin salir del portal.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
@@ -86,7 +86,7 @@ export function AppDashboard({
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-black/20 p-5 backdrop-blur">
+          <div className="rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur sm:p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-muted">Estado del portal</p>
             <div className="mt-5 space-y-4">
               <SummaryRow
@@ -126,7 +126,7 @@ export function AppDashboard({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <CardDescription className="text-[11px] uppercase tracking-[0.18em]">{item.label}</CardDescription>
-                    <CardTitle className="mt-3 text-3xl">{item.value}</CardTitle>
+                    <CardTitle className="mt-3 text-2xl sm:text-3xl">{item.value}</CardTitle>
                   </div>
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                     <Icon className="h-5 w-5 text-brandBright" />
@@ -144,7 +144,7 @@ export function AppDashboard({
       {!hasWhatsAppChannel ? (
         <section>
           <Card className="overflow-hidden border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.20),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
-            <CardContent className="grid gap-5 p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-8">
+            <CardContent className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-5 lg:p-8">
               <div>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand/30 bg-brand/15 text-brandBright">
@@ -152,7 +152,7 @@ export function AppDashboard({
                   </span>
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-muted">WhatsApp channel</p>
-                    <h3 className="mt-1 text-2xl font-semibold">
+                    <h3 className="mt-1 text-xl font-semibold sm:text-2xl">
                       {channelStatus.tone === "danger" ? "Revisa la conexion de tu WhatsApp" : "Conecta tu WhatsApp en 2 minutos"}
                     </h3>
                   </div>
@@ -161,17 +161,17 @@ export function AppDashboard({
                   {channelStatus.detail}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
                   href="/app/integrations"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5 sm:w-auto"
                 >
                   {channelStatus.tone === "danger" ? "Revisar conexion" : "Conectar WhatsApp"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   href="/app/integrations"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-white/5 px-5 py-3 text-sm font-medium text-text hover:bg-white/10"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-white/5 px-5 py-3 text-sm font-medium text-text hover:bg-white/10 sm:w-auto"
                 >
                   Ir a integraciones
                 </Link>
@@ -250,7 +250,7 @@ export function AppDashboard({
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
+            <div className="hidden overflow-hidden rounded-2xl border border-[color:var(--border)] md:block">
               <div className="grid grid-cols-[minmax(0,1.2fr)_180px_180px_140px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
                 <span>Contacto</span>
                 <span>Telefono</span>
@@ -271,6 +271,22 @@ export function AppDashboard({
                     ))}
                   </div>
                   <div className="flex items-center text-sm text-muted">{contact.lastInteraction}</div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-3 md:hidden">
+              {contacts.map((contact) => (
+                <div key={contact.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                  <p className="font-medium">{contact.name}</p>
+                  <p className="mt-1 text-sm text-muted">{contact.phone}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {contact.tags.slice(0, 2).map((tag) => (
+                      <Badge key={tag} variant="muted">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs text-muted">Ultima interaccion: {contact.lastInteraction}</p>
                 </div>
               ))}
             </div>

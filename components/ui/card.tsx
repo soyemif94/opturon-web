@@ -11,9 +11,9 @@ export function CardHeader({
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { action?: React.ReactNode }) {
   return (
-    <div className={cn("flex items-start justify-between gap-3 p-4 pb-2", className)} {...props}>
+    <div className={cn("flex flex-col gap-3 p-4 pb-2 sm:flex-row sm:items-start sm:justify-between", className)} {...props}>
       <div className="min-w-0 flex-1">{props.children}</div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="w-full sm:w-auto sm:shrink-0">{action}</div> : null}
     </div>
   );
 }

@@ -734,7 +734,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </div>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="muted">Inventario</Badge>}>
             <div>
@@ -783,14 +783,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader
             action={
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <Badge variant="muted">{filteredProducts.length} visibles</Badge>
                 {categoryFilter ? <Badge variant="outline">Categoria filtrada</Badge> : null}
-                <Button type="button" variant="ghost" size="sm" onClick={() => setListExpanded((current) => !current)}>
+                <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setListExpanded((current) => !current)}>
                   {listExpanded ? "Colapsar" : "Expandir"}
                   {listExpanded ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
                 </Button>
@@ -805,7 +805,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           <CardContent className="space-y-3 pt-0">
             <div className="flex flex-col gap-3 lg:flex-row">
               <select
-                className="h-10 min-w-[220px] rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text lg:min-w-[220px] lg:w-auto"
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
               >
@@ -841,7 +841,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   </p>
                 </div>
                 {!readOnly ? (
-                  <Button type="button" variant="secondary" size="sm" onClick={() => openQuickCreate(activeCategory.id)}>
+                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => openQuickCreate(activeCategory.id)}>
                     Agregar producto en {activeCategory.name}
                   </Button>
                 ) : null}
@@ -866,14 +866,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <span>{selectedIds.length} seleccionados</span>
                   {selectedVisibleCount > 0 ? <span>· {selectedVisibleCount} visibles</span> : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={toggleSelectAllVisible}>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={toggleSelectAllVisible}>
                     {allVisibleSelected ? "Limpiar visibles" : "Seleccionar todo"}
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
+                  <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
                     Limpiar seleccion
                   </Button>
-                  <Button type="button" variant="destructive" size="sm" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
+                  <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
                     <Trash2 className="mr-1 h-4 w-4" />
                     {bulkDeleting ? "Eliminando..." : "Eliminar seleccionados"}
                   </Button>

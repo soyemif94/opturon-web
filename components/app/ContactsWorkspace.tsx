@@ -108,7 +108,8 @@ export function ContactsWorkspace({
               description="Crea el primero para empezar a vincular facturas, cobros y futuras conversaciones."
             />
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
+            <>
+              <div className="hidden overflow-hidden rounded-2xl border border-[color:var(--border)] md:block">
               <div className="grid grid-cols-[minmax(0,1.2fr)_180px_210px_140px_160px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
                 <span>Contacto</span>
                 <span>Empresa</span>
@@ -142,7 +143,36 @@ export function ContactsWorkspace({
                   </button>
                 );
               })}
-            </div>
+              </div>
+              <div className="space-y-3 md:hidden">
+                {contacts.map((contact) => {
+                  const active = selected?.id === contact.id;
+                  return (
+                    <button
+                      key={contact.id}
+                      type="button"
+                      onClick={() => setSelectedId(contact.id)}
+                      className={`w-full rounded-2xl border p-4 text-left transition-colors ${active ? "border-brand/35 bg-brand/5" : "border-[color:var(--border)] bg-surface/55 hover:bg-surface/40"}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{contact.name}</p>
+                          <p className="mt-1 text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
+                        </div>
+                        <Badge variant={contact.status === "archived" ? "danger" : "success"}>{contact.status || "active"}</Badge>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-sm text-muted sm:grid-cols-2">
+                        <p>Empresa: {contact.companyName || "-"}</p>
+                        <p>Movimiento: {relativeDateLabel(contact.updatedAt || contact.createdAt || contact.lastInteractionAt)}</p>
+                      </div>
+                      <div className="mt-3">
+                        <FinancialSignalCell contact={contact} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -152,13 +182,13 @@ export function ContactsWorkspace({
           <CardHeader
             action={
               selected ? (
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                   {!readOnly ? (
-                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                    <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto">
                       <Link href={`/app/contacts/${selected.id}/edit`}>Editar</Link>
                     </Button>
                   ) : null}
-                  <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                  <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto">
                     <Link href={`/app/contacts/${selected.id}`}>Abrir detalle</Link>
                   </Button>
                 </div>
