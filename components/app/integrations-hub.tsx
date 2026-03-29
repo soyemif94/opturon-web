@@ -307,7 +307,7 @@ export function IntegrationsHub({
   async function handleDiscoverAssets() {
     if (!manualForm.accessToken.trim()) return;
     setDiscoveryBusy(true);
-    setDiscoveryMessage("Buscando cuentas de WhatsApp en Meta...");
+    setDiscoveryMessage("Buscando activos de WhatsApp en Meta Business...");
     setDiscoveryItems([]);
     try {
       const response = await fetch("/api/app/integrations/whatsapp/discover-assets", {
@@ -322,21 +322,21 @@ export function IntegrationsHub({
         | null;
 
       if (!response.ok) {
-        throw new Error(json?.detail || json?.error || "No pudimos descubrir activos desde Meta.");
+        throw new Error(formatDiscoverAssetsError(json?.error, json?.detail));
       }
 
       const items = json?.data?.items || [];
       setDiscoveryItems(items);
       if (items.length) {
         setDiscoveryMessage(null);
-        toast.success("Cuentas detectadas", `Encontramos ${items.length} opcion(es) para este token.`);
+        toast.success("Activos detectados", `Encontramos ${items.length} opcion(es) para completar la conexion manual.`);
       } else {
-        setDiscoveryMessage("No encontramos cuentas accesibles con ese token. Puedes completar WABA ID y Phone Number ID manualmente.");
+        setDiscoveryMessage("No encontramos activos accesibles con ese token. Puedes completar WABA ID y Phone Number ID manualmente.");
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No pudimos descubrir cuentas en Meta.";
+      const message = error instanceof Error ? error.message : "No pudimos descubrir activos en Meta.";
       setDiscoveryMessage(message);
-      toast.error("No pudimos detectar tus cuentas", message);
+      toast.error("No pudimos autodetectar activos", message);
     } finally {
       setDiscoveryBusy(false);
     }
@@ -441,6 +441,23 @@ export function IntegrationsHub({
       tone: liveWhatsApp.connectedNumber ? "muted" : "warning"
     }
   ] as const;
+
+  function formatDiscoverAssetsError(
+    errorCode: string | null | undefined,
+    detail: string | null | undefined
+  ) {
+    const code = String(errorCode || "").trim();
+    if (code === "meta_insufficient_permissions") {
+      return "Tu token no tiene permisos para listar negocios o WABAs. Puedes continuar conectando manualmente.";
+    }
+    if (code === "meta_business_assets_not_found") {
+      return "No encontramos activos accesibles con ese token. Si ya conoces tu WABA ID y tu Phone Number ID, puedes continuar con conexion manual.";
+    }
+    return (
+      String(detail || "").trim() ||
+      "No pudimos autodetectar activos desde Meta. Puedes continuar con conexion manual."
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -648,11 +665,11 @@ export function IntegrationsHub({
         className="grid gap-5 outline-none xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]"
       >
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="warning">Ruta recomendada ahora</Badge>}>
+          <CardHeader action={<Badge variant="warning">Ruta principal recomendada</Badge>}>
             <div>
               <CardTitle className="text-xl">Conexion manual asistida</CardTitle>
               <CardDescription>
-                Pega tu Access Token de Meta y deja que Opturon detecte automaticamente tus cuentas y numeros disponibles. Si lo prefieres, tambien puedes completar los IDs manualmente.
+                Completa WABA ID, Phone Number ID y tu Access Token para validar el canal directamente contra Meta. La autodeteccion queda disponible como ayuda avanzada, no como paso obligatorio.
               </CardDescription>
             </div>
           </CardHeader>
@@ -681,6 +698,13 @@ export function IntegrationsHub({
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
               No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el
               token del canal para asociarlo al espacio correcto.
+            </div>
+
+            <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 text-sm leading-6 text-muted">
+              <p className="font-medium text-white">Flujos principales</p>
+              <p className="mt-2">
+                Para la mayoria de los espacios, las rutas mas confiables son la conexion guiada con Meta y la conexion manual asistida. La autodeteccion queda disponible como helper avanzado.
+              </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -732,23 +756,31 @@ export function IntegrationsHub({
               </label>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="secondary"
-                className="rounded-2xl"
-                onClick={() => void handleDiscoverAssets()}
-                disabled={discoveryBusy || !manualForm.accessToken.trim()}
-              >
-                {discoveryBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Detectar mis cuentas
-              </Button>
-              {discoveryMessage ? <p className="self-center text-sm text-muted">{discoveryMessage}</p> : null}
+            <div className="space-y-3 rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Autodeteccion avanzada</p>
+                  <p className="mt-1 text-sm text-muted">
+                    Autodetectar activos requiere permisos avanzados de Meta Business y puede no funcionar con todos los tokens. Si falla, puedes continuar con conexion manual.
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  className="rounded-2xl"
+                  onClick={() => void handleDiscoverAssets()}
+                  disabled={discoveryBusy || !manualForm.accessToken.trim()}
+                >
+                  {discoveryBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Autodetectar activos
+                </Button>
+              </div>
+              {discoveryMessage ? <p className="text-sm text-muted">{discoveryMessage}</p> : null}
             </div>
 
             {discoveryItems.length ? (
               <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
                 <div>
-                  <p className="text-sm font-medium">Selecciona una cuenta detectada</p>
+                  <p className="text-sm font-medium">Selecciona un activo detectado</p>
                   <p className="mt-1 text-sm text-muted">
                     Elegimos una opción y autocompletamos WABA ID, Phone Number ID y el nombre sugerido del canal.
                   </p>
@@ -888,7 +920,7 @@ export function IntegrationsHub({
               "El Phone Number ID existe y es accesible con ese token.",
               "El numero realmente pertenece a esa WABA.",
               "El canal no esta ya asociado a otro espacio.",
-              "Si la suscripcion de la app falla, el canal queda pendiente y no se pierde la validacion."
+              "Si Meta rechaza la suscripcion de la app, te mostramos el error real antes de guardar una conexion incompleta."
             ].map((item) => (
               <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
                 {item}
