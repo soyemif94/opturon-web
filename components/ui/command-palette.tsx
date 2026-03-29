@@ -164,7 +164,9 @@ export function CommandPaletteProvider({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const openHotkey = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey);
+      const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
+      if (!key) return;
+      const openHotkey = key === "k" && (event.ctrlKey || event.metaKey);
       if (openHotkey) {
         event.preventDefault();
         setOpen((prev) => !prev);

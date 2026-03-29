@@ -410,6 +410,29 @@ export async function connectPortalWhatsAppManual(
   });
 }
 
+export async function getPortalInstagramStatus(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalInstagramStatus;
+  }>(`/portal/tenants/${tenantId}/instagram/status`);
+}
+
+export async function connectPortalInstagram(
+  tenantId: string,
+  payload: {
+    code: string;
+    redirectUri: string;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalInstagramStatus;
+  }>(`/portal/tenants/${tenantId}/instagram/connect`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export type PortalWhatsAppDiscoveredAsset = {
   wabaId: string;
   wabaName: string | null;
@@ -879,6 +902,27 @@ export type PortalPaymentDestination = {
   isActive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+export type PortalInstagramChannel = {
+  id: string;
+  clinicId: string;
+  type: "instagram";
+  provider: string | null;
+  externalId: string | null;
+  externalPageId: string | null;
+  externalPageName: string | null;
+  instagramUserId: string | null;
+  instagramUsername: string | null;
+  status: string | null;
+};
+
+export type PortalInstagramStatus = {
+  tenantId: string;
+  clinicId: string | null;
+  state: "connected" | "not_connected";
+  channel: PortalInstagramChannel | null;
+  channels: PortalInstagramChannel[];
 };
 
 export type PortalCashSessionOrder = {

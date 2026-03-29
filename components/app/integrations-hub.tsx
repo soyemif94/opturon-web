@@ -37,6 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type {
+  PortalInstagramStatus,
   PortalWhatsAppDiscoveredAsset,
   PortalWhatsAppTemplate,
   PortalWhatsAppTemplateBlueprint
@@ -68,16 +69,6 @@ const SUPPORT_LINK = getTrackedWhatsAppLink({
 });
 
 const integrations: IntegrationCard[] = [
-  {
-    id: "instagram",
-    name: "Instagram",
-    description: "Centraliza mensajes directos y consultas comerciales en el mismo espacio.",
-    state: "connecting",
-    availability: "en preparacion",
-    cta: "Preparar canal",
-    icon: Instagram,
-    helper: "Ideal para negocios que atienden consultas por redes y campanas."
-  },
   {
     id: "messenger",
     name: "Facebook Messenger",
@@ -122,10 +113,12 @@ const integrations: IntegrationCard[] = [
 
 export function IntegrationsHub({
   whatsapp,
+  instagram,
   templateBlueprints,
   templates
 }: {
   whatsapp: WhatsAppConnectionStatus;
+  instagram: PortalInstagramStatus;
   templateBlueprints: PortalWhatsAppTemplateBlueprint[];
   templates: PortalWhatsAppTemplate[];
 }) {
@@ -160,6 +153,27 @@ export function IntegrationsHub({
     () => whatsappHubMeta(liveWhatsApp, effectiveState, launchMessage),
     [effectiveState, launchMessage, liveWhatsApp]
   );
+  const integrationCards = useMemo<IntegrationCard[]>(() => {
+    const instagramConnected = instagram.state === "connected";
+    const instagramLabel =
+      instagram.channel?.instagramUsername ||
+      instagram.channel?.externalPageName ||
+      "Ideal para negocios que atienden consultas por redes y campanas.";
+
+    return [
+      {
+        id: "instagram",
+        name: "Instagram",
+        description: "Centraliza mensajes directos y consultas comerciales en el mismo espacio.",
+        state: instagramConnected ? "connected" : "not_connected",
+        availability: "disponible",
+        cta: instagramConnected ? "Canal conectado" : "Conectar Instagram",
+        icon: Instagram,
+        helper: instagramLabel
+      },
+      ...integrations
+    ];
+  }, [instagram]);
 
   async function refreshWhatsAppStatus() {
     const response = await fetch("/api/app/integrations/whatsapp", { cache: "no-store" });
@@ -176,6 +190,10 @@ export function IntegrationsHub({
     if (!response.ok) return;
     const json = (await response.json().catch(() => null)) as { data?: { templates?: PortalWhatsAppTemplate[] } } | null;
     setLiveTemplates(json?.data?.templates || []);
+  }
+
+  function handleInstagramConnect() {
+    window.location.assign("/api/app/integrations/instagram/start");
   }
 
   function focusManualConnection(options?: { openHelp?: boolean }) {
@@ -585,7 +603,7 @@ export function IntegrationsHub({
         </div>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {integrations.map((integration) => {
+          {integrationCards.map((integration) => {
             const Icon = integration.icon;
             const state = stateMeta(integration.state);
             return (
@@ -609,7 +627,12 @@ export function IntegrationsHub({
                   <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
                     {state.detail}
                   </div>
-                  <Button variant={integration.state === "connected" ? "secondary" : "primary"} className="w-full rounded-2xl">
+                  <Button
+                    variant={integration.state === "connected" ? "secondary" : "primary"}
+                    className="w-full rounded-2xl"
+                    onClick={integration.id === "instagram" ? handleInstagramConnect : undefined}
+                    disabled={integration.id === "instagram" && integration.state === "connected"}
+                  >
                     {integration.cta}
                   </Button>
                 </CardContent>
