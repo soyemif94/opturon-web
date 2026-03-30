@@ -970,6 +970,56 @@ export type PortalCashSession = {
   };
 };
 
+export type PortalAgendaItem = {
+  id: string;
+  clinicId: string;
+  date: string;
+  startAt: string | null;
+  endAt: string | null;
+  contactId: string | null;
+  contact: {
+    id: string;
+    name: string;
+    phone: string | null;
+  } | null;
+  startTime: string | null;
+  endTime: string | null;
+  type: "note" | "follow_up" | "task" | "appointment" | "blocked" | "availability";
+  title: string;
+  description: string | null;
+  status: "pending" | "done" | "cancelled";
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type PortalAgendaAvailabilityDay = {
+  date: string;
+  policy: "explicit_availability" | "implicit_open";
+  availability: PortalAgendaItem[];
+  blocked: PortalAgendaItem[];
+  appointments: PortalAgendaItem[];
+  informational: PortalAgendaItem[];
+  occupiedWindows: Array<{
+    date: string;
+    type: string;
+    title: string;
+    startTime: string;
+    endTime: string;
+  }>;
+  bookableWindows: Array<{
+    date: string;
+    startTime: string;
+    endTime: string;
+  }>;
+  summary: {
+    availabilityCount: number;
+    blockedCount: number;
+    appointmentCount: number;
+    informationalCount: number;
+    bookableWindowCount: number;
+  };
+};
+
 export type PortalCashBoxOverview = PortalPaymentDestination & {
   currentSession: PortalCashSession | null;
 };
@@ -1424,6 +1474,118 @@ export async function getPortalCashOverview(tenantId: string) {
       recentClosedSessions: PortalCashSession[];
     };
   }>(`/portal/tenants/${tenantId}/cash-sessions`, undefined, false);
+}
+
+export async function getPortalAgendaItems(
+  tenantId: string,
+  options: { from: string; to: string }
+) {
+  const params = new URLSearchParams();
+  params.set("from", options.from);
+  params.set("to", options.to);
+
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      range: { fromDate: string; toDate: string };
+      items: PortalAgendaItem[];
+    };
+  }>(`/portal/tenants/${tenantId}/agenda?${params.toString()}`);
+}
+
+export async function createPortalAgendaItem(
+  tenantId: string,
+  payload: {
+    date: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    contactId?: string | null;
+    type: PortalAgendaItem["type"];
+    title: string;
+    description?: string | null;
+    status?: PortalAgendaItem["status"];
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalAgendaItem;
+  }>(`/portal/tenants/${tenantId}/agenda`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalAgendaAvailability(
+  tenantId: string,
+  options: { date?: string; from?: string; to?: string }
+) {
+  const params = new URLSearchParams();
+  if (options.date) params.set("date", options.date);
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
+
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      range: { fromDate: string; toDate: string };
+      days: PortalAgendaAvailabilityDay[];
+    };
+  }>(`/portal/tenants/${tenantId}/agenda/availability?${params.toString()}`);
+}
+
+export async function createPortalAgendaReservation(
+  tenantId: string,
+  payload: {
+    date: string;
+    startTime: string;
+    endTime: string;
+    title: string;
+    description?: string | null;
+    contactId?: string | null;
+    status?: PortalAgendaItem["status"];
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalAgendaItem;
+  }>(`/portal/tenants/${tenantId}/agenda/reservations`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function patchPortalAgendaItem(
+  tenantId: string,
+  itemId: string,
+  payload: Partial<{
+    date: string;
+    startTime: string | null;
+    endTime: string | null;
+    contactId: string | null;
+    type: PortalAgendaItem["type"];
+    title: string;
+    description: string | null;
+    status: PortalAgendaItem["status"];
+  }>
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalAgendaItem;
+  }>(`/portal/tenants/${tenantId}/agenda/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deletePortalAgendaItem(tenantId: string, itemId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalAgendaItem;
+  }>(`/portal/tenants/${tenantId}/agenda/${itemId}`, {
+    method: "DELETE"
+  });
 }
 
 export async function openPortalCashSession(
