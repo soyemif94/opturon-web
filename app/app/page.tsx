@@ -249,6 +249,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         contacts={dashboardContacts}
         quickLinks={[
           { label: "Abrir inbox", href: "/app/inbox", helper: "Ir a la vista completa de conversaciones y chat." },
+          { label: "Abrir agenda", href: "/app/agenda", helper: "Ordenar seguimientos, notas y disponibilidad del negocio." },
           { label: "Gestionar contactos", href: "/app/contacts", helper: "Ver CRM simple con tags y ultima interaccion." },
           { label: "Ver metricas", href: "/app/metrics", helper: "Revisar conversaciones, prospectos y respuesta del bot." },
           ...(canManage

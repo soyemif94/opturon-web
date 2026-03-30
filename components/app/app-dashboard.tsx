@@ -95,14 +95,19 @@ export function AppDashboard({
                 detail="Lista de conversaciones, panel de chat y ficha del contacto."
               />
               <SummaryRow
+                icon={<CalendarClock className="h-4 w-4 text-sky-300" />}
+                title="Agenda nativa"
+                detail="Seguimientos, disponibilidad y base de turnos dentro de Opturon."
+              />
+              <SummaryRow
                 icon={<Bot className="h-4 w-4 text-emerald-300" />}
                 title="Bot y automatizaciones"
                 detail="Base lista para evolucionar a flujos, respuestas y seguimiento."
               />
               <SummaryRow
                 icon={<PlugZap className="h-4 w-4 text-sky-300" />}
-                title="Conexion de WhatsApp"
-                detail="Punto preparado para el alta guiada y la activacion del canal."
+                title="WhatsApp y CRM"
+                detail="WhatsApp como canal principal hoy y CRM externo como siguiente capa de integracion."
               />
             </div>
           </div>
@@ -218,7 +223,7 @@ export function AppDashboard({
           <CardHeader action={<Badge variant="outline">Quick access</Badge>}>
             <div>
               <CardTitle className="text-xl">Accesos rapidos</CardTitle>
-              <CardDescription>Atajos para lo que un cliente necesita ver primero.</CardDescription>
+              <CardDescription>Atajos para operar conversaciones, agenda y foco comercial.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">

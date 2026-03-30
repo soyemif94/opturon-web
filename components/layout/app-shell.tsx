@@ -68,6 +68,14 @@ const navItems: Array<{
     match: (pathname: string) => pathname.startsWith("/app/contacts")
   },
   {
+    href: "/app/agenda",
+    label: "Agenda",
+    description: "Disponibilidad, seguimientos y operacion diaria",
+    icon: CalendarDays,
+    module: "agenda",
+    match: (pathname: string) => pathname.startsWith("/app/agenda")
+  },
+  {
     href: "/app/sales",
     label: "Ventas",
     description: "KPIs, oportunidades y lectura comercial del espacio",
@@ -132,14 +140,6 @@ const navItems: Array<{
     match: (pathname: string) => pathname.startsWith("/app/automations")
   },
   {
-    href: "/app/agenda",
-    label: "Agenda",
-    description: "Pendientes, seguimientos y proxima atencion",
-    icon: CalendarDays,
-    module: "agenda",
-    match: (pathname: string) => pathname.startsWith("/app/agenda")
-  },
-  {
     href: "/app/metrics",
     label: "Metricas",
     description: "Conversaciones, leads y performance",
@@ -150,7 +150,7 @@ const navItems: Array<{
   {
     href: "/app/integrations",
     label: "Integraciones",
-    description: "WhatsApp, CRM y proximas conexiones",
+    description: "WhatsApp operativo y CRM externo proximo",
     icon: PlugZap,
     module: "integrations",
     match: (pathname: string) => pathname.startsWith("/app/integrations")
@@ -309,7 +309,7 @@ export function AppShell({
                 </Badge>
                 <h2 className="mt-4 text-2xl font-semibold tracking-tight">Espacio de trabajo Opturon</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Conversaciones, automatizaciones y canal WhatsApp en una vista simple para el negocio.
+                  Conversaciones, agenda operativa y canal WhatsApp en una vista simple para el negocio.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
@@ -386,7 +386,7 @@ export function AppShell({
                   <div className="flex items-center justify-between">
                     <span>Integraciones</span>
                     <span className={sidebarWhatsAppState === "connected" ? "text-emerald-300" : "text-amber-300"}>
-                      {sidebarWhatsAppState === "connected" ? "Operativas" : "Proximo paso"}
+                      {sidebarWhatsAppState === "connected" ? "WhatsApp listo" : "Configurar canal"}
                     </span>
                   </div>
                 </div>

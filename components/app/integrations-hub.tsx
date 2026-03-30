@@ -4,23 +4,16 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
-  BadgeCheck,
-  Cable,
   CalendarDays,
   CheckCircle2,
   CopyPlus,
-  Instagram,
+  KeyRound,
   LifeBuoy,
   LoaderCircle,
-  MessageCircle,
-  MessageSquareText,
   PhoneCall,
   PlugZap,
-  ShieldAlert,
   RefreshCw,
-  KeyRound,
-  Webhook
+  ShieldAlert
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +30,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type {
-  PortalInstagramStatus,
   PortalWhatsAppDiscoveredAsset,
   PortalWhatsAppTemplate,
   PortalWhatsAppTemplateBlueprint
@@ -52,15 +44,15 @@ import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
 type IntegrationState = "not_connected" | "connecting" | "connected" | "error";
 
-type IntegrationCard = {
+type ProductCard = {
   id: string;
   name: string;
   description: string;
   state: IntegrationState;
-  availability: "disponible" | "proximamente" | "en preparacion";
-  cta: string;
-  icon: React.ComponentType<{ className?: string }>;
-  helper?: string;
+  availability: "operativo" | "proximo" | "interno";
+  helper: string;
+  detail: string;
+  href?: string;
 };
 
 const SUPPORT_LINK = getTrackedWhatsAppLink({
@@ -68,57 +60,34 @@ const SUPPORT_LINK = getTrackedWhatsAppLink({
   prefill: "Hola Opturon. Necesito ayuda para conectar WhatsApp Business en mi espacio."
 });
 
-const integrations: IntegrationCard[] = [
-  {
-    id: "messenger",
-    name: "Facebook Messenger",
-    description: "Unifica conversaciones de Facebook con el resto de tu operacion comercial.",
-    state: "not_connected",
-    availability: "proximamente",
-    cta: "Ver roadmap",
-    icon: MessageCircle,
-    helper: "Pensado para equipos que reciben consultas desde anuncios y redes."
-  },
-  {
-    id: "webchat",
-    name: "Webchat",
-    description: "Recibe prospectos desde tu sitio web y canalizalos al inbox del equipo.",
-    state: "connected",
-    availability: "disponible",
-    cta: "Gestionar widget",
-    icon: Webhook,
-    helper: "Muy util para captar consultas sin depender solo de WhatsApp."
-  },
-  {
-    id: "calendar",
-    name: "Google Calendar",
-    description: "Coordina turnos, reuniones o seguimientos directamente desde la conversacion.",
-    state: "not_connected",
-    availability: "en preparacion",
-    cta: "Explorar integracion",
-    icon: CalendarDays,
-    helper: "Un paso natural para negocios que coordinan citas o demos."
-  },
+const productCards: ProductCard[] = [
   {
     id: "crm",
     name: "CRM externo",
-    description: "Empuja contactos, etapas y actividad hacia tu CRM comercial actual.",
-    state: "error",
-    availability: "disponible",
-    cta: "Revisar conexion",
-    icon: PlugZap,
-    helper: "Sincroniza tu pipeline comercial con lo que sucede en el inbox."
+    description: "Siguiente fase real para empujar contactos, actividad y contexto comercial fuera de Opturon.",
+    state: "not_connected",
+    availability: "proximo",
+    helper: "Visible como siguiente paso, sin prometer una conexion ya lista.",
+    detail: "Se mantiene en la narrativa del producto, pero sin abrir una configuracion inmadura."
+  },
+  {
+    id: "agenda",
+    name: "Agenda de Opturon",
+    description: "Modulo nativo para disponibilidad, notas, seguimientos y futura reserva de turnos.",
+    state: "connected",
+    availability: "interno",
+    helper: "No se trata como integracion externa ni abre Google Calendar en esta fase.",
+    detail: "La agenda vive dentro del dashboard y queda lista para crecer junto al inbox y al bot.",
+    href: "/app/agenda"
   }
 ];
 
 export function IntegrationsHub({
   whatsapp,
-  instagram,
   templateBlueprints,
   templates
 }: {
   whatsapp: WhatsAppConnectionStatus;
-  instagram: PortalInstagramStatus;
   templateBlueprints: PortalWhatsAppTemplateBlueprint[];
   templates: PortalWhatsAppTemplate[];
 }) {
@@ -153,27 +122,17 @@ export function IntegrationsHub({
     () => whatsappHubMeta(liveWhatsApp, effectiveState, launchMessage),
     [effectiveState, launchMessage, liveWhatsApp]
   );
-  const integrationCards = useMemo<IntegrationCard[]>(() => {
-    const instagramConnected = instagram.state === "connected";
-    const instagramLabel =
-      instagram.channel?.instagramUsername ||
-      instagram.channel?.externalPageName ||
-      "Ideal para negocios que atienden consultas por redes y campanas.";
 
-    return [
-      {
-        id: "instagram",
-        name: "Instagram",
-        description: "Centraliza mensajes directos y consultas comerciales en el mismo espacio.",
-        state: instagramConnected ? "connected" : "not_connected",
-        availability: "disponible",
-        cta: instagramConnected ? "Canal conectado" : "Conectar Instagram",
-        icon: Instagram,
-        helper: instagramLabel
-      },
-      ...integrations
-    ];
-  }, [instagram]);
+  const templatesByKey = useMemo(() => {
+    const map = new Map<string, PortalWhatsAppTemplate>();
+    for (const item of liveTemplates) {
+      const current = map.get(item.templateKey);
+      if (!current || new Date(item.updatedAt || 0).getTime() > new Date(current.updatedAt || 0).getTime()) {
+        map.set(item.templateKey, item);
+      }
+    }
+    return map;
+  }, [liveTemplates]);
 
   async function refreshWhatsAppStatus() {
     const response = await fetch("/api/app/integrations/whatsapp", { cache: "no-store" });
@@ -192,30 +151,20 @@ export function IntegrationsHub({
     setLiveTemplates(json?.data?.templates || []);
   }
 
-  function handleInstagramConnect() {
-    window.location.assign("/api/app/integrations/instagram/start");
-  }
-
   function focusManualConnection(options?: { openHelp?: boolean }) {
     manualConnectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     manualConnectionRef.current?.focus({ preventScroll: true });
-
-    if (options?.openHelp) {
-      setManualHelpOpen(true);
-    }
+    if (options?.openHelp) setManualHelpOpen(true);
   }
 
   async function handleMetaConnect() {
-    console.info("[meta-embedded-signup-ui] click_received", {
-      currentState: liveWhatsApp.state
-    });
     setLaunchState("launching");
     setLaunchMessage(null);
     setLaunchIssueKind(null);
 
     try {
       const result = await beginMetaWhatsAppConnection();
-      setLaunchIssueKind(null);
+
       if (result.state === "pending_meta") {
         setLaunchState("pending_meta");
         setLaunchMessage(result.message);
@@ -227,36 +176,22 @@ export function IntegrationsHub({
       setLaunchState(result.state === "connected" ? "idle" : "pending_meta");
       setLaunchMessage(result.message);
       await refreshWhatsAppStatus();
-      toast.success(
-        result.state === "connected" ? "WhatsApp conectado" : "Conexion actualizada",
-        result.message
-      );
+      toast.success(result.state === "connected" ? "WhatsApp conectado" : "Conexion actualizada", result.message);
     } catch (error) {
       setLaunchState("idle");
       const details = getMetaEmbeddedSignupErrorDetails(error);
-      console[details.kind === "meta_blocked" || details.kind === "cancelled" ? "warn" : "error"](
-        "[meta-embedded-signup-ui] launch_failed",
-        {
-          kind: details.kind,
-          code: details.code,
-          fallbackToManual: details.fallbackToManual,
-          error: details.message
-        }
-      );
       setLaunchIssueKind(details.kind);
       setLaunchMessage(details.message);
 
       if (details.kind === "meta_blocked" || details.kind === "timeout") {
-        toast.error("Meta no habilitó la conexión guiada", details.message);
+        toast.error("Meta no habilito la conexion guiada", details.message);
         focusManualConnection();
         return;
       }
 
-      if (details.kind === "cancelled") {
-        return;
+      if (details.kind !== "cancelled") {
+        toast.error("No pudimos iniciar la conexion", details.message);
       }
-
-      toast.error("No pudimos iniciar la conexion", details.message);
     }
   }
 
@@ -271,18 +206,7 @@ export function IntegrationsHub({
         body: JSON.stringify(manualForm)
       });
       const json = (await response.json().catch(() => null)) as
-        | {
-            data?: {
-              status?: "connected" | "pending_meta";
-              validation?: {
-                displayPhoneNumber?: string | null;
-                verifiedName?: string | null;
-                wabaName?: string | null;
-              };
-            };
-            error?: string;
-            detail?: string;
-          }
+        | { data?: { status?: "connected" | "pending_meta"; validation?: { displayPhoneNumber?: string | null } }; error?: string; detail?: string }
         | null;
 
       if (!response.ok) {
@@ -327,16 +251,9 @@ export function IntegrationsHub({
 
       const items = json?.data?.items || [];
       setDiscoveryItems(items);
-      if (items.length) {
-        setDiscoveryMessage(null);
-        toast.success("Activos detectados", `Encontramos ${items.length} opcion(es) para completar la conexion manual.`);
-      } else {
-        setDiscoveryMessage("No encontramos activos accesibles con ese token. Puedes completar WABA ID y Phone Number ID manualmente.");
-      }
+      setDiscoveryMessage(items.length ? null : "No encontramos activos accesibles con ese token. Puedes completar WABA ID y Phone Number ID manualmente.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No pudimos descubrir activos en Meta.";
-      setDiscoveryMessage(message);
-      toast.error("No pudimos autodetectar activos", message);
+      setDiscoveryMessage(error instanceof Error ? error.message : "No pudimos descubrir activos en Meta.");
     } finally {
       setDiscoveryBusy(false);
     }
@@ -362,21 +279,14 @@ export function IntegrationsHub({
         },
         body: JSON.stringify({ templateKey, language })
       });
-      const json = (await response.json().catch(() => null)) as
-        | { data?: { template?: PortalWhatsAppTemplate; created?: boolean }; error?: string; detail?: string }
-        | null;
+      const json = (await response.json().catch(() => null)) as { data?: { created?: boolean }; error?: string; detail?: string } | null;
 
       if (!response.ok) {
         throw new Error(json?.detail || json?.error || "No pudimos crear la plantilla en Meta.");
       }
 
       await refreshTemplates();
-      toast.success(
-        json?.data?.created === false ? "Plantilla ya disponible" : "Plantilla creada",
-        json?.data?.created === false
-          ? "La plantilla ya existia para este espacio y quedo reutilizada."
-          : "La plantilla se envio a Meta y quedo asociada a tu WhatsApp."
-      );
+      toast.success(json?.data?.created === false ? "Plantilla ya disponible" : "Plantilla creada");
     } catch (error) {
       toast.error("No pudimos crear la plantilla", error instanceof Error ? error.message : "unknown_error");
     } finally {
@@ -397,9 +307,11 @@ export function IntegrationsHub({
       const json = (await response.json().catch(() => null)) as
         | { data?: { syncedCount?: number; templates?: PortalWhatsAppTemplate[] }; error?: string; detail?: string }
         | null;
+
       if (!response.ok) {
         throw new Error(json?.detail || json?.error || "No pudimos sincronizar estados de templates.");
       }
+
       setLiveTemplates(json?.data?.templates || []);
       toast.success("Templates sincronizados", `Actualizamos ${json?.data?.syncedCount || 0} templates desde Meta.`);
     } catch (error) {
@@ -409,55 +321,11 @@ export function IntegrationsHub({
     }
   }
 
-  const templatesByKey = useMemo(() => {
-    const map = new Map<string, PortalWhatsAppTemplate>();
-    for (const item of liveTemplates) {
-      const current = map.get(item.templateKey);
-      if (!current) {
-        map.set(item.templateKey, item);
-        continue;
-      }
-      if (new Date(item.updatedAt || 0).getTime() > new Date(current.updatedAt || 0).getTime()) {
-        map.set(item.templateKey, item);
-      }
-    }
-    return map;
-  }, [liveTemplates]);
-
   const readinessItems = [
-    {
-      label: "Canal del espacio",
-      value: meta.channelValue,
-      tone: meta.variant
-    },
-    {
-      label: "Webhook",
-      value: meta.webhookValue,
-      tone: meta.webhookTone
-    },
-    {
-      label: "Numero conectado",
-      value: liveWhatsApp.connectedNumber || "Pendiente",
-      tone: liveWhatsApp.connectedNumber ? "muted" : "warning"
-    }
+    { label: "Canal del espacio", value: meta.channelValue, tone: meta.variant },
+    { label: "Webhook", value: meta.webhookValue, tone: meta.webhookTone },
+    { label: "Numero conectado", value: liveWhatsApp.connectedNumber || "Pendiente", tone: liveWhatsApp.connectedNumber ? "muted" : "warning" }
   ] as const;
-
-  function formatDiscoverAssetsError(
-    errorCode: string | null | undefined,
-    detail: string | null | undefined
-  ) {
-    const code = String(errorCode || "").trim();
-    if (code === "meta_insufficient_permissions") {
-      return "Tu token no tiene permisos para listar negocios o WABAs. Puedes continuar conectando manualmente.";
-    }
-    if (code === "meta_business_assets_not_found") {
-      return "No encontramos activos accesibles con ese token. Si ya conoces tu WABA ID y tu Phone Number ID, puedes continuar con conexion manual.";
-    }
-    return (
-      String(detail || "").trim() ||
-      "No pudimos autodetectar activos desde Meta. Puedes continuar con conexion manual."
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -476,21 +344,12 @@ export function IntegrationsHub({
           </CardHeader>
           <CardContent className="space-y-5 pt-0">
             <div className="rounded-[24px] border border-white/10 bg-black/15 p-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">Estado del canal</p>
-                  <div className="mt-2 flex items-center gap-3">
-                    <span className={`inline-flex h-3 w-3 rounded-full ${meta.dotClass}`} />
-                    <p className="text-lg font-semibold text-white">{meta.label}</p>
-                  </div>
-                  <p className="mt-2 max-w-2xl text-sm leading-7 text-white/70">{meta.helper}</p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-white/55">Siguiente paso</p>
-                  <p className="mt-2 font-medium">{meta.nextStep}</p>
-                </div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">Estado del canal</p>
+              <div className="mt-2 flex items-center gap-3">
+                <span className={`inline-flex h-3 w-3 rounded-full ${meta.dotClass}`} />
+                <p className="text-lg font-semibold text-white">{meta.label}</p>
               </div>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-white/70">{meta.helper}</p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
@@ -508,29 +367,8 @@ export function IntegrationsHub({
               ))}
             </div>
 
-            {launchIssueKind === "meta_blocked" || launchIssueKind === "timeout" ? (
-              <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-4 text-sm text-white/80">
-                <p className="font-semibold text-white">Meta no habilitó el alta embebida para esta app</p>
-                <p className="mt-2 leading-6">
-                  Meta no habilito el alta guiada para esta app. Puedes continuar ahora mismo con la conexion manual
-                  asistida sin perder el progreso.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button className="rounded-2xl" onClick={() => focusManualConnection()}>
-                    Ir a conexion manual
-                  </Button>
-                  <Button variant="secondary" className="rounded-2xl" onClick={() => focusManualConnection({ openHelp: true })}>
-                    Ver ayuda
-                  </Button>
-                  <Button variant="ghost" className="rounded-2xl" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
-                    Reintentar con Meta
-                  </Button>
-                </div>
-              </div>
-            ) : launchMessage ? (
-              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
-                {launchMessage}
-              </div>
+            {launchMessage ? (
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">{launchMessage}</div>
             ) : null}
 
             <div className="flex flex-wrap gap-3">
@@ -539,23 +377,16 @@ export function IntegrationsHub({
                   {launchState === "launching" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {meta.primaryLabel}
                 </Button>
-              ) : meta.primaryHref ? (
-                <Button asChild className="rounded-2xl px-5">
-                  <Link href={meta.primaryHref}>{meta.primaryLabel}</Link>
-                </Button>
               ) : (
-                <Button className="rounded-2xl px-5" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
-                  {launchState === "launching" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {meta.primaryLabel}
+                <Button asChild className="rounded-2xl px-5">
+                  <Link href={meta.primaryHref || "/app/inbox"}>{meta.primaryLabel}</Link>
                 </Button>
               )}
-
               {meta.secondaryHref ? (
                 <Button asChild variant="secondary" className="rounded-2xl px-5">
                   <Link href={meta.secondaryHref}>{meta.secondaryLabel}</Link>
                 </Button>
               ) : null}
-
               <Button asChild variant="ghost" className="rounded-2xl px-5">
                 <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
                   <LifeBuoy className="mr-2 h-4 w-4" />
@@ -567,45 +398,22 @@ export function IntegrationsHub({
         </Card>
 
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">Onboarding</Badge>}>
+          <CardHeader action={<Badge variant="muted">Foco actual</Badge>}>
             <div>
-              <CardTitle className="text-xl">Como se activa este canal</CardTitle>
-              <CardDescription>Una experiencia pensada para conectar WhatsApp sin pedirle al cliente datos tecnicos innecesarios.</CardDescription>
+              <CardTitle className="text-xl">Como queda la jerarquia</CardTitle>
+              <CardDescription>La pantalla ahora comunica foco, solidez y estado real del producto.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             {[
-              {
-                icon: Cable,
-                title: "Conectas con Meta",
-                detail: "El cliente inicia el flujo desde Opturon y selecciona el negocio o numero que quiere usar."
-              },
-              {
-                icon: BadgeCheck,
-                title: "Validamos la configuracion",
-                detail: "Confirmamos que el numero y el canal queden asociados al espacio correcto antes de operar."
-              },
-              {
-                icon: MessageSquareText,
-                title: "Empiezas a responder",
-                detail: "Cuando el canal queda resuelto, el inbox, el checklist y las automatizaciones se habilitan sobre esa conexion."
-              }
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.title} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                      <Icon className="h-4 w-4 text-brandBright" />
-                    </span>
-                    <div>
-                      <p className="font-medium">{item.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-muted">{item.detail}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+              "WhatsApp queda como integracion principal y conserva toda su profundidad operativa.",
+              "CRM externo queda visible como siguiente fase real, sin abrir una promesa sobredimensionada.",
+              "Agenda pasa a ser un modulo interno del dashboard, no una integracion externa."
+            ].map((item) => (
+              <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
+                {item}
+              </div>
+            ))}
           </CardContent>
         </Card>
       </section>
@@ -613,49 +421,61 @@ export function IntegrationsHub({
       <section>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">Canales e integraciones</h2>
-            <p className="text-sm text-muted">Conexiones disponibles para centralizar atencion, prospectos y agenda desde un solo espacio.</p>
+            <h2 className="text-xl font-semibold">Panorama de producto</h2>
+            <p className="text-sm text-muted">Solo mostramos lo que hoy aporta valor real o lo que ya tiene una direccion clara dentro de Opturon.</p>
           </div>
-          <Badge variant="muted">Centro de integraciones</Badge>
+          <Badge variant="muted">Promesa acotada</Badge>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {integrationCards.map((integration) => {
-            const Icon = integration.icon;
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.9fr)]">
+          {productCards.map((integration) => {
             const state = stateMeta(integration.state);
             return (
               <Card key={integration.id} className="border-white/6 bg-card/90">
                 <CardHeader action={<Badge variant={state.variant}>{state.label}</Badge>}>
-                  <div className="flex items-start gap-4">
-                    <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-surface/80">
-                      <Icon className="h-5 w-5 text-brandBright" />
-                    </span>
-                    <div>
-                      <CardTitle className="text-xl">{integration.name}</CardTitle>
-                      <CardDescription>{integration.description}</CardDescription>
-                    </div>
+                  <div>
+                    <CardTitle className="text-xl">{integration.name}</CardTitle>
+                    <CardDescription>{integration.description}</CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-0">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline">{integration.availability}</Badge>
-                    {integration.helper ? <Badge variant="muted">{integration.helper}</Badge> : null}
+                    <Badge variant="muted">{integration.helper}</Badge>
                   </div>
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
-                    {state.detail}
-                  </div>
-                  <Button
-                    variant={integration.state === "connected" ? "secondary" : "primary"}
-                    className="w-full rounded-2xl"
-                    onClick={integration.id === "instagram" ? handleInstagramConnect : undefined}
-                    disabled={integration.id === "instagram" && integration.state === "connected"}
-                  >
-                    {integration.cta}
-                  </Button>
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">{integration.detail}</div>
+                  {integration.href ? (
+                    <Button asChild variant="secondary" className="w-full rounded-2xl">
+                      <Link href={integration.href}>Abrir modulo</Link>
+                    </Button>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/35 px-4 py-3 text-sm text-muted">
+                      Proximo paso visible, sin configuracion abierta todavia.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
           })}
+
+          <Card className="border-white/6 bg-card/90">
+            <CardHeader action={<Badge variant="warning">Fuera de foco</Badge>}>
+              <div>
+                <CardTitle className="text-xl">Integraciones que salen del frente</CardTitle>
+                <CardDescription>No ocupan protagonismo en esta fase para no prometer mas de lo que hoy esta consolidado.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              {[
+                "Instagram deja de aparecer como canal principal activo.",
+                "Facebook Messenger deja de aparecer como integracion principal.",
+                "Webchat no compite por jerarquia mientras no tenga madurez real.",
+                "Google Calendar no se abre en esta fase porque Agenda es nativa."
+              ].map((item) => (
+                <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">{item}</div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -665,94 +485,36 @@ export function IntegrationsHub({
         className="grid gap-5 outline-none xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]"
       >
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="warning">Ruta principal recomendada</Badge>}>
+          <CardHeader action={<Badge variant="warning">WhatsApp principal</Badge>}>
             <div>
               <CardTitle className="text-xl">Conexion manual asistida</CardTitle>
-              <CardDescription>
-                Completa WABA ID, Phone Number ID y tu Access Token para validar el canal directamente contra Meta. La autodeteccion queda disponible como ayuda avanzada, no como paso obligatorio.
-              </CardDescription>
+              <CardDescription>Completa WABA ID, Phone Number ID y tu Access Token para validar el canal directamente contra Meta.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
-            {launchIssueKind === "meta_blocked" ? (
-              <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4">
-                <p className="text-sm font-semibold text-white">Meta no habilitó el alta embebida para esta app</p>
-                <p className="mt-2 text-sm leading-6 text-white/75">
-                  No te bloqueamos por eso. Puedes continuar ahora mismo con la conexión manual asistida validando tu
-                  token, tu WABA y tu número directamente contra Meta.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button className="rounded-2xl" onClick={() => focusManualConnection()}>
-                    Ir a conexion manual
-                  </Button>
-                  <Button variant="secondary" className="rounded-2xl" onClick={() => focusManualConnection({ openHelp: true })}>
-                    Ver ayuda
-                  </Button>
-                  <Button variant="ghost" className="rounded-2xl" onClick={() => void handleMetaConnect()} disabled={launchState === "launching"}>
-                    Reintentar con Meta
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
-              No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el
-              token del canal para asociarlo al espacio correcto.
-            </div>
-
-            <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 text-sm leading-6 text-muted">
-              <p className="font-medium text-white">Flujos principales</p>
-              <p className="mt-2">
-                Para la mayoria de los espacios, las rutas mas confiables son la conexion guiada con Meta y la conexion manual asistida. La autodeteccion queda disponible como helper avanzado.
-              </p>
+              No te pedimos configuracion tecnica de webhook ni pasos raros. Solo validamos tu WABA, tu numero y el token del canal para asociarlo al espacio correcto.
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm">
                 <span className="font-medium">WABA ID</span>
-                <Input
-                  value={manualForm.wabaId}
-                  onChange={(event) => setManualForm((current) => ({ ...current, wabaId: event.target.value }))}
-                  placeholder="Ej. 178912345678901"
-                  autoComplete="off"
-                  inputMode="numeric"
-                  disabled={manualBusy}
-                />
+                <Input value={manualForm.wabaId} onChange={(event) => setManualForm((current) => ({ ...current, wabaId: event.target.value }))} placeholder="Ej. 178912345678901" autoComplete="off" inputMode="numeric" disabled={manualBusy} />
               </label>
               <label className="space-y-2 text-sm">
                 <span className="font-medium">Phone Number ID</span>
-                <Input
-                  value={manualForm.phoneNumberId}
-                  onChange={(event) => setManualForm((current) => ({ ...current, phoneNumberId: event.target.value }))}
-                  placeholder="Ej. 109876543210987"
-                  autoComplete="off"
-                  inputMode="numeric"
-                  disabled={manualBusy}
-                />
+                <Input value={manualForm.phoneNumberId} onChange={(event) => setManualForm((current) => ({ ...current, phoneNumberId: event.target.value }))} placeholder="Ej. 109876543210987" autoComplete="off" inputMode="numeric" disabled={manualBusy} />
               </label>
             </div>
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
               <label className="space-y-2 text-sm">
                 <span className="font-medium">Access Token</span>
-                <Input
-                  type="password"
-                  value={manualForm.accessToken}
-                  onChange={(event) => setManualForm((current) => ({ ...current, accessToken: event.target.value }))}
-                  placeholder="Pega aqui tu token de Meta"
-                  autoComplete="off"
-                  disabled={manualBusy}
-                />
+                <Input type="password" value={manualForm.accessToken} onChange={(event) => setManualForm((current) => ({ ...current, accessToken: event.target.value }))} placeholder="Pega aqui tu token de Meta" autoComplete="off" disabled={manualBusy} />
               </label>
               <label className="space-y-2 text-sm">
                 <span className="font-medium">Nombre del canal (opcional)</span>
-                <Input
-                  value={manualForm.channelName}
-                  onChange={(event) => setManualForm((current) => ({ ...current, channelName: event.target.value }))}
-                  placeholder="Sucursal Palermo"
-                  autoComplete="off"
-                  disabled={manualBusy}
-                />
+                <Input value={manualForm.channelName} onChange={(event) => setManualForm((current) => ({ ...current, channelName: event.target.value }))} placeholder="Sucursal Palermo" autoComplete="off" disabled={manualBusy} />
               </label>
             </div>
 
@@ -760,16 +522,9 @@ export function IntegrationsHub({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Autodeteccion avanzada</p>
-                  <p className="mt-1 text-sm text-muted">
-                    Autodetectar activos requiere permisos avanzados de Meta Business y puede no funcionar con todos los tokens. Si falla, puedes continuar con conexion manual.
-                  </p>
+                  <p className="mt-1 text-sm text-muted">Requiere permisos avanzados de Meta Business y puede no funcionar con todos los tokens.</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  className="rounded-2xl"
-                  onClick={() => void handleDiscoverAssets()}
-                  disabled={discoveryBusy || !manualForm.accessToken.trim()}
-                >
+                <Button variant="ghost" className="rounded-2xl" onClick={() => void handleDiscoverAssets()} disabled={discoveryBusy || !manualForm.accessToken.trim()}>
                   {discoveryBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Autodetectar activos
                 </Button>
@@ -778,36 +533,19 @@ export function IntegrationsHub({
             </div>
 
             {discoveryItems.length ? (
-              <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                <div>
-                  <p className="text-sm font-medium">Selecciona un activo detectado</p>
-                  <p className="mt-1 text-sm text-muted">
-                    Elegimos una opción y autocompletamos WABA ID, Phone Number ID y el nombre sugerido del canal.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  {discoveryItems.map((item) => (
-                    <button
-                      key={`${item.wabaId}:${item.phoneNumberId}`}
-                      type="button"
-                      onClick={() => applyDiscoveredAsset(item)}
-                      className="w-full rounded-2xl border border-[color:var(--border)] bg-bg/70 p-4 text-left transition hover:border-brand/40 hover:bg-bg"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <div className="mt-2 space-y-1 text-xs text-muted">
-                            <p>WABA ID: {item.wabaId}</p>
-                            <p>Phone Number ID: {item.phoneNumberId}</p>
-                            {item.qualityRating ? <p>Quality: {item.qualityRating}</p> : null}
-                          </div>
-                        </div>
-                        <Badge variant="outline">Usar</Badge>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+              <div className="space-y-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                {discoveryItems.map((item) => (
+                  <button
+                    key={`${item.wabaId}:${item.phoneNumberId}`}
+                    type="button"
+                    onClick={() => applyDiscoveredAsset(item)}
+                    className="w-full rounded-2xl border border-[color:var(--border)] bg-bg/70 p-4 text-left transition hover:border-brand/40 hover:bg-bg"
+                  >
+                    <p className="text-sm font-medium">{item.label}</p>
+                    <p className="mt-2 text-xs text-muted">WABA ID: {item.wabaId}</p>
+                    <p className="text-xs text-muted">Phone Number ID: {item.phoneNumberId}</p>
+                  </button>
+                ))}
               </div>
             ) : null}
 
@@ -818,87 +556,26 @@ export function IntegrationsHub({
               </Button>
               <Dialog open={manualHelpOpen} onOpenChange={setManualHelpOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="ghost" className="rounded-2xl">
-                    Necesito ayuda con mis datos
-                  </Button>
+                  <Button variant="ghost" className="rounded-2xl">Necesito ayuda con mis datos</Button>
                 </DialogTrigger>
                 <DialogContent className="max-h-[85vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Dónde encontrar estos datos en Meta</DialogTitle>
-                    <DialogDescription>
-                      Te mostramos exactamente qué copiar para conectar tu canal sin configuraciones raras.
-                    </DialogDescription>
+                    <DialogTitle>Donde encontrar estos datos en Meta</DialogTitle>
+                    <DialogDescription>Te mostramos exactamente que copiar para conectar tu canal sin configuraciones raras.</DialogDescription>
                   </DialogHeader>
 
                   <div className="space-y-4">
-                    <HelperBlock
-                      title="WABA ID"
-                      description="Es el identificador de tu cuenta de WhatsApp Business."
-                      bullets={[
-                        "No es tu email",
-                        "No es tu numero de telefono",
-                        "Es un numero largo"
-                      ]}
-                      example="178912345678901"
-                    />
-                    <HelperBlock
-                      title="Phone Number ID"
-                      description="Es el identificador interno del numero conectado en WhatsApp Cloud API."
-                      bullets={[
-                        "No es el numero visible de WhatsApp",
-                        "Tambien es un numero largo"
-                      ]}
-                      example="109876543210987"
-                    />
-                    <HelperBlock
-                      title="Access Token"
-                      description="Es el token de acceso que autoriza a Meta a validar y usar ese canal."
-                      bullets={[
-                        "Debe ser el token con acceso a esa cuenta y ese numero"
-                      ]}
-                      example="EAAJ..."
-                    />
-
-                    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                      <p className="text-sm font-medium">Paso a paso</p>
-                      <div className="mt-3 space-y-2 text-sm text-muted">
-                        <p>1. Entra a Meta for Developers</p>
-                        <p>2. Abre tu app de WhatsApp</p>
-                        <p>3. Ve a WhatsApp &gt; Configuracion de la API</p>
-                        <p>4. Copia estos datos:</p>
-                        <p>WhatsApp Business Account ID</p>
-                        <p>Phone Number ID</p>
-                        <p>Access Token</p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                      <p className="text-sm font-medium">Importante</p>
-                      <div className="mt-3 space-y-2 text-sm text-muted">
-                        <p>No pegues tu email en WABA ID</p>
-                        <p>No pegues tu numero de telefono en Phone Number ID</p>
-                        <p>Si el token no tiene permisos, la conexion fallara</p>
-                      </div>
-                    </div>
+                    <HelperBlock title="WABA ID" description="Es el identificador de tu cuenta de WhatsApp Business." bullets={["No es tu email", "No es tu numero de telefono", "Es un numero largo"]} example="178912345678901" />
+                    <HelperBlock title="Phone Number ID" description="Es el identificador interno del numero conectado en WhatsApp Cloud API." bullets={["No es el numero visible de WhatsApp", "Tambien es un numero largo"]} example="109876543210987" />
+                    <HelperBlock title="Access Token" description="Es el token de acceso que autoriza a Meta a validar y usar ese canal." bullets={["Debe ser el token con acceso a esa cuenta y ese numero"]} example="EAAJ..." />
                   </div>
 
                   <DialogFooter className="justify-between">
-                    <div className="flex flex-wrap gap-2">
-                      <Button asChild variant="secondary" className="rounded-2xl">
-                        <a href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">
-                          Abrir Meta for Developers
-                        </a>
-                      </Button>
-                      <Button asChild variant="ghost" className="rounded-2xl">
-                        <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noreferrer">
-                          Abrir documentacion de WhatsApp
-                        </a>
-                      </Button>
-                    </div>
+                    <Button asChild variant="secondary" className="rounded-2xl">
+                      <a href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">Abrir Meta for Developers</a>
+                    </Button>
                     <Button asChild variant="ghost" className="rounded-2xl">
-                      <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
-                        Hablar con soporte
-                      </a>
+                      <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">Hablar con soporte</a>
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -908,7 +585,7 @@ export function IntegrationsHub({
         </Card>
 
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">Checklist</Badge>}>
+          <CardHeader action={<Badge variant="muted">Validacion real</Badge>}>
             <div>
               <CardTitle className="text-xl">Que valida Opturon</CardTitle>
               <CardDescription>Antes de asociar el canal al tenant, validamos acceso real en Meta para evitar cruces entre espacios.</CardDescription>
@@ -920,11 +597,9 @@ export function IntegrationsHub({
               "El Phone Number ID existe y es accesible con ese token.",
               "El numero realmente pertenece a esa WABA.",
               "El canal no esta ya asociado a otro espacio.",
-              "Si Meta rechaza la suscripcion de la app, te mostramos el error real antes de guardar una conexion incompleta."
+              "Si Meta rechaza la suscripcion, mostramos el error real antes de guardar una conexion incompleta."
             ].map((item) => (
-              <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
-                {item}
-              </div>
+              <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">{item}</div>
             ))}
           </CardContent>
         </Card>
@@ -934,9 +609,7 @@ export function IntegrationsHub({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold">Plantillas de WhatsApp</h2>
-            <p className="text-sm text-muted">
-              Blueprints base de Opturon para crear templates aprobables por cada WABA sin pedir configuracion manual.
-            </p>
+            <p className="text-sm text-muted">Blueprints base de Opturon para crear templates aprobables por cada WABA sin pedir configuracion manual.</p>
           </div>
           <Button variant="secondary" className="rounded-2xl" onClick={() => void handleSyncTemplates()} disabled={templatesBusy === "sync"}>
             {templatesBusy === "sync" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
@@ -963,20 +636,9 @@ export function IntegrationsHub({
                     <Badge variant="muted">{blueprint.defaultLanguage}</Badge>
                     {current?.metaTemplateName ? <Badge variant="muted">{current.metaTemplateName}</Badge> : null}
                   </div>
-
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">
-                    {statusMeta.detail}
-                    {current?.rejectionReason ? (
-                      <p className="mt-2 text-sm text-danger">Motivo reportado por Meta: {current.rejectionReason}</p>
-                    ) : null}
-                  </div>
-
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">{statusMeta.detail}</div>
                   <div className="flex flex-wrap gap-3">
-                    <Button
-                      className="rounded-2xl"
-                      onClick={() => void handleCreateTemplate(blueprint.key, blueprint.defaultLanguage)}
-                      disabled={isBusy || liveWhatsApp.state !== "connected"}
-                    >
+                    <Button className="rounded-2xl" onClick={() => void handleCreateTemplate(blueprint.key, blueprint.defaultLanguage)} disabled={isBusy || liveWhatsApp.state !== "connected"}>
                       {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <CopyPlus className="mr-2 h-4 w-4" />}
                       Crear en mi WhatsApp
                     </Button>
@@ -997,6 +659,17 @@ export function IntegrationsHub({
   );
 }
 
+function formatDiscoverAssetsError(errorCode: string | null | undefined, detail: string | null | undefined) {
+  const code = String(errorCode || "").trim();
+  if (code === "meta_insufficient_permissions") {
+    return "Tu token no tiene permisos para listar negocios o WABAs. Puedes continuar conectando manualmente.";
+  }
+  if (code === "meta_business_assets_not_found") {
+    return "No encontramos activos accesibles con ese token. Si ya conoces tu WABA ID y tu Phone Number ID, puedes continuar con conexion manual.";
+  }
+  return String(detail || "").trim() || "No pudimos autodetectar activos desde Meta. Puedes continuar con conexion manual.";
+}
+
 function templateStatusMeta(status: string): {
   label: string;
   detail: string;
@@ -1004,38 +677,18 @@ function templateStatusMeta(status: string): {
 } {
   const normalized = String(status || "").trim().toLowerCase();
   if (normalized === "approved") {
-    return {
-      label: "Aprobada",
-      detail: "La plantilla ya esta aprobada en tu WABA y lista para usarse en automatizaciones futuras.",
-      variant: "success"
-    };
+    return { label: "Aprobada", detail: "La plantilla ya esta aprobada en tu WABA y lista para usarse en automatizaciones futuras.", variant: "success" };
   }
   if (normalized === "pending" || normalized === "in_review") {
-    return {
-      label: "En revision",
-      detail: "Meta recibio la plantilla y todavia no termino la aprobacion.",
-      variant: "warning"
-    };
+    return { label: "En revision", detail: "Meta recibio la plantilla y todavia no termino la aprobacion.", variant: "warning" };
   }
   if (normalized === "rejected" || normalized === "paused" || normalized === "disabled") {
-    return {
-      label: "Requiere revision",
-      detail: "Meta no dejo la plantilla operativa. Conviene revisar el copy o crear una variante nueva.",
-      variant: "danger"
-    };
+    return { label: "Requiere revision", detail: "Meta no dejo la plantilla operativa. Conviene revisar el copy o crear una variante nueva.", variant: "danger" };
   }
   if (normalized === "draft") {
-    return {
-      label: "Borrador",
-      detail: "La plantilla existe en Opturon, pero todavia no fue enviada a Meta para este espacio.",
-      variant: "muted"
-    };
+    return { label: "Borrador", detail: "La plantilla existe en Opturon, pero todavia no fue enviada a Meta para este espacio.", variant: "muted" };
   }
-  return {
-    label: "Sin crear",
-    detail: "Todavia no existe una version de esta plantilla dentro del WhatsApp Business del tenant.",
-    variant: "muted"
-  };
+  return { label: "Sin crear", detail: "Todavia no existe una version de esta plantilla dentro del WhatsApp Business del tenant.", variant: "muted" };
 }
 
 function HelperBlock({
@@ -1098,7 +751,6 @@ function whatsappHubMeta(
       title: "Tu WhatsApp Business ya esta activo",
       description: "Tu numero principal ya esta conectado a Opturon y listo para responder desde el inbox.",
       helper: launchMessage || whatsapp.helper,
-      nextStep: "Abre el inbox y valida una conversacion real.",
       channelValue: whatsapp.channelStatus || "Activo",
       webhookValue: whatsapp.webhookActive ? "Activo" : "Pendiente",
       webhookTone: whatsapp.webhookActive ? ("success" as const) : ("warning" as const),
@@ -1116,110 +768,54 @@ function whatsappHubMeta(
     };
   }
 
-  if (effectiveState === "launching") {
+  if (effectiveState === "ambiguous_configuration" || effectiveState === "error") {
     return {
       state: effectiveState,
-      label: "Preparando conexion",
+      label: effectiveState === "error" ? "Error" : "Requiere revision",
+      variant: "danger" as const,
+      dotClass: "bg-rose-400",
+      title: "Necesitamos revisar la configuracion del canal",
+      description: "Detectamos una inconsistencia antes de activar tu WhatsApp y preferimos no operar sobre un canal dudoso.",
+      helper: launchMessage || whatsapp.helper,
+      channelValue: whatsapp.channelStatus || "Revision",
+      webhookValue: whatsapp.webhookActive ? "Parcial" : "Pendiente",
+      webhookTone: "danger" as const,
+      primaryAction: "open_link" as const,
+      primaryHref: "/app/integrations",
+      primaryLabel: "Revisar conexion",
+      secondaryHref: "/app/inbox",
+      secondaryLabel: "Ver inbox",
+      supportLabel: "Necesito ayuda",
+      benefits: [
+        { title: "UI segura", detail: "No mostramos un numero ambiguo ni contaminamos el inbox con un canal equivocado." },
+        { title: "Tenant aislado", detail: "La activacion se destraba solo cuando el canal correcto queda resuelto." },
+        { title: "Siguiente paso claro", detail: "El owner sabe que necesita revisar la conexion." }
+      ]
+    };
+  }
+
+  if (effectiveState === "launching" || effectiveState === "pending_meta") {
+    return {
+      state: effectiveState,
+      label: effectiveState === "launching" ? "Preparando conexion" : "Pendiente de Meta",
       variant: "warning" as const,
       dotClass: "bg-amber-300",
       title: "Estamos preparando tu conexion con Meta",
       description: "Validamos el espacio y dejamos listo el contexto para iniciar WhatsApp Business sin exponer configuracion tecnica innecesaria.",
-      helper: "Este paso deja lista la base para que el alta guiada use el tenant correcto y no mezcle canales entre negocios.",
-      nextStep: "En unos segundos te mostramos como continuar la activacion.",
+      helper: launchMessage || "El siguiente paso es completar el flujo real de alta guiada con las credenciales finales del espacio.",
       channelValue: "Preparando",
       webhookValue: "Pendiente",
       webhookTone: "warning" as const,
       primaryAction: "connect_meta" as const,
       primaryHref: null,
       primaryLabel: "Intentar conexion guiada con Meta",
-      secondaryHref: "/app/integrations",
-      secondaryLabel: "Quedarme aca",
-      supportLabel: "Hablar con soporte",
-      benefits: [
-        { title: "Tenant correcto", detail: "La conexion se prepara con el espacio y la clinica correctos." },
-        { title: "Sin datos tecnicos", detail: "No le pedimos al cliente WABA, tokens ni IDs manuales." },
-        { title: "Base escalable", detail: "La siguiente etapa puede recibir el resultado real de Meta sin rehacer la UX." }
-      ]
-    };
-  }
-
-  if (effectiveState === "pending_meta") {
-    return {
-      state: effectiveState,
-      label: "Pendiente de Meta",
-      variant: "warning" as const,
-      dotClass: "bg-amber-300",
-      title: "La conexion ya tiene base tecnica lista",
-      description: "Estamos preparando la ultima parte del flujo de Meta para este espacio. No hace falta que cargues IDs ni configuraciones manuales.",
-      helper: launchMessage || "El siguiente paso es completar el flujo real de alta guiada con las credenciales finales del espacio.",
-      nextStep: "Cuando habilitemos la conexion automatica, vas a poder terminarla desde este mismo boton.",
-      channelValue: whatsapp.channelStatus || "Pendiente",
-      webhookValue: "Pendiente",
-      webhookTone: "warning" as const,
-      primaryAction: "connect_meta" as const,
-      primaryHref: null,
-      primaryLabel: "Reintentar conexion guiada",
       secondaryHref: "/app/inbox",
       secondaryLabel: "Ver inbox",
       supportLabel: "Necesito ayuda",
       benefits: [
-        { title: "Base ya preparada", detail: "El espacio, el clinicId y el callback futuro ya quedaron definidos." },
-        { title: "UX sin friccion", detail: "El cliente no se enfrenta a errores ni a una modal tecnica confusa." },
-        { title: "Escalable", detail: "La misma base sirve para otros tenants sin acoplarse al demo." }
-      ]
-    };
-  }
-
-  if (effectiveState === "ambiguous_configuration") {
-    return {
-      state: effectiveState,
-      label: "Requiere revision",
-      variant: "danger" as const,
-      dotClass: "bg-rose-400",
-      title: "Necesitamos revisar la configuracion del canal",
-      description: "Detectamos una configuracion pendiente antes de activar tu WhatsApp y preferimos no mostrar un numero incorrecto en el portal.",
-      helper: whatsapp.helper,
-      nextStep: "Revisemos la conexion para dejar un unico canal correcto en este espacio.",
-      channelValue: "Configuracion ambigua",
-      webhookValue: "Pendiente",
-      webhookTone: "danger" as const,
-      primaryAction: "open_link" as const,
-      primaryHref: "/app/integrations",
-      primaryLabel: "Revisar conexion",
-      secondaryHref: null,
-      secondaryLabel: "",
-      supportLabel: "Contactar soporte",
-      benefits: [
-        { title: "UI segura", detail: "No mostramos un numero ambiguo ni contaminamos el inbox con un canal equivocado." },
-        { title: "Tenant aislado", detail: "La activacion se destraba solo cuando el canal correcto queda resuelto para este negocio." },
-        { title: "Siguiente paso claro", detail: "El owner sabe que necesita revisar la conexion, no adivinar IDs tecnicos." }
-      ]
-    };
-  }
-
-  if (effectiveState === "error") {
-    return {
-      state: effectiveState,
-      label: "Error",
-      variant: "danger" as const,
-      dotClass: "bg-rose-400",
-      title: "No pudimos validar tu canal",
-      description: "Hay una falla real distinta a un espacio sin conectar y conviene revisarla antes de seguir.",
-      helper: whatsapp.helper,
-      nextStep: "Revisa la conexion o contacta soporte para destrabar la activacion.",
-      channelValue: whatsapp.channelStatus || "Error",
-      webhookValue: whatsapp.webhookActive ? "Parcial" : "Pendiente",
-      webhookTone: "danger" as const,
-      primaryAction: "open_link" as const,
-      primaryHref: "/app/integrations",
-      primaryLabel: "Revisar conexion",
-      secondaryHref: null,
-      secondaryLabel: "",
-      supportLabel: "Contactar soporte",
-      benefits: [
-        { title: "Diagnostico claro", detail: "Separamos errores reales de un simple espacio sin canal conectado." },
-        { title: "Fuente unica", detail: "La pantalla sigue leyendo el mismo estado tenant-scoped que el home y el inbox." },
-        { title: "Sin datos falsos", detail: "Nunca mostramos el canal global ni un numero ajeno por error." }
+        { title: "Tenant correcto", detail: "La conexion se prepara con el espacio correcto." },
+        { title: "Sin datos tecnicos", detail: "No le pedimos al cliente WABA, tokens ni IDs manuales." },
+        { title: "Base escalable", detail: "La siguiente etapa puede recibir el resultado real de Meta sin rehacer la UX." }
       ]
     };
   }
@@ -1230,9 +826,8 @@ function whatsappHubMeta(
     variant: "warning" as const,
     dotClass: "bg-amber-300",
     title: "Conecta tu WhatsApp Business",
-    description: "Activa tu canal principal para recibir mensajes reales, responder desde Opturon y automatizar conversaciones sin configuracion tecnica compleja.",
-    helper: whatsapp.helper,
-    nextStep: "Conecta tu numero principal para empezar a ver conversaciones reales en el inbox.",
+    description: "Activa tu canal principal para recibir mensajes reales, responder desde Opturon y automatizar conversaciones.",
+    helper: launchMessage || whatsapp.helper,
     channelValue: "Sin conectar",
     webhookValue: "Pendiente",
     webhookTone: "warning" as const,
@@ -1244,8 +839,8 @@ function whatsappHubMeta(
     supportLabel: "Necesito ayuda",
     benefits: [
       { title: "Recibir mensajes", detail: "Tus conversaciones van a entrar directo a la bandeja del espacio." },
-      { title: "Responder desde Opturon", detail: "El equipo atiende desde un solo lugar, sin cambiar de herramienta." },
-      { title: "Automatizar", detail: "El canal conectado habilita respuestas, handoff y seguimiento comercial." }
+      { title: "Responder desde Opturon", detail: "El equipo atiende desde un solo lugar." },
+      { title: "Automatizar", detail: "El canal conectado habilita respuestas y seguimiento comercial." }
     ]
   };
 }
@@ -1255,30 +850,8 @@ function stateMeta(state: IntegrationState): {
   detail: string;
   variant: "muted" | "warning" | "success" | "danger";
 } {
-  if (state === "connected") {
-    return {
-      label: "Conectado",
-      detail: "La integracion esta lista para operar y mostrar actividad dentro del espacio.",
-      variant: "success"
-    };
-  }
-  if (state === "connecting") {
-    return {
-      label: "Conectando",
-      detail: "La conexion esta en preparacion o a la espera de completar su activacion.",
-      variant: "warning"
-    };
-  }
-  if (state === "error") {
-    return {
-      label: "Error",
-      detail: "Hay una inconsistencia de acceso o configuracion que conviene revisar antes de operar.",
-      variant: "danger"
-    };
-  }
-  return {
-    label: "No conectado",
-    detail: "Disponible para iniciar la conexion cuando el negocio quiera activarlo.",
-    variant: "muted"
-  };
+  if (state === "connected") return { label: "Activo", detail: "", variant: "success" };
+  if (state === "connecting") return { label: "En preparacion", detail: "", variant: "warning" };
+  if (state === "error") return { label: "Revisar", detail: "", variant: "danger" };
+  return { label: "Proximo", detail: "", variant: "muted" };
 }
