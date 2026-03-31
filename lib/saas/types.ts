@@ -173,6 +173,8 @@ export type Conversation = {
   lastMessageAt: string;
   priority: ConversationPriority;
   botEnabled: boolean;
+  botFlowLock?: "automatic" | "agenda" | "commerce";
+  botDomainOverride?: "automatic" | "agenda" | "commerce";
 };
 
 export type Message = {

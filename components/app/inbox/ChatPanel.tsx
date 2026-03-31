@@ -5,7 +5,7 @@ import { Composer } from "@/components/app/inbox/Composer";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
-import type { DetailPayload } from "@/components/app/inbox/types";
+import type { BotDomainOverride, BotFlowLock, DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
 
 function stageLabel(value?: string) {
@@ -26,6 +26,18 @@ function responseMode(detail: DetailPayload) {
   return "bot";
 }
 
+function botDomainLabel(value?: BotDomainOverride) {
+  if (value === "agenda") return "Agenda";
+  if (value === "commerce") return "Ventas";
+  return "Automatico";
+}
+
+function botFlowLockLabel(value?: BotFlowLock) {
+  if (value === "agenda") return "Agenda";
+  if (value === "commerce") return "Ventas";
+  return "Automatico";
+}
+
 type ChatPanelProps = {
   detail: DetailPayload | null;
   loading: boolean;
@@ -41,6 +53,8 @@ type ChatPanelProps = {
   onToggleBot: () => void;
   onTakeConversation: () => void;
   onArchive: () => void;
+  onBotFlowLockChange: (value: BotFlowLock) => void;
+  onBotDomainOverrideChange: (value: BotDomainOverride) => void;
 };
 
 export function ChatPanel({
@@ -57,7 +71,9 @@ export function ChatPanel({
   onRegenerateAutoSuggestions,
   onToggleBot,
   onTakeConversation,
-  onArchive
+  onArchive,
+  onBotFlowLockChange,
+  onBotDomainOverrideChange
 }: ChatPanelProps) {
   const COLLAPSED_TIMELINE_ITEMS = 12;
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +127,32 @@ export function ChatPanel({
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <label className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
+                <span>{`Flujo: ${botFlowLockLabel(detail.conversation.botFlowLock)}`}</span>
+                <select
+                  value={detail.conversation.botFlowLock || "automatic"}
+                  onChange={(event) => onBotFlowLockChange(event.target.value as BotFlowLock)}
+                  disabled={readOnly}
+                  className="rounded-full border border-[color:var(--border)] bg-surface px-2 py-1 text-[11px] text-text outline-none disabled:opacity-40"
+                >
+                  <option value="automatic">Automatico</option>
+                  <option value="agenda">Agenda</option>
+                  <option value="commerce">Ventas</option>
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
+                <span>{`Modo bot: ${botDomainLabel(detail.conversation.botDomainOverride)}`}</span>
+                <select
+                  value={detail.conversation.botDomainOverride || "automatic"}
+                  onChange={(event) => onBotDomainOverrideChange(event.target.value as BotDomainOverride)}
+                  disabled={readOnly}
+                  className="rounded-full border border-[color:var(--border)] bg-surface px-2 py-1 text-[11px] text-text outline-none disabled:opacity-40"
+                >
+                  <option value="automatic">Automatico</option>
+                  <option value="agenda">Agenda</option>
+                  <option value="commerce">Ventas</option>
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={onToggleBot}

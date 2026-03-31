@@ -5,9 +5,11 @@ import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
 const patchSchema = z.object({
-  action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage"]),
+  action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage", "set_bot_domain_override", "set_bot_flow_lock"]),
   assignedTo: z.string().optional(),
   botEnabled: z.boolean().optional(),
+  botFlowLock: z.enum(["automatic", "agenda", "commerce"]).optional(),
+  botDomainOverride: z.enum(["automatic", "agenda", "commerce"]).optional(),
   text: z.string().optional(),
   title: z.string().optional(),
   dueDate: z.string().optional(),
@@ -130,6 +132,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     case "toggle_bot": {
       conversation.botEnabled = Boolean(payload.botEnabled);
+      break;
+    }
+    case "set_bot_domain_override": {
+      conversation.botDomainOverride = payload.botDomainOverride || "automatic";
+      break;
+    }
+    case "set_bot_flow_lock": {
+      conversation.botFlowLock = payload.botFlowLock || "automatic";
       break;
     }
     case "close": {

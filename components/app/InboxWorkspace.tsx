@@ -7,7 +7,7 @@ import { InboxConnectionEmptyState } from "@/components/app/inbox/InboxConnectio
 import { ConversationList } from "@/components/app/inbox/ConversationList";
 import { InboxLayout } from "@/components/app/inbox/InboxLayout";
 import { ProfilePanel } from "@/components/app/inbox/ProfilePanel";
-import type { ConversationRowData, DetailPayload, FilterKey } from "@/components/app/inbox/types";
+import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey } from "@/components/app/inbox/types";
 import { useInboxContext } from "@/components/inbox/inbox-context";
 import { getSuggestions, type SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { normalizeText } from "@/lib/search/normalize";
@@ -494,6 +494,18 @@ export function InboxWorkspace({
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, assignedTo: nextAssign || undefined } } : prev));
       setInboxState({ assignedTo: nextAssign });
     }
+    if (action === "set_bot_domain_override") {
+      const nextOverride = typeof payload.botDomainOverride === "string" ? (payload.botDomainOverride as BotDomainOverride) : "automatic";
+      setDetail((prev) =>
+        prev ? { ...prev, conversation: { ...prev.conversation, botDomainOverride: nextOverride } } : prev
+      );
+    }
+    if (action === "set_bot_flow_lock") {
+      const nextLock = typeof payload.botFlowLock === "string" ? (payload.botFlowLock as BotFlowLock) : "automatic";
+      setDetail((prev) =>
+        prev ? { ...prev, conversation: { ...prev.conversation, botFlowLock: nextLock } } : prev
+      );
+    }
     if (action === "mark_read") {
       setInboxState({ unreadCount: 0 });
     }
@@ -562,7 +574,7 @@ export function InboxWorkspace({
     }
   }
 
-  async function runAction(action: "toggle_bot" | "mark_hot" | "close" | "assign" | "change_stage") {
+  async function runAction(action: "toggle_bot" | "mark_hot" | "close" | "assign" | "change_stage" | "set_bot_domain_override") {
     if (!selectedId || !detail) return;
     const payload: Record<string, unknown> = {};
     if (action === "toggle_bot") payload.botEnabled = !detail.conversation.botEnabled;
@@ -578,6 +590,18 @@ export function InboxWorkspace({
     setAssignTo(currentUserId);
     const ok = await mutateConversation(selectedId, "assign", { assignedTo: currentUserId });
     if (!ok) toast.error("No se pudo tomar la conversacion");
+  }
+
+  async function changeBotDomainOverride(nextOverride: BotDomainOverride) {
+    if (!selectedId || !detail) return;
+    const ok = await runOptimisticAction("set_bot_domain_override", { botDomainOverride: nextOverride });
+    if (!ok) toast.error("No se pudo actualizar el modo del bot");
+  }
+
+  async function changeBotFlowLock(nextLock: BotFlowLock) {
+    if (!selectedId || !detail) return;
+    const ok = await runOptimisticAction("set_bot_flow_lock", { botFlowLock: nextLock });
+    if (!ok) toast.error("No se pudo actualizar el flujo del bot");
   }
 
   async function addNote() {
@@ -704,6 +728,8 @@ export function InboxWorkspace({
               onToggleBot={() => void runAction("toggle_bot")}
               onTakeConversation={() => void takeConversation()}
               onArchive={() => void runAction("close")}
+              onBotFlowLockChange={(value) => void changeBotFlowLock(value)}
+              onBotDomainOverrideChange={(value) => void changeBotDomainOverride(value)}
             />
           }
           right={

@@ -1,4 +1,6 @@
 export type FilterKey = "all" | "hot" | "sin_responder" | "nuevas" | "asignadas";
+export type BotDomainOverride = "automatic" | "agenda" | "commerce";
+export type BotFlowLock = "automatic" | "agenda" | "commerce";
 
 export type ConversationRowData = {
   id: string;
@@ -8,6 +10,8 @@ export type ConversationRowData = {
   lastMessagePreview?: string;
   priority: "normal" | "hot";
   botEnabled: boolean;
+  botFlowLock?: BotFlowLock;
+  botDomainOverride?: BotDomainOverride;
   unreadCount: number;
   slaMinutes: number;
   contact?: { id: string; name: string; phone?: string; email?: string; tags?: string[] };
