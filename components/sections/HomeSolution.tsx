@@ -1,5 +1,6 @@
 import { ArrowRightLeft, Bot, ChartNoAxesColumn, MessagesSquare, Users } from "lucide-react";
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 
 const capabilities = [
   {
@@ -54,7 +55,7 @@ export function HomeSolution() {
           return (
             <article
               key={item.title}
-              className="rounded-3xl border border-[color:var(--border)] bg-card/85 p-5 xl:min-h-[15rem]"
+              className={`rounded-3xl border border-[color:var(--border)] bg-card/85 p-5 xl:min-h-[15rem] ${getCardGlowClass("green")}`}
             >
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10">
                 <Icon className="h-4 w-4 text-brandBright" />

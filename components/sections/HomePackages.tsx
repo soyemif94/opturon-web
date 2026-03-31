@@ -1,6 +1,7 @@
 import { ArrowRight, MessageCircle } from "lucide-react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 import { WhatsAppCtaLink } from "@/components/ui/WhatsAppCtaLink";
 import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 
@@ -44,7 +45,7 @@ export function HomePackages() {
         {stages.map((stage) => (
           <article
             key={stage.name}
-            className={`rounded-[2rem] border p-7 ${
+            className={`rounded-[2rem] border p-7 ${getCardGlowClass("orange")} ${
               stage.featured
                 ? "border-brand/40 bg-[linear-gradient(180deg,rgba(176,80,0,0.16),rgba(31,31,31,0.96))]"
                 : "border-[color:var(--border)] bg-card/90"

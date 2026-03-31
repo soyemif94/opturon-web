@@ -1,5 +1,6 @@
 import { BarChart3, Bot, LayoutPanelTop, UserRoundSearch, Workflow } from "lucide-react";
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 import { HomeProductMockup } from "./HomeProductMockup";
 
 const featureBlocks = [
@@ -56,9 +57,9 @@ export function HomeServices() {
           return (
             <article
               key={feature.title}
-              className={`overflow-hidden rounded-[2rem] border border-[color:var(--border)] bg-card/90 ${
-                feature.variant === "inbox" || feature.variant === "automation" ? "whatsapp-accent-hover" : ""
-              } ${feature.variant === "inbox" ? "lg:col-span-2" : ""}`}
+              className={`overflow-hidden rounded-[2rem] border border-[color:var(--border)] bg-card/90 ${getCardGlowClass("green")} ${
+                feature.variant === "inbox" ? "lg:col-span-2" : ""
+              }`}
             >
               <div className="border-b border-[color:var(--border)] p-6 md:p-7">
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10">

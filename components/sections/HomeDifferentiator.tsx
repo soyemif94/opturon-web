@@ -1,4 +1,5 @@
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 
 const traditionalCrm = ["Cargas datos despues del chat", "El seguimiento depende de cada persona", "El cierre llega tarde y con poco contexto"];
 const opturonWay = [
@@ -19,7 +20,7 @@ export function HomeDifferentiator() {
       </div>
 
       <div className="mt-10 grid gap-5 lg:grid-cols-2">
-        <article className="rounded-3xl border border-white/10 bg-black/10 p-7">
+        <article className={`rounded-3xl border border-white/10 bg-black/10 p-7 ${getCardGlowClass("green")}`}>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">CRM tradicional</p>
           <div className="mt-6 grid gap-3">
             {traditionalCrm.map((item) => (
@@ -30,7 +31,7 @@ export function HomeDifferentiator() {
           </div>
         </article>
 
-        <article className="rounded-3xl border border-brand/35 bg-[linear-gradient(135deg,rgba(176,80,0,0.16),rgba(255,255,255,0.05))] p-7">
+        <article className={`rounded-3xl border border-brand/35 bg-[linear-gradient(135deg,rgba(176,80,0,0.16),rgba(255,255,255,0.05))] p-7 ${getCardGlowClass("green")}`}>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brandBright">Opturon</p>
           <div className="mt-6 grid gap-3">
             {opturonWay.map((item) => (

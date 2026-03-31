@@ -1,5 +1,6 @@
 import { Clock3, Flame, MessageSquareOff, Target } from "lucide-react";
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 
 const painPoints = [
   {
@@ -55,7 +56,7 @@ export function HomeProblems() {
             return (
               <article
                 key={item.title}
-                className="rounded-3xl border border-white/10 bg-card/90 p-6 transition-transform duration-300 hover:-translate-y-1"
+                className={`rounded-3xl border border-white/10 bg-card/90 p-6 ${getCardGlowClass("green")}`}
               >
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                   <Icon className="h-5 w-5 text-brandBright" />

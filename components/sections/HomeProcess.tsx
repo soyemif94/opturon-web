@@ -1,4 +1,5 @@
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 
 const steps = [
   "Llega un mensaje por WhatsApp",
@@ -24,7 +25,7 @@ export function HomeProcess() {
         {steps.map((step, index) => (
           <article
             key={step}
-            className="relative overflow-hidden rounded-3xl border border-[color:var(--border)] bg-card/80 p-6"
+            className={`relative overflow-hidden rounded-3xl border border-[color:var(--border)] bg-card/80 p-6 ${getCardGlowClass("green")}`}
           >
             <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-brand/10 blur-2xl" />
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/40 bg-brand/10 text-sm font-semibold text-brandBright">

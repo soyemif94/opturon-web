@@ -1,5 +1,6 @@
 import { Quote } from "lucide-react";
 import { Section } from "@/components/ui/Section";
+import { getCardGlowClass } from "@/components/ui/card";
 
 const proofCards = [
   {
@@ -27,7 +28,7 @@ export function HomeResults() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <article className="rounded-[2rem] border border-brand/30 bg-[linear-gradient(135deg,rgba(176,80,0,0.14),rgba(255,255,255,0.04))] p-8">
+        <article className={`rounded-[2rem] border border-brand/30 bg-[linear-gradient(135deg,rgba(176,80,0,0.14),rgba(255,255,255,0.04))] p-8 ${getCardGlowClass("orange")}`}>
           <Quote className="h-7 w-7 text-brandBright" />
           <p className="mt-6 max-w-3xl text-2xl font-medium leading-10 text-text md:text-3xl">
             "Pasamos de responder manualmente a organizar todas las ventas en un solo flujo."
@@ -43,7 +44,7 @@ export function HomeResults() {
 
         <div className="grid gap-4">
           {proofCards.map((item) => (
-            <article key={item.label} className="rounded-3xl border border-[color:var(--border)] bg-card/90 p-6">
+            <article key={item.label} className={`rounded-3xl border border-[color:var(--border)] bg-card/90 p-6 ${getCardGlowClass("green")}`}>
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">{item.label}</p>
               <p className="mt-3 text-lg font-semibold leading-8 text-text">{item.value}</p>
             </article>

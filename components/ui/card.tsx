@@ -1,8 +1,31 @@
 import * as React from "react";
 import { cn } from "@/lib/ui/cn";
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-2xl border border-[color:var(--border)] bg-card shadow-sm", className)} {...props} />;
+export type CardGlow = "green" | "orange";
+
+export function getCardGlowClass(glow?: CardGlow | null) {
+  if (glow === "green") {
+    return "transition-all duration-300 ease-out will-change-transform hover:-translate-y-1 hover:border-emerald-400/40 hover:shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_22px_60px_rgba(16,185,129,0.16)]";
+  }
+
+  if (glow === "orange") {
+    return "transition-all duration-300 ease-out will-change-transform hover:-translate-y-1 hover:border-brand/55 hover:shadow-[0_0_0_1px_rgba(192,80,0,0.14),0_22px_60px_rgba(176,80,0,0.18)]";
+  }
+
+  return "";
+}
+
+type CardProps = React.HTMLAttributes<HTMLDivElement> & {
+  cardGlow?: CardGlow;
+};
+
+export function Card({ className, cardGlow, ...props }: CardProps) {
+  return (
+    <div
+      className={cn("rounded-2xl border border-[color:var(--border)] bg-card shadow-sm", getCardGlowClass(cardGlow), className)}
+      {...props}
+    />
+  );
 }
 
 export function CardHeader({
