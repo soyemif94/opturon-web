@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GlowCard } from "@/components/ui/GlowCard";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
+import { WhatsAppCtaLink } from "@/components/ui/WhatsAppCtaLink";
 import { webPortfolioModels } from "@/lib/portfolio";
+import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 
 export const metadata: Metadata = {
   title: "Portfolio | Opturon",
@@ -25,6 +26,9 @@ export const metadata: Metadata = {
 };
 
 export default function PortfolioPage() {
+  const whatsAppLink = getTrackedWhatsAppLink({ origin: "portfolio-demo" });
+  const isExternalWhatsApp = isWhatsAppExternalLink(whatsAppLink);
+
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -63,8 +67,8 @@ export default function PortfolioPage() {
         <div className="max-w-4xl space-y-4">
           <h2 className="text-3xl font-semibold md:text-4xl">Casos tipo pensados para negocio real</h2>
           <p className="text-sm leading-6 text-muted md:text-base">
-            Cada card resume un escenario donde diseno, contenido y flujo trabajan juntos para mover al usuario hacia
-            una accion concreta. Sin imagenes fake, sin promesas vacias, con foco en conversion.
+            Cada card resume un escenario donde diseño, contenido y flujo trabajan juntos para mover al usuario hacia
+            una acción concreta. Sin imágenes fake, sin promesas vacías, con foco en conversión.
           </p>
         </div>
 
@@ -109,21 +113,27 @@ export default function PortfolioPage() {
               Esto no es solo diseño. Es el sistema que implementamos en tu negocio.
             </h2>
             <p className="max-w-3xl text-base leading-7 text-muted md:text-lg">
-              Cada ejemplo de esta seccion esta pensado para resolver un problema real: ordenar la propuesta, guiar la
-              conversacion correcta y acercar al usuario a una accion concreta. Despues del diseño viene la parte
-              importante: como se conecta eso con tu proceso comercial para convertir mejor.
+              Cada ejemplo de esta sección está pensado para resolver un problema real: ordenar la propuesta, guiar la
+              conversación correcta y acercar al usuario a una acción concreta. Después del diseño viene la parte
+              importante: cómo se conecta eso con tu proceso comercial para convertir mejor.
             </p>
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <PrimaryButton href="/servicios/diseno-web" ariaLabel="Ver cómo funciona el sistema de diseño web de Opturon">
+            <WhatsAppCtaLink
+              href={whatsAppLink}
+              origin="portfolio-demo"
+              ariaLabel="Ver cómo funciona Opturon por WhatsApp"
+              isExternal={isExternalWhatsApp}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-brandBright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
               Ver cómo funciona
-            </PrimaryButton>
+            </WhatsAppCtaLink>
             <Link
-              href="/contacto"
+              href="/servicios/diseno-web"
               className="inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/70 hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              Quiero este sistema en mi negocio
+              Ver implementación
             </Link>
           </div>
         </div>

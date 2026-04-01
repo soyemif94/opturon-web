@@ -6,11 +6,13 @@ const DEFAULT_TRACKING_CAMPAIGN = "opturon_home";
 
 const PREFILL_BY_ORIGIN: Record<string, string> = {
   hero:
-    "Hola Opturon. Quiero una auditoria estrategica inicial (15 min) para automatizar WhatsApp comercial e integrarlo con CRM.\n\nRubro:\nEquipo comercial (cantidad):\nConsultas/mes aprox:\nCRM actual:\nObjetivo (ventas/soporte/ambos):\nDia habil preferido para contacto:",
+    "Hola Opturon. Quiero probar el sistema y ver cómo funciona el flujo real por WhatsApp.\n\nRubro:\nEquipo comercial (cantidad):\nConsultas/mes aprox:\nHoy resuelvo ventas por:\nLo principal que quiero ordenar es:",
   "cta-final":
-    "Hola Opturon. Quiero ordenar WhatsApp comercial con automatizacion + CRM a traves de una auditoria estrategica inicial (15 min).\n\nRubro:\nConsultas/mes aprox:\nCRM actual:\nObjetivo:\nNecesidad de calificacion/conversion:",
+    "Hola Opturon. Quiero probar el sistema y verlo en acción por WhatsApp.\n\nRubro:\nConsultas/mes aprox:\nHoy uso CRM?:\nLo que necesito ordenar primero es:",
   sticky:
     "Hola Opturon. Quiero conversar sobre una auditoria estrategica inicial (15 min) para automatizar WhatsApp comercial.\n\nRubro:\nConsultas/mes aprox:\nDia habil para contacto:",
+  "portfolio-demo":
+    "Hola Opturon. Vengo desde Portfolio y quiero probar cómo funciona el sistema de Opturon en una conversación real por WhatsApp.\n\nRubro:\nTipo de consultas que recibo:\nObjetivo principal:",
   "package-starter":
     "Hola Opturon. Me interesa el paquete WhatsApp Starter y quiero una auditoria estrategica inicial (15 min).\n\nRubro:\nConsultas/mes:\nCRM:\nObjetivo principal:",
   "package-sales":

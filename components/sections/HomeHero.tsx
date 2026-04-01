@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { ArrowRight, ChartNoAxesColumn, MessageCircle, TimerReset, Users } from "lucide-react";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
 import { WhatsAppCtaLink } from "@/components/ui/WhatsAppCtaLink";
 import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
@@ -61,20 +61,24 @@ export function HomeHero() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton href="#producto" ariaLabel="Ver el sistema funcionando en 2 minutos">
-              Ver el sistema funcionando (2 min)
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </PrimaryButton>
             <WhatsAppCtaLink
               href={whatsAppLink}
               origin="hero"
-              ariaLabel="Hablar por WhatsApp con Opturon desde hero"
+              ariaLabel="Probar el sistema de Opturon por WhatsApp desde hero"
               isExternal={isExternalWhatsApp}
-              className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-brandBright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
-              Quiero ver esto en mi negocio
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Probar el sistema
             </WhatsAppCtaLink>
+            <Link
+              href="#producto"
+              aria-label="Ver el sistema funcionando en 2 minutos"
+              className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text transition-all duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              Ver el sistema funcionando (2 min)
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </div>
 
           <p className="text-sm text-muted">
