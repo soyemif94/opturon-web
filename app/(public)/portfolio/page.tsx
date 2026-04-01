@@ -50,7 +50,7 @@ export default function PortfolioPage() {
       <Section className="pt-20 md:pt-24">
         <div className="max-w-5xl space-y-5">
           <h1 className="max-w-4xl text-balance text-4xl font-semibold md:text-5xl">
-            Disenamos experiencias que convierten.
+            Diseñamos experiencias que convierten.
           </h1>
           <p className="max-w-4xl text-base leading-7 text-muted md:text-lg">
             Este portfolio ya no muestra mockups ficticios. Lo organizamos como escenarios de conversion para que se
