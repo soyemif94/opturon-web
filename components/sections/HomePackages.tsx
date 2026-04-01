@@ -7,21 +7,21 @@ import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 
 const stages = [
   {
-    name: "Inicio ordenado",
-    description: "Si hoy respondes como puedes y cada chat queda suelto, esta etapa te ayuda a dejar de vender a ciegas sin complicarte.",
-    bullets: ["Inbox centralizado", "Clientes ordenados", "Primer seguimiento claro"],
+    name: "Ordenar el ingreso",
+    description: "Para negocios que ya reciben consultas, pero todavia trabajan cada chat por separado y sin criterio comun.",
+    bullets: ["Inbox centralizado", "Contactos con contexto", "Primer seguimiento visible"],
     featured: false
   },
   {
-    name: "Seguimiento activo",
-    description: "Si ya tienes consultas todos los dias pero no llegas a responder todo, esta etapa te da pipeline, ritmo y seguimiento.",
-    bullets: ["Pipeline visible", "Tareas y recordatorios", "Seguimiento automatico"],
+    name: "Activar el seguimiento",
+    description: "Para equipos que ya venden por WhatsApp, pero necesitan priorizar mejor, responder a tiempo y mover oportunidades con ritmo.",
+    bullets: ["Pipeline comercial claro", "Tareas y recordatorios", "Seguimiento automatizado"],
     featured: true
   },
   {
-    name: "Operacion en crecimiento",
-    description: "Si ya vendes todos los dias y el volumen empezo a desordenarte, esta etapa te da control y seguimiento claro sin sumar caos.",
-    bullets: ["Mas usuarios", "Mas volumen de conversaciones", "Mas control del flujo comercial"],
+    name: "Escalar sin perder control",
+    description: "Para operaciones que ya tienen volumen y necesitan mas visibilidad, mas trazabilidad y menos dependencia de memoria humana.",
+    bullets: ["Mas usuarios y conversaciones", "Mas control del flujo comercial", "Mas trazabilidad operativa"],
     featured: false
   }
 ];
@@ -33,11 +33,13 @@ export function HomePackages() {
   return (
     <Section id="planes">
       <div className="max-w-3xl">
-        <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Planes</p>
-        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">Una etapa para cada momento comercial</h2>
+        <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Etapas de implementación</p>
+        <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
+          Ubica rápido qué nivel de sistema necesita hoy tu negocio
+        </h2>
         <p className="mt-4 max-w-2xl text-base leading-8 text-muted">
-          La idea no es que elijas una caja. La idea es que te reconozcas rapido en la etapa que hoy necesita mas
-          orden para vender mejor.
+          No se trata de elegir un plan bonito. Se trata de entender en qué punto está hoy tu operación comercial y
+          cuál es el siguiente nivel de orden que te conviene implementar.
         </p>
       </div>
 
@@ -58,7 +60,7 @@ export function HomePackages() {
               </div>
               {stage.featured ? (
                 <span className="rounded-full border border-brand/40 bg-brand/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brandBright">
-                  Recomendado
+                  Etapa más común
                 </span>
               ) : null}
             </div>
@@ -87,11 +89,13 @@ export function HomePackages() {
           className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           <MessageCircle className="whatsapp-accent-icon mr-2 h-4 w-4" />
-          Quiero ver esto en mi negocio
+          Quiero ubicar mi etapa
         </WhatsAppCtaLink>
       </div>
 
-      <p className="mt-4 text-xs text-muted">Te mostramos la configuracion que mejor encaja antes de definir el plan final.</p>
+      <p className="mt-4 text-xs text-muted">
+        Primero ubicamos la etapa correcta. Después definimos la configuración que mejor encaja con tu operación.
+      </p>
     </Section>
   );
 }
