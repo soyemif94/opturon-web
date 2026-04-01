@@ -1,36 +1,31 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
 import { WebDesignPortfolio } from "@/components/portfolio/WebDesignPortfolio";
 import { GlowCard } from "@/components/ui/GlowCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
 import { webPortfolioModels } from "@/lib/portfolio";
-import { getWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 
 export const metadata: Metadata = {
   title: "Portfolio | Opturon",
-  description: "Modelos de diseño web premium orientados a conversión.",
+  description: "Ejemplos de sistemas de conversion pensados para distintos tipos de negocio.",
   alternates: {
     canonical: "/portfolio"
   },
   openGraph: {
     title: "Portfolio | Opturon",
-    description: "Modelos de diseño web premium orientados a conversión.",
+    description: "Ejemplos de sistemas de conversion pensados para distintos tipos de negocio.",
     images: ["/og"]
   },
   twitter: {
     card: "summary_large_image",
     title: "Portfolio | Opturon",
-    description: "Modelos de diseño web premium orientados a conversión.",
+    description: "Ejemplos de sistemas de conversion pensados para distintos tipos de negocio.",
     images: ["/og"]
   }
 };
 
 export default function PortfolioPage() {
-  const whatsAppLink = getWhatsAppLink();
-  const isExternalWhatsApp = isWhatsAppExternalLink(whatsAppLink);
-
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -54,16 +49,20 @@ export default function PortfolioPage() {
       />
 
       <Section className="pt-20 md:pt-24">
-        <div className="max-w-4xl space-y-4">
-          <h1 className="text-balance text-4xl font-semibold md:text-5xl">Portfolio</h1>
-          <p className="text-muted md:text-lg">
-            Modelos de referencia (no corresponden a clientes reales). Diseños premium orientados a conversión.
+        <div className="max-w-5xl space-y-5">
+          <h1 className="max-w-4xl text-balance text-4xl font-semibold md:text-5xl">
+            Disenamos experiencias que convierten.
+          </h1>
+          <p className="max-w-4xl text-base leading-7 text-muted md:text-lg">
+            Modelos de referencia basados en casos reales de negocio. Cada ejemplo muestra como estructuramos
+            diseno, contenido y flujo para que la experiencia no solo se vea bien: tambien ayude a generar mas
+            consultas, ordenar la decision y acercar el cierre.
           </p>
         </div>
       </Section>
 
       <Section>
-        <h2 className="text-3xl font-semibold md:text-4xl">Diseño Web</h2>
+        <h2 className="text-3xl font-semibold md:text-4xl">Ejemplos de sistemas pensados para vender mejor</h2>
         <div className="mt-6">
           <WebDesignPortfolio />
         </div>
@@ -73,11 +72,19 @@ export default function PortfolioPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {webPortfolioModels.map((model) => (
             <GlowCard key={model.id}>
-              <h3 className="text-xl font-semibold">{model.title}</h3>
-              <p className="mt-2 text-sm text-muted">{model.idealFor}</p>
-              <ul className="mt-4 space-y-2 text-sm text-muted">
+              <div className="space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brandBright/80">
+                  Sistema de conversion
+                </p>
+                <h3 className="text-xl font-semibold leading-tight md:text-2xl">{model.title}</h3>
+                <p className="text-sm leading-6 text-muted">{model.idealFor}</p>
+              </div>
+              <ul className="mt-5 space-y-2.5 text-sm leading-6 text-muted">
                 {model.highlights.map((highlight) => (
-                  <li key={highlight}>• {highlight}</li>
+                  <li key={highlight} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-brandBright/80" />
+                    <span>{highlight}</span>
+                  </li>
                 ))}
               </ul>
               <div className="mt-5 flex flex-wrap gap-3">
@@ -95,22 +102,30 @@ export default function PortfolioPage() {
 
       <Section className="pb-24">
         <div className="rounded-3xl border border-brand/40 bg-card p-8 md:p-12">
-          <h2 className="text-3xl font-semibold md:text-4xl">Diagnóstico inicial (sin cargo)</h2>
-          <p className="mt-3 max-w-2xl text-muted">Te devolvemos un plan de acción claro en 24 hs hábiles.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para diagnóstico sin cargo">
-              Diagnóstico sin cargo
+          <div className="max-w-4xl space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brandBright/80">
+              Cierre de portfolio
+            </p>
+            <h2 className="max-w-3xl text-balance text-3xl font-semibold md:text-5xl">
+              Esto no es solo diseño. Es el sistema que implementamos en tu negocio.
+            </h2>
+            <p className="max-w-3xl text-base leading-7 text-muted md:text-lg">
+              Cada ejemplo de esta seccion esta pensado para resolver un problema real: ordenar la propuesta,
+              guiar la conversacion correcta y acercar al usuario a una accion concreta. Despues del diseño viene
+              la parte importante: como se conecta eso con tu proceso comercial para convertir mejor.
+            </p>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <PrimaryButton href="/servicios/diseno-web" ariaLabel="Ver cómo funciona el sistema de diseño web de Opturon">
+              Ver cómo funciona
             </PrimaryButton>
-            <a
-              href={whatsAppLink}
-              aria-label="Hablar por WhatsApp con Opturon"
-              target={isExternalWhatsApp ? "_blank" : undefined}
-              rel={isExternalWhatsApp ? "noopener noreferrer" : undefined}
+            <Link
+              href="/contacto"
               className="inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/70 hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              <MessageCircle className="mr-2 h-4 w-4" />
-              Hablar por WhatsApp
-            </a>
+              Quiero este sistema en mi negocio
+            </Link>
           </div>
         </div>
       </Section>

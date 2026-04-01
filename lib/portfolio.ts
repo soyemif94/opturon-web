@@ -9,65 +9,65 @@
 export const webPortfolioModels: WebPortfolioModel[] = [
   {
     id: 1,
-    title: "Landing SaaS",
-    idealFor: "Startups y productos digitales que necesitan captar demos o leads calificados.",
-    highlights: ["Hero con CTA fuerte", "Sección servicios + prueba social", "Performance y SEO base"],
+    title: "Clinica estetica - captacion por WhatsApp",
+    idealFor: "Landing orientada a generar consultas directas, filtrar interes y acelerar el agendamiento desde el primer mensaje.",
+    highlights: ["CTA directo a WhatsApp", "Flujo guiado para consultas", "Confianza y prueba social visibles"],
     category: "web"
   },
   {
     id: 2,
-    title: "Institucional Corporativa",
-    idealFor: "Empresas que necesitan presencia premium y mensaje claro de propuesta de valor.",
-    highlights: ["Arquitectura de contenido clara", "Responsive premium", "Integraciones (WhatsApp / formulario / analítica)"],
+    title: "Empresa de servicios - propuesta clara y cierre comercial",
+    idealFor: "Sitio pensado para ordenar oferta, mostrar valor diferencial y transformar visitas en reuniones calificadas.",
+    highlights: ["Mensaje de valor directo", "Servicios ordenados por decision", "CTA a reunion o diagnostico"],
     category: "web"
   },
   {
     id: 3,
-    title: "Ecommerce Minimal",
-    idealFor: "Marcas que priorizan conversión, catálogo ordenado y experiencia de compra limpia.",
-    highlights: ["Home orientada a conversión", "Ficha de producto optimizada", "Performance y SEO base"],
+    title: "Marca ecommerce - catalogo que empuja conversion",
+    idealFor: "Experiencia enfocada en reducir friccion de compra y llevar al usuario desde descubrimiento hasta checkout.",
+    highlights: ["Home pensada para vender", "Producto destacado con contexto", "Camino de compra mas simple"],
     category: "web"
   },
   {
     id: 4,
-    title: "Restó / Gastronomía",
-    idealFor: "Negocios gastronómicos con foco en reservas, menú y pedidos directos.",
-    highlights: ["Hero con CTA fuerte", "Integraciones (WhatsApp / formulario / analítica)", "Responsive premium"],
+    title: "Gastronomia - reservas y pedidos sin intermediarios",
+    idealFor: "Landing para negocios que necesitan mover reservas, menu y pedidos directos desde movil.",
+    highlights: ["Acceso rapido a reserva", "Menu visible sin friccion", "WhatsApp integrado al flujo"],
     category: "web"
   },
   {
     id: 5,
-    title: "Profesional (abogado/médico)",
-    idealFor: "Profesionales independientes que buscan confianza, autoridad y contacto rápido.",
-    highlights: ["Sección servicios + prueba social", "Hero con CTA fuerte", "Performance y SEO base"],
+    title: "Profesional independiente - autoridad que genera consultas",
+    idealFor: "Pagina diseñada para instalar confianza rapido y convertir trafico en contacto calificado.",
+    highlights: ["Posicionamiento profesional claro", "Prueba social y credenciales", "CTA directo a consulta"],
     category: "web"
   },
   {
     id: 6,
-    title: "Inmobiliaria / Alquileres",
-    idealFor: "Equipos que necesitan mostrar propiedades y acelerar consultas calificadas.",
-    highlights: ["Catálogo visual claro", "Integraciones (WhatsApp / formulario / analítica)", "Responsive premium"],
+    title: "Inmobiliaria - consultas mejor calificadas",
+    idealFor: "Sitio para mostrar propiedades, ordenar la informacion y reducir conversaciones poco utiles.",
+    highlights: ["Propiedades mejor presentadas", "Consulta guiada por interes", "Mas contexto antes del contacto"],
     category: "web"
   },
   {
     id: 7,
-    title: "Fitness / Wellness",
-    idealFor: "Estudios y marcas wellness que quieren convertir tráfico en clases o sesiones.",
-    highlights: ["Hero con CTA fuerte", "Agenda y contacto visibles", "Performance y SEO base"],
+    title: "Fitness y wellness - convertir interes en clases",
+    idealFor: "Experiencia pensada para que el usuario entienda la propuesta y avance rapido hacia una clase o sesion.",
+    highlights: ["Oferta facil de entender", "Agenda y contacto visibles", "Recorrido corto hasta la accion"],
     category: "web"
   },
   {
     id: 8,
-    title: "Educación / Cursos",
-    idealFor: "Academias y creadores que venden programas, membresías o cohortes.",
-    highlights: ["Sección servicios + prueba social", "Responsive premium", "Integraciones (WhatsApp / formulario / analítica)"],
+    title: "Cursos y formacion - venta con claridad",
+    idealFor: "Paginas para programas y cohortes donde el objetivo es explicar bien, bajar dudas y aumentar inscripciones.",
+    highlights: ["Oferta estructurada por beneficios", "Objeciones resueltas en la pagina", "CTA alineado a inscripcion"],
     category: "web"
   },
   {
     id: 9,
-    title: "Agencia Creativa",
-    idealFor: "Agencias que necesitan posicionar expertise y convertir visitas en reuniones.",
-    highlights: ["Portfolio con narrativa visual", "Hero con CTA fuerte", "Performance y SEO base"],
+    title: "Agencia o estudio - conversaciones que terminan en reunion",
+    idealFor: "Sitio enfocado en mostrar criterio, ordenar casos y transformar interes en reuniones comerciales.",
+    highlights: ["Casos presentados con intencion", "Narrativa de valor clara", "CTA a reunion estrategica"],
     category: "web"
   }
 ];

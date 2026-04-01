@@ -45,8 +45,11 @@ export function WebDesignPortfolio() {
   return (
     <>
       <div>
-        <h2 className="text-3xl font-semibold md:text-4xl">Ejemplos de diseño</h2>
-        <p className="mt-3 text-sm text-muted">Modelos de referencia (no corresponden a clientes reales).</p>
+        <h2 className="text-3xl font-semibold md:text-4xl">Ejemplos de como estructuramos conversion</h2>
+        <p className="mt-3 max-w-3xl text-sm text-muted">
+          Modelos de referencia basados en casos reales de negocio. Cada ejemplo muestra como ordenamos
+          contenido, jerarquia visual y llamados a la accion para que el sitio ayude a vender mejor.
+        </p>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((index) => {
             const row = Math.floor(index / 3);
