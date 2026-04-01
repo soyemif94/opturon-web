@@ -53,9 +53,8 @@ export default function PortfolioPage() {
             Diseñamos experiencias que convierten.
           </h1>
           <p className="max-w-4xl text-base leading-7 text-muted md:text-lg">
-            Este portfolio ya no muestra mockups ficticios. Lo organizamos como escenarios de conversion para que se
-            entienda con claridad como pensamos cada sistema segun el tipo de negocio, la conversacion que necesita
-            abrir y la accion que queremos conseguir.
+            Reunimos este portfolio como una selección de escenarios de conversión para mostrar cómo pensamos cada
+            sistema según el tipo de negocio, la conversación que necesita abrir y la acción que buscamos conseguir.
           </p>
         </div>
       </Section>
