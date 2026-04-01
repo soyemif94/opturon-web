@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
-import { WebDesignPortfolio } from "@/components/portfolio/WebDesignPortfolio";
 import { GlowCard } from "@/components/ui/GlowCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
+import { webPortfolioModels } from "@/lib/portfolio";
 import { getServiceBySlugOrThrow, serviceProcessSteps } from "@/lib/services";
 import { getWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 
@@ -62,7 +62,7 @@ export default function DisenoWebPage() {
             Diseño Web Premium orientado a conversión
           </h1>
           <p className="max-w-3xl text-lg text-muted md:text-xl">
-            Landing, institucional, ecommerce o portfolio — rápido, moderno y listo para escalar.
+            Landing, institucional, ecommerce o portfolio: rápido, moderno y listo para escalar.
           </p>
           <div className="flex flex-wrap gap-3">
             <PrimaryButton href="/contacto" ariaLabel="Agendar diagnóstico sin cargo para diseño web">
@@ -119,8 +119,37 @@ export default function DisenoWebPage() {
       </Section>
 
       <Section>
-        <WebDesignPortfolio />
-        <Link href="/portfolio" className="mt-4 inline-flex text-sm text-brandBright transition hover:text-brand">
+        <div className="max-w-4xl space-y-4">
+          <h2 className="text-3xl font-semibold md:text-4xl">Escenarios de conversión pensados para negocio real</h2>
+          <p className="text-sm leading-6 text-muted md:text-base">
+            En esta etapa preferimos mostrar criterio real de estructura, contenido y conversión antes que mockups
+            ficticios. Estos casos tipo resumen cómo organizamos una experiencia según el negocio, la conversación que
+            necesita abrir y la acción que queremos conseguir.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {webPortfolioModels.slice(0, 6).map((model) => (
+            <GlowCard key={model.id} className="flex h-full flex-col justify-between text-center md:text-left">
+              <div className="space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brandBright/80">Caso tipo</p>
+                <h3 className="text-xl font-semibold leading-tight md:text-2xl">{model.title}</h3>
+                <p className="text-sm font-medium text-text/80">{model.subtitle}</p>
+              </div>
+
+              <ul className="mt-5 space-y-2.5 text-sm leading-6 text-muted">
+                {model.highlights.map((highlight) => (
+                  <li key={highlight} className="flex items-start justify-center gap-2 text-left md:justify-start">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-brandBright/80" />
+                    <span>{highlight}</span>
+                  </li>
+                ))}
+              </ul>
+            </GlowCard>
+          ))}
+        </div>
+
+        <Link href="/portfolio" className="mt-6 inline-flex text-sm text-brandBright transition hover:text-brand">
           Ver portfolio completo →
         </Link>
       </Section>
