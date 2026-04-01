@@ -1,6 +1,5 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { WebDesignPortfolio } from "@/components/portfolio/WebDesignPortfolio";
 import { GlowCard } from "@/components/ui/GlowCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Section } from "@/components/ui/Section";
@@ -8,19 +7,19 @@ import { webPortfolioModels } from "@/lib/portfolio";
 
 export const metadata: Metadata = {
   title: "Portfolio | Opturon",
-  description: "Ejemplos de sistemas de conversion pensados para distintos tipos de negocio.",
+  description: "Casos tipo de conversion pensados para distintos tipos de negocio.",
   alternates: {
     canonical: "/portfolio"
   },
   openGraph: {
     title: "Portfolio | Opturon",
-    description: "Ejemplos de sistemas de conversion pensados para distintos tipos de negocio.",
+    description: "Casos tipo de conversion pensados para distintos tipos de negocio.",
     images: ["/og"]
   },
   twitter: {
     card: "summary_large_image",
     title: "Portfolio | Opturon",
-    description: "Ejemplos de sistemas de conversion pensados para distintos tipos de negocio.",
+    description: "Casos tipo de conversion pensados para distintos tipos de negocio.",
     images: ["/og"]
   }
 };
@@ -35,7 +34,7 @@ export default function PortfolioPage() {
     itemListElement: webPortfolioModels.map((item, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      name: item.title,
+      name: `${item.title} - ${item.subtitle}`,
       url: "https://opturon.com/servicios/diseno-web"
     }))
   };
@@ -54,42 +53,43 @@ export default function PortfolioPage() {
             Disenamos experiencias que convierten.
           </h1>
           <p className="max-w-4xl text-base leading-7 text-muted md:text-lg">
-            Modelos de referencia basados en casos reales de negocio. Cada ejemplo muestra como estructuramos
-            diseno, contenido y flujo para que la experiencia no solo se vea bien: tambien ayude a generar mas
-            consultas, ordenar la decision y acercar el cierre.
+            Este portfolio ya no muestra mockups ficticios. Lo organizamos como escenarios de conversion para que se
+            entienda con claridad como pensamos cada sistema segun el tipo de negocio, la conversacion que necesita
+            abrir y la accion que queremos conseguir.
           </p>
         </div>
       </Section>
 
-      <Section>
-        <h2 className="text-3xl font-semibold md:text-4xl">Ejemplos de sistemas pensados para vender mejor</h2>
-        <div className="mt-6">
-          <WebDesignPortfolio />
-        </div>
-      </Section>
-
       <Section className="border-y border-[color:var(--border)] bg-surface/40">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="max-w-4xl space-y-4">
+          <h2 className="text-3xl font-semibold md:text-4xl">Casos tipo pensados para negocio real</h2>
+          <p className="text-sm leading-6 text-muted md:text-base">
+            Cada card resume un escenario donde diseno, contenido y flujo trabajan juntos para mover al usuario hacia
+            una accion concreta. Sin imagenes fake, sin promesas vacias, con foco en conversion.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {webPortfolioModels.map((model) => (
-            <GlowCard key={model.id}>
+            <GlowCard key={model.id} className="flex h-full flex-col justify-between text-center md:text-left">
               <div className="space-y-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brandBright/80">
-                  Sistema de conversion
-                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brandBright/80">Caso tipo</p>
                 <h3 className="text-xl font-semibold leading-tight md:text-2xl">{model.title}</h3>
-                <p className="text-sm leading-6 text-muted">{model.idealFor}</p>
+                <p className="text-sm font-medium text-text/80">{model.subtitle}</p>
               </div>
+
               <ul className="mt-5 space-y-2.5 text-sm leading-6 text-muted">
                 {model.highlights.map((highlight) => (
-                  <li key={highlight} className="flex items-start gap-2">
+                  <li key={highlight} className="flex items-start justify-center gap-2 text-left md:justify-start">
                     <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-brandBright/80" />
                     <span>{highlight}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-5 flex flex-wrap gap-3">
+
+              <div className="mt-5 flex flex-wrap justify-center gap-3 md:justify-start">
                 <Link href="/contacto" className="text-sm font-medium text-brandBright transition hover:text-brand">
-                  Quiero uno así
+                  Quiero este enfoque
                 </Link>
                 <Link href="/servicios/diseno-web" className="text-sm text-muted transition hover:text-text">
                   Ver servicio
@@ -110,9 +110,9 @@ export default function PortfolioPage() {
               Esto no es solo diseño. Es el sistema que implementamos en tu negocio.
             </h2>
             <p className="max-w-3xl text-base leading-7 text-muted md:text-lg">
-              Cada ejemplo de esta seccion esta pensado para resolver un problema real: ordenar la propuesta,
-              guiar la conversacion correcta y acercar al usuario a una accion concreta. Despues del diseño viene
-              la parte importante: como se conecta eso con tu proceso comercial para convertir mejor.
+              Cada ejemplo de esta seccion esta pensado para resolver un problema real: ordenar la propuesta, guiar la
+              conversacion correcta y acercar al usuario a una accion concreta. Despues del diseño viene la parte
+              importante: como se conecta eso con tu proceso comercial para convertir mejor.
             </p>
           </div>
 
