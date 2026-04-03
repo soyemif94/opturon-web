@@ -78,6 +78,8 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   const [saving, setSaving] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [destinationUpdatingId, setDestinationUpdatingId] = useState<string | null>(null);
+  const [detailPaymentDestinationId, setDetailPaymentDestinationId] = useState("");
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
 
   const selectedProduct = useMemo(
@@ -232,6 +234,10 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     };
   }, []);
 
+  useEffect(() => {
+    setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
+  }, [selectedOrder?.id, selectedOrder?.paymentDestinationId]);
+
   async function reloadOrders(preferredOrderId?: string) {
     const response = await fetch("/api/app/orders", { cache: "no-store" });
     const json = await response.json().catch(() => null);
@@ -263,7 +269,9 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
         throw new Error(json?.error || "No se pudo cargar el detalle del pedido.");
       }
 
-      setSelectedOrder((json.order as PortalOrder) || null);
+      const nextOrder = (json.order as PortalOrder) || null;
+      setSelectedOrder(nextOrder);
+      setDetailPaymentDestinationId(nextOrder?.paymentDestinationId || "");
     } catch (error) {
       setFeedback({
         tone: "danger",
@@ -378,7 +386,10 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       const response = await fetch(`/api/app/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderStatus })
+        body: JSON.stringify({
+          orderStatus,
+          paymentDestinationId: detailPaymentDestinationId || null
+        })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
@@ -388,6 +399,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       const updatedOrder = json.order as PortalOrder;
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder((current) => (current?.id === updatedOrder.id ? updatedOrder : current));
+      setDetailPaymentDestinationId(updatedOrder.paymentDestinationId || "");
       await reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined);
       setFeedback({ tone: "success", text: "Estado del pedido actualizado." });
     } catch (error) {
@@ -397,6 +409,39 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       });
     } finally {
       setStatusUpdatingId(null);
+    }
+  }
+
+  async function saveOrderPaymentDestination() {
+    if (!selectedOrder) return;
+
+    setDestinationUpdatingId(selectedOrder.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/orders/${selectedOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentDestinationId: detailPaymentDestinationId || null
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(humanizeOrderError(json) || "No se pudo actualizar el destino de cobro.");
+      }
+
+      const updatedOrder = json.order as PortalOrder;
+      setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
+      setSelectedOrder(updatedOrder);
+      setDetailPaymentDestinationId(updatedOrder.paymentDestinationId || "");
+      setFeedback({ tone: "success", text: "Destino de cobro actualizado." });
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: error instanceof Error ? error.message : "No se pudo actualizar el destino de cobro."
+      });
+    } finally {
+      setDestinationUpdatingId(null);
     }
   }
 
@@ -717,6 +762,39 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                     </div>
                   ) : null}
 
+                  <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div>
+                      <p className="text-sm font-semibold">Destino del cobro</p>
+                      <p className="mt-1 text-sm text-muted">Puedes imputarlo manualmente desde este detalle antes o al momento de marcar el pedido como pagado.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Destino</label>
+                        <select
+                          className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                          value={detailPaymentDestinationId}
+                          onChange={(event) => setDetailPaymentDestinationId(event.target.value)}
+                          disabled={metaLoading || readOnly || !backendReady || destinationUpdatingId === selectedOrder.id}
+                        >
+                          <option value="">Sin definir</option>
+                          {paymentDestinations.map((destination) => (
+                            <option key={destination.id} value={destination.id}>
+                              {destination.name}{` · ${labelForPaymentDestinationType(destination.type)}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={readOnly || !backendReady || destinationUpdatingId === selectedOrder.id}
+                        onClick={() => void saveOrderPaymentDestination()}
+                      >
+                        {destinationUpdatingId === selectedOrder.id ? "Guardando..." : "Guardar destino"}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Cambiar estado</label>
                     <div className="flex flex-wrap gap-2">
@@ -940,6 +1018,10 @@ function humanizeOrderError(payload: any) {
       return "El destino de cobro seleccionado ya no existe.";
     case "payment_destination_inactive":
       return "El destino de cobro seleccionado esta inactivo.";
+    case "missing_payment_destination_for_paid_order":
+      return "Define un destino de cobro antes de marcar el pedido como pagado.";
+    case "invalid_order_payment_amount":
+      return "El total del pedido no es valido para registrar el cobro.";
     case "order_item_insufficient_stock":
       return "No hay stock suficiente para el producto seleccionado.";
     case "order_item_product_inactive":
