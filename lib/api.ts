@@ -1627,7 +1627,7 @@ export async function closePortalCashSession(
 export async function patchPortalOrderStatus(
   tenantId: string,
   orderId: string,
-  payload: { orderStatus: string; paymentStatus?: string }
+  payload: { orderStatus: string; paymentStatus?: string; paymentDestinationId?: string | null }
 ) {
   return backendFetch<{ success: boolean; data: PortalOrder }>(
     `/portal/tenants/${tenantId}/orders/${orderId}/status`,
@@ -2096,6 +2096,21 @@ export async function getPortalProductDetail(tenantId: string, productId: string
   return backendFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}`,
     undefined,
+    false
+  );
+}
+
+export async function patchPortalOrder(
+  tenantId: string,
+  orderId: string,
+  payload: { paymentDestinationId?: string | null }
+) {
+  return backendFetch<{ success: boolean; data: PortalOrder }>(
+    `/portal/tenants/${tenantId}/orders/${orderId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    },
     false
   );
 }
