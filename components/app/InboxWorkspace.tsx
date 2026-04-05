@@ -668,6 +668,7 @@ export function InboxWorkspace({
   const conversationUrl = selectedId
     ? `/app/inbox/${selectedId}${demo && tenantId ? `?demo=1&tenantId=${tenantId}` : ""}`
     : undefined;
+  const orderHref = detail?.relatedOrder?.id ? `/app/orders?orderId=${encodeURIComponent(detail.relatedOrder.id)}` : undefined;
   const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
 
   return (
@@ -753,6 +754,7 @@ export function InboxWorkspace({
               onTaskTitleChange={setTaskTitle}
               onAddTask={() => void addTask()}
               historyHref={conversationUrl}
+              orderHref={orderHref}
             />
           }
         />

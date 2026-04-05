@@ -68,6 +68,7 @@ type ProfilePanelProps = {
   onTaskTitleChange: (value: string) => void;
   onAddTask: () => void;
   historyHref?: string;
+  orderHref?: string;
 };
 
 export function ProfilePanel({
@@ -89,7 +90,8 @@ export function ProfilePanel({
   taskTitle,
   onTaskTitleChange,
   onAddTask,
-  historyHref
+  historyHref,
+  orderHref
 }: ProfilePanelProps) {
   if (loading) {
     return (
@@ -160,6 +162,9 @@ export function ProfilePanel({
                 {stageLabel(detail.deal?.stage)}
               </InboxBadge>
               <InboxBadge className="capitalize">{conversationStatusLabel(detail.conversation.status)}</InboxBadge>
+              {detail.conversation.transferPaymentStatus === "payment_pending_validation" ? (
+                <InboxBadge className="capitalize">Pago pendiente</InboxBadge>
+              ) : null}
             </div>
           </div>
           <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-3">
@@ -241,6 +246,15 @@ export function ProfilePanel({
               Ver historial
             </button>
           )}
+          {orderHref ? (
+            <Link
+              href={orderHref}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-xs text-muted hover:text-text"
+            >
+              <History className="h-3.5 w-3.5" />
+              Ver pedido
+            </Link>
+          ) : null}
         </div>
 
         <div className="mt-3 flex gap-2">
@@ -276,6 +290,15 @@ export function ProfilePanel({
               ? "Contacto con prioridad alta. Conviene dar seguimiento comercial rapido para no perder la oportunidad."
               : "Conversacion activa dentro del inbox, lista para seguimiento comercial y respuesta desde el equipo."}
           </div>
+          {detail.relatedOrder ? (
+            <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 p-3">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Pedido vinculado</p>
+              <p className="mt-2 text-sm font-medium">{detail.relatedOrder.id}</p>
+              <p className="mt-1 text-xs text-muted">
+                {detail.relatedOrder.paymentStatus || "Sin pago"} · {detail.relatedOrder.orderStatus || "Sin estado"}
+              </p>
+            </div>
+          ) : null}
         </div>
       </CardSection>
 

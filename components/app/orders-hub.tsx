@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ClipboardList, Package, Receipt, ShoppingBag } from "lucide-react";
 import type { PortalContact, PortalOrder, PortalOrderPaymentMetrics, PortalOrderPaymentMetricsRange, PortalPaymentDestination } from "@/lib/api";
@@ -22,6 +23,7 @@ const ORDER_STATUS_OPTIONS = [
 
 type OrdersHubProps = {
   initialOrders: PortalOrder[];
+  initialOrderId?: string;
   readOnly?: boolean;
   backendReady: boolean;
 };
@@ -73,9 +75,11 @@ const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
   rejected: 0
 };
 
-export function OrdersHub({ initialOrders, readOnly = false, backendReady }: OrdersHubProps) {
+export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, backendReady }: OrdersHubProps) {
   const [orders, setOrders] = useState(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState<PortalOrder | null>(initialOrders[0] || null);
+  const [selectedOrder, setSelectedOrder] = useState<PortalOrder | null>(
+    initialOrders.find((order) => order.id === initialOrderId) || initialOrders[0] || null
+  );
   const [viewMode, setViewMode] = useState<OrdersViewMode>("all");
   const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
   const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
@@ -147,6 +151,11 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     () => (viewMode === "pending_validation" ? orders.filter((order) => isPendingTransferValidation(order)) : orders),
     [orders, viewMode]
   );
+  const selectedConversationHref = selectedOrder?.conversationPreview?.conversationId
+    ? `/app/inbox/${selectedOrder.conversationPreview.conversationId}`
+    : selectedOrder?.conversationId
+      ? `/app/inbox/${selectedOrder.conversationId}`
+      : null;
 
   async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
     setMetricsLoading(true);
@@ -308,7 +317,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
 
   useEffect(() => {
     if (viewMode !== "pending_validation") {
-      if (!selectedOrder && orders[0]) setSelectedOrder(orders[0]);
+      if (!selectedOrder && orders[0]) setSelectedOrder(orders.find((order) => order.id === initialOrderId) || orders[0]);
       return;
     }
 
@@ -323,7 +332,16 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     if (!selectedOrder || !isPendingTransferValidation(selectedOrder)) {
       setSelectedOrder(nextVisible[0]);
     }
-  }, [orders, selectedOrder, viewMode]);
+  }, [initialOrderId, orders, selectedOrder, viewMode]);
+
+  useEffect(() => {
+    if (!initialOrderId) return;
+    const matchingOrder = orders.find((order) => order.id === initialOrderId);
+    if (!matchingOrder) return;
+    if (selectedOrder?.id !== matchingOrder.id) {
+      setSelectedOrder(matchingOrder);
+    }
+  }, [initialOrderId, orders, selectedOrder?.id]);
 
   async function loadOrderDetail(orderId: string) {
     setLoadingDetailId(orderId);
@@ -963,6 +981,72 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                     </div>
                   ) : null}
 
+                  {selectedOrder.conversationPreview ? (
+                    <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">Contexto de conversacion</p>
+                          <p className="mt-1 text-sm text-muted">
+                            Ultimos mensajes relevantes para entender rapido el caso antes de operar el cobro.
+                          </p>
+                        </div>
+                        {selectedConversationHref ? (
+                          <Button asChild type="button" variant="secondary" size="sm">
+                            <Link href={selectedConversationHref}>Ver conversacion completa</Link>
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <DetailStat label="Conversacion" value={selectedOrder.conversationPreview.conversationId} />
+                        <DetailStat
+                          label="Estado"
+                          value={labelForConversationState(
+                            selectedOrder.conversationPreview.state,
+                            selectedOrder.conversationPreview.stage
+                          )}
+                        />
+                      </div>
+
+                      {selectedOrder.conversationPreview.messages.length ? (
+                        <div className="space-y-3">
+                          {selectedOrder.conversationPreview.messages.map((message) => (
+                            <div
+                              key={message.id}
+                              className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3 text-sm"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-medium">
+                                  {message.direction === "inbound" ? "Cliente" : "Bot / Equipo"}
+                                </span>
+                                <span className="text-xs text-muted">{formatDate(message.timestamp)}</span>
+                              </div>
+                              <p className="mt-2 whitespace-pre-wrap leading-6 text-muted">
+                                {message.text || "(mensaje sin texto)"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-card/70 p-3 text-sm text-muted">
+                          No encontramos mensajes recientes para previsualizar en este pedido.
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedConversationHref ? (
+                    <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                      <div>
+                        <p className="text-sm font-semibold">Contexto de conversacion</p>
+                        <p className="mt-1 text-sm text-muted">
+                          Este pedido tiene una conversacion asociada, pero todavia no cargamos mensajes recientes.
+                        </p>
+                      </div>
+                      <Button asChild type="button" variant="secondary" size="sm">
+                        <Link href={selectedConversationHref}>Ver conversacion completa</Link>
+                      </Button>
+                    </div>
+                  ) : null}
+
                   <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
                     <div>
                       <p className="text-sm font-semibold">Destino del cobro</p>
@@ -1301,6 +1385,13 @@ function labelForPaymentDestination(order: PortalOrder) {
   const type = order.paymentDestination?.type || order.paymentDestinationTypeSnapshot;
   if (!name) return "Sin definir";
   return `${name}${type ? ` · ${labelForPaymentDestinationType(type)}` : ""}`;
+}
+
+function labelForConversationState(state: string | null | undefined, stage: string | null | undefined) {
+  const safeState = String(state || "").trim();
+  const safeStage = String(stage || "").trim();
+  if (safeState && safeStage) return `${safeState} · ${safeStage}`;
+  return safeState || safeStage || "Sin estado";
 }
 
 function formatCurrency(value: number, currency = "ARS") {
