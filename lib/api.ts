@@ -882,6 +882,19 @@ export type PortalOrderTransferPayment = {
   conversationStage: string | null;
 };
 
+export type PortalOrderConversationPreview = {
+  conversationId: string;
+  state: string | null;
+  stage: string | null;
+  messages: Array<{
+    id: string;
+    direction: string;
+    text: string;
+    timestamp: string;
+    type: string | null;
+  }>;
+};
+
 export type PortalOrder = {
   id: string;
   clinicId: string;
@@ -901,6 +914,7 @@ export type PortalOrder = {
   paymentDestinationTypeSnapshot?: "bank" | "wallet" | "cash_box" | "other" | null;
   paymentStatus: string;
   orderStatus: string;
+  conversationId?: string | null;
   createdAt: string;
   updatedAt: string;
   contact: {
@@ -920,6 +934,7 @@ export type PortalOrder = {
     isActive: boolean | null;
   } | null;
   transferPayment?: PortalOrderTransferPayment | null;
+  conversationPreview?: PortalOrderConversationPreview | null;
   items: PortalOrderItem[];
 };
 

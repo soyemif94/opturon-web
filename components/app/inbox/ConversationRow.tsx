@@ -64,6 +64,9 @@ export function ConversationRow({
               <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
               <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
               {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
+              {row.transferPaymentStatus === "payment_pending_validation" ? (
+                <InboxBadge className="text-[11px]">Pago pendiente</InboxBadge>
+              ) : null}
             </div>
             <p className="mt-0.5 text-xs text-muted">{meta}</p>
           </div>

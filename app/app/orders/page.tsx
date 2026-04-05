@@ -4,11 +4,19 @@ import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalOrders, isBackendConfigured, type PortalOrder } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
-export default async function AppOrdersPage() {
+export default async function AppOrdersPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ orderId?: string | string[] | undefined }>;
+}) {
   const ctx = await requireAppPage();
   const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let initialOrders: PortalOrder[] = [];
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const initialOrderId = Array.isArray(resolvedSearchParams?.orderId)
+    ? resolvedSearchParams?.orderId[0]
+    : resolvedSearchParams?.orderId;
 
   if (ctx.tenantId && backendReady) {
     try {
@@ -25,7 +33,12 @@ export default async function AppOrdersPage() {
       description="Registra pedidos internos, revisa su estado y prepara la operacion diaria desde un modulo simple pero listo para crecer hacia pagos y facturacion."
       badge="Operacion comercial"
     >
-      <OrdersHub initialOrders={initialOrders} backendReady={backendReady} readOnly={!ctx.tenantId || readOnly} />
+      <OrdersHub
+        initialOrders={initialOrders}
+        initialOrderId={typeof initialOrderId === "string" ? initialOrderId : undefined}
+        backendReady={backendReady}
+        readOnly={!ctx.tenantId || readOnly}
+      />
     </ClientPageShell>
   );
 }
