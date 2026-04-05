@@ -79,7 +79,9 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [destinationUpdatingId, setDestinationUpdatingId] = useState<string | null>(null);
+  const [paymentValidationBusy, setPaymentValidationBusy] = useState<"approve" | "reject" | null>(null);
   const [detailPaymentDestinationId, setDetailPaymentDestinationId] = useState("");
+  const [paymentRejectionReason, setPaymentRejectionReason] = useState("");
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
 
   const selectedProduct = useMemo(
@@ -236,6 +238,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
 
   useEffect(() => {
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
+    setPaymentRejectionReason(selectedOrder?.transferPayment?.rejectionReason || "");
   }, [selectedOrder?.id, selectedOrder?.paymentDestinationId]);
 
   async function reloadOrders(preferredOrderId?: string) {
@@ -442,6 +445,51 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       });
     } finally {
       setDestinationUpdatingId(null);
+    }
+  }
+
+  async function validateTransferPayment(action: "approve" | "reject") {
+    if (!selectedOrder?.transferPayment) return;
+
+    setPaymentValidationBusy(action);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/orders/${selectedOrder.id}/payment-validation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          rejectionReason: action === "reject" ? paymentRejectionReason.trim() || null : null
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(humanizeOrderError(json) || "No se pudo validar el comprobante.");
+      }
+
+      const updatedOrder = json.order as PortalOrder;
+      const notificationOk = json.notification?.status === "sent" || json.notification?.ok === true;
+      setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order)));
+      setSelectedOrder(updatedOrder);
+      setPaymentRejectionReason(updatedOrder.transferPayment?.rejectionReason || "");
+      setFeedback({
+        tone: notificationOk ? "success" : "warning",
+        text:
+          action === "approve"
+            ? notificationOk
+              ? "Pago aprobado, pedido actualizado y cliente notificado."
+              : "Pago aprobado y pedido actualizado, pero la notificacion saliente no pudo confirmarse."
+            : notificationOk
+              ? "Comprobante rechazado y cliente notificado para reenviar."
+              : "Comprobante rechazado, pero la notificacion saliente no pudo confirmarse."
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: error instanceof Error ? error.message : "No se pudo validar el comprobante."
+      });
+    } finally {
+      setPaymentValidationBusy(null);
     }
   }
 
@@ -795,6 +843,89 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                     </div>
                   </div>
 
+                  {selectedOrder.transferPayment ? (
+                    <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">Validacion manual de transferencia</p>
+                          <p className="mt-1 text-sm text-muted">
+                            Usa esta accion para aprobar o rechazar el comprobante y notificar el resultado por WhatsApp.
+                          </p>
+                        </div>
+                        <Badge variant={badgeForTransferValidation(selectedOrder.transferPayment.status)}>
+                          {labelForTransferValidation(selectedOrder.transferPayment.status)}
+                        </Badge>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <DetailStat label="Pedido asociado" value={selectedOrder.transferPayment.orderId || "Sin pedido"} />
+                        <DetailStat label="Metodo" value={labelForTransferMethod(selectedOrder.transferPayment.paymentMethod)} />
+                        <DetailStat
+                          label="Comprobante recibido"
+                          value={selectedOrder.transferPayment.proofSubmittedAt ? formatDate(selectedOrder.transferPayment.proofSubmittedAt) : "Sin fecha"}
+                        />
+                        <DetailStat
+                          label="Archivo"
+                          value={
+                            selectedOrder.transferPayment.proofMetadata?.filename ||
+                            selectedOrder.transferPayment.proofMetadata?.type ||
+                            "Sin metadata"
+                          }
+                        />
+                      </div>
+
+                      {selectedOrder.transferPayment.proofMetadata?.caption ? (
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3 text-sm text-muted">
+                          Caption del comprobante: {selectedOrder.transferPayment.proofMetadata.caption}
+                        </div>
+                      ) : null}
+
+                      {selectedOrder.transferPayment.validatedAt ? (
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3 text-sm text-muted">
+                          {selectedOrder.transferPayment.validationDecision === "approved" ? "Aprobado" : "Rechazado"} el{" "}
+                          {formatDate(selectedOrder.transferPayment.validatedAt)}
+                          {selectedOrder.transferPayment.validatedByName
+                            ? ` por ${selectedOrder.transferPayment.validatedByName}`
+                            : selectedOrder.transferPayment.validatedBy
+                              ? ` por ${selectedOrder.transferPayment.validatedBy}`
+                              : ""}
+                          {selectedOrder.transferPayment.rejectionReason
+                            ? ` · Motivo: ${selectedOrder.transferPayment.rejectionReason}`
+                            : ""}
+                        </div>
+                      ) : null}
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Motivo de rechazo</label>
+                        <Textarea
+                          className="min-h-[88px]"
+                          value={paymentRejectionReason}
+                          onChange={(event) => setPaymentRejectionReason(event.target.value)}
+                          placeholder="Opcional. Ej: el comprobante no coincide con el importe o la cuenta."
+                          disabled={readOnly || paymentValidationBusy !== null}
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          disabled={readOnly || paymentValidationBusy !== null}
+                          onClick={() => void validateTransferPayment("approve")}
+                        >
+                          {paymentValidationBusy === "approve" ? "Aprobando..." : "Aprobar pago"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={readOnly || paymentValidationBusy !== null}
+                          onClick={() => void validateTransferPayment("reject")}
+                        >
+                          {paymentValidationBusy === "reject" ? "Rechazando..." : "Rechazar comprobante"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Cambiar estado</label>
                     <div className="flex flex-wrap gap-2">
@@ -887,6 +1018,12 @@ function badgeForPaymentStatus(status: string) {
   return "warning" as const;
 }
 
+function badgeForTransferValidation(status: string | null | undefined) {
+  if (status === "payment_confirmed") return "success" as const;
+  if (status === "payment_rejected") return "danger" as const;
+  return "warning" as const;
+}
+
 function labelForOrderStatus(status: string) {
   switch (status) {
     case "new":
@@ -923,6 +1060,27 @@ function labelForPaymentStatus(status: string) {
     default:
       return status;
   }
+}
+
+function labelForTransferValidation(status: string | null | undefined) {
+  switch (status) {
+    case "payment_requested":
+      return "Pago solicitado";
+    case "payment_pending_validation":
+      return "Pendiente de validacion";
+    case "payment_confirmed":
+      return "Pago validado";
+    case "payment_rejected":
+      return "Comprobante rechazado";
+    default:
+      return status || "Sin estado";
+  }
+}
+
+function labelForTransferMethod(method: string | null | undefined) {
+  if (method === "bank_transfer") return "Transferencia";
+  if (method === "cash") return "Efectivo";
+  return method || "Sin definir";
 }
 
 function labelForCustomerType(type: string | null | undefined) {
@@ -1029,6 +1187,14 @@ function humanizeOrderError(payload: any) {
       return "El producto seleccionado esta inactivo.";
     case "order_item_product_not_found":
       return "El producto seleccionado ya no existe.";
+    case "invalid_payment_validation_action":
+      return "La accion de validacion no es valida.";
+    case "order_without_conversation":
+      return "Este pedido no tiene una conversacion asociada para validar el comprobante.";
+    case "transfer_payment_not_found":
+      return "No encontramos un comprobante pendiente asociado a este pedido.";
+    case "transfer_payment_already_confirmed":
+      return "Este pago ya fue validado anteriormente.";
     default:
       return typeof payload.error === "string" ? payload.error : null;
   }

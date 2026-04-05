@@ -852,6 +852,36 @@ export type PortalOrderItem = {
   createdAt: string;
 };
 
+export type PortalOrderTransferPayment = {
+  orderId: string | null;
+  status: string | null;
+  paymentMethod: string | null;
+  destinationId: string | null;
+  requestedAt: string | null;
+  proofSubmittedAt: string | null;
+  proofMessageId: string | null;
+  proofMetadata: {
+    messageId: string | null;
+    providerMessageId: string | null;
+    type: string | null;
+    mediaId: string | null;
+    mimeType: string | null;
+    caption: string | null;
+    filename: string | null;
+    sha256: string | null;
+  } | null;
+  validationMode: string | null;
+  validationDecision: string | null;
+  validatedAt: string | null;
+  validatedBy: string | null;
+  validatedByName: string | null;
+  rejectionReason: string | null;
+  orderPaymentStatus: string | null;
+  conversationId: string | null;
+  conversationState: string | null;
+  conversationStage: string | null;
+};
+
 export type PortalOrder = {
   id: string;
   clinicId: string;
@@ -889,6 +919,7 @@ export type PortalOrder = {
     type: "bank" | "wallet" | "cash_box" | "other" | null;
     isActive: boolean | null;
   } | null;
+  transferPayment?: PortalOrderTransferPayment | null;
   items: PortalOrderItem[];
 };
 
@@ -1634,6 +1665,39 @@ export async function patchPortalOrderStatus(
     {
       method: "PATCH",
       body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function validatePortalOrderTransferPayment(
+  tenantId: string,
+  orderId: string,
+  payload: { action: "approve" | "reject"; rejectionReason?: string | null },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+
+  return backendFetch<{
+    success: boolean;
+    data: {
+      order: PortalOrder;
+      notification: {
+        id?: string;
+        status?: string;
+        providerMessageId?: string | null;
+        ok?: boolean;
+        reason?: string | null;
+      };
+    };
+  }>(
+    `/portal/tenants/${tenantId}/orders/${orderId}/payment-validation`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload || {})
     },
     false
   );
