@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ClipboardList, Package, Receipt, ShoppingBag } from "lucide-react";
-import type { PortalContact, PortalOrder, PortalPaymentDestination } from "@/lib/api";
+import type { PortalContact, PortalOrder, PortalOrderPaymentMetrics, PortalOrderPaymentMetricsRange, PortalPaymentDestination } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,10 +66,19 @@ const initialForm: OrderFormState = {
 
 type OrdersViewMode = "all" | "pending_validation";
 
+const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
+  range: "last_7_days",
+  pending: 0,
+  approved: 0,
+  rejected: 0
+};
+
 export function OrdersHub({ initialOrders, readOnly = false, backendReady }: OrdersHubProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [selectedOrder, setSelectedOrder] = useState<PortalOrder | null>(initialOrders[0] || null);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("all");
+  const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
+  const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
@@ -78,6 +87,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
   const [productsLoading, setProductsLoading] = useState(true);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [metaLoading, setMetaLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
@@ -137,6 +147,26 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     () => (viewMode === "pending_validation" ? orders.filter((order) => isPendingTransferValidation(order)) : orders),
     [orders, viewMode]
   );
+
+  async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
+    setMetricsLoading(true);
+    try {
+      const response = await fetch(`/api/app/orders/payment-metrics?range=${encodeURIComponent(range)}`, { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.details || json?.error || "No se pudieron cargar las metricas de pagos.");
+      }
+
+      setPaymentMetrics({
+        range,
+        pending: Number(json?.pending || 0),
+        approved: Number(json?.approved || 0),
+        rejected: Number(json?.rejected || 0)
+      });
+    } finally {
+      setMetricsLoading(false);
+    }
+  }
 
   async function reloadProducts(preferredProductId?: string) {
     setProductsLoading(true);
@@ -245,6 +275,10 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    void loadPaymentMetrics(metricsRange);
+  }, [metricsRange]);
 
   useEffect(() => {
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
@@ -499,7 +533,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
 
       const updatedOrder = json.order as PortalOrder;
       const notificationOk = json.notification?.status === "sent" || json.notification?.ok === true;
-      await reloadOrders(updatedOrder.id);
+      await Promise.all([reloadOrders(updatedOrder.id), loadPaymentMetrics(metricsRange)]);
       setSelectedOrder(updatedOrder);
       setPaymentRejectionReason(updatedOrder.transferPayment?.rejectionReason || "");
       setFeedback({
@@ -536,6 +570,56 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
           helper="Comprobantes de transferencia pendientes de revision manual."
         />
       </section>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Metricas operativas de pagos</CardTitle>
+            <CardDescription>Conteos simples del flujo de validacion manual por transferencia.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant={metricsRange === "today" ? "primary" : "secondary"} onClick={() => setMetricsRange("today")}>
+              Hoy
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={metricsRange === "last_7_days" ? "primary" : "secondary"}
+              onClick={() => setMetricsRange("last_7_days")}
+            >
+              7 dias
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={metricsRange === "last_30_days" ? "primary" : "secondary"}
+              onClick={() => setMetricsRange("last_30_days")}
+            >
+              30 dias
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            icon={Package}
+            label="Pendientes"
+            value={metricsLoading ? "..." : String(paymentMetrics.pending)}
+            helper="Basado en proofSubmittedAt."
+          />
+          <MetricCard
+            icon={Receipt}
+            label="Aprobados"
+            value={metricsLoading ? "..." : String(paymentMetrics.approved)}
+            helper="Basado en validatedAt."
+          />
+          <MetricCard
+            icon={ShoppingBag}
+            label="Rechazados"
+            value={metricsLoading ? "..." : String(paymentMetrics.rejected)}
+            helper="Basado en validatedAt."
+          />
+        </CardContent>
+      </Card>
 
       {feedback ? (
         <div className="rounded-2xl border border-[color:var(--border)] bg-surface/70 px-4 py-3">

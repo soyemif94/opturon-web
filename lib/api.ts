@@ -923,6 +923,15 @@ export type PortalOrder = {
   items: PortalOrderItem[];
 };
 
+export type PortalOrderPaymentMetricsRange = "today" | "last_7_days" | "last_30_days";
+
+export type PortalOrderPaymentMetrics = {
+  range: PortalOrderPaymentMetricsRange;
+  pending: number;
+  approved: number;
+  rejected: number;
+};
+
 export type PortalPaymentDestinationType = "bank" | "wallet" | "cash_box" | "other";
 
 export type PortalPaymentDestination = {
@@ -1410,6 +1419,18 @@ export async function getPortalOrders(tenantId: string) {
 export async function getPortalOrderDetail(tenantId: string, orderId: string) {
   return backendFetch<{ success: boolean; data: PortalOrder }>(
     `/portal/tenants/${tenantId}/orders/${orderId}`,
+    undefined,
+    false
+  );
+}
+
+export async function getPortalOrderPaymentMetrics(
+  tenantId: string,
+  range: PortalOrderPaymentMetricsRange
+) {
+  const query = new URLSearchParams({ range });
+  return backendFetch<{ success: boolean; data: PortalOrderPaymentMetrics }>(
+    `/portal/tenants/${tenantId}/orders/payment-metrics?${query.toString()}`,
     undefined,
     false
   );
