@@ -123,8 +123,7 @@ export function InboxWorkspace({
     try {
       const response = await fetch(
         appendQuery("/api/app/inbox", {
-          filter,
-          q: search
+          filter
         }),
         { cache: "no-store" }
       );
