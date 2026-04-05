@@ -64,9 +64,12 @@ const initialForm: OrderFormState = {
   quantity: "1"
 };
 
+type OrdersViewMode = "all" | "pending_validation";
+
 export function OrdersHub({ initialOrders, readOnly = false, backendReady }: OrdersHubProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [selectedOrder, setSelectedOrder] = useState<PortalOrder | null>(initialOrders[0] || null);
+  const [viewMode, setViewMode] = useState<OrdersViewMode>("all");
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
@@ -119,14 +122,21 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const preparing = orders.filter((order) => order.orderStatus === "preparing" || order.orderStatus === "ready").length;
     const pending = orders.filter((order) => order.orderStatus === "new" || order.orderStatus === "pending_payment").length;
+    const pendingValidation = orders.filter((order) => isPendingTransferValidation(order)).length;
 
     return {
       count: orders.length,
       totalRevenue,
       preparing,
-      pending
+      pending,
+      pendingValidation
     };
   }, [orders]);
+
+  const visibleOrders = useMemo(
+    () => (viewMode === "pending_validation" ? orders.filter((order) => isPendingTransferValidation(order)) : orders),
+    [orders, viewMode]
+  );
 
   async function reloadProducts(preferredProductId?: string) {
     setProductsLoading(true);
@@ -251,15 +261,35 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
     const nextOrders = Array.isArray(json?.orders) ? (json.orders as PortalOrder[]) : [];
     setOrders(nextOrders);
 
+    const preferredPool = viewMode === "pending_validation" ? nextOrders.filter((order) => isPendingTransferValidation(order)) : nextOrders;
     const preferredOrder =
-      nextOrders.find((order) => order.id === preferredOrderId) ||
-      nextOrders.find((order) => order.id === selectedOrder?.id) ||
-      nextOrders[0] ||
+      preferredPool.find((order) => order.id === preferredOrderId) ||
+      preferredPool.find((order) => order.id === selectedOrder?.id) ||
+      preferredPool[0] ||
       null;
 
     setSelectedOrder(preferredOrder);
     return nextOrders;
   }
+
+  useEffect(() => {
+    if (viewMode !== "pending_validation") {
+      if (!selectedOrder && orders[0]) setSelectedOrder(orders[0]);
+      return;
+    }
+
+    const nextVisible = orders.filter((order) => isPendingTransferValidation(order));
+    if (!nextVisible.length) {
+      if (selectedOrder && !isPendingTransferValidation(selectedOrder)) {
+        setSelectedOrder(null);
+      }
+      return;
+    }
+
+    if (!selectedOrder || !isPendingTransferValidation(selectedOrder)) {
+      setSelectedOrder(nextVisible[0]);
+    }
+  }, [orders, selectedOrder, viewMode]);
 
   async function loadOrderDetail(orderId: string) {
     setLoadingDetailId(orderId);
@@ -469,7 +499,7 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
 
       const updatedOrder = json.order as PortalOrder;
       const notificationOk = json.notification?.status === "sent" || json.notification?.ok === true;
-      setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order)));
+      await reloadOrders(updatedOrder.id);
       setSelectedOrder(updatedOrder);
       setPaymentRejectionReason(updatedOrder.transferPayment?.rejectionReason || "");
       setFeedback({
@@ -499,7 +529,12 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
         <MetricCard icon={ClipboardList} label="Pedidos registrados" value={String(stats.count)} helper="Pedidos internos visibles en el portal." />
         <MetricCard icon={Receipt} label="Facturacion potencial" value={formatCurrency(stats.totalRevenue)} helper="Total bruto de los pedidos registrados." />
         <MetricCard icon={ShoppingBag} label="Pendientes" value={String(stats.pending)} helper="Pedidos nuevos o esperando pago." />
-        <MetricCard icon={Package} label="En preparacion" value={String(stats.preparing)} helper="Pedidos en marcha para el equipo." />
+        <MetricCard
+          icon={Package}
+          label="Pagos por validar"
+          value={String(stats.pendingValidation)}
+          helper="Comprobantes de transferencia pendientes de revision manual."
+        />
       </section>
 
       {feedback ? (
@@ -529,12 +564,28 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
-              {orders.length === 0 ? (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant={viewMode === "all" ? "primary" : "secondary"} onClick={() => setViewMode("all")}>
+                  Todos
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={viewMode === "pending_validation" ? "primary" : "secondary"}
+                  onClick={() => setViewMode("pending_validation")}
+                >
+                  Pendientes de validacion
+                </Button>
+              </div>
+
+              {visibleOrders.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                  Todavia no hay pedidos cargados. Usa el formulario lateral para registrar el primero y dejar visible el flujo completo en el panel.
+                  {viewMode === "pending_validation"
+                    ? "No hay comprobantes pendientes de validacion manual en este momento."
+                    : "Todavia no hay pedidos cargados. Usa el formulario lateral para registrar el primero y dejar visible el flujo completo en el panel."}
                 </div>
               ) : (
-                orders.map((order) => (
+                visibleOrders.map((order) => (
                   <button
                     key={order.id}
                     type="button"
@@ -551,6 +602,9 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                           <p className="text-base font-semibold">{labelForOrderCustomer(order)}</p>
                           <Badge variant={badgeForOrderStatus(order.orderStatus)}>{labelForOrderStatus(order.orderStatus)}</Badge>
                           <Badge variant={badgeForPaymentStatus(order.paymentStatus)}>{labelForPaymentStatus(order.paymentStatus)}</Badge>
+                          {isPendingTransferValidation(order) ? (
+                            <Badge variant={badgeForTransferValidation(order.transferPayment?.status)}>Pago por validar</Badge>
+                          ) : null}
                           {order.customerType === "final_consumer" ? <Badge variant="muted">Consumidor final</Badge> : null}
                         </div>
                         <p className="mt-2 text-sm text-muted">{labelForOrderPhone(order)}</p>
@@ -559,6 +613,21 @@ export function OrdersHub({ initialOrders, readOnly = false, backendReady }: Ord
                           <span>·</span>
                           <span>{formatDate(order.createdAt)}</span>
                         </div>
+                        {order.transferPayment ? (
+                          <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-card/75 p-3 text-xs text-muted">
+                            <p>
+                              Comprobante: {labelForTransferValidation(order.transferPayment.status)}
+                              {order.transferPayment.proofSubmittedAt ? ` · ${formatDate(order.transferPayment.proofSubmittedAt)}` : ""}
+                            </p>
+                            <p className="mt-1">
+                              {order.transferPayment.proofMetadata?.type || "Sin tipo"}
+                              {order.transferPayment.proofMetadata?.caption ? ` · ${order.transferPayment.proofMetadata.caption}` : ""}
+                              {!order.transferPayment.proofMetadata?.caption && order.transferPayment.proofMetadata?.filename
+                                ? ` · ${order.transferPayment.proofMetadata.filename}`
+                                : ""}
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-3">
                         <p className="text-sm font-medium">{formatCurrency(order.total, order.currency)}</p>
@@ -1081,6 +1150,14 @@ function labelForTransferMethod(method: string | null | undefined) {
   if (method === "bank_transfer") return "Transferencia";
   if (method === "cash") return "Efectivo";
   return method || "Sin definir";
+}
+
+function isPendingTransferValidation(order: PortalOrder) {
+  return (
+    order.transferPayment?.status === "payment_pending_validation" &&
+    order.transferPayment?.orderId === order.id &&
+    Boolean(order.transferPayment?.proofSubmittedAt)
+  );
 }
 
 function labelForCustomerType(type: string | null | undefined) {
