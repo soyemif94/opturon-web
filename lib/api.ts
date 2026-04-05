@@ -779,6 +779,17 @@ export type PortalBusinessSettings = {
   policies: string;
 };
 
+export type PortalBotTransferConfig = {
+  enabled: boolean;
+  alias: string;
+  cbu: string;
+  titular: string;
+  bank: string;
+  instructions: string;
+  destinationId?: string | null;
+  reference?: string | null;
+};
+
 export async function getPortalBusinessSettings(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;
@@ -803,6 +814,44 @@ export async function patchPortalBusinessSettings(
     };
   }>(`/portal/tenants/${tenantId}/business`, {
     method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalBotTransferConfig(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      settings: {
+        tenantId: string;
+        clinicId: string;
+        clinicName: string | null;
+        transferConfig: PortalBotTransferConfig;
+      };
+    };
+  }>(`/portal/tenants/${tenantId}/bot/transfer-config`);
+}
+
+export async function savePortalBotTransferConfig(
+  tenantId: string,
+  payload: Partial<PortalBotTransferConfig>
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      settings: {
+        tenantId: string;
+        clinicId: string;
+        clinicName: string | null;
+        transferConfig: PortalBotTransferConfig;
+      };
+    };
+  }>(`/portal/tenants/${tenantId}/bot/transfer-config`, {
+    method: "POST",
     body: JSON.stringify(payload)
   });
 }

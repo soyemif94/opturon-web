@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Building2, Shield, Users } from "lucide-react";
+import { Bell, Building2, Landmark, Shield, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientPageShell } from "@/components/app/client-page-shell";
@@ -35,6 +35,12 @@ export default async function AppSettingsPage() {
               icon={<Users className="h-4 w-4 text-brandBright" />}
               title="Usuarios del espacio"
               description="Revisa quien accede al portal y como se distribuye el trabajo dentro del equipo."
+            />
+            <SettingsLinkCard
+              href="/app/settings/transfer"
+              icon={<Landmark className="h-4 w-4 text-brandBright" />}
+              title="Cobro por transferencia"
+              description="Edita alias, CBU y el mensaje que el bot usa para cobrar por transferencia."
             />
             <div className="grid gap-4 md:grid-cols-2">
               <SettingsStaticCard
