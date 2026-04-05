@@ -1,8 +1,10 @@
-import { MessageSquareText, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageSquareText, Search, SlidersHorizontal } from "lucide-react";
+import { useMemo, useState } from "react";
 import { ConversationRow } from "@/components/app/inbox/ConversationRow";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ConversationListSkeleton } from "@/components/app/inbox/Skeleton";
 import type { ConversationRowData, FilterKey } from "@/components/app/inbox/types";
+import { normalizeText } from "@/lib/search/normalize";
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "Todas" },
@@ -11,6 +13,8 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "nuevas", label: "Nuevas" },
   { key: "asignadas", label: "Asignadas" }
 ];
+
+const RECENT_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
 
 export function ConversationList({
   rows,
@@ -46,6 +50,59 @@ export function ConversationList({
   onRetry: () => void;
 }) {
   const unread = rows.reduce((acc, row) => acc + row.unreadCount, 0);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    pending: false,
+    recent: false,
+    all: true
+  });
+
+  const normalizedQuery = useMemo(() => normalizeText(search).join(" "), [search]);
+
+  const visibleRows = useMemo(() => {
+    if (!normalizedQuery) return rows;
+    return rows.filter((row) => buildSearchHaystack(row).includes(normalizedQuery));
+  }, [normalizedQuery, rows]);
+
+  const groupedRows = useMemo(() => {
+    const now = Date.now();
+    const pending = visibleRows.filter((row) => row.transferPaymentStatus === "payment_pending_validation");
+    const recent = visibleRows.filter((row) => {
+      if (row.transferPaymentStatus === "payment_pending_validation") return false;
+      const lastMessageAt = new Date(row.lastMessageAt).getTime();
+      if (Number.isNaN(lastMessageAt)) return false;
+      return now - lastMessageAt <= RECENT_WINDOW_MS;
+    });
+    const all = visibleRows.filter(
+      (row) => row.transferPaymentStatus !== "payment_pending_validation" && !recent.some((candidate) => candidate.id === row.id)
+    );
+
+    return [
+      {
+        key: "pending",
+        title: "Pagos pendientes",
+        description: "Conversaciones que tienen comprobante pendiente de validación manual.",
+        rows: pending,
+        emptyLabel: "No hay pagos pendientes en este momento."
+      },
+      {
+        key: "recent",
+        title: "Recientes",
+        description: "Actividad reciente para seguir respondiendo sin recorrer todo el historial.",
+        rows: recent,
+        emptyLabel: "No hay conversaciones recientes para mostrar."
+      },
+      {
+        key: "all",
+        title: "Todas",
+        description: "Resto del historial operativo del inbox.",
+        rows: all,
+        emptyLabel: "No quedan conversaciones fuera de los grupos prioritarios."
+      }
+    ];
+  }, [visibleRows]);
+
+  const hasSearchResults = visibleRows.length > 0;
+  const isSearching = search.trim().length > 0;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
@@ -54,7 +111,7 @@ export function ConversationList({
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-muted">Inbox</p>
             <h2 className="mt-1 text-base font-semibold">Conversaciones</h2>
-            <p className="mt-1 text-[11px] text-muted">WhatsApp en tiempo real, ordenado por ultima actividad y prioridad.</p>
+            <p className="mt-1 text-[11px] text-muted">WhatsApp en tiempo real, con prioridad visible y mejor encontrabilidad operativa.</p>
           </div>
           <InboxBadge active={readOnly}>Demo</InboxBadge>
         </div>
@@ -65,7 +122,7 @@ export function ConversationList({
             <p className="mt-1.5 text-lg font-semibold">{rows.length}</p>
           </div>
           <div className="rounded-2xl border border-[color:var(--border)] bg-card/70 p-2.5">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">No leidas</p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">No leídas</p>
             <p className="mt-1.5 text-lg font-semibold">{unread}</p>
           </div>
         </div>
@@ -75,7 +132,7 @@ export function ConversationList({
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar por contacto, telefono o email"
+            placeholder="Buscar por nombre o teléfono"
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
         </div>
@@ -95,7 +152,7 @@ export function ConversationList({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {loading ? <ConversationListSkeleton /> : null}
 
         {!loading && errorMessage ? (
@@ -112,12 +169,14 @@ export function ConversationList({
           </div>
         ) : null}
 
-        {!loading && hasLoaded && !errorMessage && rows.length === 0 ? (
+        {!loading && hasLoaded && !errorMessage && !hasSearchResults ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-card/40 px-5 text-center">
             <MessageSquareText className="h-8 w-8 text-muted" />
-            <p className="mt-3 text-base font-semibold">Todavia no hay conversaciones visibles</p>
+            <p className="mt-3 text-base font-semibold">{isSearching ? "No encontramos conversaciones para esa búsqueda" : "Todavía no hay conversaciones visibles"}</p>
             <p className="mt-1 text-xs leading-6 text-muted">
-              Cuando entren mensajes por WhatsApp o limpies los filtros actuales, las conversaciones van a aparecer aqui para gestionarlas desde el portal.
+              {isSearching
+                ? "Probá con otro nombre, apellido, teléfono o limpiá la búsqueda para volver al listado completo."
+                : "Cuando entren mensajes por WhatsApp o limpies los filtros actuales, las conversaciones van a aparecer acá para gestionarlas desde el portal."}
             </p>
             <button
               type="button"
@@ -129,20 +188,81 @@ export function ConversationList({
           </div>
         ) : null}
 
-        {!loading
-          ? rows.map((row) => (
-              <ConversationRow
-                key={row.id}
-                row={row}
-                selected={selectedId === row.id}
-                onSelect={() => onSelect(row.id)}
-                onMarkHot={() => onMarkHot(row.id)}
-                onClose={() => onClose(row.id)}
-                disabled={readOnly}
-              />
-            ))
+        {!loading && hasSearchResults
+          ? groupedRows.map((group) => {
+              const isCollapsed = collapsedGroups[group.key] ?? false;
+              return (
+                <section key={group.key} className="rounded-2xl border border-[color:var(--border)] bg-card/40">
+                  <button
+                    type="button"
+                    onClick={() => setCollapsedGroups((current) => ({ ...current, [group.key]: !isCollapsed }))}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">{group.title}</p>
+                        <InboxBadge active={group.key === "pending"}>{group.rows.length}</InboxBadge>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted">{group.description}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
+                      {isCollapsed ? (
+                        <>
+                          Expandir
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </>
+                      ) : (
+                        <>
+                          Colapsar
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </>
+                      )}
+                    </span>
+                  </button>
+
+                  {!isCollapsed ? (
+                    <div className="border-t border-[color:var(--border)] px-3 pb-3 pt-2">
+                      {group.rows.length ? (
+                        <div className="space-y-2.5">
+                          {group.rows.map((row) => (
+                            <ConversationRow
+                              key={row.id}
+                              row={row}
+                              selected={selectedId === row.id}
+                              onSelect={() => onSelect(row.id)}
+                              onMarkHot={() => onMarkHot(row.id)}
+                              onClose={() => onClose(row.id)}
+                              disabled={readOnly}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/40 px-4 py-3 text-xs text-muted">
+                          {group.emptyLabel}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })
           : null}
       </div>
     </div>
   );
+}
+
+function buildSearchHaystack(row: ConversationRowData) {
+  const values = [
+    row.contact?.name,
+    row.contact?.phone,
+    row.contact?.email,
+    row.contact?.id,
+    row.lastMessagePreview,
+    row.transferPaymentOrderId
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return normalizeText(values).join(" ");
 }
