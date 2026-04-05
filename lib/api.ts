@@ -829,6 +829,7 @@ export async function getPortalBotTransferConfig(tenantId: string) {
         clinicId: string;
         clinicName: string | null;
         transferConfig: PortalBotTransferConfig;
+        previewText?: string;
       };
     };
   }>(`/portal/tenants/${tenantId}/bot/transfer-config`);
@@ -848,6 +849,7 @@ export async function savePortalBotTransferConfig(
         clinicId: string;
         clinicName: string | null;
         transferConfig: PortalBotTransferConfig;
+        previewText?: string;
       };
     };
   }>(`/portal/tenants/${tenantId}/bot/transfer-config`, {

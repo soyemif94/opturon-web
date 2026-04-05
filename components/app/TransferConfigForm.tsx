@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { toast } from "@/components/ui/toast";
 import type { PortalBotTransferConfig } from "@/lib/api";
 
@@ -9,35 +9,64 @@ type TransferConfigFormProps = {
   tenantName?: string;
 };
 
+type FieldErrors = {
+  general?: string;
+  alias?: string;
+  cbu?: string;
+};
+
 export function TransferConfigForm({ initialConfig, tenantName }: TransferConfigFormProps) {
-  const [form, setForm] = useState<PortalBotTransferConfig>(initialConfig);
+  const [form, setForm] = useState<PortalBotTransferConfig>(normalizeForm(initialConfig));
   const [isSaving, setIsSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({
     tone: null,
     text: ""
   });
 
+  const previewText = useMemo(() => buildTransferPreview(form), [form]);
+
+  function updateField<K extends keyof PortalBotTransferConfig>(key: K, value: PortalBotTransferConfig[K]) {
+    setForm((current) => normalizeForm({ ...current, [key]: value }));
+    setFieldErrors((current) => ({ ...current, [key]: undefined, general: undefined }));
+  }
+
   async function save(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    setIsSaving(true);
+    const normalizedForm = normalizeForm(form);
+    const nextFieldErrors = validateTransferForm(normalizedForm);
+    setForm(normalizedForm);
+    setFieldErrors(nextFieldErrors);
     setFeedback({ tone: null, text: "" });
+
+    if (Object.keys(nextFieldErrors).length) {
+      const message = nextFieldErrors.general || nextFieldErrors.alias || nextFieldErrors.cbu || "Revisá los datos de transferencia.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error de validación", message);
+      return;
+    }
+
+    setIsSaving(true);
 
     try {
       const response = await fetch("/api/app/settings/transfer-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(normalizedForm)
       });
       const json = await safeJson(response);
       if (!response.ok) {
+        const nextErrors = normalizeFieldErrors(json?.fieldErrors);
         const message = json?.detail || json?.error || "No se pudo guardar la configuración de transferencia.";
+        setFieldErrors(nextErrors);
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al guardar", String(message));
         return;
       }
 
-      const nextConfig = json?.settings?.transferConfig || form;
+      const nextConfig = normalizeForm(json?.settings?.transferConfig || normalizedForm);
       setForm(nextConfig);
+      setFieldErrors({});
       setFeedback({ tone: "success", text: "Configuración de transferencia guardada correctamente." });
       toast.success("Cobro por transferencia actualizado");
     } catch {
@@ -72,46 +101,70 @@ export function TransferConfigForm({ initialConfig, tenantName }: TransferConfig
             </p>
           </div>
           <label className="inline-flex items-center gap-3 text-sm font-medium">
-            <input
-              type="checkbox"
-              checked={form.enabled}
-              onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked }))}
-            />
+            <input type="checkbox" checked={form.enabled} onChange={(event) => updateField("enabled", event.target.checked)} />
             {form.enabled ? "Activo" : "Inactivo"}
           </label>
         </div>
+        {fieldErrors.general ? <p className="mt-3 text-xs text-red-300">{fieldErrors.general}</p> : null}
       </section>
 
-      <div className="mt-5 grid gap-5">
-        <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <div className="mb-4">
-            <p className="text-sm font-semibold">Datos de cobro</p>
-            <p className="mt-1 text-xs leading-6 text-muted">
-              Cargá al menos alias o CBU si querés dejar la transferencia activa.
-            </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Alias" value={form.alias} onChange={(value) => setForm((current) => ({ ...current, alias: value }))} />
-            <Field label="CBU" value={form.cbu} onChange={(value) => setForm((current) => ({ ...current, cbu: value }))} />
-            <Field label="Titular" value={form.titular} onChange={(value) => setForm((current) => ({ ...current, titular: value }))} />
-            <Field label="Banco" value={form.bank} onChange={(value) => setForm((current) => ({ ...current, bank: value }))} />
-          </div>
-        </section>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+            <div className="mb-4">
+              <p className="text-sm font-semibold">Datos de cobro</p>
+              <p className="mt-1 text-xs leading-6 text-muted">
+                Cargá al menos alias o CBU si querés dejar la transferencia activa.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field
+                label="Alias"
+                value={form.alias}
+                onChange={(value) => updateField("alias", value)}
+                hint="Ejemplo: MI.NEGOCIO.VENTAS"
+                error={fieldErrors.alias}
+              />
+              <Field
+                label="CBU"
+                value={form.cbu}
+                onChange={(value) => updateField("cbu", value)}
+                hint="22 dígitos numéricos"
+                error={fieldErrors.cbu}
+              />
+              <Field label="Titular" value={form.titular} onChange={(value) => updateField("titular", value)} />
+              <Field label="Banco" value={form.bank} onChange={(value) => updateField("bank", value)} />
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+            <div className="mb-4">
+              <p className="text-sm font-semibold">Mensaje base</p>
+              <p className="mt-1 text-xs leading-6 text-muted">
+                Opcional. Si lo dejás vacío, el bot usa el mensaje estándar ya validado.
+              </p>
+            </div>
+            <Field
+              label="Instrucciones de pago"
+              value={form.instructions}
+              onChange={(value) => updateField("instructions", value)}
+              multiline
+              rows={4}
+            />
+          </section>
+        </div>
 
         <section className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <div className="mb-4">
-            <p className="text-sm font-semibold">Mensaje base</p>
-            <p className="mt-1 text-xs leading-6 text-muted">
-              Opcional. Si lo dejás vacío, el bot usa el mensaje estándar ya validado.
-            </p>
-          </div>
-          <Field
-            label="Instrucciones de pago"
-            value={form.instructions}
-            onChange={(value) => setForm((current) => ({ ...current, instructions: value }))}
-            multiline
-            rows={4}
-          />
+          <p className="text-sm font-semibold">Preview del mensaje</p>
+          <p className="mt-1 text-xs leading-6 text-muted">
+            Así se va a ver el mensaje que el bot usa cuando el cliente pide pagar por transferencia.
+          </p>
+          <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-[color:var(--border)] bg-bg p-4 text-sm leading-6 text-text">
+            {previewText}
+          </pre>
+          <p className="mt-3 text-xs leading-6 text-muted">
+            La referencia se muestra si ya existe en la configuración actual del workspace.
+          </p>
         </section>
       </div>
 
@@ -135,13 +188,17 @@ function Field({
   value,
   onChange,
   multiline,
-  rows
+  rows,
+  hint,
+  error
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   multiline?: boolean;
   rows?: number;
+  hint?: string;
+  error?: string;
 }) {
   return (
     <label className="grid gap-1 text-sm">
@@ -160,8 +217,76 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
         />
       )}
+      {error ? <span className="text-xs text-red-300">{error}</span> : hint ? <span className="text-xs text-muted">{hint}</span> : null}
     </label>
   );
+}
+
+function normalizeText(value: unknown) {
+  return String(value || "").trim().normalize("NFC");
+}
+
+function normalizeForm(config: PortalBotTransferConfig): PortalBotTransferConfig {
+  return {
+    ...config,
+    enabled: Boolean(config.enabled),
+    alias: normalizeText(config.alias),
+    cbu: normalizeText(config.cbu).replace(/\s+/g, ""),
+    titular: normalizeText(config.titular),
+    bank: normalizeText(config.bank),
+    instructions: normalizeText(config.instructions)
+  };
+}
+
+function normalizeFieldErrors(input: unknown): FieldErrors {
+  if (!input || typeof input !== "object") return {};
+  const safe = input as Record<string, unknown>;
+  return {
+    general: typeof safe.general === "string" ? safe.general : undefined,
+    alias: typeof safe.alias === "string" ? safe.alias : undefined,
+    cbu: typeof safe.cbu === "string" ? safe.cbu : undefined
+  };
+}
+
+function validateTransferForm(form: PortalBotTransferConfig): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (form.enabled && !form.alias && !form.cbu) {
+    errors.general = "Para activar transferencia, cargá al menos alias o CBU.";
+  }
+
+  if (form.alias && !/^[a-z0-9._-]{6,40}$/i.test(form.alias)) {
+    errors.alias = "Usá entre 6 y 40 caracteres con letras, números, punto, guion o guion bajo.";
+  }
+
+  if (form.cbu && !/^\d{22}$/.test(form.cbu)) {
+    errors.cbu = "El CBU debe tener 22 dígitos numéricos.";
+  }
+
+  return errors;
+}
+
+function buildTransferPreview(config: PortalBotTransferConfig) {
+  if (!config.enabled) {
+    return "Transferencia desactivada.\n\nMientras esté inactiva, el bot no va a ofrecer alias ni CBU.";
+  }
+
+  const lines = [
+    "Perfecto.",
+    "",
+    "Podés pagar por transferencia con estos datos:"
+  ];
+
+  if (config.alias) lines.push(`- Alias: ${config.alias}`);
+  if (config.cbu) lines.push(`- CBU: ${config.cbu}`);
+  if (config.titular) lines.push(`- Titular: ${config.titular}`);
+  if (config.bank) lines.push(`- Banco: ${config.bank}`);
+  if (config.reference) lines.push(`- Referencia: ${config.reference}`);
+
+  lines.push("");
+  lines.push(config.instructions || "Cuando hagas la transferencia, mandame el comprobante por acá y lo dejo registrado.");
+
+  return lines.join("\n");
 }
 
 async function safeJson(response: Response) {
