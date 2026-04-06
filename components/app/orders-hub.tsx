@@ -97,8 +97,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [destinationUpdatingId, setDestinationUpdatingId] = useState<string | null>(null);
+  const [sellerUpdatingId, setSellerUpdatingId] = useState<string | null>(null);
   const [paymentValidationBusy, setPaymentValidationBusy] = useState<"approve" | "reject" | null>(null);
   const [detailPaymentDestinationId, setDetailPaymentDestinationId] = useState("");
+  const [detailSellerUserId, setDetailSellerUserId] = useState("");
   const [paymentRejectionReason, setPaymentRejectionReason] = useState("");
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
 
@@ -315,8 +317,9 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
 
   useEffect(() => {
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
+    setDetailSellerUserId(selectedOrder?.sellerUserId || "");
     setPaymentRejectionReason(selectedOrder?.transferPayment?.rejectionReason || "");
-  }, [selectedOrder?.id, selectedOrder?.paymentDestinationId]);
+  }, [selectedOrder?.id, selectedOrder?.paymentDestinationId, selectedOrder?.sellerUserId]);
 
   async function reloadOrders(preferredOrderId?: string) {
     const response = await fetch("/api/app/orders", { cache: "no-store" });
@@ -562,6 +565,43 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       });
     } finally {
       setDestinationUpdatingId(null);
+    }
+  }
+
+  async function saveOrderSeller() {
+    if (!selectedOrder) return;
+    if (!detailSellerUserId.trim()) {
+      setFeedback({ tone: "warning", text: "Selecciona el vendedor responsable del pedido." });
+      return;
+    }
+
+    setSellerUpdatingId(selectedOrder.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/orders/${selectedOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerUserId: detailSellerUserId
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(humanizeOrderError(json) || "No se pudo actualizar el vendedor del pedido.");
+      }
+
+      const updatedOrder = json.order as PortalOrder;
+      setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
+      setSelectedOrder(updatedOrder);
+      setDetailSellerUserId(updatedOrder.sellerUserId || "");
+      setFeedback({ tone: "success", text: "Vendedor del pedido actualizado." });
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: error instanceof Error ? error.message : "No se pudo actualizar el vendedor del pedido."
+      });
+    } finally {
+      setSellerUpdatingId(null);
     }
   }
 
@@ -1090,6 +1130,39 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       </Button>
                     </div>
                   ) : null}
+
+                  <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div>
+                      <p className="text-sm font-semibold">Vendedor asignado</p>
+                      <p className="mt-1 text-sm text-muted">Puedes corregir o reasignar el vendedor responsable sin alterar el resto del pedido.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Vendedor</label>
+                        <select
+                          className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                          value={detailSellerUserId}
+                          onChange={(event) => setDetailSellerUserId(event.target.value)}
+                          disabled={metaLoading || readOnly || !backendReady || sellerUpdatingId === selectedOrder.id || sellers.length === 0}
+                        >
+                          <option value="">{metaLoading ? "Cargando equipo..." : "Selecciona un vendedor"}</option>
+                          {sellers.map((seller) => (
+                            <option key={seller.id} value={seller.id}>
+                              {seller.name}{seller.role ? ` · ${labelForSellerRole(seller.role)}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={readOnly || !backendReady || sellerUpdatingId === selectedOrder.id || !detailSellerUserId}
+                        onClick={() => void saveOrderSeller()}
+                      >
+                        {sellerUpdatingId === selectedOrder.id ? "Guardando..." : "Guardar vendedor"}
+                      </Button>
+                    </div>
+                  </div>
 
                   <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
                     <div>

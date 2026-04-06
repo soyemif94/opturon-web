@@ -2315,7 +2315,7 @@ export async function getPortalProductDetail(tenantId: string, productId: string
 export async function patchPortalOrder(
   tenantId: string,
   orderId: string,
-  payload: { paymentDestinationId?: string | null }
+  payload: { paymentDestinationId?: string | null; sellerUserId?: string | null }
 ) {
   return backendFetch<{ success: boolean; data: PortalOrder }>(
     `/portal/tenants/${tenantId}/orders/${orderId}`,
