@@ -31,6 +31,17 @@ export function ConversationList({
   readOnly,
   onClearFilters,
   onRetry
+  ,
+  visibility,
+  onVisibilityChange,
+  selectedIds,
+  onToggleSelect,
+  onSelectVisible,
+  onClearSelection,
+  onArchiveSelected,
+  archiveBusy,
+  onRestoreSelected,
+  restoreBusy
 }: {
   rows: ConversationRowData[];
   loading: boolean;
@@ -47,6 +58,16 @@ export function ConversationList({
   readOnly: boolean;
   onClearFilters: () => void;
   onRetry: () => void;
+  visibility: "active" | "archived";
+  onVisibilityChange: (value: "active" | "archived") => void;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
+  onSelectVisible: (ids: string[]) => void;
+  onClearSelection: () => void;
+  onArchiveSelected: () => void;
+  archiveBusy?: boolean;
+  onRestoreSelected: () => void;
+  restoreBusy?: boolean;
 }) {
   const unread = rows.reduce((acc, row) => acc + row.unreadCount, 0);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
@@ -93,6 +114,13 @@ export function ConversationList({
 
   const hasSearchResults = visibleRows.length > 0;
   const isSearching = search.trim().length > 0;
+  const visibleIds = useMemo(() => visibleRows.map((row) => row.id), [visibleRows]);
+  const selectedVisibleCount = useMemo(
+    () => visibleIds.filter((id) => selectedIds.includes(id)).length,
+    [selectedIds, visibleIds]
+  );
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+  const showingArchived = visibility === "archived";
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
@@ -128,6 +156,14 @@ export function ConversationList({
         </div>
 
         <div className="mt-3">
+          <div className="mb-2 flex flex-wrap gap-2">
+            <button type="button" onClick={() => onVisibilityChange("active")}>
+              <InboxBadge active={!showingArchived}>Activas</InboxBadge>
+            </button>
+            <button type="button" onClick={() => onVisibilityChange("archived")}>
+              <InboxBadge active={showingArchived}>Archivadas</InboxBadge>
+            </button>
+          </div>
           <div className="mb-1.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted">
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filtros
@@ -138,6 +174,42 @@ export function ConversationList({
                 <InboxBadge active={filter === item.key}>{item.label}</InboxBadge>
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-card/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted">
+              {selectedIds.length > 0
+                ? `${selectedIds.length} conversaciones seleccionadas`
+                : showingArchived
+                  ? "Selecciona conversaciones archivadas para restaurarlas al inbox activo."
+                  : "Selecciona conversaciones para ocultarlas del panel sin borrar historial."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => (allVisibleSelected ? onClearSelection() : onSelectVisible(visibleIds))}
+                className="rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text"
+                disabled={!visibleIds.length}
+              >
+                {allVisibleSelected ? "Limpiar visibles" : "Seleccionar visibles"}
+              </button>
+              <button
+                type="button"
+                onClick={showingArchived ? onRestoreSelected : onArchiveSelected}
+                className={`rounded-full border px-3 py-1.5 text-xs disabled:opacity-40 ${
+                  showingArchived
+                    ? "border-emerald-400/30 text-emerald-100 hover:text-white"
+                    : "border-red-400/30 text-red-100 hover:text-white"
+                }`}
+                disabled={readOnly || selectedIds.length === 0 || archiveBusy || restoreBusy}
+              >
+                {showingArchived
+                  ? restoreBusy ? "Restaurando..." : "Restaurar seleccionadas"
+                  : archiveBusy ? "Ocultando..." : "Ocultar seleccionadas"}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -162,11 +234,19 @@ export function ConversationList({
         {!loading && hasLoaded && !errorMessage && !hasSearchResults ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-card/40 px-5 text-center">
             <MessageSquareText className="h-8 w-8 text-muted" />
-            <p className="mt-3 text-base font-semibold">{isSearching ? "No encontramos conversaciones para esa busqueda" : "Todavia no hay conversaciones visibles"}</p>
+            <p className="mt-3 text-base font-semibold">
+              {isSearching
+                ? "No encontramos conversaciones para esa busqueda"
+                : showingArchived
+                  ? "Todavia no hay conversaciones archivadas"
+                  : "Todavia no hay conversaciones visibles"}
+            </p>
             <p className="mt-1 text-xs leading-6 text-muted">
               {isSearching
                 ? "Proba con otro nombre, apellido, telefono o limpia la busqueda para volver al listado completo."
-                : "Cuando entren mensajes por WhatsApp o limpies los filtros actuales, las conversaciones van a aparecer aca para gestionarlas desde el portal."}
+                : showingArchived
+                  ? "Cuando ocultes conversaciones desde el inbox activo, vas a poder restaurarlas desde esta vista."
+                  : "Cuando entren mensajes por WhatsApp o limpies los filtros actuales, las conversaciones van a aparecer aca para gestionarlas desde el portal."}
             </p>
             <button
               type="button"
@@ -219,7 +299,9 @@ export function ConversationList({
                               key={row.id}
                               row={row}
                               selected={selectedId === row.id}
+                              bulkSelected={selectedIds.includes(row.id)}
                               onSelect={() => onSelect(row.id)}
+                              onToggleSelect={() => onToggleSelect(row.id)}
                               onMarkHot={() => onMarkHot(row.id)}
                               onClose={() => onClose(row.id)}
                               disabled={readOnly}

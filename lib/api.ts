@@ -612,14 +612,16 @@ export async function deletePortalUser(tenantId: string, userId: string, current
   });
 }
 
-export async function getPortalConversations(tenantId: string) {
+export async function getPortalConversations(tenantId: string, options?: { visibility?: "active" | "archived" }) {
+  const params = new URLSearchParams();
+  if (options?.visibility === "archived") params.set("visibility", "archived");
   return backendFetch<{
     success: boolean;
     data: {
       tenantId: string;
       conversations: any[];
     };
-  }>(`/portal/tenants/${tenantId}/conversations`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/conversations${params.toString() ? `?${params.toString()}` : ""}`, undefined, false);
 }
 
 export type PortalContact = {
@@ -692,14 +694,16 @@ export type PortalContactDetail = PortalContact & {
   };
 };
 
-export async function getPortalContacts(tenantId: string) {
+export async function getPortalContacts(tenantId: string, options?: { visibility?: "active" | "archived" }) {
+  const params = new URLSearchParams();
+  if (options?.visibility === "archived") params.set("visibility", "archived");
   return backendFetch<{
     success: boolean;
     data: {
       tenantId: string;
       contacts: PortalContact[];
     };
-  }>(`/portal/tenants/${tenantId}/contacts`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/contacts${params.toString() ? `?${params.toString()}` : ""}`, undefined, false);
 }
 
 export async function getPortalContactDetail(tenantId: string, contactId: string) {
@@ -752,8 +756,34 @@ export async function patchPortalContact(
       method: "PATCH",
       body: JSON.stringify(payload)
     },
-    false
-  );
+      false
+    );
+  }
+
+export async function archivePortalContacts(tenantId: string, contactIds: string[]) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      archivedContactIds: string[];
+      archivedCount: number;
+    };
+  }>(`/portal/tenants/${tenantId}/contacts/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ contactIds })
+  }, false);
+}
+
+export async function restorePortalContacts(tenantId: string, contactIds: string[]) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      restoredContactIds: string[];
+      restoredCount: number;
+    };
+  }>(`/portal/tenants/${tenantId}/contacts/restore`, {
+    method: "PATCH",
+    body: JSON.stringify({ contactIds })
+  }, false);
 }
 
 export type PortalBusinessSettings = {
@@ -873,8 +903,34 @@ export async function patchPortalConversation(tenantId: string, conversationId: 
       method: "PATCH",
       body: JSON.stringify(payload || {})
     },
-    false
-  );
+      false
+    );
+  }
+
+export async function archivePortalConversations(tenantId: string, conversationIds: string[]) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      archivedConversationIds: string[];
+      archivedCount: number;
+    };
+  }>(`/portal/tenants/${tenantId}/conversations/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ conversationIds })
+  }, false);
+}
+
+export async function restorePortalConversations(tenantId: string, conversationIds: string[]) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      restoredConversationIds: string[];
+      restoredCount: number;
+    };
+  }>(`/portal/tenants/${tenantId}/conversations/restore`, {
+    method: "PATCH",
+    body: JSON.stringify({ conversationIds })
+  }, false);
 }
 
 export async function sendPortalMessage(

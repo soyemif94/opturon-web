@@ -32,14 +32,18 @@ function statusLabel(status: ConversationRowData["status"], unreadCount: number)
 export function ConversationRow({
   row,
   selected,
+  bulkSelected,
   onSelect,
+  onToggleSelect,
   onMarkHot,
   onClose,
   disabled
 }: {
   row: ConversationRowData;
   selected: boolean;
+  bulkSelected?: boolean;
   onSelect: () => void;
+  onToggleSelect?: () => void;
   onMarkHot: () => void;
   onClose: () => void;
   disabled?: boolean;
@@ -76,10 +80,24 @@ export function ConversationRow({
         hasUnread && !selected ? "bg-brand/5" : ""
       )}
     >
-      <button onClick={onSelect} className="w-full text-left" type="button">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-start gap-3">
+        {onToggleSelect ? (
+          <label className="mt-1 inline-flex items-center">
+            <input
+              type="checkbox"
+              checked={Boolean(bulkSelected)}
+              onChange={() => onToggleSelect()}
+              disabled={disabled}
+              className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)]"
+              aria-label={`Seleccionar conversacion ${contact}`}
+            />
+          </label>
+        ) : null}
+
+        <button onClick={onSelect} className="w-full text-left" type="button">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
               <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
               <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
               <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
@@ -89,26 +107,27 @@ export function ConversationRow({
               ) : null}
             </div>
             <p className="mt-0.5 text-xs text-muted">{meta}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="inline-flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">
-              <span className={cn("inline-flex h-2.5 w-2.5 rounded-full", priorityUi.dotClassName)} />
-              <span>{priorityUi.label}</span>
             </div>
-            <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
-            {hasUnread ? (
-              <span className="mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-2 text-[11px] font-semibold text-white">
-                {row.unreadCount}
-              </span>
-            ) : null}
+            <div className="shrink-0 text-right">
+              <div className="inline-flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">
+                <span className={cn("inline-flex h-2.5 w-2.5 rounded-full", priorityUi.dotClassName)} />
+                <span>{priorityUi.label}</span>
+              </div>
+              <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
+              {hasUnread ? (
+                <span className="mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-2 text-[11px] font-semibold text-white">
+                  {row.unreadCount}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </div>
 
-        <div className="mt-3 flex items-start justify-between gap-3">
-          <p className={cn("line-clamp-2 min-w-0 text-xs leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
-          <span className={cn("text-xs", slaTone(row.slaMinutes))}>SLA {row.slaMinutes}m</span>
-        </div>
-      </button>
+          <div className="mt-3 flex items-start justify-between gap-3">
+            <p className={cn("line-clamp-2 min-w-0 text-xs leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
+            <span className={cn("text-xs", slaTone(row.slaMinutes))}>SLA {row.slaMinutes}m</span>
+          </div>
+        </button>
+      </div>
 
       <div className="mt-2 flex gap-2 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto">
         <button

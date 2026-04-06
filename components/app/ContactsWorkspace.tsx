@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Building2, Mail, Phone, Plus, ReceiptText, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,14 +41,119 @@ export function ContactsWorkspace({
   readOnly?: boolean;
 }) {
   const [contacts, setContacts] = useState(Array.isArray(initialContacts) ? initialContacts : []);
+  const [viewMode, setViewMode] = useState<"active" | "archived">("active");
   const [selectedId, setSelectedId] = useState(initialContacts[0]?.id || "");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draft, setDraft] = useState<ContactDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
 
   const selected = useMemo(
     () => contacts.find((item) => item.id === selectedId) || contacts[0] || null,
     [contacts, selectedId]
   );
+  const allVisibleSelected = contacts.length > 0 && contacts.every((contact) => selectedIds.includes(contact.id));
+  const showingArchived = viewMode === "archived";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContacts() {
+      setLoadingContacts(true);
+      try {
+        const response = await fetch(`/api/app/contacts?visibility=${viewMode}`, { cache: "no-store" });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(String(json?.error || "contacts_list_failed"));
+        if (cancelled) return;
+        const nextContacts = Array.isArray(json?.contacts) ? (json.contacts as PortalContactDetail[]) : [];
+        setContacts(nextContacts);
+        setSelectedIds([]);
+        setSelectedId((current) => (current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || ""));
+      } catch (error) {
+        if (!cancelled) {
+          toast.error("No se pudieron cargar los contactos", error instanceof Error ? error.message : "unknown_error");
+        }
+      } finally {
+        if (!cancelled) setLoadingContacts(false);
+      }
+    }
+
+    void loadContacts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode]);
+
+  async function archiveSelectedContacts() {
+    if (readOnly || selectedIds.length === 0 || archiving) return;
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(`Se ocultaran ${selectedIds.length} contactos del panel. El historial comercial seguira preservado.`);
+    if (!confirmed) return;
+
+    setArchiving(true);
+    try {
+      const response = await fetch("/api/app/contacts/archive", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: selectedIds })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "contacts_archive_failed"));
+
+      const archivedIds = Array.isArray(json?.archivedContactIds) ? json.archivedContactIds : selectedIds;
+      const remaining = contacts.filter((contact) => !archivedIds.includes(contact.id));
+      setContacts(remaining);
+      setSelectedIds([]);
+      if (selectedId && archivedIds.includes(selectedId)) {
+        setSelectedId(remaining[0]?.id || "");
+      }
+      toast.success("Contactos ocultados", "Ya no aparecen en la base visible del panel.");
+    } catch (error) {
+      toast.error("No se pudieron ocultar los contactos", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  async function restoreSelectedContacts() {
+    if (readOnly || selectedIds.length === 0 || restoring) return;
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(`Se restauraran ${selectedIds.length} contactos a la base activa.`);
+    if (!confirmed) return;
+
+    setRestoring(true);
+    try {
+      const response = await fetch("/api/app/contacts/restore", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: selectedIds })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "contacts_restore_failed"));
+
+      const restoredIds = Array.isArray(json?.restoredContactIds) ? json.restoredContactIds : selectedIds;
+      const remaining = contacts.filter((contact) => !restoredIds.includes(contact.id));
+      setContacts(remaining);
+      setSelectedIds([]);
+      if (selectedId && restoredIds.includes(selectedId)) {
+        setSelectedId(remaining[0]?.id || "");
+      }
+      toast.success("Contactos restaurados", "Ya vuelven a aparecer en la base activa.");
+    } catch (error) {
+      toast.error("No se pudieron restaurar los contactos", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   async function createContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,16 +206,59 @@ export function ContactsWorkspace({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {!contacts.length ? (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button type="button" variant={showingArchived ? "ghost" : "secondary"} size="sm" className="rounded-2xl" onClick={() => setViewMode("active")}>
+              Activos
+            </Button>
+            <Button type="button" variant={showingArchived ? "secondary" : "ghost"} size="sm" className="rounded-2xl" onClick={() => setViewMode("archived")}>
+              Archivados
+            </Button>
+          </div>
+          <div className="mb-4 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted">
+                {selectedIds.length > 0
+                  ? `${selectedIds.length} contactos seleccionados`
+                  : showingArchived
+                    ? "Selecciona contactos archivados para restaurarlos a la base activa."
+                    : "Selecciona contactos para ocultarlos del panel sin borrar historial."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-2xl"
+                  onClick={() => setSelectedIds(allVisibleSelected ? [] : contacts.map((contact) => contact.id))}
+                  disabled={contacts.length === 0}
+                >
+                  {allVisibleSelected ? "Limpiar visibles" : "Seleccionar visibles"}
+                </Button>
+                <Button
+                  type="button"
+                  variant={showingArchived ? "secondary" : "destructive"}
+                  size="sm"
+                  className="rounded-2xl"
+                  onClick={() => void (showingArchived ? restoreSelectedContacts() : archiveSelectedContacts())}
+                  disabled={readOnly || selectedIds.length === 0 || archiving || restoring}
+                >
+                  {showingArchived ? restoring ? "Restaurando..." : "Restaurar seleccionados" : archiving ? "Ocultando..." : "Ocultar seleccionados"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {!contacts.length && !loadingContacts ? (
             <EmptyState
               icon={<UserRound className="h-5 w-5" />}
-              title="Todavia no hay contactos visibles"
-              description="Crea el primero para empezar a vincular facturas, cobros y futuras conversaciones."
+              title={showingArchived ? "Todavia no hay contactos archivados" : "Todavia no hay contactos visibles"}
+              description={showingArchived ? "Cuando archives contactos desde la vista activa, vas a poder restaurarlos desde aca." : "Crea el primero para empezar a vincular facturas, cobros y futuras conversaciones."}
             />
           ) : (
             <>
               <div className="hidden overflow-hidden rounded-2xl border border-[color:var(--border)] md:block">
-              <div className="grid grid-cols-[minmax(0,1.2fr)_180px_210px_140px_160px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
+              <div className="grid grid-cols-[32px_minmax(0,1.2fr)_180px_210px_140px_160px] gap-4 border-b border-[color:var(--border)] bg-surface/70 px-4 py-3 text-xs uppercase tracking-[0.16em] text-muted">
+                <span />
                 <span>Contacto</span>
                 <span>Empresa</span>
                 <span>Senal financiera</span>
@@ -120,16 +268,30 @@ export function ContactsWorkspace({
               {contacts.map((contact) => {
                 const active = selected?.id === contact.id;
                 return (
-                  <button
+                  <div
                     key={contact.id}
-                    type="button"
-                    onClick={() => setSelectedId(contact.id)}
-                    className={`grid w-full grid-cols-[minmax(0,1.2fr)_180px_210px_140px_160px] gap-4 border-b border-[color:var(--border)] px-4 py-4 text-left transition-colors last:border-b-0 ${active ? "bg-brand/5" : "hover:bg-surface/40"}`}
+                    className={`grid w-full grid-cols-[32px_minmax(0,1.2fr)_180px_210px_140px_160px] gap-4 border-b border-[color:var(--border)] px-4 py-4 text-left transition-colors last:border-b-0 ${active ? "bg-brand/5" : "hover:bg-surface/40"}`}
                   >
-                    <div className="min-w-0">
+                    <label
+                      className="inline-flex items-center"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(contact.id)}
+                        onChange={() =>
+                          setSelectedIds((current) =>
+                            current.includes(contact.id) ? current.filter((id) => id !== contact.id) : [...current, contact.id]
+                          )
+                        }
+                        disabled={readOnly}
+                        className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)]"
+                        aria-label={`Seleccionar contacto ${contact.name}`}
+                      />
+                    </label>
+                    <button type="button" onClick={() => setSelectedId(contact.id)} className="min-w-0 text-left">
                       <p className="truncate font-medium">{contact.name}</p>
                       <p className="mt-1 truncate text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
-                    </div>
+                    </button>
                     <div className="flex items-center text-sm text-muted">{contact.companyName || "-"}</div>
                     <div className="flex items-center">
                       <FinancialSignalCell contact={contact} />
@@ -140,7 +302,7 @@ export function ContactsWorkspace({
                     <div className="flex items-center text-sm text-muted">
                       {relativeDateLabel(contact.updatedAt || contact.createdAt || contact.lastInteractionAt)}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
               </div>
@@ -148,17 +310,29 @@ export function ContactsWorkspace({
                 {contacts.map((contact) => {
                   const active = selected?.id === contact.id;
                   return (
-                    <button
+                    <div
                       key={contact.id}
-                      type="button"
-                      onClick={() => setSelectedId(contact.id)}
                       className={`w-full rounded-2xl border p-4 text-left transition-colors ${active ? "border-brand/35 bg-brand/5" : "border-[color:var(--border)] bg-surface/55 hover:bg-surface/40"}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(contact.id)}
+                            onChange={() =>
+                              setSelectedIds((current) =>
+                                current.includes(contact.id) ? current.filter((id) => id !== contact.id) : [...current, contact.id]
+                              )
+                            }
+                            disabled={readOnly}
+                            className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)]"
+                            aria-label={`Seleccionar contacto ${contact.name}`}
+                          />
+                        </label>
+                        <button type="button" onClick={() => setSelectedId(contact.id)} className="min-w-0 text-left">
                           <p className="truncate font-medium">{contact.name}</p>
                           <p className="mt-1 text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
-                        </div>
+                        </button>
                         <Badge variant={contact.status === "archived" ? "danger" : "success"}>{contact.status || "active"}</Badge>
                       </div>
                       <div className="mt-3 grid gap-2 text-sm text-muted sm:grid-cols-2">
@@ -168,7 +342,7 @@ export function ContactsWorkspace({
                       <div className="mt-3">
                         <FinancialSignalCell contact={contact} />
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

@@ -19,6 +19,7 @@ function backendUnavailable() {
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
+  const visibility = url.searchParams.get("visibility") === "archived" ? "archived" : "active";
   const tenantContext = await resolveAppTenant({
     requestedTenantId: url.searchParams.get("tenantId") || undefined,
     demo: url.searchParams.get("demo") === "1"
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
-    const result = await getPortalContacts(tenantContext.tenantId);
+    const result = await getPortalContacts(tenantContext.tenantId, { visibility });
     return noStore(
       NextResponse.json({
         readOnly: tenantContext.readOnly,

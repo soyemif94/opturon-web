@@ -39,16 +39,20 @@ export function InboxWorkspace({
   const setInboxControls = inbox.setControls;
   const clearInboxControls = inbox.clearControls;
   const [filter, setFilter] = useState<FilterKey>(DEFAULT_FILTER);
+  const [visibility, setVisibility] = useState<"active" | "archived">("active");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<ConversationRowData[]>([]);
   const [rowsLoading, setRowsLoading] = useState(true);
   const [rowsLoaded, setRowsLoaded] = useState(false);
   const [rowsError, setRowsError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>(initialConversationId);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [channelState, setChannelState] = useState<WhatsAppConnectionStatus | null>(null);
+  const [archivingSelection, setArchivingSelection] = useState(false);
+  const [restoringSelection, setRestoringSelection] = useState(false);
   const [composer, setComposer] = useState("");
   const [noteText, setNoteText] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -123,7 +127,8 @@ export function InboxWorkspace({
     try {
       const response = await fetch(
         appendQuery("/api/app/inbox", {
-          filter
+          filter,
+          visibility
         }),
         { cache: "no-store" }
       );
@@ -154,6 +159,7 @@ export function InboxWorkspace({
         setChannelState(json.channelState || null);
         if (!selectedId && nextRows.length) setSelectedId(nextRows[0].id);
         if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
+        setSelectedIds((current) => current.filter((id) => nextRows.some((item) => item.id === id)));
       }
 
       setRowsError(null);
@@ -207,7 +213,7 @@ export function InboxWorkspace({
   useEffect(() => {
     void loadRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, onlyUnread]);
+  }, [filter, onlyUnread, visibility]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -525,6 +531,86 @@ export function InboxWorkspace({
     return ok;
   }
 
+  async function archiveSelectedConversations() {
+    if (readOnly || selectedIds.length === 0 || archivingSelection) return;
+
+    const currentSelection = [...selectedIds];
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(`Se ocultaran ${currentSelection.length} conversaciones del inbox. El historial y los pedidos seguiran intactos.`);
+    if (!confirmed) return;
+
+    setArchivingSelection(true);
+    try {
+      const response = await fetch(appendQuery("/api/app/inbox/archive"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds: currentSelection })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "inbox_archive_failed"));
+
+      const archivedIds = Array.isArray(json?.archivedConversationIds) ? json.archivedConversationIds : currentSelection;
+      const remaining = rows.filter((row) => !archivedIds.includes(row.id));
+      setRows(remaining);
+      setSelectedIds([]);
+      if (selectedId && archivedIds.includes(selectedId)) {
+        setSelectedId(remaining[0]?.id);
+        if (!remaining.length) {
+          setSelectedId(undefined);
+          setDetail(null);
+        }
+      }
+      toast.success("Conversaciones ocultadas", "Ya no aparecen en el inbox, pero el historial sigue preservado.");
+      await loadRows();
+    } catch (error) {
+      toast.error("No se pudieron ocultar las conversaciones", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setArchivingSelection(false);
+    }
+  }
+
+  async function restoreSelectedConversations() {
+    if (readOnly || selectedIds.length === 0 || restoringSelection) return;
+
+    const currentSelection = [...selectedIds];
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(`Se restauraran ${currentSelection.length} conversaciones al inbox activo.`);
+    if (!confirmed) return;
+
+    setRestoringSelection(true);
+    try {
+      const response = await fetch(appendQuery("/api/app/inbox/restore"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds: currentSelection })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "inbox_restore_failed"));
+
+      const restoredIds = Array.isArray(json?.restoredConversationIds) ? json.restoredConversationIds : currentSelection;
+      const remaining = rows.filter((row) => !restoredIds.includes(row.id));
+      setRows(remaining);
+      setSelectedIds([]);
+      if (selectedId && restoredIds.includes(selectedId)) {
+        setSelectedId(remaining[0]?.id);
+        if (!remaining.length) {
+          setSelectedId(undefined);
+          setDetail(null);
+        }
+      }
+      toast.success("Conversaciones restauradas", "Ya vuelven a aparecer en el inbox activo.");
+      await loadRows();
+    } catch (error) {
+      toast.error("No se pudieron restaurar las conversaciones", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setRestoringSelection(false);
+    }
+  }
+
   useEffect(() => {
     setInboxControls({
       applyFilter: (nextFilter) => setFilter(nextFilter as FilterKey),
@@ -710,6 +796,21 @@ export function InboxWorkspace({
                 setOnlyUnread(false);
               }}
               onRetry={() => void loadRows()}
+              visibility={visibility}
+              onVisibilityChange={(value) => {
+                setVisibility(value);
+                setSelectedIds([]);
+              }}
+              selectedIds={selectedIds}
+              onToggleSelect={(id) =>
+                setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+              }
+              onSelectVisible={(ids) => setSelectedIds(ids)}
+              onClearSelection={() => setSelectedIds([])}
+              onArchiveSelected={() => void archiveSelectedConversations()}
+              archiveBusy={archivingSelection}
+              onRestoreSelected={() => void restoreSelectedConversations()}
+              restoreBusy={restoringSelection}
             />
           }
           center={

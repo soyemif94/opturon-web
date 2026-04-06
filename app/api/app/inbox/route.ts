@@ -14,6 +14,7 @@ import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 const filtersSchema = z.object({
   filter: z.enum(["all", "hot", "sin_responder", "nuevas", "asignadas"]).optional(),
   q: z.string().optional(),
+  visibility: z.enum(["active", "archived"]).optional(),
   tenantId: z.string().optional(),
   demo: z.string().optional()
 });
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
   const userId = tenantContext.ctx?.userId;
   const q = (params.q || "").toLowerCase().trim();
   const filter = params.filter || "all";
+  const visibility = params.visibility || "active";
 
   let conversations = tenantContext.readOnly ? listInboxConversations(tenantContext.tenantId) : [];
   let channelState = buildWhatsAppConnectionStatus({
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
     try {
       const [contextResult, conversationsResult, onboardingResult] = await Promise.all([
         getPortalTenantContext(tenantContext.tenantId),
-        getPortalConversations(tenantContext.tenantId),
+        getPortalConversations(tenantContext.tenantId, { visibility }),
         getPortalWhatsAppEmbeddedSignupStatus(tenantContext.tenantId).catch(() => null)
       ]);
 
