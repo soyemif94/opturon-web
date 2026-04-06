@@ -13,6 +13,9 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "in_conversation", label: "En conversacion" },
   { key: "follow_up", label: "Seguimiento" },
   { key: "closed", label: "Cerrados" },
+  { key: "with_follow_up", label: "Con seguimiento" },
+  { key: "overdue", label: "Vencidos" },
+  { key: "today", label: "Hoy" },
   { key: "unassigned", label: "Sin asignar" }
 ];
 

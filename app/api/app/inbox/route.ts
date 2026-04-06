@@ -12,7 +12,7 @@ import { listInboxConversations } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 const filtersSchema = z.object({
-  filter: z.enum(["all", "new", "in_conversation", "follow_up", "closed", "unassigned", "nuevas", "asignadas"]).optional(),
+  filter: z.enum(["all", "new", "in_conversation", "follow_up", "closed", "unassigned", "with_follow_up", "overdue", "today", "nuevas", "asignadas"]).optional(),
   q: z.string().optional(),
   visibility: z.enum(["active", "archived"]).optional(),
   tenantId: z.string().optional(),
@@ -86,11 +86,22 @@ export async function GET(request: NextRequest) {
   }
 
   conversations = conversations.filter((item) => {
+    const nextActionAt = item.nextActionAt ? new Date(item.nextActionAt) : null;
+    const hasNextAction = nextActionAt && !Number.isNaN(nextActionAt.getTime());
+    const now = new Date();
+    const isToday =
+      hasNextAction &&
+      nextActionAt.getFullYear() === now.getFullYear() &&
+      nextActionAt.getMonth() === now.getMonth() &&
+      nextActionAt.getDate() === now.getDate();
     if (filter === "new" || filter === "nuevas") return item.leadStatus === "NEW";
     if (filter === "in_conversation") return item.leadStatus === "IN_CONVERSATION";
     if (filter === "follow_up") return item.leadStatus === "FOLLOW_UP";
     if (filter === "closed") return item.leadStatus === "CLOSED";
     if (filter === "unassigned") return !item.assignedSellerUserId;
+    if (filter === "with_follow_up") return Boolean(hasNextAction);
+    if (filter === "overdue") return Boolean(hasNextAction && nextActionAt.getTime() < now.getTime());
+    if (filter === "today") return Boolean(isToday);
     if (filter === "asignadas") return Boolean(item.assignedSellerUserId && item.assignedSellerUserId === userId);
     return true;
   });

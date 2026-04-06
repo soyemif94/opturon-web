@@ -171,6 +171,8 @@ export type Conversation = {
   contactId: string;
   status: ConversationStatus;
   leadStatus?: ConversationLeadStatus;
+  nextActionAt?: string | null;
+  nextActionNote?: string | null;
   assignedTo?: string;
   assignedSellerUserId?: string;
   assignedSellerName?: string;

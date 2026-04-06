@@ -71,7 +71,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ...detail,
     conversation: {
       ...detail.conversation,
-      leadStatus: detail.conversation.leadStatus || "NEW"
+      leadStatus: detail.conversation.leadStatus || "NEW",
+      nextActionAt: detail.conversation.nextActionAt || null,
+      nextActionNote: detail.conversation.nextActionNote || null
     },
     quickReplies: inboxQuickReplies(),
     aiEvents: inboxAiEvents(tenantContext.tenantId, id)

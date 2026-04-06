@@ -37,6 +37,27 @@ function leadStatusUi(leadStatus: ConversationRowData["leadStatus"]) {
   return { label: "Nuevo", className: "border-white/10 bg-white/5 text-muted" };
 }
 
+function followUpUi(nextActionAt?: string | null) {
+  if (!nextActionAt) return null;
+  const date = new Date(nextActionAt);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = new Date();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (date.getTime() < now.getTime()) {
+    return { label: "Atrasado", className: "border-red-400/30 bg-red-400/10 text-red-100" };
+  }
+  if (isToday) {
+    return { label: "Hoy", className: "border-amber-400/30 bg-amber-400/10 text-amber-100" };
+  }
+  return {
+    label: date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }),
+    className: "border-white/10 bg-white/5 text-muted"
+  };
+}
+
 export function ConversationRow({
   row,
   selected,
@@ -63,6 +84,7 @@ export function ConversationRow({
   const ownerLabel = row.assignedSellerName || row.assignedTo || "Sin asignar";
   const derivedPriority = getConversationPriority(row);
   const leadStatus = leadStatusUi(row.leadStatus);
+  const followUp = followUpUi(row.nextActionAt);
   const priorityUi =
     derivedPriority === "high"
       ? {
@@ -120,12 +142,14 @@ export function ConversationRow({
                   <InboxBadge className={cn("text-[11px]", leadStatus.className)}>{leadStatus.label}</InboxBadge>
                   <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
                   {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
+                  {followUp ? <InboxBadge className={cn("text-[11px]", followUp.className)}>{followUp.label}</InboxBadge> : null}
                   {row.transferPaymentStatus === "payment_pending_validation" ? (
                     <InboxBadge className="text-[11px]">Pago pendiente</InboxBadge>
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-xs text-muted">{meta}</p>
                 <p className="mt-1 text-[11px] text-muted">Owner: {ownerLabel}</p>
+                {row.nextActionNote ? <p className="mt-1 line-clamp-1 text-[11px] text-muted">Seguimiento: {row.nextActionNote}</p> : null}
               </div>
             </div>
             <div className="shrink-0 text-right">

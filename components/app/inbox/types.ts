@@ -1,4 +1,4 @@
-export type FilterKey = "all" | "new" | "in_conversation" | "follow_up" | "closed" | "unassigned";
+export type FilterKey = "all" | "new" | "in_conversation" | "follow_up" | "closed" | "unassigned" | "with_follow_up" | "overdue" | "today";
 export type BotDomainOverride = "automatic" | "agenda" | "commerce";
 export type BotFlowLock = "automatic" | "agenda" | "commerce";
 export type LeadStatus = "NEW" | "IN_CONVERSATION" | "FOLLOW_UP" | "CLOSED";
@@ -20,6 +20,8 @@ export type ConversationRowData = {
   botDomainOverride?: BotDomainOverride;
   unreadCount: number;
   slaMinutes: number;
+  nextActionAt?: string | null;
+  nextActionNote?: string | null;
   transferPaymentStatus?: string | null;
   transferPaymentOrderId?: string | null;
   contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; tags?: string[] };

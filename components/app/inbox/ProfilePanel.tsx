@@ -85,6 +85,13 @@ type ProfilePanelProps = {
   leadStatus: LeadStatus;
   leadStatusBusy?: boolean;
   onLeadStatusChange: (value: LeadStatus) => void;
+  nextActionAt: string;
+  nextActionNote: string;
+  nextActionBusy?: boolean;
+  onNextActionAtChange: (value: string) => void;
+  onNextActionNoteChange: (value: string) => void;
+  onSaveNextAction: () => void;
+  onClearNextAction: () => void;
 };
 
 export function ProfilePanel({
@@ -112,7 +119,14 @@ export function ProfilePanel({
   orderHref,
   leadStatus,
   leadStatusBusy,
-  onLeadStatusChange
+  onLeadStatusChange,
+  nextActionAt,
+  nextActionNote,
+  nextActionBusy,
+  onNextActionAtChange,
+  onNextActionNoteChange,
+  onSaveNextAction,
+  onClearNextAction
 }: ProfilePanelProps) {
   if (loading) {
     return (
@@ -337,6 +351,43 @@ export function ProfilePanel({
         </div>
       </CardSection>
 
+      <CardSection title="Seguimiento" subtitle="Proxima accion comercial para este lead">
+        <div className="space-y-2">
+          <input
+            type="datetime-local"
+            value={nextActionAt}
+            onChange={(event) => onNextActionAtChange(event.target.value)}
+            className="w-full rounded-xl border border-[color:var(--border)] bg-bg px-2.5 py-2 text-sm"
+            disabled={readOnly || nextActionBusy}
+          />
+          <input
+            value={nextActionNote}
+            onChange={(event) => onNextActionNoteChange(event.target.value)}
+            className="w-full rounded-xl border border-[color:var(--border)] bg-bg px-2.5 py-2 text-sm"
+            placeholder="Volver a contactar con promo"
+            disabled={readOnly || nextActionBusy}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onSaveNextAction}
+              disabled={readOnly || nextActionBusy}
+              className="rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+            >
+              {nextActionBusy ? "Guardando..." : "Guardar seguimiento"}
+            </button>
+            <button
+              type="button"
+              onClick={onClearNextAction}
+              disabled={readOnly || nextActionBusy}
+              className="rounded-xl border border-[color:var(--border)] px-3 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
+            >
+              Limpiar seguimiento
+            </button>
+          </div>
+        </div>
+      </CardSection>
+
       <CardSection title="Resumen del contacto" subtitle="Ultima interaccion, seguimiento y notas">
         <div className="space-y-3 text-sm text-muted">
           <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 p-3">
@@ -391,7 +442,7 @@ export function ProfilePanel({
         </ul>
       </CardSection>
 
-      <CardSection title="Seguimiento" subtitle="Tareas para continuar la gestion del contacto">
+      <CardSection title="Tareas" subtitle="Tareas para continuar la gestion del contacto">
         <div className="flex gap-2">
           <input
             value={taskTitle}

@@ -30,12 +30,47 @@ type SellerOption = {
 const DEFAULT_FILTER: FilterKey = "all";
 
 function matchesInboxFilter(row: ConversationRowData, filter: FilterKey) {
+  const parsedNextActionAt = row.nextActionAt ? new Date(row.nextActionAt) : null;
+  const nextActionAt =
+    parsedNextActionAt && !Number.isNaN(parsedNextActionAt.getTime()) ? parsedNextActionAt : null;
+  const hasNextAction = Boolean(nextActionAt);
+  const now = new Date();
+  const nextActionTime = nextActionAt ? nextActionAt.getTime() : null;
+  const isToday =
+    Boolean(
+      nextActionAt &&
+        nextActionAt.getFullYear() === now.getFullYear() &&
+        nextActionAt.getMonth() === now.getMonth() &&
+        nextActionAt.getDate() === now.getDate()
+    );
   if (filter === "new") return row.leadStatus === "NEW";
   if (filter === "in_conversation") return row.leadStatus === "IN_CONVERSATION";
   if (filter === "follow_up") return row.leadStatus === "FOLLOW_UP";
   if (filter === "closed") return row.leadStatus === "CLOSED";
   if (filter === "unassigned") return !row.assignedSellerUserId;
+  if (filter === "with_follow_up") return hasNextAction;
+  if (filter === "overdue") return Boolean(nextActionTime !== null && nextActionTime < now.getTime());
+  if (filter === "today") return Boolean(isToday);
   return true;
+}
+
+function toDateTimeLocalValue(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function fromDateTimeLocalValue(value: string) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) return null;
+  const date = new Date(safeValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export function InboxWorkspace({
@@ -76,6 +111,9 @@ export function InboxWorkspace({
   const [sellerOptions, setSellerOptions] = useState<SellerOption[]>([]);
   const [assigningSeller, setAssigningSeller] = useState(false);
   const [leadStatusBusy, setLeadStatusBusy] = useState(false);
+  const [nextActionBusy, setNextActionBusy] = useState(false);
+  const [nextActionAtInput, setNextActionAtInput] = useState("");
+  const [nextActionNoteInput, setNextActionNoteInput] = useState("");
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [autoSuggestions, setAutoSuggestions] = useState<SuggestionItem[]>([]);
@@ -208,6 +246,8 @@ export function InboxWorkspace({
         setReadOnly(nextReadOnly);
         if (json.deal?.stage) setDealStage(json.deal.stage);
         setAssignTo(json.conversation?.assignedSellerUserId || "");
+        setNextActionAtInput(toDateTimeLocalValue(json.conversation?.nextActionAt));
+        setNextActionNoteInput(json.conversation?.nextActionNote || "");
         const latestMessage = Array.isArray(json.messages) && json.messages.length > 0 ? json.messages[json.messages.length - 1] : null;
         if (json.conversation?.id) {
           setRows((prev) =>
@@ -217,6 +257,8 @@ export function InboxWorkspace({
                     ...row,
                     leadStatus: json.conversation.leadStatus || row.leadStatus,
                     leadStatusLabel: json.conversation.leadStatusLabel || row.leadStatusLabel,
+                    nextActionAt: json.conversation.nextActionAt || null,
+                    nextActionNote: json.conversation.nextActionNote || null,
                     lastMessageAt: latestMessage?.timestamp || json.conversation.lastMessageAt || row.lastMessageAt,
                     lastMessagePreview: latestMessage?.text || row.lastMessagePreview
                   }
@@ -600,6 +642,40 @@ export function InboxWorkspace({
     );
   }
 
+  function applyNextActionLocally(conversationId: string, nextActionAt: string | null, nextActionNote: string | null) {
+    setRows((prev) => {
+      const nextRows = prev.map((row) =>
+        row.id === conversationId
+          ? {
+              ...row,
+              nextActionAt,
+              nextActionNote
+            }
+          : row
+      );
+
+      const updatedRow = nextRows.find((row) => row.id === conversationId);
+      if (updatedRow && !matchesInboxFilter(updatedRow, filter)) {
+        return nextRows.filter((row) => row.id !== conversationId);
+      }
+
+      return nextRows;
+    });
+
+    setDetail((prev) =>
+      prev && prev.conversation.id === conversationId
+        ? {
+            ...prev,
+            conversation: {
+              ...prev.conversation,
+              nextActionAt,
+              nextActionNote
+            }
+          }
+        : prev
+    );
+  }
+
   async function assignSeller(conversationId: string, sellerUserId: string) {
     const seller = sellerOptions.find((item) => item.id === sellerUserId);
     if (!conversationId || !seller || readOnly || assigningSeller) return false;
@@ -685,6 +761,65 @@ export function InboxWorkspace({
       return false;
     } finally {
       setLeadStatusBusy(false);
+    }
+  }
+
+  async function saveNextAction(
+    conversationId: string,
+    patch: { nextActionAt?: string | null; nextActionNote?: string | null }
+  ) {
+    if (!conversationId || readOnly || nextActionBusy || !detail) return false;
+
+    const snapshotDetail = detail;
+    const snapshotRows = rows;
+    const nextActionAt = Object.prototype.hasOwnProperty.call(patch, "nextActionAt")
+      ? patch.nextActionAt || null
+      : detail.conversation.nextActionAt || null;
+    const nextActionNote = Object.prototype.hasOwnProperty.call(patch, "nextActionNote")
+      ? patch.nextActionNote || null
+      : detail.conversation.nextActionNote || null;
+
+    setNextActionBusy(true);
+    applyNextActionLocally(conversationId, nextActionAt, nextActionNote);
+
+    try {
+      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}/next-action`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch)
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "next_action_failed"));
+      }
+
+      if (
+        selectedId === conversationId &&
+        !matchesInboxFilter(
+          {
+            ...detail.conversation,
+            nextActionAt,
+            nextActionNote
+          },
+          filter
+        )
+      ) {
+        setSelectedId(undefined);
+        setDetail(null);
+      }
+
+      void loadRows({ silent: true });
+      if (selectedId === conversationId) {
+        void loadDetail(conversationId, { silent: true });
+      }
+      return true;
+    } catch (error) {
+      setDetail(snapshotDetail);
+      setRows(snapshotRows);
+      toast.error("No se pudo guardar el seguimiento", error instanceof Error ? error.message : "unknown_error");
+      return false;
+    } finally {
+      setNextActionBusy(false);
     }
   }
 
@@ -1076,6 +1211,24 @@ export function InboxWorkspace({
               onLeadStatusChange={(value) => {
                 if (!selectedId) return;
                 void changeLeadStatus(selectedId, value);
+              }}
+              nextActionAt={nextActionAtInput}
+              nextActionNote={nextActionNoteInput}
+              nextActionBusy={nextActionBusy}
+              onNextActionAtChange={setNextActionAtInput}
+              onNextActionNoteChange={setNextActionNoteInput}
+              onSaveNextAction={() => {
+                if (!selectedId) return;
+                void saveNextAction(selectedId, {
+                  nextActionAt: fromDateTimeLocalValue(nextActionAtInput),
+                  nextActionNote: nextActionNoteInput.trim() || null
+                });
+              }}
+              onClearNextAction={() => {
+                if (!selectedId) return;
+                setNextActionAtInput("");
+                setNextActionNoteInput("");
+                void saveNextAction(selectedId, { nextActionAt: null, nextActionNote: null });
               }}
               onAssign={() => void reassignConversation()}
               onToggleBot={() => void runAction("toggle_bot")}
