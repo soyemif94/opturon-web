@@ -13,6 +13,9 @@ export type OpsSellerOption = {
   role: string | null;
 };
 
+const URGENT_RESPONSE_MINUTES = 30;
+const COLD_LEAD_HOURS = 72;
+
 function leadTone(status: LeadStatus) {
   if (status === "IN_CONVERSATION") return "border-sky-500/30 bg-sky-500/10 text-sky-200";
   if (status === "FOLLOW_UP") return "border-amber-500/30 bg-amber-500/10 text-amber-200";
@@ -37,6 +40,23 @@ function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
+function isUrgentLead(row: ConversationRowData) {
+  return row.leadStatus !== "CLOSED" && row.unreadCount > 0 && row.slaMinutes >= URGENT_RESPONSE_MINUTES;
+}
+
+function isColdLead(row: ConversationRowData, now = new Date()) {
+  if (row.leadStatus === "CLOSED") return false;
+  if (row.unreadCount > 0 || row.nextActionAt) return false;
+  const lastMessageAt = new Date(row.lastMessageAt);
+  if (Number.isNaN(lastMessageAt.getTime())) return false;
+  return now.getTime() - lastMessageAt.getTime() >= COLD_LEAD_HOURS * 60 * 60 * 1000;
+}
+
+function slaTone(type: "urgent" | "cold") {
+  if (type === "urgent") return "border-red-500/30 bg-red-500/10 text-red-100";
+  return "border-slate-400/20 bg-slate-400/10 text-slate-100";
+}
+
 export function OpsLeadTable({
   title,
   description,
@@ -47,6 +67,7 @@ export function OpsLeadTable({
   emptyMessage,
   showOwner = false,
   showFollowUp = false,
+  showSlaSignals = true,
   onAssign
 }: {
   title: string;
@@ -58,6 +79,7 @@ export function OpsLeadTable({
   emptyMessage: string;
   showOwner?: boolean;
   showFollowUp?: boolean;
+  showSlaSignals?: boolean;
   onAssign: (conversationId: string, sellerUserId: string) => void;
 }) {
   const [draftAssignments, setDraftAssignments] = useState<Record<string, string>>({});
@@ -97,6 +119,8 @@ export function OpsLeadTable({
             const draftSellerId = draftAssignments[row.id] ?? row.assignedSellerUserId ?? "";
             const ownerLabel = row.assignedSellerName || row.assignedTo || "Sin asignar";
             const isBusy = assigningId === row.id;
+            const urgent = showSlaSignals && isUrgentLead(row);
+            const cold = showSlaSignals && !urgent && isColdLead(row);
 
             return (
               <div
@@ -107,6 +131,8 @@ export function OpsLeadTable({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold">{row.contact?.name || "Sin nombre"}</p>
                     <Badge className={leadTone(row.leadStatus)}>{leadLabel(row.leadStatus)}</Badge>
+                    {urgent ? <Badge className={slaTone("urgent")}>Urgente</Badge> : null}
+                    {cold ? <Badge className={slaTone("cold")}>Frio</Badge> : null}
                   </div>
                   <p className="text-xs text-muted">{row.contact?.phone || row.contact?.email || "Sin contacto"}</p>
                   <p className="line-clamp-2 text-sm text-muted">{row.lastMessagePreview || "Sin mensajes recientes"}</p>

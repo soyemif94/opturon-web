@@ -26,11 +26,13 @@ type OpsAlert = {
   severity: "critical" | "warning" | "info";
   message: string;
   ctaLabel?: string;
-  target?: "kpis" | "unassigned" | "overdue" | "today" | "seller_load";
+  target?: "kpis" | "unassigned" | "overdue" | "today" | "urgent" | "cold" | "seller_load";
   href?: string;
 };
 
 const OVERLOAD_THRESHOLD = 5;
+const URGENT_RESPONSE_MINUTES = 30;
+const COLD_LEAD_HOURS = 72;
 
 function isSameDay(value: string, now = new Date()) {
   const date = new Date(value);
@@ -50,6 +52,18 @@ function isOverdue(row: ConversationRowData, now = new Date()) {
 
 function isActiveLead(row: ConversationRowData) {
   return row.leadStatus !== "CLOSED";
+}
+
+function isUrgentLead(row: ConversationRowData) {
+  return isActiveLead(row) && row.unreadCount > 0 && row.slaMinutes >= URGENT_RESPONSE_MINUTES;
+}
+
+function isColdLead(row: ConversationRowData, now = new Date()) {
+  if (!isActiveLead(row)) return false;
+  if (row.unreadCount > 0 || row.nextActionAt) return false;
+  const lastMessageAt = new Date(row.lastMessageAt);
+  if (Number.isNaN(lastMessageAt.getTime())) return false;
+  return now.getTime() - lastMessageAt.getTime() >= COLD_LEAD_HOURS * 60 * 60 * 1000;
 }
 
 export function OpsDashboard({
@@ -72,6 +86,8 @@ export function OpsDashboard({
   const unassignedRef = useRef<HTMLDivElement | null>(null);
   const overdueRef = useRef<HTMLDivElement | null>(null);
   const todayRef = useRef<HTMLDivElement | null>(null);
+  const urgentRef = useRef<HTMLDivElement | null>(null);
+  const coldRef = useRef<HTMLDivElement | null>(null);
   const sellerLoadRef = useRef<HTMLDivElement | null>(null);
 
   async function loadOpsData(options?: { silent?: boolean }) {
@@ -128,6 +144,20 @@ export function OpsDashboard({
     () => activeConversations.filter((row) => row.nextActionAt && isSameDay(row.nextActionAt, now)),
     [activeConversations, now]
   );
+  const urgentLeads = useMemo(
+    () =>
+      activeConversations
+        .filter((row) => isUrgentLead(row))
+        .sort((left, right) => right.slaMinutes - left.slaMinutes || right.unreadCount - left.unreadCount),
+    [activeConversations]
+  );
+  const coldLeads = useMemo(
+    () =>
+      activeConversations
+        .filter((row) => isColdLead(row, now))
+        .sort((left, right) => new Date(left.lastMessageAt).getTime() - new Date(right.lastMessageAt).getTime()),
+    [activeConversations, now]
+  );
   const sellerLoad = useMemo(() => {
     const buckets = new Map<string, OpsSellerLoadItem>();
 
@@ -179,6 +209,17 @@ export function OpsDashboard({
       });
     }
 
+    if (urgentLeads.length > 0) {
+      alerts.push({
+        id: "urgent_leads",
+        severity: "critical",
+        message: `Tenes ${urgentLeads.length} ${urgentLeads.length === 1 ? "lead urgente sin respuesta" : "leads urgentes sin respuesta"}`,
+        ctaLabel: urgentLeads.length === 1 ? "Abrir lead" : "Ver urgentes",
+        target: urgentLeads.length === 1 ? undefined : "urgent",
+        href: urgentLeads.length === 1 ? `/app/inbox/${urgentLeads[0]?.id}` : undefined
+      });
+    }
+
     if (todayLeads.length > 0) {
       alerts.push({
         id: "today_follow_ups",
@@ -187,6 +228,17 @@ export function OpsDashboard({
         ctaLabel: todayLeads.length === 1 ? "Abrir lead" : "Ver hoy",
         target: todayLeads.length === 1 ? undefined : "today",
         href: todayLeads.length === 1 ? `/app/inbox/${todayLeads[0]?.id}` : undefined
+      });
+    }
+
+    if (coldLeads.length > 0) {
+      alerts.push({
+        id: "cold_leads",
+        severity: "info",
+        message: `Tenes ${coldLeads.length} ${coldLeads.length === 1 ? "lead frio" : "leads frios"} sin movimiento reciente`,
+        ctaLabel: coldLeads.length === 1 ? "Abrir lead" : "Ver frios",
+        target: coldLeads.length === 1 ? undefined : "cold",
+        href: coldLeads.length === 1 ? `/app/inbox/${coldLeads[0]?.id}` : undefined
       });
     }
 
@@ -201,7 +253,7 @@ export function OpsDashboard({
     }
 
     return alerts.slice(0, 5);
-  }, [overdueLeads.length, sellerLoad, todayLeads.length, unassignedLeads.length]);
+  }, [coldLeads, overdueLeads, sellerLoad, todayLeads, unassignedLeads, urgentLeads]);
 
   function scrollToSection(target: NonNullable<OpsAlert["target"]>) {
     setFocusedSection(target);
@@ -212,6 +264,10 @@ export function OpsDashboard({
           ? overdueRef.current
           : target === "today"
             ? todayRef.current
+            : target === "urgent"
+              ? urgentRef.current
+              : target === "cold"
+                ? coldRef.current
           : target === "seller_load"
             ? sellerLoadRef.current
             : kpisRef.current;
@@ -354,6 +410,27 @@ export function OpsDashboard({
         />
       </section>
 
+      <section className="grid gap-4 xl:grid-cols-2">
+        <KpiCard
+          icon={ShieldAlert}
+          label="Leads urgentes"
+          value={urgentLeads.length}
+          helper="Inbound sin respuesta operativa suficiente."
+          loading={loading}
+          active={urgentLeads.length > 0}
+          tone="critical"
+        />
+        <KpiCard
+          icon={BellRing}
+          label="Leads frios"
+          value={coldLeads.length}
+          helper="Sin movimiento reciente ni proximo seguimiento."
+          loading={loading}
+          active={coldLeads.length > 0}
+          tone="info"
+        />
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <div ref={unassignedRef} className={sectionClassName(focusedSection === "unassigned")}>
           <OpsLeadTable
@@ -388,6 +465,21 @@ export function OpsDashboard({
         />
       </div>
 
+      <div ref={urgentRef} className={sectionClassName(focusedSection === "urgent")}>
+        <OpsLeadTable
+          title="Leads urgentes"
+          description="Inbound reciente con demora operativa segun el SLA basico."
+          rows={urgentLeads}
+          sellers={sellers}
+          readOnly={readOnly || !backendReady}
+          assigningId={assigningId}
+          emptyMessage="No hay leads urgentes segun el SLA basico actual."
+          showOwner
+          showSlaSignals
+          onAssign={assignSeller}
+        />
+      </div>
+
       <div ref={todayRef} className={sectionClassName(focusedSection === "today")}>
         <OpsLeadTable
           title="Seguimientos para hoy"
@@ -399,6 +491,21 @@ export function OpsDashboard({
           emptyMessage="No hay seguimientos planificados para hoy."
           showOwner
           showFollowUp
+          onAssign={assignSeller}
+        />
+      </div>
+
+      <div ref={coldRef} className={sectionClassName(focusedSection === "cold")}>
+        <OpsLeadTable
+          title="Leads frios"
+          description="Leads sin movimiento reciente ni seguimiento activo para reactivar o cerrar criterio."
+          rows={coldLeads}
+          sellers={sellers}
+          readOnly={readOnly || !backendReady}
+          assigningId={assigningId}
+          emptyMessage="No hay leads frios segun el criterio basico actual."
+          showOwner
+          showSlaSignals
           onAssign={assignSeller}
         />
       </div>
@@ -423,16 +530,27 @@ function KpiCard({
   label,
   value,
   helper,
-  loading
+  loading,
+  active = false,
+  tone = "default"
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
   helper: string;
   loading?: boolean;
+  active?: boolean;
+  tone?: "default" | "critical" | "info";
 }) {
+  const toneClassName =
+    tone === "critical"
+      ? "border-red-500/20 bg-red-500/5"
+      : tone === "info"
+        ? "border-sky-500/20 bg-sky-500/5"
+        : "border-white/6 bg-card/90";
+
   return (
-    <Card className="border-white/6 bg-card/90">
+    <Card className={`${toneClassName} ${active ? "ring-1 ring-current/20" : ""}`}>
       <CardContent className="flex items-start gap-4 p-5">
         <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-surface/80">
           <Icon className="h-5 w-5 text-brandBright" />
