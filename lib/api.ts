@@ -630,6 +630,7 @@ export type PortalContact = {
   waId: string | null;
   phone: string | null;
   name: string;
+  profileImageUrl?: string | null;
   optedOut: boolean;
   lastInteractionAt: string | null;
   conversationCount: number;
@@ -642,6 +643,7 @@ export type PortalContact = {
 
 export type PortalContactDetail = PortalContact & {
   email?: string | null;
+  profileImageUrl?: string | null;
   whatsappPhone?: string | null;
   taxId?: string | null;
   taxCondition?: string | null;
@@ -720,6 +722,7 @@ export async function createPortalContact(
     name: string;
     email?: string | null;
     phone?: string | null;
+    profileImageUrl?: string | null;
     whatsappPhone?: string | null;
     companyName?: string | null;
     taxId?: string | null;
@@ -743,6 +746,7 @@ export async function patchPortalContact(
     name: string;
     email?: string | null;
     phone?: string | null;
+    profileImageUrl?: string | null;
     whatsappPhone?: string | null;
     companyName?: string | null;
     taxId?: string | null;
@@ -790,6 +794,7 @@ export type PortalBusinessSettings = {
   tenantId: string;
   clinicId: string | null;
   clinicName: string | null;
+  profileImageUrl: string;
   legalName: string;
   taxId: string;
   taxIdType: string;

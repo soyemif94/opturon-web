@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/toast";
 
 type Settings = {
   tenantId?: string;
+  profileImageUrl?: string;
   legalName?: string;
   taxId?: string;
   taxIdType?: string;
@@ -154,6 +155,25 @@ export function BusinessSettingsForm({
 
         <Section title="Operacion del negocio" helper="Se mantiene la ficha operativa de Fase 1 para inbox, ventas y automatizaciones.">
           <div className="grid gap-3">
+            <Field label="Imagen del negocio (URL)" value={form.profileImageUrl || ""} onChange={(v) => setForm((p) => ({ ...p, profileImageUrl: v }))} />
+            {(form.profileImageUrl || "").trim() ? (
+              <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-4">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Preview</p>
+                <div className="mt-3 flex items-center gap-4">
+                  <div className="h-20 w-20 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-surface/60">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.profileImageUrl} alt={form.legalName || tenantName || "Negocio"} className="h-full w-full object-cover" />
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[color:var(--border)] px-3 py-2 text-sm text-muted"
+                    onClick={() => setForm((p) => ({ ...p, profileImageUrl: "" }))}
+                  >
+                    Quitar imagen
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <Field label="Horarios" value={form.openingHours || ""} onChange={(v) => setForm((p) => ({ ...p, openingHours: v }))} />
             <Field label="Direccion operativa" value={form.address || ""} onChange={(v) => setForm((p) => ({ ...p, address: v }))} />
             <Field label="Zonas de entrega o atencion" value={form.deliveryZones || ""} onChange={(v) => setForm((p) => ({ ...p, deliveryZones: v }))} multiline />

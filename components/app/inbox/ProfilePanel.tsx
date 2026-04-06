@@ -4,6 +4,7 @@ import { CardSection } from "@/components/app/inbox/CardSection";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
 import type { DetailPayload } from "@/components/app/inbox/types";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 
 const DEAL_STAGES = [
   ["lead", "Prospecto"],
@@ -27,13 +28,6 @@ function taskStatusLabel(value?: string) {
   if (value === "todo") return "Pendiente";
   if (value === "done") return "Hecha";
   return value;
-}
-
-function initials(name?: string) {
-  const value = (name || "").trim();
-  if (!value) return "CT";
-  const parts = value.split(/\s+/).slice(0, 2);
-  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
 }
 
 function stageTone(stage?: string) {
@@ -118,9 +112,12 @@ export function ProfilePanel({
       <CardSection title="Contacto" subtitle="Perfil rapido para contexto y seguimiento">
         <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-brand/20 bg-brand/10 text-sm font-semibold text-brandBright">
-              {initials(detail.contact?.name)}
-            </span>
+            <SimpleAvatar
+              src={detail.contact?.profileImageUrl}
+              name={detail.contact?.name}
+              className="h-14 w-14 rounded-[20px] border border-brand/20 bg-brand/10 text-sm text-brandBright"
+              fallbackClassName="bg-brand/10 text-brandBright"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="truncate text-lg font-semibold">{detail.contact?.name || "Sin nombre"}</p>

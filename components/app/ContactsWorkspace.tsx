@@ -12,11 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { PortalContactDetail } from "@/lib/api";
 import { formatMoney, relativeDateLabel } from "@/lib/billing";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 
 type ContactDraft = {
   name: string;
   email: string;
   phone: string;
+  profileImageUrl: string;
   whatsappPhone: string;
   companyName: string;
   taxId: string;
@@ -27,6 +29,7 @@ const EMPTY_DRAFT: ContactDraft = {
   name: "",
   email: "",
   phone: "",
+  profileImageUrl: "",
   whatsappPhone: "",
   companyName: "",
   taxId: "",
@@ -188,6 +191,7 @@ export function ContactsWorkspace({
           name: draft.name.trim(),
           email: draft.email.trim() || null,
           phone: draft.phone.trim() || null,
+          profileImageUrl: draft.profileImageUrl.trim() || null,
           whatsappPhone: draft.whatsappPhone.trim() || null,
           companyName: draft.companyName.trim() || null,
           taxId: draft.taxId.trim() || null,
@@ -323,9 +327,17 @@ export function ContactsWorkspace({
                         aria-label={`Seleccionar contacto ${contact.name}`}
                       />
                     </label>
-                    <button type="button" onClick={() => setSelectedId(contact.id)} className="min-w-0 text-left">
-                      <p className="truncate font-medium">{contact.name}</p>
-                      <p className="mt-1 truncate text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
+                    <button type="button" onClick={() => setSelectedId(contact.id)} className="flex min-w-0 items-center gap-3 text-left">
+                      <SimpleAvatar
+                        src={contact.profileImageUrl}
+                        name={contact.name}
+                        className="h-11 w-11 rounded-2xl border border-[color:var(--border)] bg-brand/10 text-brandBright"
+                        fallbackClassName="bg-brand/10 text-brandBright"
+                      />
+                      <span className="min-w-0">
+                        <p className="truncate font-medium">{contact.name}</p>
+                        <p className="mt-1 truncate text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
+                      </span>
                     </button>
                     <div className="flex items-center text-sm text-muted">{contact.companyName || "-"}</div>
                     <div className="flex items-center">
@@ -364,9 +376,17 @@ export function ContactsWorkspace({
                             aria-label={`Seleccionar contacto ${contact.name}`}
                           />
                         </label>
-                        <button type="button" onClick={() => setSelectedId(contact.id)} className="min-w-0 text-left">
-                          <p className="truncate font-medium">{contact.name}</p>
-                          <p className="mt-1 text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
+                        <button type="button" onClick={() => setSelectedId(contact.id)} className="flex min-w-0 items-center gap-3 text-left">
+                          <SimpleAvatar
+                            src={contact.profileImageUrl}
+                            name={contact.name}
+                            className="h-11 w-11 rounded-2xl border border-[color:var(--border)] bg-brand/10 text-brandBright"
+                            fallbackClassName="bg-brand/10 text-brandBright"
+                          />
+                          <span className="min-w-0">
+                            <p className="truncate font-medium">{contact.name}</p>
+                            <p className="mt-1 text-sm text-muted">{contact.email || contact.phone || contact.whatsappPhone || "Sin datos de contacto"}</p>
+                          </span>
                         </button>
                         <Badge variant={contact.status === "archived" ? "danger" : "success"}>{contact.status || "active"}</Badge>
                       </div>
@@ -413,11 +433,21 @@ export function ContactsWorkspace({
             {selected ? (
               <>
                 <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
-                  <p className="text-lg font-semibold">{selected.name}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant={selected.status === "archived" ? "danger" : "success"}>{selected.status || "active"}</Badge>
-                    {selected.companyName ? <Badge variant="muted">{selected.companyName}</Badge> : null}
-                    {selected.taxId ? <Badge variant="outline">CUIT/DNI {selected.taxId}</Badge> : null}
+                  <div className="flex items-start gap-4">
+                    <SimpleAvatar
+                      src={selected.profileImageUrl}
+                      name={selected.name}
+                      className="h-16 w-16 rounded-[22px] border border-[color:var(--border)] bg-brand/10 text-lg text-brandBright"
+                      fallbackClassName="bg-brand/10 text-brandBright"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-semibold">{selected.name}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Badge variant={selected.status === "archived" ? "danger" : "success"}>{selected.status || "active"}</Badge>
+                        {selected.companyName ? <Badge variant="muted">{selected.companyName}</Badge> : null}
+                        {selected.taxId ? <Badge variant="outline">CUIT/DNI {selected.taxId}</Badge> : null}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <DetailRow icon={<Mail className="h-4 w-4" />} label="Email" value={selected.email || "-"} />
@@ -450,6 +480,35 @@ export function ContactsWorkspace({
                 <Input placeholder="Email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} disabled={readOnly || saving} />
                 <Input placeholder="Telefono" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} disabled={readOnly || saving} />
               </div>
+              <Input
+                placeholder="URL de imagen de perfil"
+                value={draft.profileImageUrl}
+                onChange={(event) => setDraft((current) => ({ ...current, profileImageUrl: event.target.value }))}
+                disabled={readOnly || saving}
+              />
+              {draft.profileImageUrl.trim() ? (
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Preview</p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <SimpleAvatar
+                      src={draft.profileImageUrl}
+                      name={draft.name || "Nuevo contacto"}
+                      className="h-14 w-14 rounded-[18px] border border-[color:var(--border)] bg-brand/10 text-brandBright"
+                      fallbackClassName="bg-brand/10 text-brandBright"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-2xl"
+                      onClick={() => setDraft((current) => ({ ...current, profileImageUrl: "" }))}
+                      disabled={readOnly || saving}
+                    >
+                      Quitar imagen
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 <Input placeholder="WhatsApp" value={draft.whatsappPhone} onChange={(event) => setDraft((current) => ({ ...current, whatsappPhone: event.target.value }))} disabled={readOnly || saving} />
                 <Input placeholder="Empresa" value={draft.companyName} onChange={(event) => setDraft((current) => ({ ...current, companyName: event.target.value }))} disabled={readOnly || saving} />

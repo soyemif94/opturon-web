@@ -12,6 +12,7 @@ import { appendAuditLog, readSaasData, writeSaasData } from "@/lib/saas/store";
 
 const schema = z.object({
   legalName: z.string().optional(),
+  profileImageUrl: z.string().optional(),
   taxId: z.string().optional(),
   taxIdType: z.string().optional(),
   vatCondition: z.string().optional(),
@@ -34,6 +35,7 @@ function emptySettings(tenantId: string) {
   return {
     tenantId,
     legalName: "",
+    profileImageUrl: "",
     taxId: "",
     taxIdType: "NONE",
     vatCondition: "",
@@ -129,6 +131,7 @@ export async function PATCH(request: NextRequest) {
 
       const normalizedPayload = {
         legalName: String(parsed.data.legalName || ""),
+        profileImageUrl: String(parsed.data.profileImageUrl || ""),
         taxId: String(parsed.data.taxId || ""),
         taxIdType: String(parsed.data.taxIdType || "NONE"),
         vatCondition: String(parsed.data.vatCondition || ""),

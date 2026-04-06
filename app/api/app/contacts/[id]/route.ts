@@ -57,6 +57,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       name: String(body?.name || "").trim(),
       email: body?.email || null,
       phone: body?.phone || null,
+      profileImageUrl: body?.profileImageUrl || null,
       whatsappPhone: body?.whatsappPhone || null,
       companyName: body?.companyName || null,
       taxId: body?.taxId || null,

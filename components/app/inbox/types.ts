@@ -16,14 +16,14 @@ export type ConversationRowData = {
   slaMinutes: number;
   transferPaymentStatus?: string | null;
   transferPaymentOrderId?: string | null;
-  contact?: { id: string; name: string; phone?: string; email?: string; tags?: string[] };
+  contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; tags?: string[] };
   deal?: { id: string; stage: string; value: number; probability: number };
 };
 
 export type DetailPayload = {
   readOnly: boolean;
   conversation: ConversationRowData;
-  contact?: { id: string; name: string; phone?: string; email?: string; industry?: string; tags: string[] };
+  contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; industry?: string; tags: string[] };
   deal?: { id: string; stage: string; value: number; probability: number };
   messages: Array<{ id: string; direction: string; text: string; timestamp: string; status: string; optimistic?: boolean }>;
   notes: Array<{ id: string; text: string; createdAt: string }>;

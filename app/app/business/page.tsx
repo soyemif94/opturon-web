@@ -6,6 +6,7 @@ import { readSaasData } from "@/lib/saas/store";
 
 const EMPTY_SETTINGS = {
   tenantId: "",
+  profileImageUrl: "",
   legalName: "",
   taxId: "",
   taxIdType: "NONE",
@@ -60,6 +61,12 @@ export default async function BusinessPage() {
             <div className="space-y-4">
               <div className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Estado del perfil fiscal</p>
+                {(realTenantSettings.profileImageUrl || "").trim() ? (
+                  <div className="mt-3 h-20 w-20 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-surface/60">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={realTenantSettings.profileImageUrl} alt={clinicName} className="h-full w-full object-cover" />
+                  </div>
+                ) : null}
                 <p className="mt-3 text-xl font-semibold">Fuente central del emisor conectada al espacio</p>
                 <p className="mt-2 text-sm leading-6 text-muted">
                   Los datos del negocio se guardan sobre la clinica real del espacio y alimentan por defecto la pre-facturacion contable.
@@ -106,6 +113,12 @@ export default async function BusinessPage() {
           <div className="space-y-4">
             <div className="rounded-[24px] border border-[color:var(--border)] bg-card p-5 shadow-sm">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Resumen del negocio</p>
+              {(settings.profileImageUrl || "").trim() ? (
+                <div className="mt-3 h-20 w-20 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-surface/60">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={settings.profileImageUrl} alt={tenant?.name || "Tu negocio"} className="h-full w-full object-cover" />
+                </div>
+              ) : null}
               <p className="mt-3 text-xl font-semibold">{tenant?.name || "Tu negocio"}</p>
               <p className="mt-1 text-sm text-muted">{tenant?.industry || "Operacion comercial"}</p>
               <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">

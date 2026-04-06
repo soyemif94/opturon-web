@@ -2,6 +2,7 @@ import { InboxBadge } from "@/components/app/inbox/Badge";
 import { getConversationPriority } from "@/components/app/inbox/conversation-priority";
 import { cn } from "@/lib/cn";
 import type { ConversationRowData } from "@/components/app/inbox/types";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 
 function formatAgo(iso: string) {
   const date = new Date(iso).getTime();
@@ -96,17 +97,25 @@ export function ConversationRow({
 
         <button onClick={onSelect} className="w-full text-left" type="button">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-              <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
-              <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
-              <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
-              {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
-              {row.transferPaymentStatus === "payment_pending_validation" ? (
-                <InboxBadge className="text-[11px]">Pago pendiente</InboxBadge>
-              ) : null}
-            </div>
-            <p className="mt-0.5 text-xs text-muted">{meta}</p>
+            <div className="flex min-w-0 items-start gap-3">
+              <SimpleAvatar
+                src={row.contact?.profileImageUrl}
+                name={contact}
+                className="h-11 w-11 rounded-2xl border border-[color:var(--border)] bg-brand/10 text-sm text-brandBright"
+                fallbackClassName="bg-brand/10 text-brandBright"
+              />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
+                  <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
+                  <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
+                  {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
+                  {row.transferPaymentStatus === "payment_pending_validation" ? (
+                    <InboxBadge className="text-[11px]">Pago pendiente</InboxBadge>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-xs text-muted">{meta}</p>
+              </div>
             </div>
             <div className="shrink-0 text-right">
               <div className="inline-flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">

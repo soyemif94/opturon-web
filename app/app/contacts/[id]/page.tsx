@@ -7,6 +7,7 @@ import { getPortalContactDetail, isBackendConfigured } from "@/lib/api";
 import Link from "next/link";
 import { formatDateLabel, formatDateTimeLabel, formatMoney, titleCaseLabel, badgeToneByStatus } from "@/lib/billing";
 import { requireAppPage } from "@/lib/saas/access";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 
 export default async function AppContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireAppPage();
@@ -44,8 +45,18 @@ export default async function AppContactDetailPage({ params }: { params: Promise
             }
           >
             <div>
-              <CardTitle className="text-xl">{contact?.name || "Contacto no disponible"}</CardTitle>
-              <CardDescription>{contact?.companyName || contact?.email || contact?.phone || "Sin contexto adicional"}</CardDescription>
+              <div className="flex items-center gap-4">
+                <SimpleAvatar
+                  src={contact?.profileImageUrl}
+                  name={contact?.name || "Contacto"}
+                  className="h-16 w-16 rounded-[22px] border border-[color:var(--border)] bg-brand/10 text-lg text-brandBright"
+                  fallbackClassName="bg-brand/10 text-brandBright"
+                />
+                <div className="min-w-0">
+                  <CardTitle className="text-xl">{contact?.name || "Contacto no disponible"}</CardTitle>
+                  <CardDescription>{contact?.companyName || contact?.email || contact?.phone || "Sin contexto adicional"}</CardDescription>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3">
