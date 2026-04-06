@@ -21,6 +21,12 @@ type InboxListResponse = {
   channelState?: WhatsAppConnectionStatus;
 };
 
+type SellerOption = {
+  id: string;
+  name: string;
+  role: string;
+};
+
 const DEFAULT_FILTER: FilterKey = "all";
 
 export function InboxWorkspace({
@@ -58,6 +64,8 @@ export function InboxWorkspace({
   const [taskTitle, setTaskTitle] = useState("");
   const [dealStage, setDealStage] = useState("lead");
   const [assignTo, setAssignTo] = useState("");
+  const [sellerOptions, setSellerOptions] = useState<SellerOption[]>([]);
+  const [assigningSeller, setAssigningSeller] = useState(false);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [autoSuggestions, setAutoSuggestions] = useState<SuggestionItem[]>([]);
@@ -184,12 +192,12 @@ export function InboxWorkspace({
       const nextSnapshot = JSON.stringify(json);
       const changed = detailSnapshotRef.current !== nextSnapshot;
 
-      if (changed && requestSeq === detailRequestSeqRef.current) {
+        if (changed && requestSeq === detailRequestSeqRef.current) {
         detailSnapshotRef.current = nextSnapshot;
         setDetail(json);
         setReadOnly(nextReadOnly);
         if (json.deal?.stage) setDealStage(json.deal.stage);
-        setAssignTo(json.conversation?.assignedTo || "");
+        setAssignTo(json.conversation?.assignedSellerUserId || "");
         const latestMessage = Array.isArray(json.messages) && json.messages.length > 0 ? json.messages[json.messages.length - 1] : null;
         if (json.conversation?.id) {
           setRows((prev) =>
@@ -289,6 +297,28 @@ export function InboxWorkspace({
   const lastInboundMessage = useMemo(() => {
     return [...(detail?.messages || [])].reverse().find((message) => message.direction === "inbound");
   }, [detail?.messages]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const response = await fetch("/api/app/orders/meta", { cache: "no-store" });
+      if (!response.ok || cancelled) return;
+      const json = await response.json().catch(() => null);
+      if (cancelled || !json || !Array.isArray(json.sellers)) return;
+      setSellerOptions(
+        json.sellers
+          .filter((seller: any) => seller && seller.id && seller.role !== "viewer")
+          .map((seller: any) => ({
+            id: String(seller.id),
+            name: String(seller.name || seller.id),
+            role: String(seller.role || "seller")
+          }))
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -445,7 +475,7 @@ export function InboxWorkspace({
       intent: detail?.aiEvents?.[0]?.text || null,
       stage: detail?.deal?.stage || null,
       botEnabled: detail?.conversation?.botEnabled ?? null,
-      assignedTo: detail?.conversation?.assignedTo || null,
+      assignedTo: detail?.conversation?.assignedSellerName || detail?.conversation?.assignedTo || null,
       isHot: (detail?.conversation?.priority || selectedRow?.priority) === "hot",
       lastMessageAt: detail?.conversation?.lastMessageAt || selectedRow?.lastMessageAt || null,
       unreadCount: selectedRow?.unreadCount || 0
@@ -468,6 +498,89 @@ export function InboxWorkspace({
     await loadRows();
     if (selectedId === conversationId) await loadDetail(conversationId);
     return true;
+  }
+
+  function applyAssignedSellerLocally(conversationId: string, seller: SellerOption) {
+    setRows((prev) => {
+      const nextRows = prev
+        .map((row) =>
+          row.id === conversationId
+            ? {
+                ...row,
+                assignedTo: seller.name,
+                assignedSellerUserId: seller.id,
+                assignedSellerName: seller.name,
+                assignedSellerRole: seller.role
+              }
+            : row
+        );
+
+      if (filter === "asignadas" && currentUserId && seller.id !== currentUserId) {
+        return nextRows.filter((row) => row.id !== conversationId);
+      }
+
+      return nextRows;
+    });
+
+    setDetail((prev) =>
+      prev && prev.conversation.id === conversationId
+        ? {
+            ...prev,
+            conversation: {
+              ...prev.conversation,
+              assignedTo: seller.name,
+              assignedSellerUserId: seller.id,
+              assignedSellerName: seller.name,
+              assignedSellerRole: seller.role
+            },
+            assignee: {
+              id: seller.id,
+              name: seller.name
+            },
+            assignedSeller: {
+              id: seller.id,
+              name: seller.name,
+              role: seller.role
+            }
+          }
+        : prev
+    );
+
+    setInboxState({ assignedTo: seller.name });
+  }
+
+  async function assignSeller(conversationId: string, sellerUserId: string) {
+    const seller = sellerOptions.find((item) => item.id === sellerUserId);
+    if (!conversationId || !seller || readOnly || assigningSeller) return false;
+
+    setAssigningSeller(true);
+    try {
+      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}/assign-seller`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sellerUserId })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "assign_seller_failed"));
+      }
+
+      applyAssignedSellerLocally(conversationId, seller);
+      if (selectedId === conversationId && filter === "asignadas" && currentUserId && seller.id !== currentUserId) {
+        setSelectedId(undefined);
+        setDetail(null);
+      }
+      void loadRows({ silent: true });
+      if (selectedId === conversationId) {
+        void loadDetail(conversationId, { silent: true });
+      }
+      return true;
+    } catch (error) {
+      toast.error("No se pudo reasignar la conversacion", error instanceof Error ? error.message : "unknown_error");
+      return false;
+    } finally {
+      setAssigningSeller(false);
+    }
   }
 
   async function runOptimisticAction(action: string, payload: Record<string, unknown> = {}) {
@@ -673,8 +786,16 @@ export function InboxWorkspace({
   async function takeConversation() {
     if (!selectedId || !currentUserId || readOnly) return;
     setAssignTo(currentUserId);
-    const ok = await mutateConversation(selectedId, "assign", { assignedTo: currentUserId });
+    const ok = await assignSeller(selectedId, currentUserId);
     if (!ok) toast.error("No se pudo tomar la conversacion");
+  }
+
+  async function reassignConversation() {
+    if (!selectedId || !assignTo) return;
+    const ok = await assignSeller(selectedId, assignTo);
+    if (ok) {
+      toast.success("Conversacion reasignada", "El owner se actualizo al instante en el inbox.");
+    }
   }
 
   async function changeBotDomainOverride(nextOverride: BotDomainOverride) {
@@ -843,7 +964,9 @@ export function InboxWorkspace({
               onSaveDealStage={() => void runAction("change_stage")}
               assignTo={assignTo}
               onAssignToChange={setAssignTo}
-              onAssign={() => void runAction("assign")}
+              sellerOptions={sellerOptions}
+              assigningSeller={assigningSeller}
+              onAssign={() => void reassignConversation()}
               onToggleBot={() => void runAction("toggle_bot")}
               onMarkHot={() => void runAction("mark_hot")}
               onClose={() => void runAction("close")}

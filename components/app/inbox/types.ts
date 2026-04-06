@@ -6,6 +6,9 @@ export type ConversationRowData = {
   id: string;
   status: "open" | "closed" | "new";
   assignedTo?: string;
+  assignedSellerUserId?: string | null;
+  assignedSellerName?: string | null;
+  assignedSellerRole?: string | null;
   lastMessageAt: string;
   lastMessagePreview?: string;
   priority: "normal" | "hot";
@@ -29,6 +32,7 @@ export type DetailPayload = {
   notes: Array<{ id: string; text: string; createdAt: string }>;
   tasks: Array<{ id: string; title: string; status: string; dueDate?: string }>;
   assignee?: { id: string; name: string };
+  assignedSeller?: { id?: string | null; name?: string | null; role?: string | null };
   relatedOrder?: {
     id: string;
     orderStatus?: string | null;

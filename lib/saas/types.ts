@@ -170,6 +170,9 @@ export type Conversation = {
   contactId: string;
   status: ConversationStatus;
   assignedTo?: string;
+  assignedSellerUserId?: string;
+  assignedSellerName?: string;
+  assignedSellerRole?: TenantRole | string;
   lastMessageAt: string;
   priority: ConversationPriority;
   botEnabled: boolean;

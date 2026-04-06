@@ -51,6 +51,8 @@ type ProfilePanelProps = {
   onSaveDealStage: () => void;
   assignTo: string;
   onAssignToChange: (value: string) => void;
+  sellerOptions: Array<{ id: string; name: string; role: string }>;
+  assigningSeller?: boolean;
   onAssign: () => void;
   onToggleBot: () => void;
   onMarkHot: () => void;
@@ -74,6 +76,8 @@ export function ProfilePanel({
   onSaveDealStage,
   assignTo,
   onAssignToChange,
+  sellerOptions,
+  assigningSeller,
   onAssign,
   onToggleBot,
   onMarkHot,
@@ -254,22 +258,41 @@ export function ProfilePanel({
           ) : null}
         </div>
 
-        <div className="mt-3 flex gap-2">
-          <input
+        <div className="mt-3 space-y-2">
+          <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 px-3 py-2 text-xs text-muted">
+            Owner actual: <span className="font-medium text-text">{detail.conversation.assignedSellerName || detail.conversation.assignedTo || "Sin asignar"}</span>
+          </div>
+          <div className="flex gap-2">
+            <select
             value={assignTo}
             onChange={(event) => onAssignToChange(event.target.value)}
-            placeholder="Asignar a usuario"
             className="w-full rounded-xl border border-[color:var(--border)] bg-bg px-2.5 py-2 text-sm"
             disabled={readOnly}
-          />
-          <button
-            type="button"
-            onClick={onToggleBot}
-            disabled={readOnly}
-            className="rounded-xl border border-[color:var(--border)] px-3 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
           >
-            Bot
-          </button>
+              <option value="">Seleccionar vendedor</option>
+              {sellerOptions.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onAssign}
+              disabled={readOnly || !assignTo || assigningSeller}
+              className="rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+            >
+              {assigningSeller ? "Guardando..." : "Reasignar"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleBot}
+              disabled={readOnly}
+              className="rounded-xl border border-[color:var(--border)] px-3 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
+            >
+              Bot
+            </button>
+          </div>
         </div>
       </CardSection>
 

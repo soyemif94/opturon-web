@@ -53,6 +53,7 @@ export function ConversationRow({
   const meta = row.contact?.phone || row.contact?.email || "Sin contacto";
   const preview = row.lastMessagePreview?.trim() || "Sin mensajes recientes";
   const hasUnread = row.unreadCount > 0;
+  const ownerLabel = row.assignedSellerName || row.assignedTo || "Sin asignar";
   const derivedPriority = getConversationPriority(row);
   const priorityUi =
     derivedPriority === "high"
@@ -115,6 +116,7 @@ export function ConversationRow({
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-xs text-muted">{meta}</p>
+                <p className="mt-1 text-[11px] text-muted">Owner: {ownerLabel}</p>
               </div>
             </div>
             <div className="shrink-0 text-right">

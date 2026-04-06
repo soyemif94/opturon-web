@@ -912,6 +912,17 @@ export async function patchPortalConversation(tenantId: string, conversationId: 
     );
   }
 
+export async function assignPortalConversationSeller(tenantId: string, conversationId: string, sellerUserId: string) {
+  return backendFetch<{ success: boolean; data: any }>(
+    `/portal/tenants/${tenantId}/conversations/${conversationId}/assign-seller`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ sellerUserId })
+    },
+    false
+  );
+}
+
 export async function archivePortalConversations(tenantId: string, conversationIds: string[]) {
   return backendFetch<{
     success: boolean;

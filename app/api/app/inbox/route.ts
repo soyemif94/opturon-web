@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     if (filter === "hot") return item.priority === "hot";
     if (filter === "sin_responder") return item.unreadCount > 0;
     if (filter === "nuevas") return item.status === "new";
-    if (filter === "asignadas") return Boolean(item.assignedTo && item.assignedTo === userId);
+    if (filter === "asignadas") return Boolean(item.assignedSellerUserId && item.assignedSellerUserId === userId);
     return true;
   });
 
