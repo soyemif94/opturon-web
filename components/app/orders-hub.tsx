@@ -81,6 +81,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     initialOrders.find((order) => order.id === initialOrderId) || initialOrders[0] || null
   );
   const [viewMode, setViewMode] = useState<OrdersViewMode>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
   const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
   const [form, setForm] = useState<OrderFormState>(initialForm);
@@ -151,6 +152,29 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     () => (viewMode === "pending_validation" ? orders.filter((order) => isPendingTransferValidation(order)) : orders),
     [orders, viewMode]
   );
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredOrders = useMemo(() => {
+    if (!normalizedSearch) return visibleOrders;
+
+    return visibleOrders.filter((order) => {
+      const haystack = [
+        order.id,
+        order.customerName,
+        order.customerPhone,
+        order.contact?.name,
+        order.contact?.phone,
+        order.paymentStatus,
+        order.orderStatus,
+        order.paymentDestination?.name,
+        order.paymentDestinationNameSnapshot
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, visibleOrders]);
   const selectedConversationHref = selectedOrder?.conversationPreview?.conversationId
     ? `/app/inbox/${selectedOrder.conversationPreview.conversationId}`
     : selectedOrder?.conversationId
@@ -342,6 +366,17 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       setSelectedOrder(matchingOrder);
     }
   }, [initialOrderId, orders, selectedOrder?.id]);
+
+  useEffect(() => {
+    if (!filteredOrders.length) {
+      if (selectedOrder) setSelectedOrder(null);
+      return;
+    }
+
+    if (!selectedOrder || !filteredOrders.some((order) => order.id === selectedOrder.id)) {
+      setSelectedOrder(filteredOrders[0]);
+    }
+  }, [filteredOrders, selectedOrder]);
 
   async function loadOrderDetail(orderId: string) {
     setLoadingDetailId(orderId);
@@ -680,14 +715,23 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                 </Button>
               </div>
 
-              {visibleOrders.length === 0 ? (
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Buscar por pedido, cliente o teléfono"
+                aria-label="Buscar pedidos"
+              />
+
+              {filteredOrders.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                  {viewMode === "pending_validation"
-                    ? "No hay comprobantes pendientes de validacion manual en este momento."
-                    : "Todavia no hay pedidos cargados. Usa el formulario lateral para registrar el primero y dejar visible el flujo completo en el panel."}
+                  {visibleOrders.length > 0 && normalizedSearch
+                    ? "No encontramos pedidos para esa búsqueda."
+                    : viewMode === "pending_validation"
+                      ? "No hay comprobantes pendientes de validacion manual en este momento."
+                      : "Todavia no hay pedidos cargados. Usa el formulario lateral para registrar el primero y dejar visible el flujo completo en el panel."}
                 </div>
               ) : (
-                visibleOrders.map((order) => (
+                filteredOrders.map((order) => (
                   <button
                     key={order.id}
                     type="button"
