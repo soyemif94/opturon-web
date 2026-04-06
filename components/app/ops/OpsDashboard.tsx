@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, Inbox, UserMinus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, BellRing, CalendarClock, Inbox, ShieldAlert, UserMinus, Users } from "lucide-react";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 import { OpsLeadTable, type OpsSellerOption } from "@/components/app/ops/OpsLeadTable";
 import { OpsSellerLoad, type OpsSellerLoadItem } from "@/components/app/ops/OpsSellerLoad";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 
 type InboxListResponse = {
@@ -18,6 +19,16 @@ type OrdersMetaResponse = {
   sellers: OpsSellerOption[];
   currentUserId?: string | null;
 };
+
+type OpsAlert = {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  message: string;
+  ctaLabel?: string;
+  target: "kpis" | "unassigned" | "overdue" | "seller_load";
+};
+
+const OVERLOAD_THRESHOLD = 1;
 
 function isSameDay(value: string, now = new Date()) {
   const date = new Date(value);
@@ -54,6 +65,11 @@ export function OpsDashboard({
   const [sellers, setSellers] = useState<OpsSellerOption[]>(initialSellers);
   const [loading, setLoading] = useState(initialConversations.length === 0 && backendReady);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [focusedSection, setFocusedSection] = useState<OpsAlert["target"] | null>(null);
+  const kpisRef = useRef<HTMLDivElement | null>(null);
+  const unassignedRef = useRef<HTMLDivElement | null>(null);
+  const overdueRef = useRef<HTMLDivElement | null>(null);
+  const sellerLoadRef = useRef<HTMLDivElement | null>(null);
 
   async function loadOpsData(options?: { silent?: boolean }) {
     if (!backendReady) return;
@@ -89,10 +105,7 @@ export function OpsDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendReady]);
 
-  const activeConversations = useMemo(
-    () => conversations.filter((row) => isActiveLead(row)),
-    [conversations]
-  );
+  const activeConversations = useMemo(() => conversations.filter((row) => isActiveLead(row)), [conversations]);
   const now = new Date();
   const unassignedLeads = useMemo(
     () =>
@@ -138,6 +151,70 @@ export function OpsDashboard({
         left.sellerName.localeCompare(right.sellerName)
     );
   }, [activeConversations, now]);
+  const opsAlerts = useMemo(() => {
+    const alerts: OpsAlert[] = [];
+    const overloadedSeller = sellerLoad.find((item) => item.totalActiveLeads > OVERLOAD_THRESHOLD) || null;
+
+    if (overdueLeads.length > 0) {
+      alerts.push({
+        id: "overdue_follow_ups",
+        severity: "critical",
+        message: `Tenes ${overdueLeads.length} ${overdueLeads.length === 1 ? "seguimiento vencido" : "seguimientos vencidos"}`,
+        ctaLabel: "Ver vencidos",
+        target: "overdue"
+      });
+    }
+
+    if (unassignedLeads.length > 0) {
+      alerts.push({
+        id: "unassigned_leads",
+        severity: "critical",
+        message: `Tenes ${unassignedLeads.length} ${unassignedLeads.length === 1 ? "lead sin vendedor asignado" : "leads sin vendedor asignado"}`,
+        ctaLabel: "Ver sin asignar",
+        target: "unassigned"
+      });
+    }
+
+    if (todayLeads.length > 0) {
+      alerts.push({
+        id: "today_follow_ups",
+        severity: "warning",
+        message: `Tenes ${todayLeads.length} ${todayLeads.length === 1 ? "seguimiento para hoy" : "seguimientos para hoy"}`,
+        ctaLabel: "Ver resumen",
+        target: "kpis"
+      });
+    }
+
+    if (overloadedSeller) {
+      alerts.push({
+        id: "seller_overload",
+        severity: "warning",
+        message: `${overloadedSeller.sellerName} tiene una carga alta de leads`,
+        ctaLabel: "Ver carga",
+        target: "seller_load"
+      });
+    }
+
+    return alerts.slice(0, 5);
+  }, [overdueLeads.length, sellerLoad, todayLeads.length, unassignedLeads.length]);
+
+  function scrollToSection(target: OpsAlert["target"]) {
+    setFocusedSection(target);
+    const node =
+      target === "unassigned"
+        ? unassignedRef.current
+        : target === "overdue"
+          ? overdueRef.current
+          : target === "seller_load"
+            ? sellerLoadRef.current
+            : kpisRef.current;
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.setTimeout(() => {
+      setFocusedSection((current) => (current === target ? null : current));
+    }, 1800);
+  }
 
   async function assignSeller(conversationId: string, sellerUserId: string) {
     const seller = sellers.find((item) => item.id === sellerUserId);
@@ -190,7 +267,47 @@ export function OpsDashboard({
         </Card>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-4">
+      <Card className="border-white/6 bg-card/90">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-surface/80">
+              <BellRing className="h-4.5 w-4.5 text-brandBright" />
+            </span>
+            <div>
+              <CardTitle className="text-xl">Alertas operativas</CardTitle>
+              <CardDescription>Lectura rapida de prioridades para supervision comercial.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {opsAlerts.length === 0 ? (
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-4 text-sm text-muted">
+              No hay alertas operativas criticas en este momento.
+            </div>
+          ) : (
+            opsAlerts.map((alert) => (
+              <div key={alert.id} className={alertTone(alert.severity)}>
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-black/10">
+                    <AlertIcon severity={alert.severity} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{alert.message}</p>
+                    <p className="mt-1 text-xs opacity-80">{alertSeverityLabel(alert.severity)}</p>
+                  </div>
+                  {alert.ctaLabel ? (
+                    <Button type="button" size="sm" variant="secondary" onClick={() => scrollToSection(alert.target)}>
+                      {alert.ctaLabel}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <section ref={kpisRef} className={sectionClassName(focusedSection === "kpis", "grid gap-4 xl:grid-cols-4")}>
         <KpiCard
           icon={Inbox}
           label="Leads activos"
@@ -222,32 +339,38 @@ export function OpsDashboard({
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <div ref={unassignedRef} className={sectionClassName(focusedSection === "unassigned")}>
+          <OpsLeadTable
+            title="Leads sin asignar"
+            description="Ideal para repartir rapido y que no queden oportunidades sin owner."
+            rows={unassignedLeads}
+            sellers={sellers}
+            readOnly={readOnly || !backendReady}
+            assigningId={assigningId}
+            emptyMessage="No hay leads activos sin asignar."
+            onAssign={assignSeller}
+          />
+        </div>
+
+        <div ref={sellerLoadRef} className={sectionClassName(focusedSection === "seller_load")}>
+          <OpsSellerLoad items={sellerLoad} />
+        </div>
+      </div>
+
+      <div ref={overdueRef} className={sectionClassName(focusedSection === "overdue")}>
         <OpsLeadTable
-          title="Leads sin asignar"
-          description="Ideal para repartir rapido y que no queden oportunidades sin owner."
-          rows={unassignedLeads}
+          title="Leads vencidos"
+          description="Seguimientos atrasados que conviene recuperar antes de que se enfrien."
+          rows={overdueLeads}
           sellers={sellers}
           readOnly={readOnly || !backendReady}
           assigningId={assigningId}
-          emptyMessage="No hay leads activos sin asignar."
+          emptyMessage="No hay seguimientos vencidos en este momento."
+          showOwner
+          showFollowUp
           onAssign={assignSeller}
         />
-
-        <OpsSellerLoad items={sellerLoad} />
       </div>
-
-      <OpsLeadTable
-        title="Leads vencidos"
-        description="Seguimientos atrasados que conviene recuperar antes de que se enfrien."
-        rows={overdueLeads}
-        sellers={sellers}
-        readOnly={readOnly || !backendReady}
-        assigningId={assigningId}
-        emptyMessage="No hay seguimientos vencidos en este momento."
-        showOwner
-        showFollowUp
-        onAssign={assignSeller}
-      />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 px-4 py-3">
         <div className="space-y-1">
@@ -291,4 +414,26 @@ function KpiCard({
       </CardContent>
     </Card>
   );
+}
+
+function sectionClassName(active: boolean, extra = "") {
+  return `${active ? "rounded-[24px] ring-1 ring-brand/50 transition-all" : ""}${extra ? ` ${extra}` : ""}`.trim();
+}
+
+function alertTone(severity: OpsAlert["severity"]) {
+  if (severity === "critical") return "rounded-[22px] border border-red-500/30 bg-red-500/10 p-4 text-red-100";
+  if (severity === "warning") return "rounded-[22px] border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100";
+  return "rounded-[22px] border border-sky-500/30 bg-sky-500/10 p-4 text-sky-100";
+}
+
+function alertSeverityLabel(severity: OpsAlert["severity"]) {
+  if (severity === "critical") return "Atencion inmediata";
+  if (severity === "warning") return "Prioridad operativa";
+  return "Seguimiento informativo";
+}
+
+function AlertIcon({ severity }: { severity: OpsAlert["severity"] }) {
+  if (severity === "critical") return <ShieldAlert className="h-4.5 w-4.5" />;
+  if (severity === "warning") return <AlertTriangle className="h-4.5 w-4.5" />;
+  return <Users className="h-4.5 w-4.5" />;
 }
