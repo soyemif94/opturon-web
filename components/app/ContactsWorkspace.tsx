@@ -42,6 +42,7 @@ export function ContactsWorkspace({
 }) {
   const [contacts, setContacts] = useState(Array.isArray(initialContacts) ? initialContacts : []);
   const [viewMode, setViewMode] = useState<"active" | "archived">("active");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(initialContacts[0]?.id || "");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draft, setDraft] = useState<ContactDraft>(EMPTY_DRAFT);
@@ -49,12 +50,25 @@ export function ContactsWorkspace({
   const [archiving, setArchiving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleContacts = useMemo(() => {
+    if (!normalizedSearch) return contacts;
+
+    return contacts.filter((contact) => {
+      const haystack = [contact.name, contact.phone, contact.email]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [contacts, normalizedSearch]);
 
   const selected = useMemo(
-    () => contacts.find((item) => item.id === selectedId) || contacts[0] || null,
-    [contacts, selectedId]
+    () => visibleContacts.find((item) => item.id === selectedId) || visibleContacts[0] || null,
+    [visibleContacts, selectedId]
   );
-  const allVisibleSelected = contacts.length > 0 && contacts.every((contact) => selectedIds.includes(contact.id));
+  const allVisibleSelected = visibleContacts.length > 0 && visibleContacts.every((contact) => selectedIds.includes(contact.id));
   const showingArchived = viewMode === "archived";
 
   useEffect(() => {
@@ -70,6 +84,7 @@ export function ContactsWorkspace({
         const nextContacts = Array.isArray(json?.contacts) ? (json.contacts as PortalContactDetail[]) : [];
         setContacts(nextContacts);
         setSelectedIds([]);
+        setSearchQuery("");
         setSelectedId((current) => (current && nextContacts.some((contact) => contact.id === current) ? current : nextContacts[0]?.id || ""));
       } catch (error) {
         if (!cancelled) {
@@ -229,8 +244,8 @@ export function ContactsWorkspace({
                   variant="ghost"
                   size="sm"
                   className="rounded-2xl"
-                  onClick={() => setSelectedIds(allVisibleSelected ? [] : contacts.map((contact) => contact.id))}
-                  disabled={contacts.length === 0}
+                  onClick={() => setSelectedIds(allVisibleSelected ? [] : visibleContacts.map((contact) => contact.id))}
+                  disabled={visibleContacts.length === 0}
                 >
                   {allVisibleSelected ? "Limpiar visibles" : "Seleccionar visibles"}
                 </Button>
@@ -247,12 +262,32 @@ export function ContactsWorkspace({
               </div>
             </div>
           </div>
+          <div className="mb-4">
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Buscar por nombre o teléfono"
+              aria-label="Buscar contactos"
+            />
+          </div>
 
-          {!contacts.length && !loadingContacts ? (
+          {!visibleContacts.length && !loadingContacts ? (
             <EmptyState
               icon={<UserRound className="h-5 w-5" />}
-              title={showingArchived ? "Todavia no hay contactos archivados" : "Todavia no hay contactos visibles"}
-              description={showingArchived ? "Cuando archives contactos desde la vista activa, vas a poder restaurarlos desde aca." : "Crea el primero para empezar a vincular facturas, cobros y futuras conversaciones."}
+              title={
+                contacts.length > 0 && normalizedSearch
+                  ? "No encontramos contactos para esa búsqueda"
+                  : showingArchived
+                    ? "Todavia no hay contactos archivados"
+                    : "Todavia no hay contactos visibles"
+              }
+              description={
+                contacts.length > 0 && normalizedSearch
+                  ? "Probá con otro nombre, teléfono o email."
+                  : showingArchived
+                    ? "Cuando archives contactos desde la vista activa, vas a poder restaurarlos desde aca."
+                    : "Crea el primero para empezar a vincular facturas, cobros y futuras conversaciones."
+              }
             />
           ) : (
             <>
@@ -265,7 +300,7 @@ export function ContactsWorkspace({
                 <span>Estado</span>
                 <span>Ultimo movimiento</span>
               </div>
-              {contacts.map((contact) => {
+              {visibleContacts.map((contact) => {
                 const active = selected?.id === contact.id;
                 return (
                   <div
@@ -307,7 +342,7 @@ export function ContactsWorkspace({
               })}
               </div>
               <div className="space-y-3 md:hidden">
-                {contacts.map((contact) => {
+                {visibleContacts.map((contact) => {
                   const active = selected?.id === contact.id;
                   return (
                     <div
