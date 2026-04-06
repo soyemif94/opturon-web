@@ -153,7 +153,7 @@ export function OpsDashboard({
   }, [activeConversations, now]);
   const opsAlerts = useMemo(() => {
     const alerts: OpsAlert[] = [];
-    const overloadedSeller = sellerLoad.find((item) => item.totalActiveLeads > OVERLOAD_THRESHOLD) || null;
+    const overloadedSeller = sellerLoad.find((item) => item.totalActiveLeads >= OVERLOAD_THRESHOLD) || null;
 
     if (overdueLeads.length > 0) {
       alerts.push({
