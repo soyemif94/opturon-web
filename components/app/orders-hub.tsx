@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ClipboardList, Package, Receipt, ShoppingBag } from "lucide-react";
-import type { PortalContact, PortalOrder, PortalOrderPaymentMetrics, PortalOrderPaymentMetricsRange, PortalPaymentDestination } from "@/lib/api";
+import type {
+  PortalContact,
+  PortalOrder,
+  PortalOrderPaymentMetrics,
+  PortalOrderPaymentMetricsRange,
+  PortalPaymentDestination,
+  PortalSellerMetrics
+} from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,6 +82,16 @@ const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
   rejected: 0
 };
 
+const defaultSellerMetrics: PortalSellerMetrics = {
+  salesCriteria: {
+    countedOrderStatuses: "status != cancelled",
+    paidOrderCriteria: "paymentStatus = paid"
+  },
+  sellerMetrics: [],
+  ordersWithoutSeller: 0,
+  currency: "ARS"
+};
+
 export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, backendReady }: OrdersHubProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [selectedOrder, setSelectedOrder] = useState<PortalOrder | null>(
@@ -84,6 +101,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [searchQuery, setSearchQuery] = useState("");
   const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
   const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
+  const [sellerMetrics, setSellerMetrics] = useState<PortalSellerMetrics>(defaultSellerMetrics);
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
@@ -93,6 +111,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [contactsLoading, setContactsLoading] = useState(true);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(true);
+  const [sellerMetricsLoading, setSellerMetricsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
@@ -200,6 +219,29 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       });
     } finally {
       setMetricsLoading(false);
+    }
+  }
+
+  async function loadSellerMetrics() {
+    setSellerMetricsLoading(true);
+    try {
+      const response = await fetch("/api/app/orders/seller-metrics", { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.details || json?.error || "No se pudieron cargar las metricas por vendedor.");
+      }
+
+      setSellerMetrics({
+        salesCriteria: {
+          countedOrderStatuses: String(json?.salesCriteria?.countedOrderStatuses || "status != cancelled"),
+          paidOrderCriteria: String(json?.salesCriteria?.paidOrderCriteria || "paymentStatus = paid")
+        },
+        sellerMetrics: Array.isArray(json?.sellerMetrics) ? json.sellerMetrics : [],
+        ordersWithoutSeller: Number(json?.ordersWithoutSeller || 0),
+        currency: typeof json?.currency === "string" && json.currency ? json.currency : "ARS"
+      });
+    } finally {
+      setSellerMetricsLoading(false);
     }
   }
 
@@ -314,6 +356,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   useEffect(() => {
     void loadPaymentMetrics(metricsRange);
   }, [metricsRange]);
+
+  useEffect(() => {
+    void loadSellerMetrics();
+  }, []);
 
   useEffect(() => {
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
@@ -482,7 +528,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       } else if (createdOrder) {
         setSelectedOrder(createdOrder);
       }
-      await reloadProducts(form.productId);
+      await Promise.all([reloadProducts(form.productId), loadSellerMetrics()]);
       setForm((current) => ({
         ...initialForm,
         customerType: current.customerType,
@@ -523,7 +569,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder((current) => (current?.id === updatedOrder.id ? updatedOrder : current));
       setDetailPaymentDestinationId(updatedOrder.paymentDestinationId || "");
-      await reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined);
+      await Promise.all([
+        reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined),
+        loadSellerMetrics()
+      ]);
       setFeedback({ tone: "success", text: "Estado del pedido actualizado." });
     } catch (error) {
       setFeedback({
@@ -594,6 +643,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder(updatedOrder);
       setDetailSellerUserId(updatedOrder.sellerUserId || "");
+      await loadSellerMetrics();
       setFeedback({ tone: "success", text: "Vendedor del pedido actualizado." });
     } catch (error) {
       setFeedback({
@@ -626,7 +676,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
 
       const updatedOrder = json.order as PortalOrder;
       const notificationOk = json.notification?.status === "sent" || json.notification?.ok === true;
-      await Promise.all([reloadOrders(updatedOrder.id), loadPaymentMetrics(metricsRange)]);
+      await Promise.all([reloadOrders(updatedOrder.id), loadPaymentMetrics(metricsRange), loadSellerMetrics()]);
       setSelectedOrder(updatedOrder);
       setPaymentRejectionReason(updatedOrder.transferPayment?.rejectionReason || "");
       setFeedback({
@@ -711,6 +761,56 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
             value={metricsLoading ? "..." : String(paymentMetrics.rejected)}
             helper="Basado en validatedAt."
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Metricas base por vendedor</CardTitle>
+            <CardDescription>
+              Fuente de verdad: seller del pedido en orders. Se cuentan pedidos no cancelados y el total vendido suma solo pagos confirmados.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sellerMetricsLoading ? (
+            <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+              Cargando metricas por vendedor...
+            </div>
+          ) : sellerMetrics.sellerMetrics.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+              Todavia no hay vendedores con pedidos asignados dentro del criterio actual.
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {sellerMetrics.sellerMetrics.map((metric) => (
+                <div key={metric.sellerUserId} className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{metric.sellerName}</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted">{labelForSellerRole(metric.sellerRole)}</p>
+                    </div>
+                    <Badge variant="muted">Seller</Badge>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <DetailStat label="Ventas" value={String(metric.totalOrders)} />
+                    <DetailStat label="Pagadas" value={String(metric.totalPaidOrders)} />
+                    <DetailStat label="Total vendido" value={formatCurrency(metric.totalRevenue, sellerMetrics.currency)} />
+                    <DetailStat label="Ticket promedio" value={formatCurrency(metric.averageTicket, sellerMetrics.currency)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/35 p-4">
+            <p className="text-sm font-semibold text-foreground">Sin vendedor asignado</p>
+            <p className="mt-1 text-sm text-muted">Pedidos visibles con sellerUserId vacio. No se mezclan con ningun vendedor.</p>
+            <div className="mt-4 max-w-xs">
+              <DetailStat label="Pedidos" value={sellerMetricsLoading ? "..." : String(sellerMetrics.ordersWithoutSeller)} />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

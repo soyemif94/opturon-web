@@ -1059,6 +1059,26 @@ export type PortalOrderPaymentMetrics = {
   rejected: number;
 };
 
+export type PortalSellerMetric = {
+  sellerUserId: string;
+  sellerName: string | null;
+  sellerRole: string | null;
+  totalOrders: number;
+  totalPaidOrders: number;
+  totalRevenue: number;
+  averageTicket: number;
+};
+
+export type PortalSellerMetrics = {
+  salesCriteria: {
+    countedOrderStatuses: string;
+    paidOrderCriteria: string;
+  };
+  sellerMetrics: PortalSellerMetric[];
+  ordersWithoutSeller: number;
+  currency: string;
+};
+
 export type PortalPaymentDestinationType = "bank" | "wallet" | "cash_box" | "other";
 
 export type PortalPaymentDestination = {
@@ -1558,6 +1578,14 @@ export async function getPortalOrderPaymentMetrics(
   const query = new URLSearchParams({ range });
   return backendFetch<{ success: boolean; data: PortalOrderPaymentMetrics }>(
     `/portal/tenants/${tenantId}/orders/payment-metrics?${query.toString()}`,
+    undefined,
+    false
+  );
+}
+
+export async function getPortalSellerMetrics(tenantId: string) {
+  return backendFetch<{ success: boolean; data: PortalSellerMetrics }>(
+    `/portal/tenants/${tenantId}/seller-metrics`,
     undefined,
     false
   );
