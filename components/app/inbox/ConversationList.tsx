@@ -9,10 +9,11 @@ import { normalizeText } from "@/lib/search/normalize";
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "Todas" },
-  { key: "hot", label: "Prospecto caliente" },
-  { key: "sin_responder", label: "Esperando respuesta" },
-  { key: "nuevas", label: "Nuevas" },
-  { key: "asignadas", label: "Asignadas" }
+  { key: "new", label: "Nuevos" },
+  { key: "in_conversation", label: "En conversacion" },
+  { key: "follow_up", label: "Seguimiento" },
+  { key: "closed", label: "Cerrados" },
+  { key: "unassigned", label: "Sin asignar" }
 ];
 
 export function ConversationList({

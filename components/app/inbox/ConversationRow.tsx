@@ -30,6 +30,13 @@ function statusLabel(status: ConversationRowData["status"], unreadCount: number)
   return "Activa";
 }
 
+function leadStatusUi(leadStatus: ConversationRowData["leadStatus"]) {
+  if (leadStatus === "IN_CONVERSATION") return { label: "En conversacion", className: "border-sky-400/30 bg-sky-400/10 text-sky-100" };
+  if (leadStatus === "FOLLOW_UP") return { label: "Seguimiento", className: "border-amber-400/30 bg-amber-400/10 text-amber-100" };
+  if (leadStatus === "CLOSED") return { label: "Cerrado", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100" };
+  return { label: "Nuevo", className: "border-white/10 bg-white/5 text-muted" };
+}
+
 export function ConversationRow({
   row,
   selected,
@@ -55,6 +62,7 @@ export function ConversationRow({
   const hasUnread = row.unreadCount > 0;
   const ownerLabel = row.assignedSellerName || row.assignedTo || "Sin asignar";
   const derivedPriority = getConversationPriority(row);
+  const leadStatus = leadStatusUi(row.leadStatus);
   const priorityUi =
     derivedPriority === "high"
       ? {
@@ -109,6 +117,7 @@ export function ConversationRow({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
                   <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
+                  <InboxBadge className={cn("text-[11px]", leadStatus.className)}>{leadStatus.label}</InboxBadge>
                   <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
                   {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
                   {row.transferPaymentStatus === "payment_pending_validation" ? (

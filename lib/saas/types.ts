@@ -5,6 +5,7 @@ export type TenantStatus = "active" | "trial" | "at_risk" | "cancelled";
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type ConversationStatus = "open" | "closed" | "new";
 export type ConversationPriority = "normal" | "hot";
+export type ConversationLeadStatus = "NEW" | "IN_CONVERSATION" | "FOLLOW_UP" | "CLOSED";
 export type MessageDirection = "inbound" | "outbound" | "system";
 export type MessageStatus = "sent" | "delivered" | "read" | "failed";
 export type DealStage = "lead" | "qualified" | "proposal" | "won" | "lost";
@@ -169,6 +170,7 @@ export type Conversation = {
   tenantId: string;
   contactId: string;
   status: ConversationStatus;
+  leadStatus?: ConversationLeadStatus;
   assignedTo?: string;
   assignedSellerUserId?: string;
   assignedSellerName?: string;

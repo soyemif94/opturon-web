@@ -3,7 +3,7 @@ import { Archive, Clock3, Flag, History, Phone, Tag, UserRound } from "lucide-re
 import { CardSection } from "@/components/app/inbox/CardSection";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
-import type { DetailPayload } from "@/components/app/inbox/types";
+import type { DetailPayload, LeadStatus } from "@/components/app/inbox/types";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 
 const DEAL_STAGES = [
@@ -15,6 +15,12 @@ const DEAL_STAGES = [
 ] as const;
 
 const DEAL_STAGE_LABELS = new Map<string, string>(DEAL_STAGES);
+const LEAD_STATUS_OPTIONS: Array<{ value: LeadStatus; label: string }> = [
+  { value: "NEW", label: "Nuevo" },
+  { value: "IN_CONVERSATION", label: "En conversacion" },
+  { value: "FOLLOW_UP", label: "Seguimiento" },
+  { value: "CLOSED", label: "Cerrado" }
+];
 
 function conversationStatusLabel(value?: string) {
   if (!value) return "Sin estado";
@@ -42,6 +48,17 @@ function stageLabel(value?: string) {
   return DEAL_STAGE_LABELS.get(value) || value;
 }
 
+function leadStatusTone(value?: LeadStatus) {
+  if (value === "IN_CONVERSATION") return "border-sky-500/30 bg-sky-500/10 text-sky-200";
+  if (value === "FOLLOW_UP") return "border-amber-500/30 bg-amber-500/10 text-amber-200";
+  if (value === "CLOSED") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+  return "border-white/10 bg-white/5 text-muted";
+}
+
+function leadStatusLabel(value?: LeadStatus) {
+  return LEAD_STATUS_OPTIONS.find((item) => item.value === value)?.label || "Nuevo";
+}
+
 type ProfilePanelProps = {
   detail: DetailPayload | null;
   loading: boolean;
@@ -65,6 +82,9 @@ type ProfilePanelProps = {
   onAddTask: () => void;
   historyHref?: string;
   orderHref?: string;
+  leadStatus: LeadStatus;
+  leadStatusBusy?: boolean;
+  onLeadStatusChange: (value: LeadStatus) => void;
 };
 
 export function ProfilePanel({
@@ -89,7 +109,10 @@ export function ProfilePanel({
   onTaskTitleChange,
   onAddTask,
   historyHref,
-  orderHref
+  orderHref,
+  leadStatus,
+  leadStatusBusy,
+  onLeadStatusChange
 }: ProfilePanelProps) {
   if (loading) {
     return (
@@ -162,6 +185,7 @@ export function ProfilePanel({
               <InboxBadge className="capitalize" active>
                 {stageLabel(detail.deal?.stage)}
               </InboxBadge>
+              <InboxBadge className={leadStatusTone(leadStatus)}>{leadStatusLabel(leadStatus)}</InboxBadge>
               <InboxBadge className="capitalize">{conversationStatusLabel(detail.conversation.status)}</InboxBadge>
               {detail.conversation.transferPaymentStatus === "payment_pending_validation" ? (
                 <InboxBadge className="capitalize">Pago pendiente</InboxBadge>
@@ -177,6 +201,23 @@ export function ProfilePanel({
           </div>
         </div>
         <div className="flex gap-2">
+          <select
+            value={leadStatus}
+            onChange={(event) => onLeadStatusChange(event.target.value as LeadStatus)}
+            className="w-full rounded-xl border border-[color:var(--border)] bg-bg px-2.5 py-2 text-sm"
+            disabled={readOnly || leadStatusBusy}
+          >
+            {LEAD_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 px-3 py-2 text-xs text-muted">
+            {leadStatusBusy ? "Guardando estado..." : "Estado del lead"}
+          </div>
+        </div>
+        <div className="mt-2 flex gap-2">
           <select
             value={dealStage}
             onChange={(event) => onDealStageChange(event.target.value)}

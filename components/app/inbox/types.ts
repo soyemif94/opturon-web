@@ -1,10 +1,13 @@
-export type FilterKey = "all" | "hot" | "sin_responder" | "nuevas" | "asignadas";
+export type FilterKey = "all" | "new" | "in_conversation" | "follow_up" | "closed" | "unassigned";
 export type BotDomainOverride = "automatic" | "agenda" | "commerce";
 export type BotFlowLock = "automatic" | "agenda" | "commerce";
+export type LeadStatus = "NEW" | "IN_CONVERSATION" | "FOLLOW_UP" | "CLOSED";
 
 export type ConversationRowData = {
   id: string;
   status: "open" | "closed" | "new";
+  leadStatus: LeadStatus;
+  leadStatusLabel?: string;
   assignedTo?: string;
   assignedSellerUserId?: string | null;
   assignedSellerName?: string | null;

@@ -7,7 +7,7 @@ import { InboxConnectionEmptyState } from "@/components/app/inbox/InboxConnectio
 import { ConversationList } from "@/components/app/inbox/ConversationList";
 import { InboxLayout } from "@/components/app/inbox/InboxLayout";
 import { ProfilePanel } from "@/components/app/inbox/ProfilePanel";
-import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey } from "@/components/app/inbox/types";
+import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey, LeadStatus } from "@/components/app/inbox/types";
 import { useInboxContext } from "@/components/inbox/inbox-context";
 import { getSuggestions, type SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { normalizeText } from "@/lib/search/normalize";
@@ -28,6 +28,15 @@ type SellerOption = {
 };
 
 const DEFAULT_FILTER: FilterKey = "all";
+
+function matchesInboxFilter(row: ConversationRowData, filter: FilterKey) {
+  if (filter === "new") return row.leadStatus === "NEW";
+  if (filter === "in_conversation") return row.leadStatus === "IN_CONVERSATION";
+  if (filter === "follow_up") return row.leadStatus === "FOLLOW_UP";
+  if (filter === "closed") return row.leadStatus === "CLOSED";
+  if (filter === "unassigned") return !row.assignedSellerUserId;
+  return true;
+}
 
 export function InboxWorkspace({
   initialConversationId,
@@ -66,6 +75,7 @@ export function InboxWorkspace({
   const [assignTo, setAssignTo] = useState("");
   const [sellerOptions, setSellerOptions] = useState<SellerOption[]>([]);
   const [assigningSeller, setAssigningSeller] = useState(false);
+  const [leadStatusBusy, setLeadStatusBusy] = useState(false);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [autoSuggestions, setAutoSuggestions] = useState<SuggestionItem[]>([]);
@@ -205,6 +215,8 @@ export function InboxWorkspace({
               row.id === json.conversation.id
                 ? {
                     ...row,
+                    leadStatus: json.conversation.leadStatus || row.leadStatus,
+                    leadStatusLabel: json.conversation.leadStatusLabel || row.leadStatusLabel,
                     lastMessageAt: latestMessage?.timestamp || json.conversation.lastMessageAt || row.lastMessageAt,
                     lastMessagePreview: latestMessage?.text || row.lastMessagePreview
                   }
@@ -222,14 +234,6 @@ export function InboxWorkspace({
     void loadRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, onlyUnread, visibility]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadRows();
-    }, 250);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -510,12 +514,14 @@ export function InboxWorkspace({
                 assignedTo: seller.name,
                 assignedSellerUserId: seller.id,
                 assignedSellerName: seller.name,
-                assignedSellerRole: seller.role
+                assignedSellerRole: seller.role,
+                leadStatus: row.leadStatus === "NEW" ? "IN_CONVERSATION" : row.leadStatus,
+                leadStatusLabel: row.leadStatus === "NEW" ? "En conversacion" : row.leadStatusLabel
               }
             : row
         );
 
-      if (filter === "asignadas" && currentUserId && seller.id !== currentUserId) {
+      if (filter === "unassigned") {
         return nextRows.filter((row) => row.id !== conversationId);
       }
 
@@ -531,7 +537,9 @@ export function InboxWorkspace({
               assignedTo: seller.name,
               assignedSellerUserId: seller.id,
               assignedSellerName: seller.name,
-              assignedSellerRole: seller.role
+              assignedSellerRole: seller.role,
+              leadStatus: prev.conversation.leadStatus === "NEW" ? "IN_CONVERSATION" : prev.conversation.leadStatus,
+              leadStatusLabel: prev.conversation.leadStatus === "NEW" ? "En conversacion" : prev.conversation.leadStatusLabel
             },
             assignee: {
               id: seller.id,
@@ -547,6 +555,49 @@ export function InboxWorkspace({
     );
 
     setInboxState({ assignedTo: seller.name });
+  }
+
+  function applyLeadStatusLocally(conversationId: string, leadStatus: LeadStatus) {
+    const leadStatusLabel =
+      leadStatus === "IN_CONVERSATION"
+        ? "En conversacion"
+        : leadStatus === "FOLLOW_UP"
+          ? "Seguimiento"
+          : leadStatus === "CLOSED"
+            ? "Cerrado"
+            : "Nuevo";
+
+    setRows((prev) => {
+      const nextRows = prev.map((row) =>
+        row.id === conversationId
+          ? {
+              ...row,
+              leadStatus,
+              leadStatusLabel
+            }
+          : row
+      );
+
+      const updatedRow = nextRows.find((row) => row.id === conversationId);
+      if (updatedRow && !matchesInboxFilter(updatedRow, filter)) {
+        return nextRows.filter((row) => row.id !== conversationId);
+      }
+
+      return nextRows;
+    });
+
+    setDetail((prev) =>
+      prev && prev.conversation.id === conversationId
+        ? {
+            ...prev,
+            conversation: {
+              ...prev.conversation,
+              leadStatus,
+              leadStatusLabel
+            }
+          }
+        : prev
+    );
   }
 
   async function assignSeller(conversationId: string, sellerUserId: string) {
@@ -566,7 +617,7 @@ export function InboxWorkspace({
       }
 
       applyAssignedSellerLocally(conversationId, seller);
-      if (selectedId === conversationId && filter === "asignadas" && currentUserId && seller.id !== currentUserId) {
+      if (selectedId === conversationId && filter === "unassigned") {
         setSelectedId(undefined);
         setDetail(null);
       }
@@ -580,6 +631,60 @@ export function InboxWorkspace({
       return false;
     } finally {
       setAssigningSeller(false);
+    }
+  }
+
+  async function changeLeadStatus(conversationId: string, nextLeadStatus: LeadStatus) {
+    if (!conversationId || readOnly || leadStatusBusy || !detail) return false;
+
+    const snapshotDetail = detail;
+    const snapshotRows = rows;
+    setLeadStatusBusy(true);
+    applyLeadStatusLocally(conversationId, nextLeadStatus);
+
+    try {
+      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}/lead-status`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadStatus: nextLeadStatus })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "lead_status_failed"));
+      }
+
+      const stillVisible = matchesInboxFilter(
+        {
+          ...(detail.conversation.id === conversationId ? detail.conversation : rows.find((row) => row.id === conversationId) || {
+            id: conversationId,
+            status: "open",
+            leadStatus: nextLeadStatus,
+            lastMessageAt: new Date().toISOString(),
+            priority: "normal",
+            botEnabled: true,
+            unreadCount: 0,
+            slaMinutes: 0
+          }),
+          leadStatus: nextLeadStatus
+        } as ConversationRowData,
+        filter
+      );
+      if (!stillVisible && selectedId === conversationId) {
+        setSelectedId(undefined);
+        setDetail(null);
+      }
+      void loadRows({ silent: true });
+      if (selectedId === conversationId) {
+        void loadDetail(conversationId, { silent: true });
+      }
+      return true;
+    } catch (error) {
+      setDetail(snapshotDetail);
+      setRows(snapshotRows);
+      toast.error("No se pudo actualizar el estado", error instanceof Error ? error.message : "unknown_error");
+      return false;
+    } finally {
+      setLeadStatusBusy(false);
     }
   }
 
@@ -966,6 +1071,12 @@ export function InboxWorkspace({
               onAssignToChange={setAssignTo}
               sellerOptions={sellerOptions}
               assigningSeller={assigningSeller}
+              leadStatus={detail?.conversation?.leadStatus || "NEW"}
+              leadStatusBusy={leadStatusBusy}
+              onLeadStatusChange={(value) => {
+                if (!selectedId) return;
+                void changeLeadStatus(selectedId, value);
+              }}
               onAssign={() => void reassignConversation()}
               onToggleBot={() => void runAction("toggle_bot")}
               onMarkHot={() => void runAction("mark_hot")}

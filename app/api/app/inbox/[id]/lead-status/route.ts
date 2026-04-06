@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { assignPortalConversationSeller, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
+import { getBackendErrorStatus, isBackendConfigured, patchPortalConversationLeadStatus } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 
 const patchSchema = z.object({
-  sellerUserId: z.string().uuid()
+  leadStatus: z.enum(["NEW", "IN_CONVERSATION", "FOLLOW_UP", "CLOSED"])
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
-      const result = await assignPortalConversationSeller(tenantContext.tenantId, id, parsed.data.sellerUserId);
+      const result = await patchPortalConversationLeadStatus(tenantContext.tenantId, id, parsed.data.leadStatus);
       return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       return NextResponse.json(
@@ -40,28 +40,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const data = readSaasData();
   const conversation = data.conversations.find((item) => item.id === id && item.tenantId === tenantContext.tenantId);
-  const membership = data.memberships.find(
-    (item) => item.userId === parsed.data.sellerUserId && item.tenantId === tenantContext.tenantId && item.role !== "viewer"
-  );
-  const user = membership ? data.users.find((item) => item.id === membership.userId) : undefined;
   if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
-  if (!user) return NextResponse.json({ error: "seller_user_not_found" }, { status: 422 });
 
-  conversation.assignedTo = user.id;
-  conversation.assignedSellerUserId = user.id;
-  conversation.assignedSellerName = user.name;
-  conversation.assignedSellerRole = membership?.role || "seller";
-  if ((conversation.leadStatus || "NEW") === "NEW") {
-    conversation.leadStatus = "IN_CONVERSATION";
-  }
+  conversation.leadStatus = parsed.data.leadStatus;
+  conversation.lastMessageAt = new Date().toISOString();
   writeSaasData(data);
 
   appendAuditLog({
     tenantId: tenantContext.tenantId,
     userId: tenantContext.ctx?.userId,
-    action: "inbox_assign_seller",
+    action: "inbox_lead_status",
     entity: "conversation",
-    entityId: conversation.id
+    entityId: conversation.id,
+    metadata: { leadStatus: parsed.data.leadStatus }
   });
   touchTenantActivity(tenantContext.tenantId);
 
@@ -69,11 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     ok: true,
     conversation: {
       id: conversation.id,
-      assignedSellerUserId: user.id,
-      assignedSellerName: user.name,
-      assignedSellerRole: membership?.role || "seller",
-      assignedTo: user.name,
-      leadStatus: conversation.leadStatus || "IN_CONVERSATION"
+      leadStatus: parsed.data.leadStatus
     }
   });
 }

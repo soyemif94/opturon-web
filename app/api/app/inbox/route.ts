@@ -12,7 +12,7 @@ import { listInboxConversations } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 const filtersSchema = z.object({
-  filter: z.enum(["all", "hot", "sin_responder", "nuevas", "asignadas"]).optional(),
+  filter: z.enum(["all", "new", "in_conversation", "follow_up", "closed", "unassigned", "nuevas", "asignadas"]).optional(),
   q: z.string().optional(),
   visibility: z.enum(["active", "archived"]).optional(),
   tenantId: z.string().optional(),
@@ -73,6 +73,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  conversations = conversations.map((item) => ({
+    ...item,
+    leadStatus: item.leadStatus || "NEW"
+  }));
+
   if (q) {
     conversations = conversations.filter((item) => {
       const text = `${item.contact?.name || ""} ${item.contact?.phone || ""} ${item.contact?.email || ""}`.toLowerCase();
@@ -81,9 +86,11 @@ export async function GET(request: NextRequest) {
   }
 
   conversations = conversations.filter((item) => {
-    if (filter === "hot") return item.priority === "hot";
-    if (filter === "sin_responder") return item.unreadCount > 0;
-    if (filter === "nuevas") return item.status === "new";
+    if (filter === "new" || filter === "nuevas") return item.leadStatus === "NEW";
+    if (filter === "in_conversation") return item.leadStatus === "IN_CONVERSATION";
+    if (filter === "follow_up") return item.leadStatus === "FOLLOW_UP";
+    if (filter === "closed") return item.leadStatus === "CLOSED";
+    if (filter === "unassigned") return !item.assignedSellerUserId;
     if (filter === "asignadas") return Boolean(item.assignedSellerUserId && item.assignedSellerUserId === userId);
     return true;
   });

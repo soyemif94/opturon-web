@@ -69,6 +69,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({
     readOnly: tenantContext.readOnly,
     ...detail,
+    conversation: {
+      ...detail.conversation,
+      leadStatus: detail.conversation.leadStatus || "NEW"
+    },
     quickReplies: inboxQuickReplies(),
     aiEvents: inboxAiEvents(tenantContext.tenantId, id)
   }, {
@@ -128,6 +132,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   switch (payload.action) {
     case "assign": {
       conversation.assignedTo = payload.assignedTo;
+      if ((conversation.leadStatus || "NEW") === "NEW") {
+        conversation.leadStatus = "IN_CONVERSATION";
+      }
       break;
     }
     case "toggle_bot": {
