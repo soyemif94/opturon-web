@@ -1,4 +1,5 @@
 import { InboxBadge } from "@/components/app/inbox/Badge";
+import { getConversationPriority } from "@/components/app/inbox/conversation-priority";
 import { cn } from "@/lib/cn";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 
@@ -47,12 +48,31 @@ export function ConversationRow({
   const meta = row.contact?.phone || row.contact?.email || "Sin contacto";
   const preview = row.lastMessagePreview?.trim() || "Sin mensajes recientes";
   const hasUnread = row.unreadCount > 0;
+  const derivedPriority = getConversationPriority(row);
+  const priorityUi =
+    derivedPriority === "high"
+      ? {
+          label: "Alta",
+          dotClassName: "bg-red-400 shadow-[0_0_0_4px_rgba(248,113,113,0.18)]",
+          rowClassName: "border-red-400/35 bg-red-400/[0.08] hover:bg-red-400/[0.12]"
+        }
+      : derivedPriority === "medium"
+        ? {
+            label: "Reciente",
+            dotClassName: "bg-amber-300 shadow-[0_0_0_4px_rgba(252,211,77,0.12)]",
+            rowClassName: "border-amber-300/20 bg-amber-300/[0.04] hover:bg-amber-300/[0.08]"
+          }
+        : {
+            label: "Normal",
+            dotClassName: "bg-slate-400",
+            rowClassName: "border-[color:var(--border)] hover:bg-muted/50"
+          };
 
   return (
     <div
       className={cn(
         "group rounded-2xl border p-3 transition-colors",
-        selected ? "border-brand/40 bg-muted/10 ring-1 ring-brand/30" : "border-[color:var(--border)] hover:bg-muted/50",
+        selected ? "border-brand/40 bg-muted/10 ring-1 ring-brand/30" : priorityUi.rowClassName,
         hasUnread && !selected ? "bg-brand/5" : ""
       )}
     >
@@ -71,6 +91,10 @@ export function ConversationRow({
             <p className="mt-0.5 text-xs text-muted">{meta}</p>
           </div>
           <div className="shrink-0 text-right">
+            <div className="inline-flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">
+              <span className={cn("inline-flex h-2.5 w-2.5 rounded-full", priorityUi.dotClassName)} />
+              <span>{priorityUi.label}</span>
+            </div>
             <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
             {hasUnread ? (
               <span className="mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-2 text-[11px] font-semibold text-white">
