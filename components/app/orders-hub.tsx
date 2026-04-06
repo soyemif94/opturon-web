@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ClipboardList, Package, Receipt, ShoppingBag } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeCheck, ClipboardList, Package, Receipt, ShoppingBag, Star } from "lucide-react";
 import type {
   PortalContact,
   PortalOrder,
@@ -74,6 +74,12 @@ const initialForm: OrderFormState = {
 };
 
 type OrdersViewMode = "all" | "pending_validation";
+
+type SellerInsight = {
+  id: string;
+  tone: "alert" | "positive" | "highlight";
+  message: string;
+};
 
 const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
   range: "last_7_days",
@@ -215,6 +221,69 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     () => sellerMetrics.sellerMetrics.find((metric) => metric.sellerUserId === selectedSellerMetricId) || sellerMetrics.sellerMetrics[0] || null,
     [selectedSellerMetricId, sellerMetrics.sellerMetrics]
   );
+  const sellerInsights = useMemo(() => {
+    const metrics = sellerMetrics.sellerMetrics;
+    if (!metrics.length && sellerMetrics.ordersWithoutSeller <= 0) return [] as SellerInsight[];
+
+    const insights: SellerInsight[] = [];
+    const topSeller = metrics[0] || null;
+    const rankedByConversion = metrics
+      .filter((metric) => metric.totalOrders > 0)
+      .map((metric) => ({
+        ...metric,
+        conversionRate: metric.totalPaidOrders / metric.totalOrders
+      }))
+      .sort((left, right) => right.conversionRate - left.conversionRate || right.totalPaidOrders - left.totalPaidOrders);
+    const bestConversion = rankedByConversion[0] || null;
+    const lowConversionCandidate = rankedByConversion
+      .filter((metric) => metric.totalOrders >= 3 && metric.conversionRate < 0.5)
+      .sort((left, right) => left.conversionRate - right.conversionRate || right.totalOrders - left.totalOrders)[0] || null;
+    const topAverageTicket = metrics
+      .filter((metric) => metric.totalPaidOrders > 0)
+      .sort((left, right) => right.averageTicket - left.averageTicket || right.totalRevenue - left.totalRevenue)[0] || null;
+
+    if (sellerMetrics.ordersWithoutSeller > 0) {
+      insights.push({
+        id: "unassigned_orders",
+        tone: "alert",
+        message: `Tenes ${sellerMetrics.ordersWithoutSeller} pedidos sin vendedor asignado`
+      });
+    }
+
+    if (lowConversionCandidate) {
+      insights.push({
+        id: "low_conversion",
+        tone: "alert",
+        message: `${lowConversionCandidate.sellerName || "Este vendedor"} tiene margen de mejora en cierres`
+      });
+    }
+
+    if (bestConversion && bestConversion.totalPaidOrders > 0) {
+      insights.push({
+        id: "best_conversion",
+        tone: "positive",
+        message: `${bestConversion.sellerName || "Este vendedor"} convierte el ${Math.round(bestConversion.conversionRate * 100)}% de sus ventas`
+      });
+    }
+
+    if (topSeller && topSeller.totalRevenue > 0) {
+      insights.push({
+        id: "top_seller",
+        tone: "highlight",
+        message: `${topSeller.sellerName || "Este vendedor"} lidera en ventas`
+      });
+    }
+
+    if (topAverageTicket && (!topSeller || topAverageTicket.sellerUserId !== topSeller.sellerUserId)) {
+      insights.push({
+        id: "top_ticket",
+        tone: "positive",
+        message: `${topAverageTicket.sellerName || "Este vendedor"} tiene el ticket promedio mas alto`
+      });
+    }
+
+    return insights.slice(0, 5);
+  }, [sellerMetrics.ordersWithoutSeller, sellerMetrics.sellerMetrics]);
 
   async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
     setMetricsLoading(true);
@@ -799,6 +868,29 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {sellerInsights.length > 0 ? (
+            <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/45 p-4">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-300" />
+                <p className="text-sm font-semibold text-foreground">Insights del negocio</p>
+              </div>
+              <div className="mt-4 space-y-3">
+                {sellerInsights.map((insight) => (
+                  <div key={insight.id} className="flex items-start gap-3 rounded-2xl border border-[color:var(--border)] bg-card/80 px-4 py-3">
+                    {insight.tone === "alert" ? (
+                      <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300" />
+                    ) : insight.tone === "positive" ? (
+                      <BadgeCheck className="mt-0.5 h-4 w-4 text-emerald-300" />
+                    ) : (
+                      <Star className="mt-0.5 h-4 w-4 text-sky-300" />
+                    )}
+                    <p className="text-sm text-foreground">{insight.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {sellerMetricsLoading ? (
             <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
               Cargando metricas por vendedor...
