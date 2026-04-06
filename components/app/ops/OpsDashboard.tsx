@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BellRing, CalendarClock, Inbox, ShieldAlert, UserMinus, Users } from "lucide-react";
 import type { ConversationRowData } from "@/components/app/inbox/types";
@@ -25,10 +26,11 @@ type OpsAlert = {
   severity: "critical" | "warning" | "info";
   message: string;
   ctaLabel?: string;
-  target: "kpis" | "unassigned" | "overdue" | "seller_load";
+  target?: "kpis" | "unassigned" | "overdue" | "today" | "seller_load";
+  href?: string;
 };
 
-const OVERLOAD_THRESHOLD = 1;
+const OVERLOAD_THRESHOLD = 5;
 
 function isSameDay(value: string, now = new Date()) {
   const date = new Date(value);
@@ -69,6 +71,7 @@ export function OpsDashboard({
   const kpisRef = useRef<HTMLDivElement | null>(null);
   const unassignedRef = useRef<HTMLDivElement | null>(null);
   const overdueRef = useRef<HTMLDivElement | null>(null);
+  const todayRef = useRef<HTMLDivElement | null>(null);
   const sellerLoadRef = useRef<HTMLDivElement | null>(null);
 
   async function loadOpsData(options?: { silent?: boolean }) {
@@ -160,8 +163,9 @@ export function OpsDashboard({
         id: "overdue_follow_ups",
         severity: "critical",
         message: `Tenes ${overdueLeads.length} ${overdueLeads.length === 1 ? "seguimiento vencido" : "seguimientos vencidos"}`,
-        ctaLabel: "Ver vencidos",
-        target: "overdue"
+        ctaLabel: overdueLeads.length === 1 ? "Abrir lead" : "Ver vencidos",
+        target: overdueLeads.length === 1 ? undefined : "overdue",
+        href: overdueLeads.length === 1 ? `/app/inbox/${overdueLeads[0]?.id}` : undefined
       });
     }
 
@@ -180,8 +184,9 @@ export function OpsDashboard({
         id: "today_follow_ups",
         severity: "warning",
         message: `Tenes ${todayLeads.length} ${todayLeads.length === 1 ? "seguimiento para hoy" : "seguimientos para hoy"}`,
-        ctaLabel: "Ver resumen",
-        target: "kpis"
+        ctaLabel: todayLeads.length === 1 ? "Abrir lead" : "Ver hoy",
+        target: todayLeads.length === 1 ? undefined : "today",
+        href: todayLeads.length === 1 ? `/app/inbox/${todayLeads[0]?.id}` : undefined
       });
     }
 
@@ -198,13 +203,15 @@ export function OpsDashboard({
     return alerts.slice(0, 5);
   }, [overdueLeads.length, sellerLoad, todayLeads.length, unassignedLeads.length]);
 
-  function scrollToSection(target: OpsAlert["target"]) {
+  function scrollToSection(target: NonNullable<OpsAlert["target"]>) {
     setFocusedSection(target);
     const node =
       target === "unassigned"
         ? unassignedRef.current
         : target === "overdue"
           ? overdueRef.current
+          : target === "today"
+            ? todayRef.current
           : target === "seller_load"
             ? sellerLoadRef.current
             : kpisRef.current;
@@ -285,24 +292,33 @@ export function OpsDashboard({
               No hay alertas operativas criticas en este momento.
             </div>
           ) : (
-            opsAlerts.map((alert) => (
-              <div key={alert.id} className={alertTone(alert.severity)}>
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-black/10">
-                    <AlertIcon severity={alert.severity} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">{alert.message}</p>
-                    <p className="mt-1 text-xs opacity-80">{alertSeverityLabel(alert.severity)}</p>
+            opsAlerts.map((alert) => {
+              const target = alert.target;
+
+              return (
+                <div key={alert.id} className={alertTone(alert.severity)}>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-black/10">
+                      <AlertIcon severity={alert.severity} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">{alert.message}</p>
+                      <p className="mt-1 text-xs opacity-80">{alertSeverityLabel(alert.severity)}</p>
+                    </div>
+                    {alert.ctaLabel && alert.href ? (
+                      <Button asChild type="button" size="sm" variant="secondary">
+                        <Link href={alert.href}>{alert.ctaLabel}</Link>
+                      </Button>
+                    ) : null}
+                    {alert.ctaLabel && target ? (
+                      <Button type="button" size="sm" variant="secondary" onClick={() => scrollToSection(target)}>
+                        {alert.ctaLabel}
+                      </Button>
+                    ) : null}
                   </div>
-                  {alert.ctaLabel ? (
-                    <Button type="button" size="sm" variant="secondary" onClick={() => scrollToSection(alert.target)}>
-                      {alert.ctaLabel}
-                    </Button>
-                  ) : null}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </CardContent>
       </Card>
@@ -366,6 +382,21 @@ export function OpsDashboard({
           readOnly={readOnly || !backendReady}
           assigningId={assigningId}
           emptyMessage="No hay seguimientos vencidos en este momento."
+          showOwner
+          showFollowUp
+          onAssign={assignSeller}
+        />
+      </div>
+
+      <div ref={todayRef} className={sectionClassName(focusedSection === "today")}>
+        <OpsLeadTable
+          title="Seguimientos para hoy"
+          description="Leads que conviene trabajar durante la jornada para no perder timing comercial."
+          rows={todayLeads}
+          sellers={sellers}
+          readOnly={readOnly || !backendReady}
+          assigningId={assigningId}
+          emptyMessage="No hay seguimientos planificados para hoy."
           showOwner
           showFollowUp
           onAssign={assignSeller}
