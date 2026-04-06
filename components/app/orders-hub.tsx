@@ -102,6 +102,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
   const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
   const [sellerMetrics, setSellerMetrics] = useState<PortalSellerMetrics>(defaultSellerMetrics);
+  const [selectedSellerMetricId, setSelectedSellerMetricId] = useState<string>("");
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
@@ -201,6 +202,19 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     : selectedOrder?.conversationId
       ? `/app/inbox/${selectedOrder.conversationId}`
       : null;
+  const topSellerUserId = sellerMetrics.sellerMetrics[0]?.sellerUserId || "";
+  const maxSellerRevenue = useMemo(
+    () => sellerMetrics.sellerMetrics.reduce((max, metric) => Math.max(max, Number(metric.totalRevenue || 0)), 0),
+    [sellerMetrics.sellerMetrics]
+  );
+  const maxSellerPaidOrders = useMemo(
+    () => sellerMetrics.sellerMetrics.reduce((max, metric) => Math.max(max, Number(metric.totalPaidOrders || 0)), 0),
+    [sellerMetrics.sellerMetrics]
+  );
+  const selectedSellerMetric = useMemo(
+    () => sellerMetrics.sellerMetrics.find((metric) => metric.sellerUserId === selectedSellerMetricId) || sellerMetrics.sellerMetrics[0] || null,
+    [selectedSellerMetricId, sellerMetrics.sellerMetrics]
+  );
 
   async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
     setMetricsLoading(true);
@@ -360,6 +374,17 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   useEffect(() => {
     void loadSellerMetrics();
   }, []);
+
+  useEffect(() => {
+    if (!sellerMetrics.sellerMetrics.length) {
+      if (selectedSellerMetricId) setSelectedSellerMetricId("");
+      return;
+    }
+
+    if (!selectedSellerMetricId || !sellerMetrics.sellerMetrics.some((metric) => metric.sellerUserId === selectedSellerMetricId)) {
+      setSelectedSellerMetricId(sellerMetrics.sellerMetrics[0]?.sellerUserId || "");
+    }
+  }, [selectedSellerMetricId, sellerMetrics.sellerMetrics]);
 
   useEffect(() => {
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
@@ -784,25 +809,164 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              {sellerMetrics.sellerMetrics.map((metric) => (
-                <div key={metric.sellerUserId} className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{metric.sellerName}</p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted">{labelForSellerRole(metric.sellerRole)}</p>
+              {sellerMetrics.sellerMetrics.map((metric, index) => {
+                const revenue = Number(metric.totalRevenue || 0);
+                const paidOrders = Number(metric.totalPaidOrders || 0);
+                const revenueRatio = maxSellerRevenue > 0 ? Math.max((revenue / maxSellerRevenue) * 100, revenue > 0 ? 8 : 0) : 0;
+                const paidShare = metric.totalOrders > 0 ? Math.round((paidOrders / metric.totalOrders) * 100) : 0;
+                const isTopSeller = metric.sellerUserId === topSellerUserId;
+                const isSelected = metric.sellerUserId === selectedSellerMetric?.sellerUserId;
+
+                return (
+                  <button
+                    key={metric.sellerUserId}
+                    type="button"
+                    onClick={() => setSelectedSellerMetricId(metric.sellerUserId)}
+                    className={`rounded-[22px] border p-4 text-left transition-colors ${
+                      isSelected
+                        ? "border-brand/45 bg-brand/8"
+                        : isTopSeller
+                          ? "border-emerald-500/35 bg-emerald-500/8"
+                          : "border-[color:var(--border)] bg-surface/60 hover:bg-surface/80"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{metric.sellerName}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted">{labelForSellerRole(metric.sellerRole)}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {isTopSeller ? <Badge variant="success">Top vendedor</Badge> : null}
+                        <Badge variant="muted">#{index + 1}</Badge>
+                      </div>
                     </div>
-                    <Badge variant="muted">Seller</Badge>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <DetailStat label="Ventas" value={String(metric.totalOrders)} />
-                    <DetailStat label="Pagadas" value={String(metric.totalPaidOrders)} />
-                    <DetailStat label="Total vendido" value={formatCurrency(metric.totalRevenue, sellerMetrics.currency)} />
-                    <DetailStat label="Ticket promedio" value={formatCurrency(metric.averageTicket, sellerMetrics.currency)} />
-                  </div>
-                </div>
-              ))}
+
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-muted">
+                        <span>Impacto por total vendido</span>
+                        <span>{maxSellerRevenue > 0 ? `${Math.round((revenue / maxSellerRevenue) * 100)}% del lider` : "Sin ventas pagadas"}</span>
+                      </div>
+                      <div className="h-3 overflow-hidden rounded-full bg-surface/80">
+                        <div
+                          className={`h-full rounded-full ${isTopSeller ? "bg-emerald-400" : "bg-brand"}`}
+                          style={{ width: `${Math.min(revenueRatio, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <DetailStat label="Ventas" value={String(metric.totalOrders)} />
+                      <DetailStat label="Pagadas" value={String(metric.totalPaidOrders)} />
+                      <DetailStat label="Total vendido" value={formatCurrency(metric.totalRevenue, sellerMetrics.currency)} />
+                      <DetailStat label="Ticket promedio" value={formatCurrency(metric.averageTicket, sellerMetrics.currency)} />
+                    </div>
+
+                    <p className="mt-3 text-xs text-muted">Conversion a pago dentro del vendedor: {paidShare}%</p>
+                  </button>
+                );
+              })}
             </div>
           )}
+
+          {selectedSellerMetric ? (
+            <div className="rounded-[24px] border border-[color:var(--border)] bg-card/90 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-muted">Perfil de vendedor</p>
+                  <h3 className="mt-2 text-lg font-semibold text-foreground">{selectedSellerMetric.sellerName}</h3>
+                  <p className="mt-1 text-sm text-muted">
+                    {labelForSellerRole(selectedSellerMetric.sellerRole)} · ranking{" "}
+                    {sellerMetrics.sellerMetrics.findIndex((metric) => metric.sellerUserId === selectedSellerMetric.sellerUserId) + 1}
+                  </p>
+                </div>
+                {selectedSellerMetric.sellerUserId === topSellerUserId ? <Badge variant="success">Mejor facturacion actual</Badge> : null}
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-4">
+                <DetailStat label="Ventas" value={String(selectedSellerMetric.totalOrders)} />
+                <DetailStat label="Pagadas" value={String(selectedSellerMetric.totalPaidOrders)} />
+                <DetailStat label="Total vendido" value={formatCurrency(selectedSellerMetric.totalRevenue, sellerMetrics.currency)} />
+                <DetailStat label="Ticket promedio" value={formatCurrency(selectedSellerMetric.averageTicket, sellerMetrics.currency)} />
+              </div>
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4">
+                  <p className="text-sm font-semibold text-foreground">Distribucion de ventas pagadas</p>
+                  <p className="mt-1 text-sm text-muted">Comparacion visual contra el vendedor con mayor facturacion actual.</p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted">
+                      <span>Total vendido</span>
+                      <span>
+                        {maxSellerRevenue > 0
+                          ? `${Math.round((selectedSellerMetric.totalRevenue / maxSellerRevenue) * 100)}% del lider`
+                          : "Sin ventas pagadas"}
+                      </span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-surface/80">
+                      <div
+                        className="h-full rounded-full bg-brand"
+                        style={{
+                          width: `${Math.min(
+                            maxSellerRevenue > 0
+                              ? Math.max((selectedSellerMetric.totalRevenue / maxSellerRevenue) * 100, selectedSellerMetric.totalRevenue > 0 ? 8 : 0)
+                              : 0,
+                            100
+                          )}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4">
+                  <p className="text-sm font-semibold text-foreground">Pagadas vs no pagadas</p>
+                  <p className="mt-1 text-sm text-muted">Fallback visual simple usando la base actual del modelo.</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="h-3 overflow-hidden rounded-full bg-surface/80">
+                      <div className="flex h-full w-full">
+                        <div
+                          className="h-full bg-emerald-400"
+                          style={{
+                            width: `${
+                              selectedSellerMetric.totalOrders > 0
+                                ? (selectedSellerMetric.totalPaidOrders / selectedSellerMetric.totalOrders) * 100
+                                : 0
+                            }%`
+                          }}
+                        />
+                        <div
+                          className="h-full bg-white/12"
+                          style={{
+                            width: `${
+                              selectedSellerMetric.totalOrders > 0
+                                ? ((selectedSellerMetric.totalOrders - selectedSellerMetric.totalPaidOrders) / selectedSellerMetric.totalOrders) * 100
+                                : 100
+                            }%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DetailStat label="Pagadas" value={String(selectedSellerMetric.totalPaidOrders)} />
+                      <DetailStat
+                        label="No pagadas"
+                        value={String(Math.max(selectedSellerMetric.totalOrders - selectedSellerMetric.totalPaidOrders, 0))}
+                      />
+                    </div>
+                    <p className="text-xs text-muted">
+                      Ventas pagadas:{" "}
+                      {selectedSellerMetric.totalOrders > 0
+                        ? `${Math.round((selectedSellerMetric.totalPaidOrders / selectedSellerMetric.totalOrders) * 100)}%`
+                        : "0%"}
+                      {maxSellerPaidOrders > 0
+                        ? ` · pagadas vs lider: ${Math.round((selectedSellerMetric.totalPaidOrders / maxSellerPaidOrders) * 100)}%`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/35 p-4">
             <p className="text-sm font-semibold text-foreground">Sin vendedor asignado</p>
