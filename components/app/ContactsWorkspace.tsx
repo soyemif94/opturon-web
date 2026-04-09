@@ -207,9 +207,9 @@ export function ContactsWorkspace({
       if (deletedIds.length > 0 && blockedCount === 0) {
         toast.success("Contactos eliminados", "Los archivados seleccionados se borraron definitivamente.");
       } else if (deletedIds.length > 0) {
-        toast.success("Eliminacion parcial", `Se eliminaron ${deletedIds.length} contactos. ${blockedCount} quedaron bloqueados por historial asociado.`);
+        toast.success("Eliminacion parcial", `Se eliminaron ${deletedIds.length} contactos. ${blockedCount} no estaban disponibles para borrar.`);
       } else {
-        toast.error("No se pudieron eliminar", "Los contactos archivados seleccionados tienen historial asociado o ya no existen.");
+        toast.error("No se pudieron eliminar", "Los contactos archivados seleccionados ya no existen o no estaban disponibles para borrar.");
       }
     } catch (error) {
       toast.error("No se pudieron eliminar los contactos", error instanceof Error ? error.message : "unknown_error");
