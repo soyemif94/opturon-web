@@ -32,7 +32,7 @@ export function InboxLayout({
         </aside>
         <main
           className={cn(
-            "min-h-0 min-w-0 flex-col gap-3 overflow-hidden",
+            "flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden",
             hasDetail ? "flex" : "hidden xl:flex"
           )}
         >

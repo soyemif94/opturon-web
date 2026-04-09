@@ -78,6 +78,8 @@ export function ChatPanel({
   const COLLAPSED_TIMELINE_ITEMS = 12;
   const endRef = useRef<HTMLDivElement | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
+  const previousConversationIdRef = useRef<string | null>(null);
 
   const timeline = useMemo(() => {
     if (!detail) return [] as Array<{ kind: "message" | "event"; id: string; payload: any }>;
@@ -99,12 +101,26 @@ export function ChatPanel({
   }, [detail?.conversation.id]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [detail?.conversation.id, lastTimelineKey]);
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+
+    const conversationId = detail?.conversation.id || null;
+    const conversationChanged = previousConversationIdRef.current !== conversationId;
+    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    const shouldStickToBottom = conversationChanged || distanceFromBottom < 120;
+
+    previousConversationIdRef.current = conversationId;
+    if (!shouldStickToBottom) return;
+
+    viewport.scrollTo({
+      top: viewport.scrollHeight,
+      behavior: conversationChanged ? "auto" : "smooth"
+    });
+  }, [detail?.conversation.id, lastTimelineKey, timeline.length]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
+      <header className="sticky top-0 z-10 shrink-0 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
         {detail ? (
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -187,7 +203,10 @@ export function ChatPanel({
         )}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_24%)] p-3">
+      <div
+        ref={scrollViewportRef}
+        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_24%)] p-3"
+      >
         {loading && !detail ? (
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, idx) => (
@@ -260,7 +279,7 @@ export function ChatPanel({
       </div>
 
       {detail ? (
-        <div className="space-y-1.5 px-2.5 pb-2.5">
+        <div className="shrink-0 space-y-1.5 px-2.5 pb-2.5">
           <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />
           <Composer
             value={composer}

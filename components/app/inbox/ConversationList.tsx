@@ -127,8 +127,8 @@ export function ConversationList({
   const showingArchived = visibility === "archived";
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="border-b border-[color:var(--border)] bg-surface/85 p-3.5">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/85 p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-muted">Inbox</p>
