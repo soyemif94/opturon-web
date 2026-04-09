@@ -1201,7 +1201,7 @@ export function InboxWorkspace({
   const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
 
   return (
-    <div className="flex min-h-[calc(100vh-180px)] flex-col gap-3 text-sm xl:min-h-[calc(100vh-132px)]">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 text-sm">
       <header className="shrink-0">
         <h1 className="text-base font-semibold">Inbox</h1>
         <p className="text-xs text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>

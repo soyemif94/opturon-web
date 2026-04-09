@@ -21,7 +21,7 @@ export function InboxLayout({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-1">
-      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-3 xl:h-[calc(100vh-172px)] xl:min-h-[760px] xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-3 xl:min-h-0 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside
           className={cn(
             "min-h-[320px] min-w-0 overflow-hidden",
