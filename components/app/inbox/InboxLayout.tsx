@@ -20,11 +20,11 @@ export function InboxLayout({
   const [contextExpanded, setContextExpanded] = useState(false);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-1">
-      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-3 xl:min-h-0 xl:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="flex h-full min-h-0 flex-1 flex-col pb-1">
+      <div className="grid h-full min-h-0 flex-1 grid-cols-1 items-stretch gap-3 xl:min-h-0 xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.4fr)] 2xl:grid-cols-[minmax(400px,1fr)_minmax(0,1.45fr)]">
         <aside
           className={cn(
-            "min-h-[320px] min-w-0 overflow-hidden",
+            "h-full min-h-[320px] min-w-0 overflow-hidden",
             hasDetail ? "hidden xl:block xl:min-h-0" : "block xl:min-h-0"
           )}
         >
@@ -32,7 +32,7 @@ export function InboxLayout({
         </aside>
         <main
           className={cn(
-            "flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden",
+            "flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-hidden",
             hasDetail ? "flex" : "hidden xl:flex"
           )}
         >
@@ -49,7 +49,7 @@ export function InboxLayout({
             </div>
           ) : null}
 
-          <section className="min-h-[420px] min-w-0 flex-1 overflow-hidden xl:min-h-0">{center}</section>
+          <section className="h-full min-h-[420px] min-w-0 flex-1 overflow-hidden xl:min-h-0">{center}</section>
           <section className="shrink-0 overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.015))] shadow-[0_16px_40px_rgba(0,0,0,0.14)]">
             <button
               type="button"

@@ -9,6 +9,10 @@ export type ConversationLeadStatus = "NEW" | "IN_CONVERSATION" | "FOLLOW_UP" | "
 export type MessageDirection = "inbound" | "outbound" | "system";
 export type MessageStatus = "sent" | "delivered" | "read" | "failed";
 export type DealStage = "lead" | "qualified" | "proposal" | "won" | "lost";
+export type AgendaItemType = "note" | "follow_up" | "task" | "appointment" | "blocked" | "availability";
+export type AgendaItemStatus = "pending" | "confirmed" | "done" | "reschedule" | "cancelled";
+export type AgendaCommercialActionType = "visit" | "demo";
+export type AgendaCommercialOutcome = "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won";
 
 export type Tenant = {
   id: string;
@@ -195,6 +199,33 @@ export type Message = {
   providerMessageId?: string;
 };
 
+export type AgendaItem = {
+  id: string;
+  tenantId: string;
+  date: string;
+  startAt: string | null;
+  endAt: string | null;
+  contactId: string | null;
+  conversationId?: string | null;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
+  title: string;
+  description: string | null;
+  type: AgendaItemType;
+  status: AgendaItemStatus;
+  commercialActionType?: AgendaCommercialActionType | null;
+  commercialOutcome?: AgendaCommercialOutcome | null;
+  origin?: string | null;
+  location?: string | null;
+  resultNote?: string | null;
+  nextStepNote?: string | null;
+  nextActionAt?: string | null;
+  contactNameSnapshot?: string | null;
+  phoneSnapshot?: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type Deal = {
   id: string;
   tenantId: string;
@@ -211,6 +242,7 @@ export type SaasData = {
   contacts: Contact[];
   conversations: Conversation[];
   messages: Message[];
+  agendaItems: AgendaItem[];
   deals: Deal[];
   tenantNotes: TenantNote[];
   tenantTasks: TenantTask[];

@@ -128,6 +128,15 @@ export function ProfilePanel({
   onSaveNextAction,
   onClearNextAction
 }: ProfilePanelProps) {
+  const commercialActionParams = detail
+    ? {
+        conversationId: detail.conversation.id,
+        contactId: detail.contact?.id || "",
+        contactName: detail.contact?.name || detail.conversation.contact?.name || "",
+        phone: detail.contact?.phone || detail.conversation.contact?.phone || ""
+      }
+    : null;
+
   if (loading) {
     return (
       <div className="h-full rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
@@ -309,6 +318,30 @@ export function ProfilePanel({
             >
               <History className="h-3.5 w-3.5" />
               Ver pedido
+            </Link>
+          ) : null}
+          {commercialActionParams ? (
+            <Link
+              href={{
+                pathname: "/app/agenda",
+                query: { ...commercialActionParams, actionType: "demo" }
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100 hover:bg-amber-500/15"
+            >
+              <Clock3 className="h-3.5 w-3.5" />
+              Agendar demo
+            </Link>
+          ) : null}
+          {commercialActionParams ? (
+            <Link
+              href={{
+                pathname: "/app/agenda",
+                query: { ...commercialActionParams, actionType: "visit" }
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100 hover:bg-amber-500/15"
+            >
+              <Clock3 className="h-3.5 w-3.5" />
+              Agendar visita
             </Link>
           ) : null}
         </div>

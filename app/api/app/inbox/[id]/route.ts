@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { getBackendErrorStatus, getPortalConversationDetail, isBackendConfigured, patchPortalConversation } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
-import { appendAuditLog, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
+import { appendAuditLog, applyCommercialBotHandoff, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
 const patchSchema = z.object({
   action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage", "set_bot_domain_override", "set_bot_flow_lock"]),
@@ -63,6 +63,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
   }
 
+  applyCommercialBotHandoff(tenantContext.tenantId, id);
   const detail = getInboxConversationDetail(tenantContext.tenantId, id);
   if (!detail) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 

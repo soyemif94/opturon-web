@@ -7,6 +7,7 @@ import {
   isBackendConfigured
 } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
+import { listInboxConversations, readSaasData } from "@/lib/saas/store";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -25,7 +26,35 @@ export async function GET(request: NextRequest) {
     demo: url.searchParams.get("demo") === "1"
   });
   if (tenantContext.error) return tenantContext.error;
-  if (!isBackendConfigured()) return backendUnavailable();
+
+  if (!isBackendConfigured()) {
+    const data = readSaasData();
+    const conversations = listInboxConversations(tenantContext.tenantId);
+    const contacts = data.contacts
+      .filter((contact) => contact.tenantId === tenantContext.tenantId)
+      .map((contact) => {
+        const related = conversations.filter((conversation) => conversation.contact?.id === contact.id);
+        return {
+          id: contact.id,
+          clinicId: tenantContext.tenantId,
+          waId: contact.phone || null,
+          phone: contact.phone || null,
+          name: contact.name,
+          profileImageUrl: null,
+          optedOut: false,
+          lastInteractionAt: related[0]?.lastMessageAt || null,
+          conversationCount: related.length
+        };
+      });
+
+    return noStore(
+      NextResponse.json({
+        readOnly: tenantContext.readOnly,
+        tenantId: tenantContext.tenantId,
+        contacts
+      })
+    );
+  }
 
   try {
     const result = await getPortalContacts(tenantContext.tenantId, { visibility });

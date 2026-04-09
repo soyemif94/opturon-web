@@ -8,7 +8,7 @@ import {
   isBackendConfigured
 } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
-import { listInboxConversations } from "@/lib/saas/store";
+import { applyCommercialBotHandoff, listInboxConversations } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 const filtersSchema = z.object({
@@ -35,6 +35,10 @@ export async function GET(request: NextRequest) {
   const q = (params.q || "").toLowerCase().trim();
   const filter = params.filter || "all";
   const visibility = params.visibility || "active";
+
+  if (tenantContext.readOnly) {
+    applyCommercialBotHandoff(tenantContext.tenantId);
+  }
 
   let conversations = tenantContext.readOnly ? listInboxConversations(tenantContext.tenantId) : [];
   let channelState = buildWhatsAppConnectionStatus({

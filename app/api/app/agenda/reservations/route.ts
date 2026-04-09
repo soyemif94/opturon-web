@@ -6,6 +6,7 @@ import {
   isBackendConfigured
 } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
+import { createAgendaItem, touchTenantActivity } from "@/lib/saas/store";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -26,8 +27,6 @@ export async function POST(request: NextRequest) {
     return noStore(NextResponse.json({ error: "missing_tenant_context" }, { status: 400 }));
   }
 
-  if (!isBackendConfigured()) return backendUnavailable();
-
   const body = (await request.json().catch(() => null)) as
     | {
         date?: string;
@@ -36,9 +35,84 @@ export async function POST(request: NextRequest) {
         title?: string;
         description?: string | null;
         contactId?: string | null;
-        status?: "pending" | "done" | "cancelled";
+        conversationId?: string | null;
+        assignedUserId?: string | null;
+        assignedUserName?: string | null;
+        status?: "pending" | "confirmed" | "done" | "reschedule" | "cancelled";
+        commercialActionType?: "visit" | "demo" | null;
+        commercialOutcome?: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | null;
+        origin?: string | null;
+        location?: string | null;
+        resultNote?: string | null;
+        nextStepNote?: string | null;
+        nextActionAt?: string | null;
+        contactNameSnapshot?: string | null;
+        phoneSnapshot?: string | null;
       }
     | null;
+
+  if (!isBackendConfigured()) {
+    const item = createAgendaItem(auth.ctx.tenantId, {
+      date: String(body?.date || ""),
+      startTime: String(body?.startTime || ""),
+      endTime: String(body?.endTime || ""),
+      title: String(body?.title || ""),
+      description: typeof body?.description === "string" ? body.description : null,
+      contactId: typeof body?.contactId === "string" ? body.contactId : null,
+      conversationId: typeof body?.conversationId === "string" ? body.conversationId : null,
+      assignedUserId: typeof body?.assignedUserId === "string" ? body.assignedUserId : null,
+      assignedUserName: typeof body?.assignedUserName === "string" ? body.assignedUserName : null,
+      status: body?.status || "pending",
+      type: "appointment",
+      commercialActionType: body?.commercialActionType || null,
+      commercialOutcome: body?.commercialOutcome || null,
+      origin: typeof body?.origin === "string" ? body.origin : null,
+      location: typeof body?.location === "string" ? body.location : null,
+      resultNote: typeof body?.resultNote === "string" ? body.resultNote : null,
+      nextStepNote: typeof body?.nextStepNote === "string" ? body.nextStepNote : null,
+      nextActionAt: typeof body?.nextActionAt === "string" ? body.nextActionAt : null,
+      contactNameSnapshot: typeof body?.contactNameSnapshot === "string" ? body.contactNameSnapshot : null,
+      phoneSnapshot: typeof body?.phoneSnapshot === "string" ? body.phoneSnapshot : null
+    });
+    touchTenantActivity(auth.ctx.tenantId);
+    return noStore(
+      NextResponse.json({
+        data: {
+          id: item.id,
+          clinicId: item.tenantId,
+          date: item.date,
+          startAt: item.startAt,
+          endAt: item.endAt,
+          contactId: item.contactId || null,
+          conversationId: item.conversationId || null,
+          assignedUserId: item.assignedUserId || null,
+          assignedUserName: item.assignedUserName || null,
+          contact: item.contactId
+            ? {
+                id: item.contactId,
+                name: item.contactNameSnapshot || "Sin nombre",
+                phone: item.phoneSnapshot || null
+              }
+            : null,
+          startTime: item.startAt ? item.startAt.slice(11, 16) : null,
+          endTime: item.endAt ? item.endAt.slice(11, 16) : null,
+          type: item.type,
+          title: item.title,
+          description: item.description,
+          status: item.status,
+          commercialActionType: item.commercialActionType || null,
+          commercialOutcome: item.commercialOutcome || null,
+          origin: item.origin || null,
+          location: item.location || null,
+          resultNote: item.resultNote || null,
+          nextStepNote: item.nextStepNote || null,
+          nextActionAt: item.nextActionAt || null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        }
+      }, { status: 201 })
+    );
+  }
 
   try {
     const result = await createPortalAgendaReservation(auth.ctx.tenantId, {

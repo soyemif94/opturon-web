@@ -6,6 +6,7 @@ import {
   isBackendConfigured
 } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
+import { getAgendaAvailability } from "@/lib/saas/store";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -26,12 +27,15 @@ export async function GET(request: NextRequest) {
     return noStore(NextResponse.json({ error: "missing_tenant_context" }, { status: 400 }));
   }
 
-  if (!isBackendConfigured()) return backendUnavailable();
-
   const url = new URL(request.url);
   const date = String(url.searchParams.get("date") || "").trim();
   const from = String(url.searchParams.get("from") || "").trim();
   const to = String(url.searchParams.get("to") || "").trim();
+
+  if (!isBackendConfigured()) {
+    const days = date ? [getAgendaAvailability(auth.ctx.tenantId, date)] : [];
+    return noStore(NextResponse.json({ data: { days, from: from || null, to: to || null } }, { status: 200 }));
+  }
 
   try {
     const result = await getPortalAgendaAvailability(auth.ctx.tenantId, { date, from, to });

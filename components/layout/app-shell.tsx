@@ -246,17 +246,25 @@ export function AppShell({
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const previousPathnameRef = useRef(pathname);
+  const activePathnameRef = useRef(pathname);
+  const opsLockSentRef = useRef(false);
 
-  useEffect(() => {
-    setSidebarStatus(whatsappStatus);
-  }, [whatsappStatus]);
-
-  useEffect(() => {
-    const previousPathname = previousPathnameRef.current;
-    previousPathnameRef.current = pathname;
-
-    if (!previousPathname.startsWith("/app/ops") || pathname.startsWith("/app/ops")) {
+  function sendOpsLockRequest() {
+    if (!activePathnameRef.current.startsWith("/app/ops") || opsLockSentRef.current) {
       return;
+    }
+
+    opsLockSentRef.current = true;
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        const beaconSent = navigator.sendBeacon("/api/app/ops/lock", new Blob([], { type: "application/json" }));
+        if (beaconSent) {
+          return;
+        }
+      }
+    } catch {
+      // Fall through to fetch keepalive.
     }
 
     void fetch("/api/app/ops/lock", {
@@ -267,7 +275,52 @@ export function AppShell({
     }).catch(() => {
       // The next visit to /app/ops will still validate server-side.
     });
+  }
+
+  useEffect(() => {
+    setSidebarStatus(whatsappStatus);
+  }, [whatsappStatus]);
+
+  useEffect(() => {
+    activePathnameRef.current = pathname;
+
+    if (pathname.startsWith("/app/ops")) {
+      opsLockSentRef.current = false;
+    }
   }, [pathname]);
+
+  useEffect(() => {
+    const previousPathname = previousPathnameRef.current;
+    previousPathnameRef.current = pathname;
+
+    if (!previousPathname.startsWith("/app/ops") || pathname.startsWith("/app/ops")) {
+      return;
+    }
+
+    activePathnameRef.current = previousPathname;
+    sendOpsLockRequest();
+    activePathnameRef.current = pathname;
+  }, [pathname]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        sendOpsLockRequest();
+      }
+    }
+
+    function handleBeforeUnload() {
+      sendOpsLockRequest();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   useEffect(() => {
     if (!tenantId) return;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ConversationRowData, LeadStatus } from "@/components/app/inbox/types";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +83,7 @@ export function OpsLeadTable({
   showSlaSignals?: boolean;
   onAssign: (conversationId: string, sellerUserId: string) => void;
 }) {
+  const router = useRouter();
   const [draftAssignments, setDraftAssignments] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -121,11 +123,28 @@ export function OpsLeadTable({
             const isBusy = assigningId === row.id;
             const urgent = showSlaSignals && isUrgentLead(row);
             const cold = showSlaSignals && !urgent && isColdLead(row);
+            const inboxHref = row.id ? `/app/inbox/${row.id}` : null;
 
             return (
               <div
                 key={row.id}
-                className="grid gap-4 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
+                role={inboxHref ? "button" : undefined}
+                tabIndex={inboxHref ? 0 : undefined}
+                onClick={(event) => {
+                  if (!inboxHref) return;
+                  const target = event.target as HTMLElement | null;
+                  if (target?.closest("button, a, select, option, input, label")) return;
+                  router.push(inboxHref);
+                }}
+                onKeyDown={(event) => {
+                  if (!inboxHref) return;
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  router.push(inboxHref);
+                }}
+                className={`grid gap-4 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4 transition-colors lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] ${
+                  inboxHref ? "cursor-pointer hover:border-brand/35 hover:bg-brand/8 focus:outline-none focus:ring-2 focus:ring-brand/30" : ""
+                }`}
               >
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -140,6 +159,7 @@ export function OpsLeadTable({
                     {showOwner ? <span>Owner: {ownerLabel}</span> : null}
                     {showFollowUp ? <span>Seguimiento: {formatDateTime(row.nextActionAt)}</span> : null}
                     {showFollowUp && row.nextActionNote ? <span>Nota: {row.nextActionNote}</span> : null}
+                    {inboxHref ? <span className="text-brandBright">Click para abrir hilo</span> : null}
                   </div>
                 </div>
 

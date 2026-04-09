@@ -53,6 +53,22 @@ type AssignableSeller = {
   role: string | null;
 };
 
+function hydrateOrderSeller(order: PortalOrder, sellers: AssignableSeller[]): PortalOrder {
+  const seller = order.sellerUserId ? sellers.find((item) => item.id === order.sellerUserId) || null : null;
+  if (!seller) return order;
+  return {
+    ...order,
+    sellerNameSnapshot: order.sellerNameSnapshot || seller.name,
+    seller: order.seller?.name
+      ? order.seller
+      : {
+          id: seller.id,
+          name: seller.name,
+          role: seller.role
+        }
+  };
+}
+
 type OrderFormState = {
   customerType: "registered_contact" | "final_consumer";
   contactId: string;
@@ -659,7 +675,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
         throw new Error(humanizeOrderError(json) || "No se pudo actualizar el estado del pedido.");
       }
 
-      const updatedOrder = json.order as PortalOrder;
+      const updatedOrder = hydrateOrderSeller(json.order as PortalOrder, sellers);
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder((current) => (current?.id === updatedOrder.id ? updatedOrder : current));
       setDetailPaymentDestinationId(updatedOrder.paymentDestinationId || "");
@@ -1151,6 +1167,8 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                         </div>
                         <p className="mt-2 text-sm text-muted">{labelForOrderPhone(order)}</p>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
+                          <span>Vendedor: {labelForOrderSeller(order, sellers)}</span>
+                          <span>·</span>
                           <span>{order.items.length} item(s)</span>
                           <span>·</span>
                           <span>{formatDate(order.createdAt)}</span>
@@ -1386,7 +1404,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                     <DetailStat label="Cliente" value={labelForOrderCustomer(selectedOrder)} />
                     <DetailStat label="Telefono" value={labelForOrderPhone(selectedOrder)} />
                     <DetailStat label="Tipo de cliente" value={labelForCustomerType(selectedOrder.customerType)} />
-                    <DetailStat label="Vendedor" value={labelForOrderSeller(selectedOrder)} />
+                    <DetailStat label="Vendedor" value={labelForOrderSeller(selectedOrder, sellers)} />
                     <DetailStat label="Destino de cobro" value={labelForPaymentDestination(selectedOrder)} />
                     <DetailStat label="Origen" value={labelForOrderSource(selectedOrder)} />
                     <DetailStat label="Total" value={formatCurrency(selectedOrder.total, selectedOrder.currency)} />
@@ -1822,11 +1840,12 @@ function labelForSellerRole(role: string | null | undefined) {
   }
 }
 
-function labelForOrderSeller(order: PortalOrder) {
+function labelForOrderSeller(order: PortalOrder, sellers: AssignableSeller[] = []) {
+  const fallbackSeller = order.sellerUserId ? sellers.find((seller) => seller.id === order.sellerUserId) : null;
   if (order.source === "bot" && !order.seller?.name && !order.sellerNameSnapshot) {
     return "Bot";
   }
-  return order.seller?.name || order.sellerNameSnapshot || "Sin asignar";
+  return order.seller?.name || order.sellerNameSnapshot || fallbackSeller?.name || "Sin asignar";
 }
 
 function labelForOrderSource(order: PortalOrder) {

@@ -1252,6 +1252,9 @@ export type PortalAgendaItem = {
   startAt: string | null;
   endAt: string | null;
   contactId: string | null;
+  conversationId?: string | null;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
   contact: {
     id: string;
     name: string;
@@ -1262,7 +1265,14 @@ export type PortalAgendaItem = {
   type: "note" | "follow_up" | "task" | "appointment" | "blocked" | "availability";
   title: string;
   description: string | null;
-  status: "pending" | "done" | "cancelled";
+  status: "pending" | "confirmed" | "done" | "reschedule" | "cancelled";
+  commercialActionType?: "visit" | "demo" | null;
+  commercialOutcome?: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | null;
+  origin?: string | null;
+  location?: string | null;
+  resultNote?: string | null;
+  nextStepNote?: string | null;
+  nextActionAt?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };

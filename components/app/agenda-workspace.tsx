@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { PortalAgendaAvailabilityDay, PortalContact } from "@/lib/api";
 import {
@@ -25,7 +26,7 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/ui/cn";
 
 type AgendaItemType = "note" | "follow_up" | "task" | "appointment" | "blocked" | "availability";
-type AgendaStatus = "pending" | "done" | "cancelled";
+type AgendaStatus = "pending" | "confirmed" | "done" | "reschedule" | "cancelled";
 
 type AgendaItem = {
   id: string;
@@ -34,6 +35,9 @@ type AgendaItem = {
   startAt: string | null;
   endAt: string | null;
   contactId: string | null;
+  conversationId?: string | null;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
   contact: {
     id: string;
     name: string;
@@ -45,6 +49,13 @@ type AgendaItem = {
   title: string;
   description: string | null;
   status: AgendaStatus;
+  commercialActionType?: "visit" | "demo" | null;
+  commercialOutcome?: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | null;
+  origin?: string | null;
+  location?: string | null;
+  resultNote?: string | null;
+  nextStepNote?: string | null;
+  nextActionAt?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -56,6 +67,17 @@ type DraftState = {
   startTime: string;
   endTime: string;
   contactId: string;
+  conversationId: string;
+  assignedUserId: string;
+  commercialActionType: "visit" | "demo" | "";
+  commercialOutcome: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | "";
+  origin: string;
+  location: string;
+  resultNote: string;
+  nextStepNote: string;
+  nextActionAt: string;
+  contactNameSnapshot: string;
+  phoneSnapshot: string;
 };
 
 type EditState = DraftState & {
@@ -110,12 +132,6 @@ function typeMeta(type: AgendaItemType) {
   return { label: "Nota", variant: "muted" as const };
 }
 
-function statusMeta(status: AgendaStatus) {
-  if (status === "done") return { label: "Hecho", variant: "success" as const };
-  if (status === "cancelled") return { label: "Cancelado", variant: "danger" as const };
-  return { label: "Pendiente", variant: "warning" as const };
-}
-
 function formatTimeLabel(item: AgendaItem) {
   if (item.startTime && item.endTime) return `${item.startTime} - ${item.endTime}`;
   if (item.startTime) return item.startTime;
@@ -142,11 +158,168 @@ function toEditState(item: AgendaItem): EditState {
     startTime: item.startTime || "",
     endTime: item.endTime || "",
     contactId: item.contactId || "",
+    conversationId: item.conversationId || "",
+    assignedUserId: item.assignedUserId || "",
+    commercialActionType: item.commercialActionType || "",
+    commercialOutcome: item.commercialOutcome || "",
+    origin: item.origin || "",
+    location: item.location || "",
+    resultNote: item.resultNote || "",
+    nextStepNote: item.nextStepNote || "",
+    nextActionAt: item.nextActionAt ? item.nextActionAt.slice(0, 16) : "",
+    contactNameSnapshot: item.contact?.name || "",
+    phoneSnapshot: item.contact?.phone || "",
     status: item.status
   };
 }
 
-export function AgendaWorkspace() {
+type AgendaWorkspaceProps = {
+  currentUserId?: string | null;
+  sellerOptions?: Array<{ id: string; name: string; role: string }>;
+  initialCommercialPrefill?: {
+    conversationId?: string;
+    contactId?: string;
+    contactName?: string;
+    phone?: string;
+    actionType?: "visit" | "demo";
+  };
+};
+
+function buildCommercialTitle(actionType?: "visit" | "demo", contactName?: string | null) {
+  const base = actionType === "visit" ? "Visita comercial" : "Demo comercial";
+  return contactName ? `${base} - ${contactName}` : base;
+}
+
+function createDraftState(initialCommercialPrefill?: AgendaWorkspaceProps["initialCommercialPrefill"]): DraftState {
+  return {
+    title: initialCommercialPrefill?.actionType
+      ? buildCommercialTitle(initialCommercialPrefill.actionType, initialCommercialPrefill.contactName)
+      : "",
+    type: initialCommercialPrefill?.actionType ? "appointment" : "note",
+    description: initialCommercialPrefill?.conversationId ? "Lead comercial derivado desde bot handoff." : "",
+    startTime: "",
+    endTime: "",
+    contactId: initialCommercialPrefill?.contactId || "",
+    conversationId: initialCommercialPrefill?.conversationId || "",
+    assignedUserId: "",
+    commercialActionType: initialCommercialPrefill?.actionType || "",
+    commercialOutcome: "",
+    origin: initialCommercialPrefill?.conversationId ? "lead_comercial_bot_handoff" : "",
+    location: "",
+    resultNote: "",
+    nextStepNote: "",
+    nextActionAt: "",
+    contactNameSnapshot: initialCommercialPrefill?.contactName || "",
+    phoneSnapshot: initialCommercialPrefill?.phone || ""
+  };
+}
+
+function toConversationNextActionAt(date: string, startTime?: string | null) {
+  if (!date || !startTime) return null;
+  const iso = new Date(`${date}T${startTime}:00`).toISOString();
+  return Number.isNaN(Date.parse(iso)) ? null : iso;
+}
+
+function commercialActionLabel(actionType?: "visit" | "demo" | null) {
+  if (actionType === "visit") return "Visita comercial";
+  if (actionType === "demo") return "Demo comercial";
+  return null;
+}
+
+function commercialOutcomeLabel(outcome?: AgendaItem["commercialOutcome"] | "") {
+  if (outcome === "interested") return "Interesado";
+  if (outcome === "not_interested") return "No interesado";
+  if (outcome === "proposal_requested") return "Pidio propuesta";
+  if (outcome === "follow_up_later") return "Recontactar mas adelante";
+  if (outcome === "future_demo") return "Demo futura";
+  if (outcome === "won") return "Venta cerrada";
+  return null;
+}
+
+function commercialOutcomeVariant(outcome?: AgendaItem["commercialOutcome"] | "") {
+  if (outcome === "won") return "success" as const;
+  if (outcome === "proposal_requested" || outcome === "interested") return "warning" as const;
+  if (outcome === "not_interested") return "danger" as const;
+  return "outline" as const;
+}
+
+function isTodayKey(dateKey: string) {
+  return dateKey === toDateKey(new Date());
+}
+
+function isCommercialAttentionItem(item: Pick<AgendaItem, "commercialActionType" | "status" | "nextActionAt" | "date">) {
+  if (!item.commercialActionType) return false;
+  if (item.status === "reschedule" || item.status === "pending") return true;
+  if (item.status === "confirmed" && isTodayKey(item.date)) return true;
+  if (!item.nextActionAt) return false;
+  return new Date(item.nextActionAt).getTime() <= Date.now();
+}
+
+function commercialPriorityRank(item: Pick<AgendaItem, "commercialActionType" | "status" | "nextActionAt" | "date">) {
+  if (!item.commercialActionType) return 50;
+  if (item.status === "reschedule") return 0;
+  if (item.status === "pending" && isTodayKey(item.date)) return 1;
+  if (item.status === "confirmed" && isTodayKey(item.date)) return 2;
+  if (item.status === "pending") return 3;
+  if (item.nextActionAt && new Date(item.nextActionAt).getTime() <= Date.now()) return 4;
+  if (item.status === "done") return 8;
+  if (item.status === "cancelled") return 9;
+  return 5;
+}
+
+function commercialSurfaceClass(item: Pick<AgendaItem, "commercialActionType" | "status" | "date" | "nextActionAt" | "assignedUserId">, currentUserId?: string | null) {
+  if (!item.commercialActionType) return "";
+  if (item.status === "reschedule") return "border-amber-400/45 bg-amber-500/[0.12]";
+  if (item.status === "confirmed") return "border-emerald-400/35 bg-emerald-500/[0.12]";
+  if (item.status === "pending" && isTodayKey(item.date)) return "border-brand/55 bg-brand/[0.12]";
+  if (currentUserId && item.assignedUserId === currentUserId) return "border-sky-400/30 bg-sky-500/[0.10]";
+  return "border-fuchsia-400/25 bg-fuchsia-500/[0.08]";
+}
+
+function statusMeta(status: AgendaStatus, commercial?: boolean | null) {
+  if (status === "done") return { label: commercial ? "Realizada" : "Hecho", variant: "success" as const };
+  if (status === "confirmed") return { label: "Confirmada", variant: "success" as const };
+  if (status === "reschedule") return { label: "Reprogramar", variant: "warning" as const };
+  if (status === "cancelled") return { label: "Cancelada", variant: "danger" as const };
+  return { label: "Pendiente", variant: "warning" as const };
+}
+
+function buildCommercialNextAction(item: Pick<AgendaItem, "commercialActionType" | "commercialOutcome" | "status" | "startTime" | "date" | "resultNote" | "nextStepNote" | "nextActionAt">) {
+  const label = commercialActionLabel(item.commercialActionType) || "Accion comercial";
+  const outcomeLabel = commercialOutcomeLabel(item.commercialOutcome);
+  const scheduledAt = item.nextActionAt || toConversationNextActionAt(item.date, item.startTime);
+
+  if (item.status === "done") {
+    return {
+      nextActionAt: item.nextActionAt || null,
+      nextActionNote: item.nextStepNote?.trim() || outcomeLabel || item.resultNote?.trim() || `${label} realizada`
+    };
+  }
+  if (item.status === "reschedule") {
+    return {
+      nextActionAt: item.nextActionAt || null,
+      nextActionNote: item.nextStepNote?.trim() || `${label} a reprogramar`
+    };
+  }
+  if (item.status === "cancelled") {
+    return {
+      nextActionAt: item.nextActionAt || null,
+      nextActionNote: item.nextStepNote?.trim() || `${label} cancelada`
+    };
+  }
+  if (item.status === "confirmed") {
+    return {
+      nextActionAt: scheduledAt,
+      nextActionNote: `${label} confirmada en Agenda`
+    };
+  }
+  return {
+    nextActionAt: scheduledAt,
+    nextActionNote: `${label} agendada en Agenda`
+  };
+}
+
+export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialCommercialPrefill }: AgendaWorkspaceProps) {
   const today = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(today));
@@ -162,15 +335,10 @@ export function AgendaWorkspace() {
   const [refreshSeed, setRefreshSeed] = useState(0);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
   const [availabilityDay, setAvailabilityDay] = useState<PortalAgendaAvailabilityDay | null>(null);
-  const [draft, setDraft] = useState<DraftState>({
-    title: "",
-    type: "note",
-    description: "",
-    startTime: "",
-    endTime: "",
-    contactId: ""
-  });
+  const [draft, setDraft] = useState<DraftState>(() => createDraftState(initialCommercialPrefill));
   const [editDraft, setEditDraft] = useState<EditState | null>(null);
+  const [visitScope, setVisitScope] = useState<"all" | "mine">("all");
+  const [commercialView, setCommercialView] = useState<"all" | "commercial">("all");
 
   const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
   const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
@@ -296,7 +464,9 @@ export function AgendaWorkspace() {
       inCurrentMonth: date.getMonth() === currentMonth.getMonth(),
       isToday: dateKey === toDateKey(today),
       isSelected: dateKey === selectedDateKey,
-      count: items.filter((item) => item.date === dateKey && item.status !== "cancelled").length
+      count: items.filter((item) => item.date === dateKey && item.status !== "cancelled").length,
+      commercialCount: items.filter((item) => item.date === dateKey && item.commercialActionType && item.status !== "cancelled").length,
+      attentionCount: items.filter((item) => item.date === dateKey && item.status !== "cancelled" && isCommercialAttentionItem(item)).length
     };
   });
 
@@ -304,16 +474,33 @@ export function AgendaWorkspace() {
 
   const selectedItems = items
     .filter((item) => item.date === selectedDateKey)
-    .sort((a, b) => `${a.startTime || "99:99"}${a.createdAt || ""}`.localeCompare(`${b.startTime || "99:99"}${b.createdAt || ""}`));
+    .filter((item) => visitScope === "all" || !item.commercialActionType || item.assignedUserId === currentUserId)
+    .filter((item) => commercialView === "all" || Boolean(item.commercialActionType))
+    .sort((a, b) => {
+      const priorityDiff = commercialPriorityRank(a) - commercialPriorityRank(b);
+      if (priorityDiff !== 0) return priorityDiff;
+      return `${a.startTime || "99:99"}${a.createdAt || ""}`.localeCompare(`${b.startTime || "99:99"}${b.createdAt || ""}`);
+    });
 
   const monthItems = items.filter((item) => item.date >= toDateKey(monthStart) && item.date <= toDateKey(monthEnd));
+  const monthCommercialItems = monthItems.filter((item) => item.commercialActionType && item.status !== "cancelled");
+  const myCommercialCount = monthItems.filter((item) => item.commercialActionType && item.status !== "cancelled" && item.assignedUserId === currentUserId).length;
   const appointmentCount = monthItems.filter((item) => item.type === "appointment" && item.status !== "cancelled").length;
+  const commercialCount = monthItems.filter((item) => item.commercialActionType && item.status !== "cancelled").length;
+  const interestedCount = monthCommercialItems.filter((item) => item.commercialOutcome === "interested").length;
+  const proposalRequestedCount = monthCommercialItems.filter((item) => item.commercialOutcome === "proposal_requested").length;
+  const wonCount = monthCommercialItems.filter((item) => item.commercialOutcome === "won").length;
+  const notInterestedCount = monthCommercialItems.filter((item) => item.commercialOutcome === "not_interested").length;
   const blockedCount = monthItems.filter((item) => item.type === "blocked" && item.status !== "cancelled").length;
   const availabilityCount = monthItems.filter((item) => item.type === "availability" && item.status !== "cancelled").length;
   const pendingCount = monthItems.filter((item) => item.status === "pending").length;
   const selectedAvailability = selectedItems.filter((item) => item.type === "availability" && item.status !== "cancelled");
   const selectedBlocked = selectedItems.filter((item) => item.type === "blocked" && item.status !== "cancelled");
   const selectedAppointments = selectedItems.filter((item) => item.type === "appointment" && item.status !== "cancelled");
+  const selectedCommercial = selectedItems.filter((item) => item.commercialActionType);
+  const selectedAttentionItems = selectedCommercial.filter((item) => isCommercialAttentionItem(item));
+  const selectedConfirmed = selectedCommercial.filter((item) => item.status === "confirmed");
+  const selectedTodayCommercial = selectedCommercial.filter((item) => isTodayKey(item.date));
   const createDisabled = createBusy || !draft.title.trim() || (requiresTimeRange(draft.type) && (!draft.startTime || !draft.endTime));
   const editDisabled =
     editBusy ||
@@ -324,6 +511,18 @@ export function AgendaWorkspace() {
     const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1);
     setCurrentMonth(nextMonth);
     setSelectedDateKey(toDateKey(nextMonth));
+  }
+
+  async function syncConversationNextAction(item: Pick<AgendaItem, "conversationId" | "commercialActionType" | "commercialOutcome" | "status" | "date" | "startTime" | "resultNote" | "nextStepNote" | "nextActionAt">) {
+    if (!item.conversationId || !item.commercialActionType) return;
+    const payload = buildCommercialNextAction(item);
+    await fetch(`/api/app/inbox/${item.conversationId}/next-action`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    }).catch(() => null);
   }
 
   async function handleCreateItem() {
@@ -342,10 +541,22 @@ export function AgendaWorkspace() {
           startTime: draft.startTime || null,
           endTime: draft.endTime || null,
           contactId: draft.contactId || null,
+          conversationId: draft.conversationId || null,
+          assignedUserId: draft.assignedUserId || null,
+          assignedUserName: sellerOptions.find((seller) => seller.id === draft.assignedUserId)?.name || null,
           type: draft.type,
           title: draft.title.trim(),
           description: draft.description.trim() || null,
-          status: "pending"
+          status: "pending",
+          commercialActionType: draft.commercialActionType || null,
+          commercialOutcome: draft.commercialOutcome || null,
+          origin: draft.origin || null,
+          location: draft.location.trim() || null,
+          resultNote: draft.resultNote.trim() || null,
+          nextStepNote: draft.nextStepNote.trim() || null,
+          nextActionAt: draft.nextActionAt ? new Date(draft.nextActionAt).toISOString() : null,
+          contactNameSnapshot: draft.contactNameSnapshot.trim() || null,
+          phoneSnapshot: draft.phoneSnapshot.trim() || null
         })
       });
       const json = (await response.json().catch(() => null)) as { data?: AgendaItem; detail?: string; error?: string } | null;
@@ -356,18 +567,31 @@ export function AgendaWorkspace() {
 
       const nextItem = json.data;
       setItems((current) => [...current, nextItem]);
-      setDraft({
-        title: "",
-        type: "note",
-        description: "",
-        startTime: "",
-        endTime: "",
-        contactId: ""
+      await syncConversationNextAction({
+        conversationId: draft.conversationId || null,
+        commercialActionType: draft.commercialActionType || null,
+        commercialOutcome: draft.commercialOutcome || null,
+        status: "pending",
+        date: selectedDateKey,
+        startTime: draft.startTime || null,
+        resultNote: draft.resultNote || null,
+        nextStepNote: draft.nextStepNote || null,
+        nextActionAt: draft.nextActionAt ? new Date(draft.nextActionAt).toISOString() : null
       });
+      setDraft(createDraftState());
       setRefreshSeed((current) => current + 1);
+      const commercialSuccessLabel = draft.commercialActionType ? commercialActionLabel(draft.commercialActionType) : null;
       toast.success(
-        draft.type === "appointment" ? "Turno reservado" : "Item creado",
-        draft.contactId ? "La agenda guardo el item y su contacto asociado." : "La agenda ya guardo el item en este tenant."
+        commercialSuccessLabel
+          ? `${commercialSuccessLabel} agendada`
+          : draft.type === "appointment"
+            ? "Turno reservado"
+            : "Item creado",
+        draft.commercialActionType
+          ? "La agenda ya dejo el seguimiento comercial vinculado a la conversacion."
+          : draft.contactId
+            ? "La agenda guardo el item y su contacto asociado."
+            : "La agenda ya guardo el item en este tenant."
       );
     } catch (error) {
       toast.error("No pudimos crear el item", error instanceof Error ? error.message : "unknown_error");
@@ -394,6 +618,17 @@ export function AgendaWorkspace() {
 
       const nextItem = json.data;
       setItems((current) => current.map((entry) => (entry.id === item.id ? nextItem : entry)));
+      await syncConversationNextAction({
+        conversationId: nextItem.conversationId || null,
+        commercialActionType: nextItem.commercialActionType || null,
+        commercialOutcome: nextItem.commercialOutcome || null,
+        status: nextItem.status,
+        date: nextItem.date,
+        startTime: nextItem.startTime || null,
+        resultNote: nextItem.resultNote || null,
+        nextStepNote: nextItem.nextStepNote || null,
+        nextActionAt: nextItem.nextActionAt || null
+      });
       setRefreshSeed((current) => current + 1);
     } catch (error) {
       toast.error("No pudimos actualizar el item", error instanceof Error ? error.message : "unknown_error");
@@ -428,9 +663,20 @@ export function AgendaWorkspace() {
           title: editDraft.title.trim(),
           description: editDraft.description.trim() || null,
           contactId: editDraft.type === "blocked" || editDraft.type === "availability" ? null : editDraft.contactId || null,
+          assignedUserId: editDraft.type === "blocked" || editDraft.type === "availability" ? null : editDraft.assignedUserId || null,
+          assignedUserName:
+            editDraft.type === "blocked" || editDraft.type === "availability"
+              ? null
+              : sellerOptions.find((seller) => seller.id === editDraft.assignedUserId)?.name || null,
           startTime: editDraft.startTime || null,
           endTime: editDraft.endTime || null,
           status: editDraft.status
+          ,
+          resultNote: editDraft.resultNote.trim() || null,
+          nextStepNote: editDraft.nextStepNote.trim() || null,
+          nextActionAt: editDraft.nextActionAt ? new Date(editDraft.nextActionAt).toISOString() : null
+          ,
+          commercialOutcome: editDraft.commercialOutcome || null
         })
       });
       const json = (await response.json().catch(() => null)) as { data?: AgendaItem; detail?: string; error?: string } | null;
@@ -444,6 +690,17 @@ export function AgendaWorkspace() {
       const nextDate = parseDateKey(nextItem.date);
       setCurrentMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
       setSelectedDateKey(nextItem.date);
+      await syncConversationNextAction({
+        conversationId: nextItem.conversationId || null,
+        commercialActionType: nextItem.commercialActionType || null,
+        commercialOutcome: nextItem.commercialOutcome || null,
+        status: nextItem.status,
+        date: nextItem.date,
+        startTime: nextItem.startTime || null,
+        resultNote: nextItem.resultNote || null,
+        nextStepNote: nextItem.nextStepNote || null,
+        nextActionAt: nextItem.nextActionAt || null
+      });
       setRefreshSeed((current) => current + 1);
       stopEditing();
       toast.success("Item actualizado", "La agenda guardo los cambios del item seleccionado.");
@@ -477,7 +734,7 @@ export function AgendaWorkspace() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="success">Persistente</Badge>}>
             <div>
@@ -498,7 +755,41 @@ export function AgendaWorkspace() {
             </div>
           </CardHeader>
           <CardContent className="pt-0 text-sm leading-6 text-muted">
-            {availabilityCount} bloques disponibles, {blockedCount} bloqueos y {pendingCount} items pendientes para la operacion diaria.
+            {availabilityCount} bloques disponibles, {blockedCount} bloqueos, {pendingCount} items pendientes y {commercialCount} visitas/demo comerciales activas.
+            {currentUserId ? ` ${myCommercialCount} asignadas a ti.` : ""}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="warning">{commercialCount} comerciales</Badge>}>
+            <div>
+              <CardTitle className="text-lg">Resultados Del Mes</CardTitle>
+              <CardDescription>Lectura minima de visitas y demos comerciales cargadas en el mes visible.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-2 pt-0 text-sm text-muted">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-fuchsia-100/80">Total</p>
+                <p className="mt-1 text-xl font-semibold text-fuchsia-100">{commercialCount}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-amber-100/80">Interesados</p>
+                <p className="mt-1 text-xl font-semibold text-amber-100">{interestedCount}</p>
+              </div>
+              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-sky-100/80">Propuesta</p>
+                <p className="mt-1 text-xl font-semibold text-sky-100">{proposalRequestedCount}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-100/80">Cerrados</p>
+                <p className="mt-1 text-xl font-semibold text-emerald-100">{wonCount}</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-rose-100">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-rose-100/80">No interesados</p>
+              <p className="mt-1 text-lg font-semibold">{notInterestedCount}</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -572,10 +863,14 @@ export function AgendaWorkspace() {
                       {day.isToday ? <Badge variant="warning">Hoy</Badge> : null}
                     </div>
                     <div className="mt-4 space-y-2">
+                      {day.commercialCount > 0 ? <div className="h-1.5 rounded-full bg-fuchsia-400/70" /> : null}
+                      {day.attentionCount > 0 ? <div className="h-1.5 rounded-full bg-amber-400/80" /> : null}
                       {day.count > 0 ? (
                         <>
                           <div className="h-2 rounded-full bg-brand/40" />
                           <p className="text-xs text-muted">{day.count} item(s)</p>
+                          {day.commercialCount > 0 ? <p className="text-[11px] text-fuchsia-200">{day.commercialCount} comercial(es)</p> : null}
+                          {day.attentionCount > 0 ? <p className="text-[11px] text-amber-200">{day.attentionCount} requiere accion</p> : null}
                         </>
                       ) : (
                         <p className="text-xs text-muted">Libre</p>
@@ -590,7 +885,31 @@ export function AgendaWorkspace() {
 
         <div className="space-y-5">
           <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant="muted">{selectedItems.length} item(s)</Badge>}>
+            <CardHeader
+              action={
+                <div className="flex items-center gap-2">
+                  {currentUserId ? (
+                    <div className="inline-flex rounded-xl border border-[color:var(--border)] bg-bg/50 p-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setVisitScope("all")}
+                        className={cn("rounded-lg px-2.5 py-1 transition", visitScope === "all" ? "bg-brand text-white" : "text-muted")}
+                      >
+                        Todas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVisitScope("mine")}
+                        className={cn("rounded-lg px-2.5 py-1 transition", visitScope === "mine" ? "bg-brand text-white" : "text-muted")}
+                      >
+                        Mis visitas
+                      </button>
+                    </div>
+                  ) : null}
+                  <Badge variant="muted">{selectedItems.length} item(s)</Badge>
+                </div>
+              }
+            >
               <div>
                 <CardTitle className="text-xl">
                   {selectedDate.toLocaleDateString("es-AR", {
@@ -633,6 +952,29 @@ export function AgendaWorkspace() {
                 </div>
               </div>
 
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-3 text-sm text-fuchsia-100">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-fuchsia-200/80">Comerciales</p>
+                  <p className="mt-2 text-xl font-semibold">{selectedCommercial.length}</p>
+                  <p className="mt-1 text-xs text-fuchsia-100/75">Visitas y demos visibles en este dia.</p>
+                </div>
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-amber-200/80">Requieren accion</p>
+                  <p className="mt-2 text-xl font-semibold">{selectedAttentionItems.length}</p>
+                  <p className="mt-1 text-xs text-amber-100/75">Pendientes, reprogramar o con urgencia operativa.</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-200/80">Confirmadas</p>
+                  <p className="mt-2 text-xl font-semibold">{selectedConfirmed.length}</p>
+                  <p className="mt-1 text-xs text-emerald-100/75">Listas para ejecucion comercial.</p>
+                </div>
+                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-sky-100">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-sky-200/80">De hoy</p>
+                  <p className="mt-2 text-xl font-semibold">{selectedTodayCommercial.length}</p>
+                  <p className="mt-1 text-xs text-sky-100/75">Agenda comercial a resolver hoy.</p>
+                </div>
+              </div>
+
               <div className="rounded-2xl border border-[color:var(--border)] bg-bg/35 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -662,14 +1004,51 @@ export function AgendaWorkspace() {
                 </div>
               </div>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-xl border border-[color:var(--border)] bg-bg/50 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCommercialView("all")}
+                    className={cn("rounded-lg px-2.5 py-1 transition", commercialView === "all" ? "bg-brand text-white" : "text-muted")}
+                  >
+                    Todo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCommercialView("commercial")}
+                    className={cn("rounded-lg px-2.5 py-1 transition", commercialView === "commercial" ? "bg-brand text-white" : "text-muted")}
+                  >
+                    Solo comercial
+                  </button>
+                </div>
+                <Badge variant="warning">Prioridad alta: reprogramar, pendientes y confirmadas de hoy</Badge>
+              </div>
+
+              {initialCommercialPrefill?.conversationId ? (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="warning">{commercialActionLabel(initialCommercialPrefill.actionType) || "Accion comercial"}</Badge>
+                    <Badge variant="outline">Lead derivado desde Inbox</Badge>
+                  </div>
+                  <p className="mt-2 leading-6">
+                    Esta agenda vino precompletada para{" "}
+                    <span className="font-medium text-white">{initialCommercialPrefill.contactName || "este lead"}</span>.
+                    Al guardar, la visita/demo queda vinculada a la conversacion original y visible en seguimiento.
+                  </p>
+                </div>
+              ) : null}
+
               {selectedItems.length ? (
                 selectedItems.map((item) => {
                   const meta = typeMeta(item.type);
-                  const status = statusMeta(item.status);
+                  const status = statusMeta(item.status, Boolean(item.commercialActionType));
                   const isBusy = mutationBusyId === item.id;
+                  const commercialLabel = commercialActionLabel(item.commercialActionType);
+                  const outcomeLabel = commercialOutcomeLabel(item.commercialOutcome);
+                  const requiresAttention = isCommercialAttentionItem(item);
 
                   return (
-                    <div key={item.id} className={cn("rounded-2xl border p-4", getItemSurface(item.type))}>
+                    <div key={item.id} className={cn("rounded-2xl border p-4", getItemSurface(item.type), commercialSurfaceClass(item, currentUserId))}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium">{item.title}</p>
@@ -677,6 +1056,11 @@ export function AgendaWorkspace() {
                             <Badge variant={meta.variant}>{meta.label}</Badge>
                             <Badge variant={status.variant}>{status.label}</Badge>
                             <Badge variant="outline">{formatTimeLabel(item)}</Badge>
+                            {commercialLabel ? <Badge variant="warning">{commercialLabel}</Badge> : null}
+                            {outcomeLabel ? <Badge variant={commercialOutcomeVariant(item.commercialOutcome)}>{outcomeLabel}</Badge> : null}
+                            {requiresAttention ? <Badge variant="danger">Requiere accion</Badge> : null}
+                            {item.commercialActionType && isTodayKey(item.date) ? <Badge variant="outline">Hoy</Badge> : null}
+                            {item.assignedUserName ? <Badge variant="outline">Responsable: {item.assignedUserName}</Badge> : null}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -696,16 +1080,82 @@ export function AgendaWorkspace() {
                           {item.contact.phone ? <span>- {item.contact.phone}</span> : null}
                         </div>
                       ) : null}
+                      {commercialLabel || item.origin || item.location || item.conversationId ? (
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
+                          {item.contact?.name ? (
+                            <span className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1 text-text">Contacto: {item.contact.name}</span>
+                          ) : null}
+                          {item.origin ? (
+                            <span className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1">{item.origin}</span>
+                          ) : null}
+                          {item.location ? (
+                            <span className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1">Ubicacion: {item.location}</span>
+                          ) : null}
+                          {item.conversationId ? (
+                            <Link
+                              href={`/app/inbox/${item.conversationId}`}
+                              className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1 text-text hover:bg-bg/70"
+                            >
+                              Ver conversacion {item.contact?.name ? `de ${item.contact.name}` : ""}
+                            </Link>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {item.resultNote || item.nextStepNote || item.nextActionAt ? (
+                        <div className="mt-3 space-y-2 rounded-2xl border border-[color:var(--border)] bg-bg/40 p-3 text-sm text-muted">
+                          {outcomeLabel ? (
+                            <p>
+                              <span className="font-medium text-text">Resultado comercial:</span> {outcomeLabel}
+                            </p>
+                          ) : null}
+                          {item.resultNote ? (
+                            <p>
+                              <span className="font-medium text-text">Resultado:</span> {item.resultNote}
+                            </p>
+                          ) : null}
+                          {item.nextStepNote ? (
+                            <p>
+                              <span className="font-medium text-text">Proximo paso:</span> {item.nextStepNote}
+                            </p>
+                          ) : null}
+                          {item.nextActionAt ? (
+                            <p>
+                              <span className="font-medium text-text">Proxima accion:</span>{" "}
+                              {new Date(item.nextActionAt).toLocaleString("es-AR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "pending")} disabled={isBusy || item.status === "pending"}>
                           Pendiente
                         </Button>
-                        <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>
-                          Hecho
-                        </Button>
+                        {item.commercialActionType ? (
+                          <>
+                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "confirmed")} disabled={isBusy || item.status === "confirmed"}>
+                              Confirmada
+                            </Button>
+                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>
+                              Realizada
+                            </Button>
+                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "reschedule")} disabled={isBusy || item.status === "reschedule"}>
+                              Reprogramar
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>
+                            Hecho
+                          </Button>
+                        )}
                         <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "cancelled")} disabled={isBusy || item.status === "cancelled"}>
-                          Cancelar
+                          {item.commercialActionType ? "Cancelada" : "Cancelar"}
                         </Button>
                       </div>
                     </div>
@@ -740,8 +1190,10 @@ export function AgendaWorkspace() {
                         className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       >
                         <option value="pending">Pendiente</option>
-                        <option value="done">Hecho</option>
-                        <option value="cancelled">Cancelado</option>
+                        {editDraft.commercialActionType ? <option value="confirmed">Confirmada</option> : null}
+                        <option value="done">{editDraft.commercialActionType ? "Realizada" : "Hecho"}</option>
+                        {editDraft.commercialActionType ? <option value="reschedule">Reprogramar</option> : null}
+                        <option value="cancelled">{editDraft.commercialActionType ? "Cancelada" : "Cancelado"}</option>
                       </select>
                     </label>
                   </div>
@@ -802,6 +1254,24 @@ export function AgendaWorkspace() {
                     )}
                   </div>
 
+                  {editDraft.type !== "blocked" && editDraft.type !== "availability" ? (
+                    <label className="mt-4 block space-y-2 text-sm">
+                      <span className="font-medium">Responsable</span>
+                      <select
+                        value={editDraft.assignedUserId}
+                        onChange={(event) => setEditDraft((current) => (current ? { ...current, assignedUserId: event.target.value } : current))}
+                        className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      >
+                        <option value="">Sin asignar</option>
+                        {sellerOptions.map((seller) => (
+                          <option key={seller.id} value={seller.id}>
+                            {seller.name}{seller.role ? ` · ${seller.role}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <label className="space-y-2 text-sm">
                       <span className="font-medium">Inicio</span>
@@ -817,6 +1287,55 @@ export function AgendaWorkspace() {
                     <span className="font-medium">Nota</span>
                     <Textarea value={editDraft.description} onChange={(event) => setEditDraft((current) => (current ? { ...current, description: event.target.value } : current))} className="min-h-28" />
                   </label>
+
+                  {editDraft.commercialActionType ? (
+                    <div className="mt-4 grid gap-4">
+                      <label className="space-y-2 text-sm">
+                        <span className="font-medium">Resultado comercial</span>
+                        <select
+                          value={editDraft.commercialOutcome}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, commercialOutcome: event.target.value as EditState["commercialOutcome"] } : current))}
+                          className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        >
+                          <option value="">Sin resultado estructurado</option>
+                          <option value="interested">Interesado</option>
+                          <option value="not_interested">No interesado</option>
+                          <option value="proposal_requested">Pidio propuesta</option>
+                          <option value="follow_up_later">Recontactar mas adelante</option>
+                          <option value="future_demo">Demo futura</option>
+                          <option value="won">Venta cerrada</option>
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm">
+                        <span className="font-medium">Resultado o nota de visita</span>
+                        <Textarea
+                          value={editDraft.resultNote}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, resultNote: event.target.value } : current))}
+                          className="min-h-24"
+                          placeholder="Que paso en la visita/demo, objeciones, interes real o contexto relevante."
+                        />
+                      </label>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="space-y-2 text-sm">
+                          <span className="font-medium">Proximo paso</span>
+                          <Textarea
+                            value={editDraft.nextStepNote}
+                            onChange={(event) => setEditDraft((current) => (current ? { ...current, nextStepNote: event.target.value } : current))}
+                            className="min-h-24"
+                            placeholder="Ej. enviar propuesta, recontactar, confirmar decision."
+                          />
+                        </label>
+                        <label className="space-y-2 text-sm">
+                          <span className="font-medium">Proxima fecha de accion</span>
+                          <Input
+                            type="datetime-local"
+                            value={editDraft.nextActionAt}
+                            onChange={(event) => setEditDraft((current) => (current ? { ...current, nextActionAt: event.target.value } : current))}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
                     {editDraft.type === "appointment"
@@ -844,7 +1363,7 @@ export function AgendaWorkspace() {
             <CardHeader action={<Badge variant="warning">CRUD basico</Badge>}>
               <div>
                 <CardTitle className="text-xl">Crear item del dia</CardTitle>
-                <CardDescription>La experiencia visual se mantiene y ahora puedes marcar disponibilidad, turnos o bloqueos.</CardDescription>
+                <CardDescription>La experiencia visual se mantiene y ahora tambien puedes registrar una visita o demo comercial vinculada al lead.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
@@ -903,6 +1422,53 @@ export function AgendaWorkspace() {
                 )}
               </div>
 
+              {draft.type !== "blocked" && draft.type !== "availability" ? (
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium">Responsable</span>
+                  <select
+                    value={draft.assignedUserId}
+                    onChange={(event) => setDraft((current) => ({ ...current, assignedUserId: event.target.value }))}
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  >
+                    <option value="">{currentUserId ? "Sin asignar" : "Sin responsable"}</option>
+                    {sellerOptions.map((seller) => (
+                      <option key={seller.id} value={seller.id}>
+                        {seller.name}{seller.role ? ` · ${seller.role}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {draft.type === "appointment" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm">
+                    <span className="font-medium">Accion comercial</span>
+                    <select
+                      value={draft.commercialActionType}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          commercialActionType: event.target.value as DraftState["commercialActionType"],
+                          title: event.target.value
+                            ? buildCommercialTitle(event.target.value as "visit" | "demo", current.contactNameSnapshot || contacts.find((contact) => contact.id === current.contactId)?.name)
+                            : current.title
+                        }))
+                      }
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      <option value="">Turno general</option>
+                      <option value="visit">Visita comercial</option>
+                      <option value="demo">Demo comercial</option>
+                    </select>
+                  </label>
+                  <label className="space-y-2 text-sm">
+                    <span className="font-medium">Ubicacion / direccion</span>
+                    <Input value={draft.location} onChange={(event) => setDraft((current) => ({ ...current, location: event.target.value }))} placeholder="Direccion, comercio o referencia de la demo" />
+                  </label>
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-2 text-sm">
                   <span className="font-medium">Inicio</span>
@@ -919,6 +1485,10 @@ export function AgendaWorkspace() {
                   ? "Usa este bloque para marcar franjas base disponibles que luego podra leer el bot."
                   : draft.type === "blocked"
                     ? "Usa este bloque para reservar una franja como no disponible y evitar choques obvios con turnos."
+                    : draft.commercialActionType
+                      ? `${commercialActionLabel(draft.commercialActionType)}${draft.conversationId ? " vinculada a la conversacion en handoff comercial." : " lista para seguimiento comercial."}`
+                      : draft.assignedUserId
+                        ? `Este item quedara asignado a ${sellerOptions.find((seller) => seller.id === draft.assignedUserId)?.name || "un responsable del equipo"}.`
                     : draft.contactId
                   ? `Este item quedara vinculado a ${contacts.find((contact) => contact.id === draft.contactId)?.name || "un contacto real"} dentro del tenant.`
                   : requiresTimeRange(draft.type)
@@ -931,7 +1501,7 @@ export function AgendaWorkspace() {
                 <Textarea
                   value={draft.description}
                   onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Contexto, pendiente o instruccion interna para este item."
+                  placeholder={draft.commercialActionType ? "Detalles de la visita/demo, objetivo comercial o referencias utiles para la reunion." : "Contexto, pendiente o instruccion interna para este item."}
                   className="min-h-28"
                 />
               </label>

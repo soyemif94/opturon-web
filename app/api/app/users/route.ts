@@ -137,6 +137,16 @@ function safeAppendUsersAuditLog(entry: Parameters<typeof appendAuditLog>[0]) {
   }
 }
 
+function resolvePortalUserPassword(password?: string) {
+  const explicitPassword = password?.trim();
+  if (explicitPassword) return explicitPassword;
+
+  const envPassword = String(process.env.PORTAL_USER_DEFAULT_PASSWORD || "").trim();
+  if (envPassword) return envPassword;
+
+  return null;
+}
+
 function normalizeRouteUser(user: { id: string; email: string; name: string; role?: string; tenantRole?: string }): RouteUserRow {
   const tenantRole = String(user.role || user.tenantRole || "viewer");
   return {
@@ -304,6 +314,18 @@ export async function POST(request: NextRequest) {
   const tenantId = guard.ctx?.tenantId as string;
   const email = parsed.data.email.toLowerCase();
   const countsAsSubaccount = parsed.data.role !== "owner";
+  const resolvedPassword = resolvePortalUserPassword(parsed.data.password);
+
+  if (!resolvedPassword) {
+    return NextResponse.json(
+      {
+        error: "tenant_user_password_required",
+        detail: "Debes enviar password o configurar PORTAL_USER_DEFAULT_PASSWORD."
+      },
+      { status: 400 }
+    );
+  }
+
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
@@ -322,7 +344,7 @@ export async function POST(request: NextRequest) {
         email,
         name: parsed.data.name,
         role: parsed.data.role,
-        password: parsed.data.password || "demo1234"
+        password: resolvedPassword
       }, guard.ctx?.userId || null);
 
       safeAppendUsersAuditLog({
@@ -382,7 +404,7 @@ export async function POST(request: NextRequest) {
       email,
       name: parsed.data.name,
       globalRole: "client",
-      passwordHash: hashSync(parsed.data.password || "demo1234", 10),
+      passwordHash: hashSync(resolvedPassword, 10),
       createdAt: new Date().toISOString()
     };
     data.users.push(user);

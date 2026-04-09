@@ -46,6 +46,14 @@ function writeData(data: Data) {
   writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
+function requireEnv(name: string) {
+  const value = String(process.env[name] || "").trim();
+  if (!value) {
+    throw new Error(`[seed:saas] Missing required env var ${name}`);
+  }
+  return value;
+}
+
 const data = readData();
 const now = new Date().toISOString();
 
@@ -75,10 +83,10 @@ if (!tenant) {
   });
 }
 
-const staffEmail = (process.env.SAAS_STAFF_EMAIL || "staff@opturon.com").toLowerCase();
-const staffPassword = process.env.SAAS_STAFF_PASSWORD || "demo1234";
-const ownerEmail = (process.env.SAAS_CLIENT_OWNER_EMAIL || "owner@demo-tenant.com").toLowerCase();
-const ownerPassword = process.env.SAAS_CLIENT_OWNER_PASSWORD || "demo1234";
+const staffEmail = requireEnv("SAAS_STAFF_EMAIL").toLowerCase();
+const staffPassword = requireEnv("SAAS_STAFF_PASSWORD");
+const ownerEmail = requireEnv("SAAS_CLIENT_OWNER_EMAIL").toLowerCase();
+const ownerPassword = requireEnv("SAAS_CLIENT_OWNER_PASSWORD");
 
 let staff = data.users.find((u: any) => u.email.toLowerCase() === staffEmail);
 if (!staff) {
@@ -193,6 +201,6 @@ writeData(data);
 
 console.log("[seed:saas] OK");
 console.log(`Tenant: ${tenant.name} (${tenant.id})`);
-console.log(`Staff: ${staff.email} / ${staffPassword}`);
-console.log(`Owner: ${owner.email} / ${ownerPassword}`);
+console.log(`Staff: ${staff.email}`);
+console.log(`Owner: ${owner.email}`);
 
