@@ -245,6 +245,7 @@ export async function GET() {
       {
         users: [],
         source: "empty_real_tenant",
+        activity: [],
         meta: buildRouteUsersMeta([], policy.allowedRoles)
       },
       { status: 200 }
@@ -259,6 +260,7 @@ export async function GET() {
       const users = (response.data.users || []).map((user) => normalizeRouteUserWithKind(user));
       return NextResponse.json({
         users,
+        activity: response.data.activity || [],
         meta: buildRouteUsersMeta(users, policy.allowedRoles, response.data.meta || null)
       });
     } catch (error) {
@@ -276,6 +278,7 @@ export async function GET() {
   );
   return NextResponse.json({
     users,
+    activity: [],
     meta: buildRouteUsersMeta(users, policy.allowedRoles)
   });
 }
@@ -320,7 +323,7 @@ export async function POST(request: NextRequest) {
         name: parsed.data.name,
         role: parsed.data.role,
         password: parsed.data.password || "demo1234"
-      });
+      }, guard.ctx?.userId || null);
 
       safeAppendUsersAuditLog({
         tenantId,
@@ -466,7 +469,7 @@ export async function PATCH(request: NextRequest) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
-      const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role);
+      const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role, guard.ctx?.userId || null);
       safeAppendUsersAuditLog({
         tenantId,
         userId: guard.ctx?.userId,
@@ -531,7 +534,7 @@ export async function PUT(request: NextRequest) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
-      const response = await patchPortalPrimaryUser(tenantId, parsed.data.userId);
+      const response = await patchPortalPrimaryUser(tenantId, parsed.data.userId, guard.ctx?.userId || null);
       safeAppendUsersAuditLog({
         tenantId,
         userId: guard.ctx?.userId,

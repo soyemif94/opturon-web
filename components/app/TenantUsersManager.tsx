@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import type { PortalUserAuditEvent } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 
 type UserRow = { id: string; email: string; name: string; tenantRole: string; accountKind?: "primary" | "subaccount" };
@@ -18,6 +19,7 @@ type UsersMeta = {
 type Props = {
   initialUsers: UserRow[];
   initialMeta: UsersMeta;
+  initialActivity: PortalUserAuditEvent[];
   canManage: boolean;
   currentUserId?: string;
   currentTenantRole?: string;
@@ -39,9 +41,10 @@ function accountKindLabel(accountKind?: string) {
   return accountKind === "primary" ? "cuenta principal" : "subcuenta";
 }
 
-export function TenantUsersManager({ initialUsers, initialMeta, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
+export function TenantUsersManager({ initialUsers, initialMeta, initialActivity, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [meta, setMeta] = useState(initialMeta);
+  const [activity, setActivity] = useState(initialActivity);
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
@@ -130,6 +133,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
       accountKind: user.accountKind === "primary" ? "primary" : "subaccount"
     })));
     if (json.meta) setMeta(json.meta);
+    setActivity(Array.isArray(json.activity) ? json.activity : []);
   }
 
   async function updateRole(userId: string, role: string) {
@@ -349,8 +353,58 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
           </tbody>
         </table>
       </div>
+
+      <div className="rounded-2xl border border-[color:var(--border)] bg-card p-4">
+        <h3 className="font-semibold">Actividad reciente</h3>
+        <div className="mt-3 space-y-2 text-sm">
+          {activity.length ? (
+            activity.slice(0, 8).map((entry) => (
+              <div key={entry.id} className="rounded-xl border border-[color:var(--border)] bg-surface px-3 py-2">
+                <p>{formatActivityMessage(entry)}</p>
+                <p className="mt-1 text-xs text-muted">{formatActivityTimestamp(entry.createdAt)}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted">Todavia no hay eventos operativos registrados para usuarios.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
+}
+
+function formatActivityMessage(entry: PortalUserAuditEvent) {
+  const payload = entry.payload || {};
+  const actor = entry.actorName || entry.actorEmail || "Sistema";
+  const target = entry.targetName || entry.targetEmail || String(payload.name || payload.email || "usuario");
+
+  if (entry.action === "tenant_portal_user_created") {
+    return `${actor} creo la cuenta ${target}.`;
+  }
+  if (entry.action === "tenant_primary_portal_user_changed") {
+    return `${actor} marco a ${target} como cuenta principal.`;
+  }
+  if (entry.action === "tenant_portal_user_role_updated") {
+    const previousRole = String(payload.previousRole || "").trim();
+    const nextRole = String(payload.nextRole || "").trim();
+    if (previousRole && nextRole) {
+      return `${actor} cambio el rol de ${target} de ${roleLabel(previousRole)} a ${roleLabel(nextRole)}.`;
+    }
+    return `${actor} actualizo el rol de ${target}.`;
+  }
+  if (entry.action === "tenant_portal_user_deleted") {
+    return `${actor} elimino la cuenta ${target}.`;
+  }
+  return `${actor} registro ${entry.action} sobre ${target}.`;
+}
+
+function formatActivityTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("es-AR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(date);
 }
 
 async function safeJson(response: Response) {

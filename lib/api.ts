@@ -535,12 +535,28 @@ export type PortalUsersMeta = {
   limitSource?: string | null;
 };
 
+export type PortalUserAuditEvent = {
+  id: string;
+  tenantId: string;
+  clinicId: string;
+  actorUserId?: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  targetUserId?: string | null;
+  targetName?: string | null;
+  targetEmail?: string | null;
+  action: string;
+  payload?: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 export async function getPortalUsers(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
       users: PortalUser[];
+      activity?: PortalUserAuditEvent[];
       meta?: PortalUsersMeta | null;
     };
   }>(`/portal/tenants/${tenantId}/users`);
@@ -548,8 +564,10 @@ export async function getPortalUsers(tenantId: string) {
 
 export async function createPortalUser(
   tenantId: string,
-  payload: { email: string; name: string; role: string; password: string }
+  payload: { email: string; name: string; role: string; password: string },
+  actorUserId?: string | null
   ) {
+  const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -559,6 +577,7 @@ export async function createPortalUser(
     };
   }>(`/portal/tenants/${tenantId}/users`, {
     method: "POST",
+    headers,
     body: JSON.stringify(payload)
   });
 }
@@ -599,7 +618,8 @@ export async function getPortalAuthUserByEmail(email: string) {
   }>(`/portal/auth/users/by-email?email=${encodeURIComponent(email)}`, undefined, AUTH_API_TIMEOUT_MS);
 }
 
-export async function patchPortalUserRole(tenantId: string, userId: string, role: TenantRole) {
+export async function patchPortalUserRole(tenantId: string, userId: string, role: TenantRole, actorUserId?: string | null) {
+  const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -608,11 +628,13 @@ export async function patchPortalUserRole(tenantId: string, userId: string, role
     };
   }>(`/portal/tenants/${tenantId}/users/${userId}`, {
     method: "PATCH",
+    headers,
     body: JSON.stringify({ role })
   });
 }
 
-export async function patchPortalPrimaryUser(tenantId: string, userId: string) {
+export async function patchPortalPrimaryUser(tenantId: string, userId: string, actorUserId?: string | null) {
+  const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -622,6 +644,7 @@ export async function patchPortalPrimaryUser(tenantId: string, userId: string) {
     };
   }>(`/portal/tenants/${tenantId}/users/primary`, {
     method: "PATCH",
+    headers,
     body: JSON.stringify({ userId })
   });
 }

@@ -1,6 +1,6 @@
 import { TenantUsersManager } from "@/components/app/TenantUsersManager";
 import { canManageUsers } from "@/lib/app-permissions";
-import type { PortalUsersMeta } from "@/lib/api";
+import type { PortalUserAuditEvent, PortalUsersMeta } from "@/lib/api";
 import { getPortalUsers, isBackendConfigured, isPortalInternalAuthConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
@@ -40,6 +40,7 @@ export default async function AppUsersPage() {
     limitScope: "subaccounts",
     limitSource: "default_env"
   };
+  let initialActivity: PortalUserAuditEvent[] = [];
 
   if (backendUsersReady) {
     try {
@@ -52,6 +53,7 @@ export default async function AppUsersPage() {
         accountKind: user.accountKind === "primary" ? "primary" : "subaccount"
       }));
       initialMeta = response.data.meta || initialMeta;
+      initialActivity = response.data.activity || [];
     } catch (error) {
       console.error("[app-users-page] Failed to load backend users.", error);
     }
@@ -65,6 +67,7 @@ export default async function AppUsersPage() {
       currentTenantRole={ctx.tenantRole}
       currentGlobalRole={ctx.globalRole}
       initialMeta={initialMeta}
+      initialActivity={initialActivity}
     />
   );
 }
