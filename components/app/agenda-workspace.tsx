@@ -49,7 +49,7 @@ type AgendaItem = {
   title: string;
   description: string | null;
   status: AgendaStatus;
-  commercialActionType?: "visit" | "demo" | null;
+  commercialActionType?: "visit" | "demo" | "follow_up" | null;
   commercialOutcome?: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | null;
   origin?: string | null;
   location?: string | null;
@@ -69,7 +69,7 @@ type DraftState = {
   contactId: string;
   conversationId: string;
   assignedUserId: string;
-  commercialActionType: "visit" | "demo" | "";
+  commercialActionType: "visit" | "demo" | "follow_up" | "";
   commercialOutcome: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | "";
   origin: string;
   location: string;
@@ -181,12 +181,17 @@ type AgendaWorkspaceProps = {
     contactId?: string;
     contactName?: string;
     phone?: string;
-    actionType?: "visit" | "demo";
+    actionType?: "visit" | "demo" | "follow_up";
   };
 };
 
-function buildCommercialTitle(actionType?: "visit" | "demo", contactName?: string | null) {
-  const base = actionType === "visit" ? "Visita comercial" : "Demo comercial";
+function buildCommercialTitle(actionType?: "visit" | "demo" | "follow_up", contactName?: string | null) {
+  const base =
+    actionType === "visit"
+      ? "Visita comercial"
+      : actionType === "demo"
+        ? "Demo comercial"
+        : "Seguimiento comercial";
   return contactName ? `${base} - ${contactName}` : base;
 }
 
@@ -220,9 +225,10 @@ function toConversationNextActionAt(date: string, startTime?: string | null) {
   return Number.isNaN(Date.parse(iso)) ? null : iso;
 }
 
-function commercialActionLabel(actionType?: "visit" | "demo" | null) {
+function commercialActionLabel(actionType?: "visit" | "demo" | "follow_up" | null) {
   if (actionType === "visit") return "Visita comercial";
   if (actionType === "demo") return "Demo comercial";
+  if (actionType === "follow_up") return "Seguimiento comercial";
   return null;
 }
 

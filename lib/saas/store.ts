@@ -203,9 +203,11 @@ function normalizeData(parsed?: Partial<SaasData> | null): SaasData {
 }
 
 const BOT_HANDOFF_MARKER = "En este punto lo mejor es avanzar con un asesor";
+const COMMERCIAL_HANDOFF_ORIGIN = "lead_comercial_bot_handoff";
 const BAHIA_BLANCA_VARIANTS = ["bahia blanca", "bahía blanca"];
 
 type CommercialHandoffPreference = "demo" | "visit" | "advisor" | null;
+type StructuredCommercialActionType = NonNullable<AgendaItem["commercialActionType"]>;
 
 function containsBahiaBlanca(text?: string | null) {
   const normalized = normalizeText(String(text || "")).join(" ");
@@ -240,6 +242,77 @@ function detectCommercialHandoffPreference(text?: string | null): CommercialHand
   return null;
 }
 
+function buildCommercialTitle(actionType: StructuredCommercialActionType, contactName?: string | null) {
+  const base =
+    actionType === "visit"
+      ? "Visita comercial"
+      : actionType === "demo"
+        ? "Demo comercial"
+        : "Seguimiento comercial";
+  return contactName ? `${base} - ${contactName}` : base;
+}
+
+function buildCommercialActionType(
+  preference: CommercialHandoffPreference,
+  visitEligible: boolean
+): StructuredCommercialActionType {
+  if (preference === "demo") return "demo";
+  if (preference === "visit" && visitEligible) return "visit";
+  return "follow_up";
+}
+
+function buildStructuredCommercialSummary(messages: Message[], fallbackText?: string | null) {
+  const snippets = messages
+    .filter((message) => message.direction === "inbound")
+    .slice(0, 3)
+    .map((message) => String(message.text || "").trim())
+    .filter(Boolean);
+  const summary = snippets[0] || String(fallbackText || "").trim();
+  return summary ? summary.slice(0, 220) : "Lead con intencion comercial detectada por el bot.";
+}
+
+function buildStructuredCommercialDescription(options: {
+  preference: CommercialHandoffPreference;
+  visitEligible: boolean;
+  summary: string;
+  city: string | null;
+}) {
+  const motive =
+    options.preference === "demo"
+      ? "Lead pidio demo"
+      : options.preference === "visit"
+        ? options.visitEligible
+          ? "Lead pidio visita presencial"
+          : "Lead pidio visita presencial, pero primero hay que validar ciudad"
+        : "Lead listo para hablar con asesor comercial";
+  const cityText = options.city ? ` Ciudad detectada: ${options.city}.` : "";
+  return `${motive}.${cityText} Resumen: ${options.summary}`;
+}
+
+function buildStructuredCommercialNextStep(actionType: StructuredCommercialActionType, visitEligible: boolean) {
+  if (actionType === "visit") return "Coordinar visita presencial desde Agenda.";
+  if (actionType === "demo") return "Coordinar demo comercial desde Agenda.";
+  if (visitEligible) return "Contactar al lead y definir si conviene demo o visita presencial en Bahia Blanca.";
+  return "Contactar al lead y definir demo o asesor comercial. Visita presencial solo disponible en Bahia Blanca.";
+}
+
+function findOpenCommercialAgendaItem(
+  agendaItems: AgendaItem[],
+  tenantId: string,
+  conversationId: string
+) {
+  return [...agendaItems]
+    .filter(
+      (item) =>
+        item.tenantId === tenantId &&
+        item.conversationId === conversationId &&
+        item.origin === COMMERCIAL_HANDOFF_ORIGIN &&
+        item.status !== "done" &&
+        item.status !== "cancelled"
+    )
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())[0];
+}
+
 function buildCommercialHandoffContent(inboundMessages: Message[]) {
   const contextText = inboundMessages
     .map((message) => String(message.text || ""))
@@ -247,6 +320,8 @@ function buildCommercialHandoffContent(inboundMessages: Message[]) {
   const latestText = inboundMessages[0]?.text || "";
   const visitEligible = containsBahiaBlanca(contextText);
   const preference = detectCommercialHandoffPreference(latestText);
+  const actionType = buildCommercialActionType(preference, visitEligible);
+  const city = visitEligible ? "Bahia Blanca" : null;
 
   let note =
     "Handoff comercial pendiente: hablar con asesor o agendar demo. Visita presencial solo disponible en Bahía Blanca.";
@@ -274,7 +349,7 @@ function buildCommercialHandoffContent(inboundMessages: Message[]) {
       : "Handoff comercial pendiente: lead pidio hablar con asesor. Disponible demo; visita presencial solo en Bahia Blanca.";
   }
 
-  return { message, note, visitEligible, preference };
+  return { message, note, visitEligible, preference, actionType, city };
 }
 
 function isCommercialHandoffTrigger(text?: string | null) {
@@ -739,29 +814,128 @@ export function applyCommercialBotHandoff(tenantId: string, conversationId?: str
       continue;
     }
 
-    if (hasExistingBotHandoffMessage(data.messages, conversation.id, tenantId)) {
+    const handoff = buildCommercialHandoffContent(inboundMessages);
+    const contact = data.contacts.find((item) => item.id === conversation.contactId && item.tenantId === tenantId) || null;
+    const structuredSummary = buildStructuredCommercialSummary(inboundMessages, latestInbound.text);
+    const structuredDescription = buildStructuredCommercialDescription({
+      preference: handoff.preference,
+      visitEligible: handoff.visitEligible,
+      summary: structuredSummary,
+      city: handoff.city
+    });
+    const structuredNextStep = buildStructuredCommercialNextStep(handoff.actionType, handoff.visitEligible);
+    const existingOpenItem = findOpenCommercialAgendaItem(data.agendaItems, tenantId, conversation.id);
+    const hasHandoffMessage = hasExistingBotHandoffMessage(data.messages, conversation.id, tenantId);
+    const handoffTimestamp = existingOpenItem?.nextActionAt || conversation.nextActionAt || now;
+    const agendaTitle = buildCommercialTitle(handoff.actionType, contact?.name || null);
+    const agendaPatch = {
+      contactId: conversation.contactId || null,
+      conversationId: conversation.id,
+      title: agendaTitle,
+      description: structuredDescription,
+      type: "follow_up" as const,
+      status: "pending" as const,
+      commercialActionType: handoff.actionType,
+      origin: COMMERCIAL_HANDOFF_ORIGIN,
+      location: handoff.city,
+      nextStepNote: structuredNextStep,
+      nextActionAt: handoffTimestamp,
+      contactNameSnapshot: contact?.name || null,
+      phoneSnapshot: contact?.phone || null
+    };
+    const needsAgendaUpdate =
+      !existingOpenItem ||
+      existingOpenItem.title !== agendaPatch.title ||
+      existingOpenItem.description !== agendaPatch.description ||
+      existingOpenItem.commercialActionType !== agendaPatch.commercialActionType ||
+      existingOpenItem.location !== agendaPatch.location ||
+      existingOpenItem.nextStepNote !== agendaPatch.nextStepNote ||
+      existingOpenItem.nextActionAt !== agendaPatch.nextActionAt ||
+      existingOpenItem.contactNameSnapshot !== agendaPatch.contactNameSnapshot ||
+      existingOpenItem.phoneSnapshot !== agendaPatch.phoneSnapshot ||
+      existingOpenItem.status !== agendaPatch.status ||
+      existingOpenItem.type !== agendaPatch.type;
+    const nextActionNote = `${agendaTitle} pendiente en Agenda. ${structuredNextStep}`;
+    const needsConversationUpdate =
+      conversation.priority !== "hot" ||
+      conversation.leadStatus !== "FOLLOW_UP" ||
+      conversation.botEnabled !== false ||
+      conversation.botFlowLock !== "commerce" ||
+      conversation.nextActionAt !== handoffTimestamp ||
+      conversation.nextActionNote !== nextActionNote ||
+      (!hasHandoffMessage && conversation.lastMessageAt !== now);
+
+    if (!needsAgendaUpdate && hasHandoffMessage && !needsConversationUpdate) {
       continue;
     }
-
-    const handoff = buildCommercialHandoffContent(inboundMessages);
 
     conversation.priority = "hot";
     conversation.leadStatus = "FOLLOW_UP";
     conversation.botEnabled = false;
     conversation.botFlowLock = "commerce";
-    conversation.nextActionAt = now;
-    conversation.nextActionNote = handoff.note;
-    conversation.lastMessageAt = now;
+    conversation.nextActionAt = handoffTimestamp;
+    conversation.nextActionNote = nextActionNote;
+    if (!hasHandoffMessage) {
+      conversation.lastMessageAt = now;
+    }
 
-    data.messages.push({
-      id: newId("msg"),
-      tenantId,
-      conversationId: conversation.id,
-      direction: "system",
-      text: handoff.message,
-      timestamp: now,
-      status: "sent"
-    });
+    if (existingOpenItem && needsAgendaUpdate) {
+      existingOpenItem.contactId = agendaPatch.contactId;
+      existingOpenItem.conversationId = agendaPatch.conversationId;
+      existingOpenItem.title = agendaPatch.title;
+      existingOpenItem.description = agendaPatch.description;
+      existingOpenItem.type = agendaPatch.type;
+      existingOpenItem.status = agendaPatch.status;
+      existingOpenItem.commercialActionType = agendaPatch.commercialActionType;
+      existingOpenItem.origin = agendaPatch.origin;
+      existingOpenItem.location = agendaPatch.location;
+      existingOpenItem.nextStepNote = agendaPatch.nextStepNote;
+      existingOpenItem.nextActionAt = agendaPatch.nextActionAt;
+      existingOpenItem.contactNameSnapshot = agendaPatch.contactNameSnapshot;
+      existingOpenItem.phoneSnapshot = agendaPatch.phoneSnapshot;
+      existingOpenItem.updatedAt = now;
+    } else if (!existingOpenItem) {
+      data.agendaItems.push({
+        id: newId("agenda"),
+        tenantId,
+        date: now.slice(0, 10),
+        startAt: null,
+        endAt: null,
+        contactId: agendaPatch.contactId,
+        conversationId: agendaPatch.conversationId,
+        assignedUserId: conversation.assignedSellerUserId || null,
+        assignedUserName: conversation.assignedSellerName || null,
+        title: agendaPatch.title,
+        description: agendaPatch.description,
+        type: agendaPatch.type,
+        status: agendaPatch.status,
+        commercialActionType: agendaPatch.commercialActionType,
+        commercialOutcome: null,
+        origin: agendaPatch.origin,
+        location: agendaPatch.location,
+        resultNote: null,
+        nextStepNote: agendaPatch.nextStepNote,
+        nextActionAt: agendaPatch.nextActionAt,
+        contactNameSnapshot: agendaPatch.contactNameSnapshot,
+        phoneSnapshot: agendaPatch.phoneSnapshot,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    if (!hasHandoffMessage) {
+      data.messages.push({
+        id: newId("msg"),
+        tenantId,
+        conversationId: conversation.id,
+        direction: "system",
+        text: handoff.message,
+        timestamp: now,
+        status: "sent"
+      });
+    }
+
+    const agendaAction = !existingOpenItem ? "created_open_item" : needsAgendaUpdate ? "updated_existing_open_item" : "reused_existing_open_item";
 
     data.auditLog.unshift({
       id: newId("audit"),
@@ -775,7 +949,9 @@ export function applyCommercialBotHandoff(tenantId: string, conversationId?: str
         triggerText: latestInbound.text,
         handoff: "commercial",
         visitEligible: handoff.visitEligible,
-        preference: handoff.preference
+        preference: handoff.preference,
+        actionType: handoff.actionType,
+        agendaAction
       }
     });
 

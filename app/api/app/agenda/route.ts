@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         title?: string;
         description?: string | null;
         status?: "pending" | "confirmed" | "done" | "reschedule" | "cancelled";
-        commercialActionType?: "visit" | "demo" | null;
+        commercialActionType?: "visit" | "demo" | "follow_up" | null;
         commercialOutcome?: "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won" | null;
         origin?: string | null;
         location?: string | null;

@@ -11,7 +11,7 @@ export type MessageStatus = "sent" | "delivered" | "read" | "failed";
 export type DealStage = "lead" | "qualified" | "proposal" | "won" | "lost";
 export type AgendaItemType = "note" | "follow_up" | "task" | "appointment" | "blocked" | "availability";
 export type AgendaItemStatus = "pending" | "confirmed" | "done" | "reschedule" | "cancelled";
-export type AgendaCommercialActionType = "visit" | "demo";
+export type AgendaCommercialActionType = "visit" | "demo" | "follow_up";
 export type AgendaCommercialOutcome = "interested" | "not_interested" | "proposal_requested" | "follow_up_later" | "future_demo" | "won";
 
 export type Tenant = {
