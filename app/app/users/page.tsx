@@ -17,22 +17,24 @@ export default async function AppUsersPage() {
   const canManage = canManageUsers(ctx);
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 
-  let users: Array<{ id: string; email: string; name: string; tenantRole: string }> =
+  let users: Array<{ id: string; email: string; name: string; tenantRole: string; accountKind: "primary" | "subaccount" }> =
     !ctx.tenantId && !backendUsersReady
       ? listTenantMembers(tenantId).map((user) => ({
           id: user.id,
           email: user.email,
           name: user.name,
-          tenantRole: user.tenantRole
+          tenantRole: user.tenantRole,
+          accountKind: user.tenantRole === "owner" ? "primary" : "subaccount"
         }))
       : [];
   let initialMeta: PortalUsersMeta = {
-    subaccountCount: users.filter((user) => user.tenantRole !== "owner").length,
-    primaryAccountCount: users.filter((user) => user.tenantRole === "owner").length,
+    subaccountCount: users.filter((user) => user.accountKind === "subaccount").length,
+    primaryAccountCount: users.filter((user) => user.accountKind === "primary").length,
+    primaryPortalUserId: users.find((user) => user.accountKind === "primary")?.id || null,
     subaccountLimit: DEFAULT_SUBACCOUNT_LIMIT,
     remainingSubaccounts: Math.max(
       0,
-      DEFAULT_SUBACCOUNT_LIMIT - users.filter((user) => user.tenantRole !== "owner").length
+      DEFAULT_SUBACCOUNT_LIMIT - users.filter((user) => user.accountKind === "subaccount").length
     ),
     futureLimitKey: "tenant_portal_users",
     limitScope: "subaccounts",
@@ -46,7 +48,8 @@ export default async function AppUsersPage() {
         id: user.id,
         email: user.email,
         name: user.name,
-        tenantRole: user.role
+        tenantRole: user.role,
+        accountKind: user.accountKind === "primary" ? "primary" : "subaccount"
       }));
       initialMeta = response.data.meta || initialMeta;
     } catch (error) {

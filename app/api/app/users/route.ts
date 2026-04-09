@@ -46,6 +46,7 @@ type RouteUsersMeta = {
   allowedRoles: string[];
   subaccountCount: number;
   primaryAccountCount: number;
+  primaryPortalUserId?: string | null;
   subaccountLimit: number;
   remainingSubaccounts: number;
   futureLimitKey: "tenant_portal_users";
@@ -146,6 +147,15 @@ function normalizeRouteUser(user: { id: string; email: string; name: string; rol
   };
 }
 
+function normalizeRouteUserWithKind(user: { id: string; email: string; name: string; role?: string; tenantRole?: string; accountKind?: string }): RouteUserRow {
+  const base = normalizeRouteUser(user);
+  const accountKind = String(user.accountKind || "").trim().toLowerCase() === "primary" ? "primary" : base.accountKind;
+  return {
+    ...base,
+    accountKind
+  };
+}
+
 function getUserManagementPolicy(ctx: { globalRole?: string; tenantRole?: string; tenantId?: string | null }) {
   const tenantRole = normalizeTenantRole(ctx.tenantRole);
   const staff = Boolean(isStaffRole(ctx.globalRole as any) && canManageUsers(ctx as any));
@@ -168,6 +178,13 @@ function canManageTargetRole(policy: ReturnType<typeof getUserManagementPolicy>,
   return CLIENT_SUBACCOUNT_ROLES.includes(normalized as (typeof CLIENT_SUBACCOUNT_ROLES)[number]);
 }
 
+function canManageTargetUser(policy: ReturnType<typeof getUserManagementPolicy>, targetUser?: RouteUserRow | null) {
+  if (!targetUser) return false;
+  if (policy.isStaff) return true;
+  if (targetUser.accountKind === "primary") return false;
+  return canManageTargetRole(policy, targetUser.tenantRole);
+}
+
 async function listRouteUsers(tenantId: string): Promise<RouteUserRow[]> {
   if (isBackendConfigured()) {
     const response = await getPortalUsers(tenantId);
@@ -175,7 +192,7 @@ async function listRouteUsers(tenantId: string): Promise<RouteUserRow[]> {
   }
 
   return listTenantMembers(tenantId).map((user) =>
-    normalizeRouteUser({
+    normalizeRouteUserWithKind({
       id: user.id,
       email: user.email,
       name: user.name,
@@ -190,6 +207,7 @@ function buildRouteUsersMeta(
   sourceMeta?: {
     subaccountCount?: number;
     primaryAccountCount?: number;
+    primaryPortalUserId?: string | null;
     subaccountLimit?: number;
     remainingSubaccounts?: number;
     limitSource?: string | null;
@@ -205,6 +223,7 @@ function buildRouteUsersMeta(
     allowedRoles,
     subaccountCount,
     primaryAccountCount,
+    primaryPortalUserId: sourceMeta?.primaryPortalUserId || null,
     subaccountLimit,
     remainingSubaccounts,
     futureLimitKey: "tenant_portal_users",
@@ -236,7 +255,7 @@ export async function GET() {
     if (backendRequirement) return backendRequirement;
     try {
       const response = await getPortalUsers(tenantId);
-      const users = (response.data.users || []).map((user) => normalizeRouteUser(user));
+      const users = (response.data.users || []).map((user) => normalizeRouteUserWithKind(user));
       return NextResponse.json({
         users,
         meta: buildRouteUsersMeta(users, policy.allowedRoles, response.data.meta || null)
@@ -247,7 +266,7 @@ export async function GET() {
   }
 
   const users = listTenantMembers(tenantId).map((user) =>
-    normalizeRouteUser({
+    normalizeRouteUserWithKind({
       id: user.id,
       email: user.email,
       name: user.name,
@@ -334,7 +353,7 @@ export async function POST(request: NextRequest) {
 
   const data = readSaasData();
   const currentUsers = listTenantMembers(tenantId).map((user) =>
-    normalizeRouteUser({
+    normalizeRouteUserWithKind({
       id: user.id,
       email: user.email,
       name: user.name,
@@ -423,7 +442,7 @@ export async function PATCH(request: NextRequest) {
   const currentUsers = await listRouteUsers(tenantId);
   const targetUser = currentUsers.find((user) => user.id === parsed.data.userId);
   if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!canManageTargetRole(policy, targetUser.tenantRole)) {
+  if (!canManageTargetUser(policy, targetUser)) {
     return NextResponse.json(
       {
         error: "target_user_not_manageable",
@@ -494,7 +513,7 @@ export async function DELETE(request: NextRequest) {
   const currentUsers = await listRouteUsers(tenantId);
   const targetUser = currentUsers.find((user) => user.id === userId);
   if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!canManageTargetRole(policy, targetUser.tenantRole)) {
+  if (!canManageTargetUser(policy, targetUser)) {
     return NextResponse.json(
       {
         error: "target_user_not_manageable",

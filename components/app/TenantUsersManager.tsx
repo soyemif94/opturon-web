@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { toast } from "@/components/ui/toast";
 
-type UserRow = { id: string; email: string; name: string; tenantRole: string };
+type UserRow = { id: string; email: string; name: string; tenantRole: string; accountKind?: "primary" | "subaccount" };
 type UsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
@@ -34,8 +34,8 @@ function roleLabel(role: string) {
   return ROLE_LABELS[role] || role;
 }
 
-function accountKindLabel(role: string) {
-  return role === "owner" ? "cuenta principal" : "subcuenta";
+function accountKindLabel(accountKind?: string) {
+  return accountKind === "primary" ? "cuenta principal" : "subcuenta";
 }
 
 export function TenantUsersManager({ initialUsers, initialMeta, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
@@ -55,6 +55,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
 
   function canManageTarget(user: UserRow) {
     if (isStaffManager) return true;
+    if (user.accountKind === "primary") return false;
     return user.tenantRole === "seller" || user.tenantRole === "viewer";
   }
 
@@ -115,7 +116,11 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
     const response = await fetch("/api/app/users", { cache: "no-store" });
     if (!response.ok) return;
     const json = await response.json();
-    setUsers((json.users || []).map((user: UserRow) => ({ ...user, tenantRole: user.tenantRole === "editor" ? "seller" : user.tenantRole })));
+    setUsers((json.users || []).map((user: UserRow) => ({
+      ...user,
+      tenantRole: user.tenantRole === "editor" ? "seller" : user.tenantRole,
+      accountKind: user.accountKind === "primary" ? "primary" : "subaccount"
+    })));
     if (json.meta) setMeta(json.meta);
   }
 
@@ -236,7 +241,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
                 <tr key={user.id} className="border-t border-[color:var(--border)]">
                   <td className="px-4 py-3">{user.name}</td>
                   <td className="px-4 py-3">{user.email}</td>
-                  <td className="px-4 py-3">{accountKindLabel(user.tenantRole)}</td>
+                  <td className="px-4 py-3">{accountKindLabel(user.accountKind)}</td>
                   <td className="px-4 py-3 capitalize">
                     {canManage && canManageTarget(user) ? (
                       <select

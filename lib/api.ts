@@ -518,6 +518,7 @@ export type PortalUser = {
   name: string;
   email: string;
   role: string;
+  accountKind?: "primary" | "subaccount";
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -526,6 +527,7 @@ export type PortalUser = {
 export type PortalUsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
+  primaryPortalUserId?: string | null;
   subaccountLimit: number;
   remainingSubaccounts: number;
   futureLimitKey: string;
