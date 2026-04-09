@@ -1,60 +1,62 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Shield, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-const OPS_UNLOCK_STORAGE_KEY = "ops_unlocked";
-const OPS_PASSWORD = (process.env.NEXT_PUBLIC_OPS_PASSWORD || "opturon-ops").trim();
-
-export function OpsAccessGate({ children }: { children: React.ReactNode }) {
-  const [checking, setChecking] = useState(true);
-  const [unlocked, setUnlocked] = useState(false);
+export function OpsAccessGate({
+  children,
+  initialUnlocked,
+  accessConfigured
+}: {
+  children: React.ReactNode;
+  initialUnlocked: boolean;
+  accessConfigured: boolean;
+}) {
+  const router = useRouter();
+  const [unlocked, setUnlocked] = useState(initialUnlocked);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      setUnlocked(window.localStorage.getItem(OPS_UNLOCK_STORAGE_KEY) === "true");
-    } catch {
-      setUnlocked(false);
-    } finally {
-      setChecking(false);
-    }
-  }, []);
+  const [isPending, startTransition] = useTransition();
 
   const helperText = useMemo(
     () => "Acceso simple para supervision comercial. No reemplaza seguridad fuerte ni RBAC.",
     []
   );
 
-  function handleUnlock() {
-    if (password.trim() !== OPS_PASSWORD) {
-      setError("Contrasena incorrecta");
+  async function handleUnlock() {
+    if (!accessConfigured) {
+      setError("OPS no esta configurado");
       return;
     }
 
-    try {
-      window.localStorage.setItem(OPS_UNLOCK_STORAGE_KEY, "true");
-    } catch {
-      // If localStorage is unavailable, keep the unlock in-memory for this session view.
+    setError(null);
+    const response = await fetch("/api/app/ops/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password })
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      if (payload?.error === "invalid_ops_password") {
+        setError("Contrasena incorrecta");
+      } else if (payload?.error === "ops_access_not_configured") {
+        setError("OPS no esta configurado");
+      } else {
+        setError("No se pudo desbloquear OPS");
+      }
+      return;
     }
 
     setUnlocked(true);
     setPassword("");
-    setError(null);
-  }
-
-  if (checking) {
-    return (
-      <Card className="border-white/6 bg-card/90">
-        <CardContent className="flex min-h-[320px] items-center justify-center p-6 text-sm text-muted">
-          Verificando acceso a OPS...
-        </CardContent>
-      </Card>
-    );
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   if (!unlocked) {
@@ -89,10 +91,11 @@ export function OpsAccessGate({ children }: { children: React.ReactNode }) {
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
-                    handleUnlock();
+                    void handleUnlock();
                   }
                 }}
                 placeholder="Ingresa la contrasena de OPS"
+                disabled={isPending}
               />
             </div>
 
@@ -103,14 +106,24 @@ export function OpsAccessGate({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
 
-            <Button type="button" className="w-full" onClick={handleUnlock}>
-              Entrar
+            <Button type="button" className="w-full" onClick={() => void handleUnlock()} disabled={isPending}>
+              {isPending ? "Entrando..." : "Entrar"}
             </Button>
 
             <p className="text-xs leading-5 text-muted">{helperText}</p>
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  if (!children) {
+    return (
+      <Card className="border-white/6 bg-card/90">
+        <CardContent className="flex min-h-[320px] items-center justify-center p-6 text-sm text-muted">
+          Abriendo OPS...
+        </CardContent>
+      </Card>
     );
   }
 
