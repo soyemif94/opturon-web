@@ -599,6 +599,75 @@ export function InboxWorkspace({
     setInboxState({ assignedTo: seller.name });
   }
 
+  function applyAssignedSellerFromServer(
+    conversationId: string,
+    assignment: {
+      assignedSellerUserId?: string | null;
+      assignedSellerName?: string | null;
+      assignedSellerRole?: string | null;
+      assignedTo?: string | null;
+      leadStatus?: LeadStatus | string | null;
+    }
+  ) {
+    const sellerId = String(assignment?.assignedSellerUserId || "").trim();
+    const sellerName = String(assignment?.assignedSellerName || assignment?.assignedTo || "").trim();
+    const sellerRole = String(assignment?.assignedSellerRole || "").trim() || "seller";
+    const nextLeadStatus =
+      assignment?.leadStatus === "NEW" ||
+      assignment?.leadStatus === "IN_CONVERSATION" ||
+      assignment?.leadStatus === "FOLLOW_UP" ||
+      assignment?.leadStatus === "CLOSED"
+        ? assignment.leadStatus
+        : "IN_CONVERSATION";
+
+    if (!sellerId || !sellerName) return;
+
+    applyAssignedSellerLocally(conversationId, {
+      id: sellerId,
+      name: sellerName,
+      role: sellerRole
+    });
+
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === conversationId
+          ? {
+              ...row,
+              leadStatus: nextLeadStatus,
+              leadStatusLabel:
+                nextLeadStatus === "IN_CONVERSATION"
+                  ? "En conversacion"
+                  : nextLeadStatus === "FOLLOW_UP"
+                    ? "Seguimiento"
+                    : nextLeadStatus === "CLOSED"
+                      ? "Cerrado"
+                      : "Nuevo"
+            }
+          : row
+      )
+    );
+
+    setDetail((prev) =>
+      prev && prev.conversation.id === conversationId
+        ? {
+            ...prev,
+            conversation: {
+              ...prev.conversation,
+              leadStatus: nextLeadStatus,
+              leadStatusLabel:
+                nextLeadStatus === "IN_CONVERSATION"
+                  ? "En conversacion"
+                  : nextLeadStatus === "FOLLOW_UP"
+                    ? "Seguimiento"
+                    : nextLeadStatus === "CLOSED"
+                      ? "Cerrado"
+                      : "Nuevo"
+            }
+          }
+        : prev
+    );
+  }
+
   function applyLeadStatusLocally(conversationId: string, leadStatus: LeadStatus) {
     const leadStatusLabel =
       leadStatus === "IN_CONVERSATION"
@@ -677,8 +746,8 @@ export function InboxWorkspace({
   }
 
   async function assignSeller(conversationId: string, sellerUserId: string) {
-    const seller = sellerOptions.find((item) => item.id === sellerUserId);
-    if (!conversationId || !seller || readOnly || assigningSeller) return false;
+    if (!conversationId || !sellerUserId || readOnly || assigningSeller) return false;
+    const fallbackSeller = sellerOptions.find((item) => item.id === sellerUserId);
 
     setAssigningSeller(true);
     try {
@@ -692,7 +761,21 @@ export function InboxWorkspace({
         throw new Error(String(json?.error || "assign_seller_failed"));
       }
 
-      applyAssignedSellerLocally(conversationId, seller);
+      const assignedConversation =
+        json?.conversation && typeof json.conversation === "object"
+          ? json.conversation
+          : json?.data?.conversation && typeof json.data.conversation === "object"
+            ? json.data.conversation
+            : null;
+
+      if (assignedConversation) {
+        applyAssignedSellerFromServer(conversationId, assignedConversation);
+      } else if (fallbackSeller) {
+        applyAssignedSellerLocally(conversationId, fallbackSeller);
+      } else {
+        throw new Error("assign_seller_response_missing_conversation");
+      }
+
       if (selectedId === conversationId && filter === "unassigned") {
         setSelectedId(undefined);
         setDetail(null);
