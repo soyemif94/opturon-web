@@ -612,6 +612,20 @@ export async function patchPortalUserRole(tenantId: string, userId: string, role
   });
 }
 
+export async function patchPortalPrimaryUser(tenantId: string, userId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      user: PortalUser;
+      meta?: PortalUsersMeta | null;
+    };
+  }>(`/portal/tenants/${tenantId}/users/primary`, {
+    method: "PATCH",
+    body: JSON.stringify({ userId })
+  });
+}
+
 export async function deletePortalUser(tenantId: string, userId: string, currentUserId?: string) {
   const headers = currentUserId ? { "x-portal-actor-id": currentUserId } : undefined;
   return backendPortalFetch<{

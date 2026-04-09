@@ -7,6 +7,7 @@ type UserRow = { id: string; email: string; name: string; tenantRole: string; ac
 type UsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
+  primaryPortalUserId?: string | null;
   subaccountLimit: number;
   remainingSubaccounts: number;
   futureLimitKey: string;
@@ -44,6 +45,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
+  const [pendingPrimaryUserId, setPendingPrimaryUserId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
   const isStaffManager = currentGlobalRole === "superadmin" || currentGlobalRole === "ops_admin";
@@ -56,6 +58,12 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
   function canManageTarget(user: UserRow) {
     if (isStaffManager) return true;
     if (user.accountKind === "primary") return false;
+    return user.tenantRole === "seller" || user.tenantRole === "viewer";
+  }
+
+  function canPromoteToPrimary(user: UserRow) {
+    if (user.accountKind === "primary") return false;
+    if (isStaffManager) return true;
     return user.tenantRole === "seller" || user.tenantRole === "viewer";
   }
 
@@ -154,6 +162,42 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
     }
   }
 
+  async function makePrimary(userId: string) {
+    const target = users.find((user) => user.id === userId);
+    if (!target) return;
+    const confirmed = window.confirm(`Vas a marcar a ${target.name} como cuenta principal del tenant. Esta accion reemplaza la principal actual.`);
+    if (!confirmed) return;
+
+    setPendingPrimaryUserId(userId);
+    setFeedback({ tone: null, text: "" });
+
+    try {
+      const response = await fetch("/api/app/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+
+      if (!response.ok) {
+        const json = await safeJson(response);
+        const message = json?.detail || json?.error || "No se pudo actualizar la cuenta principal.";
+        if (json?.meta) setMeta(json.meta);
+        setFeedback({ tone: "error", text: String(message) });
+        toast.error("Error al actualizar cuenta principal", String(message));
+        return;
+      }
+
+      await reloadUsers();
+      setFeedback({ tone: "success", text: "Cuenta principal actualizada correctamente." });
+      toast.success("Cuenta principal actualizada");
+    } catch {
+      setFeedback({ tone: "error", text: "Ocurrio un error de red al actualizar la cuenta principal." });
+      toast.error("Error de red", "No pudimos actualizar la cuenta principal.");
+    } finally {
+      setPendingPrimaryUserId(null);
+    }
+  }
+
   async function removeUser(userId: string) {
     setRemovingUserId(userId);
     setFeedback({ tone: null, text: "" });
@@ -193,8 +237,13 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
                 : "Solo la cuenta principal puede gestionar usuarios de este espacio."}
           </p>
           <p className="mt-2 text-xs text-muted">
-            Cuenta principal: propietario. Subcuentas activas hoy: {subaccountCount} / {subaccountLimit}. Cupo disponible: {remainingSubaccounts}.
+            Cuenta principal: 1 por tenant. Subcuentas activas hoy: {subaccountCount} / {subaccountLimit}. Cupo disponible: {remainingSubaccounts}.
           </p>
+          {meta.primaryPortalUserId ? (
+            <p className="mt-1 text-xs text-muted">
+              Cuenta principal actual: {users.find((user) => user.id === meta.primaryPortalUserId)?.name || "Configurada"}.
+            </p>
+          ) : null}
           {inviteBlockedByLimit ? (
             <p className="mt-2 text-xs text-amber-300">
               Este tenant ya alcanzo su limite de subcuentas activas. Para crear otra, primero hay que liberar cupo.
@@ -262,21 +311,36 @@ export function TenantUsersManager({ initialUsers, initialMeta, canManage, curre
                   </td>
                   {canManage ? (
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => void removeUser(user.id)}
-                        disabled={removingUserId === user.id || isCurrentUser || !canManageTarget(user)}
-                        className="text-xs text-red-300 hover:underline disabled:opacity-50"
-                        title={
-                          isCurrentUser
-                            ? "No puedes eliminar tu propio usuario activo."
-                            : !canManageTarget(user)
-                              ? "Esta cuenta no puede gestionar otra cuenta principal ni roles elevados."
-                              : "Eliminar usuario"
-                        }
-                      >
-                        {removingUserId === user.id ? "Eliminando..." : "Eliminar usuario"}
-                      </button>
+                      <div className="flex items-center justify-end gap-3">
+                        {canPromoteToPrimary(user) ? (
+                          <button
+                            type="button"
+                            onClick={() => void makePrimary(user.id)}
+                            disabled={pendingPrimaryUserId === user.id}
+                            className="text-xs text-amber-200 hover:underline disabled:opacity-50"
+                            title="Marcar como cuenta principal"
+                          >
+                            {pendingPrimaryUserId === user.id ? "Actualizando..." : "Marcar principal"}
+                          </button>
+                        ) : user.accountKind === "primary" ? (
+                          <span className="text-xs text-emerald-300">Principal actual</span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => void removeUser(user.id)}
+                          disabled={removingUserId === user.id || isCurrentUser || !canManageTarget(user)}
+                          className="text-xs text-red-300 hover:underline disabled:opacity-50"
+                          title={
+                            isCurrentUser
+                              ? "No puedes eliminar tu propio usuario activo."
+                              : !canManageTarget(user)
+                                ? "Esta cuenta no puede gestionar otra cuenta principal ni roles elevados."
+                                : "Eliminar usuario"
+                          }
+                        >
+                          {removingUserId === user.id ? "Eliminando..." : "Eliminar usuario"}
+                        </button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>

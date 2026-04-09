@@ -9,6 +9,7 @@ import {
   getPortalUsers,
   isBackendConfigured,
   isPortalInternalAuthConfigured,
+  patchPortalPrimaryUser,
   patchPortalUserRole
 } from "@/lib/api";
 import { canManageUsers, isStaffRole, normalizeTenantRole } from "@/lib/app-permissions";
@@ -188,7 +189,7 @@ function canManageTargetUser(policy: ReturnType<typeof getUserManagementPolicy>,
 async function listRouteUsers(tenantId: string): Promise<RouteUserRow[]> {
   if (isBackendConfigured()) {
     const response = await getPortalUsers(tenantId);
-    return (response.data.users || []).map((user) => normalizeRouteUser(user));
+    return (response.data.users || []).map((user) => normalizeRouteUserWithKind(user));
   }
 
   return listTenantMembers(tenantId).map((user) =>
@@ -497,6 +498,67 @@ export async function PATCH(request: NextRequest) {
     metadata: { role: parsed.data.role }
   });
   return NextResponse.json({ ok: true });
+}
+
+const updatePrimarySchema = z.object({
+  userId: z.string().min(1)
+});
+
+export async function PUT(request: NextRequest) {
+  const guard = await requireAppApi({ permission: "manage_users" });
+  if (guard.error) return guard.error;
+  const policy = getUserManagementPolicy(guard.ctx || {});
+  if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const parsed = updatePrimarySchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+  const tenantId = guard.ctx?.tenantId as string;
+  const currentUsers = await listRouteUsers(tenantId);
+  const targetUser = currentUsers.find((user) => user.id === parsed.data.userId);
+  if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (tenantId && !isBackendConfigured()) {
+    return NextResponse.json(
+      {
+        error: "portal_users_backend_unavailable",
+        detail: "La gestion de cuenta principal para workspaces reales requiere backend persistente tenant-scoped."
+      },
+      { status: 503 }
+    );
+  }
+
+  if (isBackendConfigured()) {
+    const backendRequirement = requirePortalUsersBackend(tenantId);
+    if (backendRequirement) return backendRequirement;
+    try {
+      const response = await patchPortalPrimaryUser(tenantId, parsed.data.userId);
+      safeAppendUsersAuditLog({
+        tenantId,
+        userId: guard.ctx?.userId,
+        action: "tenant_primary_user_updated",
+        entity: "membership",
+        entityId: parsed.data.userId,
+        metadata: { previousPrimaryUserId: currentUsers.find((user) => user.accountKind === "primary")?.id || null }
+      });
+      return NextResponse.json({
+        ok: true,
+        user: normalizeRouteUserWithKind(response.data.user),
+        meta: response.data.meta || null
+      });
+    } catch (error) {
+      return proxyUsersBackendError("update_primary_user", tenantId, error, {
+        targetUserId: parsed.data.userId
+      });
+    }
+  }
+
+  return NextResponse.json(
+    {
+      error: "portal_users_backend_unavailable",
+      detail: "La gestion de cuenta principal para workspaces reales requiere backend persistente tenant-scoped."
+    },
+    { status: 503 }
+  );
 }
 
 export async function DELETE(request: NextRequest) {
