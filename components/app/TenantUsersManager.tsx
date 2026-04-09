@@ -56,6 +56,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const subaccountCount = meta.subaccountCount;
   const subaccountLimit = meta.subaccountLimit;
   const remainingSubaccounts = meta.remainingSubaccounts;
+  const usedPct = subaccountLimit > 0 ? Math.min(100, Math.round((subaccountCount / subaccountLimit) * 100)) : 0;
   const inviteBlockedByLimit = form.role !== "owner" && remainingSubaccounts <= 0;
 
   function canManageTarget(user: UserRow) {
@@ -230,6 +231,52 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Usuarios cliente</h1>
 
+      <div className="rounded-2xl border border-[color:var(--border)] bg-card p-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="font-semibold">Plan y cupo de usuarios</h3>
+            <p className="mt-1 text-sm text-muted">
+              {subaccountCount} / {subaccountLimit} usuarios utilizados
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Disponibles: {remainingSubaccounts}. La cuenta principal no consume cupo.
+            </p>
+            {meta.primaryPortalUserId ? (
+              <p className="mt-1 text-xs text-muted">
+                Cuenta principal actual: {users.find((user) => user.id === meta.primaryPortalUserId)?.name || "Configurada"}.
+              </p>
+            ) : null}
+          </div>
+          <div className="w-full max-w-xs">
+            <div className="flex items-center justify-between text-xs text-muted">
+              <span>Uso del plan</span>
+              <span>{usedPct}%</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface">
+              <div
+                className={`h-full rounded-full ${inviteBlockedByLimit ? "bg-amber-400" : "bg-brand"}`}
+                style={{ width: `${usedPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {inviteBlockedByLimit ? (
+          <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3">
+            <p className="text-sm font-medium text-amber-100">Alcanzaste el limite de usuarios de tu plan.</p>
+            <p className="mt-1 text-xs text-amber-200">
+              No podes crear mas subcuentas hasta liberar cupo o ampliar tu plan.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-[color:var(--border)] bg-surface px-3 py-3">
+            <p className="text-sm text-muted">
+              Necesitas mas usuarios? Contactanos para ampliar tu plan.
+            </p>
+          </div>
+        )}
+      </div>
+
       {canManage ? (
         <form className="rounded-2xl border border-[color:var(--border)] bg-card p-4" onSubmit={invite}>
           <h3 className="font-semibold">Invitar usuario</h3>
@@ -240,17 +287,9 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
                 ? "La cuenta principal del negocio solo puede crear subcuentas operativas de vendedor o visualizador."
                 : "Solo la cuenta principal puede gestionar usuarios de este espacio."}
           </p>
-          <p className="mt-2 text-xs text-muted">
-            Cuenta principal: 1 por tenant. Subcuentas activas hoy: {subaccountCount} / {subaccountLimit}. Cupo disponible: {remainingSubaccounts}.
-          </p>
-          {meta.primaryPortalUserId ? (
-            <p className="mt-1 text-xs text-muted">
-              Cuenta principal actual: {users.find((user) => user.id === meta.primaryPortalUserId)?.name || "Configurada"}.
-            </p>
-          ) : null}
           {inviteBlockedByLimit ? (
             <p className="mt-2 text-xs text-amber-300">
-              Este tenant ya alcanzo su limite de subcuentas activas. Para crear otra, primero hay que liberar cupo.
+              Alcanzaste el limite de usuarios de tu plan. Para crear otra subcuenta, primero hay que liberar cupo.
             </p>
           ) : null}
           <div className="mt-3 grid gap-2 md:grid-cols-4">
