@@ -841,6 +841,21 @@ export async function restorePortalContacts(tenantId: string, contactIds: string
   }, false);
 }
 
+export async function deletePortalArchivedContacts(tenantId: string, contactIds: string[]) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      deletedContactIds: string[];
+      deletedCount: number;
+      blockedContactIds: string[];
+      blockedCount: number;
+    };
+  }>(`/portal/tenants/${tenantId}/contacts/archived`, {
+    method: "DELETE",
+    body: JSON.stringify({ contactIds })
+  }, false);
+}
+
 export type PortalBusinessSettings = {
   tenantId: string;
   clinicId: string | null;

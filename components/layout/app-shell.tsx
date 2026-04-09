@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -245,10 +245,29 @@ export function AppShell({
   const showUsersShortcut = canManageUsers(accessContext);
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const previousPathnameRef = useRef(pathname);
 
   useEffect(() => {
     setSidebarStatus(whatsappStatus);
   }, [whatsappStatus]);
+
+  useEffect(() => {
+    const previousPathname = previousPathnameRef.current;
+    previousPathnameRef.current = pathname;
+
+    if (!previousPathname.startsWith("/app/ops") || pathname.startsWith("/app/ops")) {
+      return;
+    }
+
+    void fetch("/api/app/ops/lock", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin",
+      keepalive: true
+    }).catch(() => {
+      // The next visit to /app/ops will still validate server-side.
+    });
+  }, [pathname]);
 
   useEffect(() => {
     if (!tenantId) return;

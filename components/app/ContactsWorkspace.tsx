@@ -52,6 +52,7 @@ export function ContactsWorkspace({
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const visibleContacts = useMemo(() => {
@@ -173,6 +174,50 @@ export function ContactsWorkspace({
     }
   }
 
+  async function deleteSelectedArchivedContacts() {
+    if (readOnly || !showingArchived || selectedIds.length === 0 || deleting) return;
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(
+            `Se eliminaran definitivamente ${selectedIds.length} contactos archivados. Esta accion no se puede deshacer.`
+          );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/app/contacts/archived", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: selectedIds })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "contacts_delete_failed"));
+
+      const deletedIds = Array.isArray(json?.deletedContactIds) ? json.deletedContactIds : selectedIds;
+      const blockedCount = Number(json?.blockedCount || 0);
+      const remaining = contacts.filter((contact) => !deletedIds.includes(contact.id));
+      setContacts(remaining);
+      setSelectedIds((current) => current.filter((id) => !deletedIds.includes(id)));
+      if (selectedId && deletedIds.includes(selectedId)) {
+        setSelectedId(remaining[0]?.id || "");
+      }
+
+      if (deletedIds.length > 0 && blockedCount === 0) {
+        toast.success("Contactos eliminados", "Los archivados seleccionados se borraron definitivamente.");
+      } else if (deletedIds.length > 0) {
+        toast.success("Eliminacion parcial", `Se eliminaron ${deletedIds.length} contactos. ${blockedCount} quedaron bloqueados por historial asociado.`);
+      } else {
+        toast.error("No se pudieron eliminar", "Los contactos archivados seleccionados tienen historial asociado o ya no existen.");
+      }
+    } catch (error) {
+      toast.error("No se pudieron eliminar los contactos", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function createContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (readOnly) return;
@@ -239,7 +284,7 @@ export function ContactsWorkspace({
                 {selectedIds.length > 0
                   ? `${selectedIds.length} contactos seleccionados`
                   : showingArchived
-                    ? "Selecciona contactos archivados para restaurarlos a la base activa."
+                    ? "Selecciona contactos archivados para restaurarlos o borrarlos definitivamente."
                     : "Selecciona contactos para ocultarlos del panel sin borrar historial."}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -259,10 +304,22 @@ export function ContactsWorkspace({
                   size="sm"
                   className="rounded-2xl"
                   onClick={() => void (showingArchived ? restoreSelectedContacts() : archiveSelectedContacts())}
-                  disabled={readOnly || selectedIds.length === 0 || archiving || restoring}
+                  disabled={readOnly || selectedIds.length === 0 || archiving || restoring || deleting}
                 >
                   {showingArchived ? restoring ? "Restaurando..." : "Restaurar seleccionados" : archiving ? "Ocultando..." : "Ocultar seleccionados"}
                 </Button>
+                {showingArchived ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="rounded-2xl"
+                    onClick={() => void deleteSelectedArchivedContacts()}
+                    disabled={readOnly || selectedIds.length === 0 || restoring || deleting}
+                  >
+                    {deleting ? "Eliminando..." : "Eliminar seleccionados"}
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>

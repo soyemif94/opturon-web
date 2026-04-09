@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, ShieldAlert } from "lucide-react";
+import { Lock, Shield, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,19 @@ export function OpsAccessGate({
 
     setUnlocked(true);
     setPassword("");
+    startTransition(() => {
+      router.refresh();
+    });
+  }
+
+  async function handleLock() {
+    setError(null);
+    await fetch("/api/app/ops/lock", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin"
+    }).catch(() => null);
+    setUnlocked(false);
     startTransition(() => {
       router.refresh();
     });
@@ -130,5 +143,15 @@ export function OpsAccessGate({
     );
   }
 
-  return <>{children}</>;
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button type="button" variant="ghost" size="sm" className="rounded-2xl" onClick={() => void handleLock()} disabled={isPending}>
+          <Lock className="mr-2 h-4 w-4" />
+          Bloquear OPS
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
 }
