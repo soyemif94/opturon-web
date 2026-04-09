@@ -22,10 +22,13 @@ export function OpsAccessGate({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const helperText = useMemo(
-    () => "Acceso simple para supervision comercial. No reemplaza seguridad fuerte ni RBAC.",
-    []
-  );
+  const helperText = useMemo(() => {
+    if (!accessConfigured) {
+      return "OPS no esta configurado. Define OPS_PASSWORD en el entorno del panel para habilitar este acceso.";
+    }
+
+    return "Acceso simple para supervision comercial. La contrasena de OPS se valida en servidor con OPS_PASSWORD.";
+  }, [accessConfigured]);
 
   async function handleUnlock() {
     if (!accessConfigured) {

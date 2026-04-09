@@ -305,13 +305,13 @@ export function AppShell({
   const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
-    <section className="min-h-screen w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
-      <div className="flex min-h-[calc(100vh-24px)] w-full items-stretch gap-3 md:min-h-[calc(100vh-40px)] md:gap-5">
+    <section className="h-screen w-full overflow-hidden bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
+      <div className="flex h-full w-full items-stretch gap-3 md:gap-5">
         <aside className="hidden w-[304px] shrink-0 xl:block">
-          <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+          <div className="flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
 
-            <div className="relative">
+            <div className="relative min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="rounded-[24px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.94))] p-5">
                 <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
                   Portal cliente
@@ -434,9 +434,9 @@ export function AppShell({
         <div className="flex min-w-0 flex-1">
           <div
             className={cn(
-              "flex min-h-full min-w-0 flex-1 flex-col",
+              "flex h-full min-h-0 min-w-0 flex-1 flex-col",
               isInboxRoute
-                ? "min-h-[calc(100vh-40px)]"
+                ? "overflow-hidden"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
             )}
           >
@@ -486,8 +486,8 @@ export function AppShell({
               className={cn(
                 "min-h-0 flex-1",
                 isInboxRoute
-                  ? "bg-transparent p-0"
-                  : "bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
+                  ? "overflow-hidden bg-transparent p-0"
+                  : "overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
               )}
             >
               {children}
