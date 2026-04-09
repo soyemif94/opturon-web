@@ -4,9 +4,19 @@ import { FormEvent, useState } from "react";
 import { toast } from "@/components/ui/toast";
 
 type UserRow = { id: string; email: string; name: string; tenantRole: string };
+type UsersMeta = {
+  subaccountCount: number;
+  primaryAccountCount: number;
+  subaccountLimit: number;
+  remainingSubaccounts: number;
+  futureLimitKey: string;
+  limitScope: "subaccounts";
+  limitSource?: string | null;
+};
 
 type Props = {
   initialUsers: UserRow[];
+  initialMeta: UsersMeta;
   canManage: boolean;
   currentUserId?: string;
   currentTenantRole?: string;
@@ -28,8 +38,9 @@ function accountKindLabel(role: string) {
   return role === "owner" ? "cuenta principal" : "subcuenta";
 }
 
-export function TenantUsersManager({ initialUsers, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
+export function TenantUsersManager({ initialUsers, initialMeta, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
   const [users, setUsers] = useState(initialUsers);
+  const [meta, setMeta] = useState(initialMeta);
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
@@ -37,7 +48,10 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId, cur
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
   const isStaffManager = currentGlobalRole === "superadmin" || currentGlobalRole === "ops_admin";
   const allowedRoles = isStaffManager ? ["owner", "manager", "seller", "viewer"] : ["seller", "viewer"];
-  const subaccountCount = users.filter((user) => user.tenantRole !== "owner").length;
+  const subaccountCount = meta.subaccountCount;
+  const subaccountLimit = meta.subaccountLimit;
+  const remainingSubaccounts = meta.remainingSubaccounts;
+  const inviteBlockedByLimit = form.role !== "owner" && remainingSubaccounts <= 0;
 
   function canManageTarget(user: UserRow) {
     if (isStaffManager) return true;
@@ -78,7 +92,8 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId, cur
 
       if (!response.ok) {
         const json = await safeJson(response);
-        const message = json?.error?.formErrors?.[0] || json?.error || "No se pudo invitar al usuario.";
+        const message = json?.detail || json?.error?.formErrors?.[0] || json?.error || "No se pudo invitar al usuario.";
+        if (json?.meta) setMeta(json.meta);
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al invitar usuario", String(message));
         return;
@@ -101,6 +116,7 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId, cur
     if (!response.ok) return;
     const json = await response.json();
     setUsers((json.users || []).map((user: UserRow) => ({ ...user, tenantRole: user.tenantRole === "editor" ? "seller" : user.tenantRole })));
+    if (json.meta) setMeta(json.meta);
   }
 
   async function updateRole(userId: string, role: string) {
@@ -172,8 +188,13 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId, cur
                 : "Solo la cuenta principal puede gestionar usuarios de este espacio."}
           </p>
           <p className="mt-2 text-xs text-muted">
-            Cuenta principal: propietario. Subcuentas activas hoy: {subaccountCount}. Punto futuro para plan: limite por tenant sobre subcuentas.
+            Cuenta principal: propietario. Subcuentas activas hoy: {subaccountCount} / {subaccountLimit}. Cupo disponible: {remainingSubaccounts}.
           </p>
+          {inviteBlockedByLimit ? (
+            <p className="mt-2 text-xs text-amber-300">
+              Este tenant ya alcanzo su limite de subcuentas activas. Para crear otra, primero hay que liberar cupo.
+            </p>
+          ) : null}
           <div className="mt-3 grid gap-2 md:grid-cols-4">
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Nombre" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
@@ -187,7 +208,7 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId, cur
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Password temporal" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <button type="submit" disabled={isSubmitting} className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting || inviteBlockedByLimit} className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
               {isSubmitting ? "Invitando..." : "Invitar"}
             </button>
             {feedback.tone ? <p className={`text-xs ${feedback.tone === "success" ? "text-green-400" : "text-red-300"}`}>{feedback.text}</p> : null}

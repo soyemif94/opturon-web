@@ -1,8 +1,14 @@
 import { TenantUsersManager } from "@/components/app/TenantUsersManager";
 import { canManageUsers } from "@/lib/app-permissions";
+import type { PortalUsersMeta } from "@/lib/api";
 import { getPortalUsers, isBackendConfigured, isPortalInternalAuthConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
+
+const DEFAULT_SUBACCOUNT_LIMIT = (() => {
+  const parsed = Number.parseInt(String(process.env.DEFAULT_TENANT_SUBACCOUNT_LIMIT || "5"), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+})();
 
 export default async function AppUsersPage() {
   const ctx = await requireAppPage({ permission: "manage_users" });
@@ -20,6 +26,18 @@ export default async function AppUsersPage() {
           tenantRole: user.tenantRole
         }))
       : [];
+  let initialMeta: PortalUsersMeta = {
+    subaccountCount: users.filter((user) => user.tenantRole !== "owner").length,
+    primaryAccountCount: users.filter((user) => user.tenantRole === "owner").length,
+    subaccountLimit: DEFAULT_SUBACCOUNT_LIMIT,
+    remainingSubaccounts: Math.max(
+      0,
+      DEFAULT_SUBACCOUNT_LIMIT - users.filter((user) => user.tenantRole !== "owner").length
+    ),
+    futureLimitKey: "tenant_portal_users",
+    limitScope: "subaccounts",
+    limitSource: "default_env"
+  };
 
   if (backendUsersReady) {
     try {
@@ -30,6 +48,7 @@ export default async function AppUsersPage() {
         name: user.name,
         tenantRole: user.role
       }));
+      initialMeta = response.data.meta || initialMeta;
     } catch (error) {
       console.error("[app-users-page] Failed to load backend users.", error);
     }
@@ -42,6 +61,7 @@ export default async function AppUsersPage() {
       currentUserId={ctx.userId}
       currentTenantRole={ctx.tenantRole}
       currentGlobalRole={ctx.globalRole}
+      initialMeta={initialMeta}
     />
   );
 }

@@ -523,12 +523,23 @@ export type PortalUser = {
   updatedAt: string;
 };
 
+export type PortalUsersMeta = {
+  subaccountCount: number;
+  primaryAccountCount: number;
+  subaccountLimit: number;
+  remainingSubaccounts: number;
+  futureLimitKey: string;
+  limitScope: "subaccounts";
+  limitSource?: string | null;
+};
+
 export async function getPortalUsers(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
       users: PortalUser[];
+      meta?: PortalUsersMeta | null;
     };
   }>(`/portal/tenants/${tenantId}/users`);
 }
@@ -536,12 +547,13 @@ export async function getPortalUsers(tenantId: string) {
 export async function createPortalUser(
   tenantId: string,
   payload: { email: string; name: string; role: string; password: string }
-) {
+  ) {
   return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
       user: PortalUser;
+      meta?: PortalUsersMeta | null;
     };
   }>(`/portal/tenants/${tenantId}/users`, {
     method: "POST",

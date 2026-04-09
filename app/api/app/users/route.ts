@@ -29,6 +29,10 @@ const updateRoleSchema = z.object({
 });
 
 const CLIENT_SUBACCOUNT_ROLES = ["seller", "viewer"] as const;
+const DEFAULT_SUBACCOUNT_LIMIT = (() => {
+  const parsed = Number.parseInt(String(process.env.DEFAULT_TENANT_SUBACCOUNT_LIMIT || "5"), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+})();
 
 type RouteUserRow = {
   id: string;
@@ -36,6 +40,17 @@ type RouteUserRow = {
   name: string;
   tenantRole: string;
   accountKind: "primary" | "subaccount";
+};
+
+type RouteUsersMeta = {
+  allowedRoles: string[];
+  subaccountCount: number;
+  primaryAccountCount: number;
+  subaccountLimit: number;
+  remainingSubaccounts: number;
+  futureLimitKey: "tenant_portal_users";
+  limitScope: "subaccounts";
+  limitSource: string;
 };
 
 function resolveBackendBaseUrl() {
@@ -169,6 +184,35 @@ async function listRouteUsers(tenantId: string): Promise<RouteUserRow[]> {
   );
 }
 
+function buildRouteUsersMeta(
+  users: RouteUserRow[],
+  allowedRoles: string[],
+  sourceMeta?: {
+    subaccountCount?: number;
+    primaryAccountCount?: number;
+    subaccountLimit?: number;
+    remainingSubaccounts?: number;
+    limitSource?: string | null;
+  } | null
+): RouteUsersMeta {
+  const subaccountCount = sourceMeta?.subaccountCount ?? users.filter((user) => user.accountKind === "subaccount").length;
+  const primaryAccountCount = sourceMeta?.primaryAccountCount ?? users.filter((user) => user.accountKind === "primary").length;
+  const subaccountLimit = Number(sourceMeta?.subaccountLimit) > 0 ? Number(sourceMeta?.subaccountLimit) : DEFAULT_SUBACCOUNT_LIMIT;
+  const remainingSubaccounts =
+    sourceMeta?.remainingSubaccounts ?? Math.max(0, subaccountLimit - subaccountCount);
+
+  return {
+    allowedRoles,
+    subaccountCount,
+    primaryAccountCount,
+    subaccountLimit,
+    remainingSubaccounts,
+    futureLimitKey: "tenant_portal_users",
+    limitScope: "subaccounts",
+    limitSource: sourceMeta?.limitSource || "default_env"
+  };
+}
+
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
@@ -181,12 +225,7 @@ export async function GET() {
       {
         users: [],
         source: "empty_real_tenant",
-        meta: {
-          allowedRoles: policy.allowedRoles,
-          subaccountCount: 0,
-          primaryAccountCount: 0,
-          futureLimitKey: "tenant_portal_users"
-        }
+        meta: buildRouteUsersMeta([], policy.allowedRoles)
       },
       { status: 200 }
     );
@@ -200,12 +239,7 @@ export async function GET() {
       const users = (response.data.users || []).map((user) => normalizeRouteUser(user));
       return NextResponse.json({
         users,
-        meta: {
-          allowedRoles: policy.allowedRoles,
-          subaccountCount: users.filter((user) => user.accountKind === "subaccount").length,
-          primaryAccountCount: users.filter((user) => user.accountKind === "primary").length,
-          futureLimitKey: "tenant_portal_users"
-        }
+        meta: buildRouteUsersMeta(users, policy.allowedRoles, response.data.meta || null)
       });
     } catch (error) {
       return proxyUsersBackendError("list_users", tenantId, error);
@@ -222,12 +256,7 @@ export async function GET() {
   );
   return NextResponse.json({
     users,
-    meta: {
-      allowedRoles: policy.allowedRoles,
-      subaccountCount: users.filter((user) => user.accountKind === "subaccount").length,
-      primaryAccountCount: users.filter((user) => user.accountKind === "primary").length,
-      futureLimitKey: "tenant_portal_users"
-    }
+    meta: buildRouteUsersMeta(users, policy.allowedRoles)
   });
 }
 
@@ -251,6 +280,7 @@ export async function POST(request: NextRequest) {
 
   const tenantId = guard.ctx?.tenantId as string;
   const email = parsed.data.email.toLowerCase();
+  const countsAsSubaccount = parsed.data.role !== "owner";
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
@@ -303,6 +333,25 @@ export async function POST(request: NextRequest) {
   }
 
   const data = readSaasData();
+  const currentUsers = listTenantMembers(tenantId).map((user) =>
+    normalizeRouteUser({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      tenantRole: user.tenantRole
+    })
+  );
+  const currentMeta = buildRouteUsersMeta(currentUsers, policy.allowedRoles);
+  if (countsAsSubaccount && currentMeta.subaccountCount >= currentMeta.subaccountLimit) {
+    return NextResponse.json(
+      {
+        error: "tenant_subaccount_limit_reached",
+        detail: "Este espacio ya alcanzo el limite de subcuentas activas.",
+        meta: currentMeta
+      },
+      { status: 409 }
+    );
+  }
   let user = data.users.find((item) => item.email.toLowerCase() === email);
   if (!user) {
     user = {
