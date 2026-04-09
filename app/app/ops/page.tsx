@@ -1,4 +1,5 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import { OpsAccessGate } from "@/components/app/ops/OpsAccessGate";
 import { OpsDashboard } from "@/components/app/ops/OpsDashboard";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalConversations, getPortalUsers, isBackendConfigured } from "@/lib/api";
@@ -49,12 +50,14 @@ export default async function AppOpsPage() {
       description="Centro de control operativo para detectar leads sin atender, seguimientos vencidos y carga por vendedor sin salir del inbox."
       badge="Supervision comercial"
     >
-      <OpsDashboard
-        initialConversations={initialConversations}
-        initialSellers={initialSellers}
-        readOnly={!ctx.tenantId || readOnly}
-        backendReady={backendReady}
-      />
+      <OpsAccessGate>
+        <OpsDashboard
+          initialConversations={initialConversations}
+          initialSellers={initialSellers}
+          readOnly={!ctx.tenantId || readOnly}
+          backendReady={backendReady}
+        />
+      </OpsAccessGate>
     </ClientPageShell>
   );
 }

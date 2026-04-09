@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ContactRound,
   Gift,
+  Shield,
   Headset,
   House,
   MessageSquareText,
@@ -58,6 +59,14 @@ const navItems: Array<{
     icon: MessageSquareText,
     module: "inbox",
     match: (pathname: string) => pathname.startsWith("/app/inbox")
+  },
+  {
+    href: "/app/ops",
+    label: "OPS",
+    description: "Supervision comercial, alertas y accion rapida sobre leads",
+    icon: Shield,
+    module: "ops",
+    match: (pathname: string) => pathname.startsWith("/app/ops")
   },
   {
     href: "/app/contacts",
