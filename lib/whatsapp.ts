@@ -13,6 +13,8 @@ const PREFILL_BY_ORIGIN: Record<string, string> = {
     "Hola Opturon. Quiero conversar sobre una auditoria estrategica inicial (15 min) para automatizar WhatsApp comercial.\n\nRubro:\nConsultas/mes aprox:\nDia habil para contacto:",
   "portfolio-demo":
     "Hola Opturon. Vengo desde Portfolio y quiero probar cómo funciona el sistema de Opturon en una conversación real por WhatsApp.\n\nRubro:\nTipo de consultas que recibo:\nObjetivo principal:",
+  "demo-page":
+    "Hola Opturon. Vengo desde la demo web y quiero una demo guiada por WhatsApp para entender como funciona Opturon en una conversacion real.",
   "package-starter":
     "Hola Opturon. Me interesa el paquete WhatsApp Starter y quiero una auditoria estrategica inicial (15 min).\n\nRubro:\nConsultas/mes:\nCRM:\nObjetivo principal:",
   "package-sales":
