@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
+  Clock3,
   MessageCircle,
   PlayCircle,
   Sparkles,
@@ -23,52 +24,73 @@ import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 export const metadata: Metadata = {
   title: "Demo comercial | Opturon",
   description:
-    "Conoce como Opturon ordena WhatsApp, seguimiento comercial y operacion de ventas en una demo guiada y simple."
+    "Conoce como Opturon evita que se enfrien leads de WhatsApp y convierte conversaciones en un sistema comercial ordenado."
 };
 
 const flowSteps = [
   {
-    title: "1. Entra un lead y el sistema responde",
+    title: "1. Dejas de depender de chats sueltos",
     description:
-      "Opturon ordena el ingreso, crea contexto y deja claro que conversacion requiere atencion humana."
+      "Cada consulta entra en un inbox ordenado con contexto, prioridad y una primera respuesta clara."
   },
   {
-    title: "2. El equipo vende con pipeline y seguimiento",
+    title: "2. El equipo sabe a quien seguir y cuando",
     description:
-      "Cada lead tiene owner, estado comercial y proxima accion para no depender de memoria ni planillas."
+      "Cada lead queda con owner, estado comercial y proxima accion para no depender de memoria ni planillas."
   },
   {
-    title: "3. La operacion se supervisa sin perder control",
+    title: "3. El negocio recupera control comercial",
     description:
-      "OPS muestra atrasos, carga por vendedor y prioridades para que el negocio no pierda oportunidades."
+      "OPS muestra atrasos, carga por vendedor y prioridades para que las oportunidades no se enfrien."
   }
 ];
 
 const serviceLevels = [
   {
     name: "Starter",
-    summary: "Para ordenar la entrada de consultas y dejar de vender chat por chat.",
+    summary: "Para negocios que reciben consultas, pero todavia atienden WhatsApp de forma improvisada.",
     bullets: ["Inbox centralizado", "Contactos con contexto", "Primer seguimiento visible"],
-    highlight: "Ideal para empezar a ordenar"
+    highlight: "Ideal para ordenar la base",
+    fit: "Si hoy respondes todo manualmente y sin un criterio comun."
   },
   {
     name: "Sales System",
     summary: "Para equipos que ya venden por WhatsApp y necesitan seguimiento comercial serio.",
     bullets: ["Pipeline comercial", "Owners y subcuentas", "OPS con alertas y SLA basico"],
-    highlight: "El nivel mas pedido"
+    highlight: "El nivel mas pedido",
+    fit: "Si ya hay volumen comercial y el problema es seguimiento, cierres y orden."
   },
   {
     name: "Ops & Scale",
     summary: "Para operaciones con volumen que necesitan trazabilidad, supervision y mas control.",
     bullets: ["Mas usuarios y control por tenant", "Seguimiento operativo", "Base lista para escalar"],
-    highlight: "Pensado para equipos con crecimiento"
+    highlight: "Pensado para equipos con crecimiento",
+    fit: "Si ya necesitas supervision, multiusuario y menos dependencia de personas clave."
   }
 ];
 
 const tangibleOutcomes = [
-  "Entendes rapido que hace Opturon en una operacion real.",
-  "Ves que nivel de sistema te conviene hoy.",
-  "Podes avanzar por WhatsApp con contexto o dejar tu intencion comercial."
+  "Entiendes rapido como evitar leads frios y conversaciones perdidas.",
+  "Ves que nivel de sistema necesita hoy tu operacion.",
+  "Puedes avanzar por WhatsApp con contexto o dejar una consulta clara."
+];
+
+const conversionPoints = [
+  {
+    label: "Problema",
+    text: "Leads sin seguimiento, respuestas desordenadas y ventas que dependen de memoria humana.",
+    icon: Clock3
+  },
+  {
+    label: "Solucion",
+    text: "Opturon convierte WhatsApp en un flujo con inbox, pipeline, owners y seguimiento visible.",
+    icon: Bot
+  },
+  {
+    label: "Resultado",
+    text: "Mas control comercial, menos oportunidades enfriadas y un proceso mas facil de supervisar.",
+    icon: Target
+  }
 ];
 
 export default function DemoPage() {
@@ -89,11 +111,11 @@ export default function DemoPage() {
 
             <div className="space-y-4">
               <h1 className="text-balance text-4xl font-semibold leading-tight md:text-6xl">
-                Mira como Opturon convierte WhatsApp en un sistema de ventas
+                Mira como Opturon evita que las ventas de WhatsApp se pierdan por desorden
               </h1>
               <p className="max-w-2xl text-lg leading-8 text-muted md:text-xl">
-                Esta demo te muestra el valor real: inbox ordenado, seguimiento comercial, control operativo y una
-                forma simple de no perder leads por desorden.
+                Esta demo te muestra, en pocos minutos, como pasar de conversaciones sueltas a un sistema comercial con
+                seguimiento, responsables y control operativo.
               </p>
             </div>
 
@@ -108,6 +130,26 @@ export default function DemoPage() {
               ))}
             </div>
 
+            <div className="grid gap-3">
+              {conversionPoints.map((point) => {
+                const Icon = point.icon;
+                return (
+                  <div
+                    key={point.label}
+                    className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
+                  >
+                    <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-brand/35 bg-brand/10">
+                      <Icon className="h-4 w-4 text-brandBright" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brandBright">{point.label}</p>
+                      <p className="mt-1 text-sm leading-7 text-text/90">{point.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <WhatsAppCtaLink
                 href={whatsAppLink}
@@ -119,20 +161,20 @@ export default function DemoPage() {
                 className="inline-flex h-11 items-center justify-center rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-brandBright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               >
                 <MessageCircle className="mr-2 h-4 w-4" />
-                Quiero ver si Opturon encaja conmigo
+                Quiero una demo guiada por WhatsApp
               </WhatsAppCtaLink>
               <SecondaryButton href="#demo-flow" ariaLabel="Ver el flujo demo de Opturon">
                 <PlayCircle className="mr-2 h-4 w-4" />
-                Ver flujo demo
+                Ver como funciona
               </SecondaryButton>
               <PrimaryButton href="/contacto" ariaLabel="Ir a contacto para hablar con Opturon">
-                Hablar con el equipo
+                Quiero hablar con el equipo
                 <ArrowRight className="ml-2 h-4 w-4" />
               </PrimaryButton>
             </div>
 
             <p className="text-sm text-muted">
-              Sin humo, sin demo falsa. Lo que ves aca sale del producto real que ya usa inbox, pipeline, OPS y
+              Sin humo, sin demo falsa. Lo que ves aqui sale del producto real que ya usa inbox, pipeline, OPS y
               multiusuario.
             </p>
           </div>
@@ -151,11 +193,11 @@ export default function DemoPage() {
         <div className="max-w-3xl">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Flujo guiado</p>
           <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
-            Asi se entiende el valor de Opturon en pocos minutos
+            Asi se entiende el valor de Opturon en tres pasos
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-8 text-muted">
-            La demo esta pensada para que un negocio entienda rapido como pasa de chats sueltos a una operacion
-            comercial ordenada.
+            Primero ves el problema que resuelve. Despues entiendes como trabaja el equipo. Y al final puedes avanzar
+            con el siguiente paso comercial.
           </p>
         </div>
 
@@ -175,7 +217,7 @@ export default function DemoPage() {
                 <Bot className="h-4 w-4 text-brandBright" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-text">Primera impresion del sistema</p>
+                <p className="text-sm font-semibold text-text">Lo primero que cambia</p>
                 <p className="text-sm text-muted">Inbox, prioridad y seguimiento en la misma superficie.</p>
               </div>
             </div>
@@ -188,7 +230,7 @@ export default function DemoPage() {
                 <Target className="h-4 w-4 text-brandBright" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-text">Seguimiento comercial visible</p>
+                <p className="text-sm font-semibold text-text">Lo que mejora despues</p>
                 <p className="text-sm text-muted">El pipeline deja claro que oportunidad mover y cual priorizar.</p>
               </div>
             </div>
@@ -201,11 +243,11 @@ export default function DemoPage() {
         <div className="max-w-3xl">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Niveles de servicio</p>
           <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
-            Elegi la etapa que mejor encaja con tu operacion
+            Elige el nivel que mejor encaja con tu momento comercial
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-8 text-muted">
-            No vendemos un plan inflado. Primero ubicamos el momento real de tu negocio y despues definimos el nivel
-            de sistema que te conviene implementar.
+            No todos los negocios necesitan lo mismo. Aqui la idea es que ubiques rapido si necesitas ordenar, vender
+            con mas seguimiento o escalar con mas control.
           </p>
         </div>
 
@@ -220,6 +262,7 @@ export default function DemoPage() {
                 <div>
                   <h3 className="text-2xl font-semibold">{level.name}</h3>
                   <p className="mt-3 text-sm leading-7 text-muted">{level.summary}</p>
+                  <p className="mt-3 text-sm font-medium text-text/90">{level.fit}</p>
                 </div>
                 <span className="rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brandBright">
                   {level.highlight}
@@ -242,11 +285,11 @@ export default function DemoPage() {
         <div className="max-w-3xl">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Avance comercial</p>
           <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
-            Sali de la demo con una conversacion comercial bien encaminada
+            Si te hace sentido, deja encaminado el siguiente paso
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-8 text-muted">
-            Si te hace sentido, podes seguir por WhatsApp con contexto o dejar tu intencion para que el equipo te
-            responda con una propuesta mas clara.
+            Puedes abrir WhatsApp con un contexto ya cargado o dejar una consulta para que te respondamos con una
+            recomendacion mas clara.
           </p>
         </div>
 
@@ -262,7 +305,7 @@ export default function DemoPage() {
                   <Users className="h-4 w-4 text-brandBright" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold">Si preferis, deja tu consulta</h3>
+                  <h3 className="text-xl font-semibold">Tambien puedes dejar tu consulta</h3>
                   <p className="mt-2 text-sm leading-7 text-muted">
                     Esto sirve para negocios que quieren avanzar, pero antes necesitan ordenar objetivo, rubro y nivel
                     de servicio.
@@ -270,7 +313,7 @@ export default function DemoPage() {
                 </div>
               </div>
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-muted">
-                <p className="font-medium text-text">Que pasa despues</p>
+                <p className="font-medium text-text">Que pasa despues de este paso</p>
                 <div className="mt-3 grid gap-3">
                   <div className="flex gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brandBright" />
@@ -290,7 +333,7 @@ export default function DemoPage() {
                 href="/contacto"
                 className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brandBright transition hover:text-brand"
               >
-                Prefiero ver la pagina de contacto completa
+                Prefiero ir a la pagina de contacto completa
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Card>
