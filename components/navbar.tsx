@@ -6,6 +6,7 @@ import { Cpu, Menu, Sparkles, X } from "lucide-react";
 
 const links = [
   { href: "/", label: "Inicio" },
+  { href: "/demo", label: "Demo" },
   { href: "/servicios", label: "Servicios" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/casos", label: "Casos" },

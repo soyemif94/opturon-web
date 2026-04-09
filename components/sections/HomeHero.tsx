@@ -72,11 +72,11 @@ export function HomeHero() {
               Probar el sistema
             </WhatsAppCtaLink>
             <Link
-              href="#producto"
-              aria-label="Ver el sistema funcionando en 2 minutos"
+              href="/demo"
+              aria-label="Ver la demo comercial de Opturon"
               className="whatsapp-accent-hover inline-flex h-11 items-center justify-center rounded-xl border border-brand/40 bg-transparent px-5 text-sm font-semibold text-text transition-all duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              Ver el sistema funcionando (2 min)
+              Ver demo comercial
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
