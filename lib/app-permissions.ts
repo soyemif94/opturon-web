@@ -33,6 +33,7 @@ type AccessContext = {
 };
 
 const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+const STAFF_USER_MANAGERS = new Set<GlobalRole>(["superadmin", "ops_admin"]);
 
 const TENANT_ROLE_PERMISSIONS: Record<TenantRole, Record<AppPermission, boolean>> = {
   owner: {
@@ -85,7 +86,12 @@ export function isStaffRole(role?: GlobalRole) {
 }
 
 export function hasAppPermission(context: AccessContext, permission: AppPermission) {
-  if (isStaffRole(context.globalRole)) return true;
+  if (isStaffRole(context.globalRole)) {
+    if (permission === "manage_users") {
+      return Boolean(context.globalRole && STAFF_USER_MANAGERS.has(context.globalRole));
+    }
+    return true;
+  }
   const tenantRole = normalizeTenantRole(context.tenantRole);
   if (!tenantRole) return false;
   return TENANT_ROLE_PERMISSIONS[tenantRole]?.[permission] === true;

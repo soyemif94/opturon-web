@@ -11,6 +11,7 @@ import {
   isPortalInternalAuthConfigured,
   patchPortalUserRole
 } from "@/lib/api";
+import { canManageUsers, isStaffRole, normalizeTenantRole } from "@/lib/app-permissions";
 import { requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, listTenantMembers, newId, readSaasData, writeSaasData } from "@/lib/saas/store";
 import { hasExplicitRuntimeDataDir, resolveRuntimeDataDir } from "@/lib/runtime-data";
@@ -26,6 +27,16 @@ const updateRoleSchema = z.object({
   userId: z.string().min(1),
   role: z.enum(["owner", "manager", "seller", "viewer"])
 });
+
+const CLIENT_SUBACCOUNT_ROLES = ["seller", "viewer"] as const;
+
+type RouteUserRow = {
+  id: string;
+  email: string;
+  name: string;
+  tenantRole: string;
+  accountKind: "primary" | "subaccount";
+};
 
 function resolveBackendBaseUrl() {
   return (
@@ -109,16 +120,73 @@ function safeAppendUsersAuditLog(entry: Parameters<typeof appendAuditLog>[0]) {
   }
 }
 
+function normalizeRouteUser(user: { id: string; email: string; name: string; role?: string; tenantRole?: string }): RouteUserRow {
+  const tenantRole = String(user.role || user.tenantRole || "viewer");
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    tenantRole,
+    accountKind: tenantRole === "owner" ? "primary" : "subaccount"
+  };
+}
+
+function getUserManagementPolicy(ctx: { globalRole?: string; tenantRole?: string; tenantId?: string | null }) {
+  const tenantRole = normalizeTenantRole(ctx.tenantRole);
+  const staff = Boolean(isStaffRole(ctx.globalRole as any) && canManageUsers(ctx as any));
+  const tenantOwner = tenantRole === "owner";
+  const canManage = Boolean(staff || tenantOwner);
+  const allowedRoles = staff ? ["owner", "manager", "seller", "viewer"] : [...CLIENT_SUBACCOUNT_ROLES];
+
+  return {
+    canManage,
+    isStaff: staff,
+    isTenantOwner: tenantOwner,
+    tenantRole,
+    allowedRoles
+  };
+}
+
+function canManageTargetRole(policy: ReturnType<typeof getUserManagementPolicy>, targetRole?: string) {
+  const normalized = String(targetRole || "").trim().toLowerCase();
+  if (policy.isStaff) return true;
+  return CLIENT_SUBACCOUNT_ROLES.includes(normalized as (typeof CLIENT_SUBACCOUNT_ROLES)[number]);
+}
+
+async function listRouteUsers(tenantId: string): Promise<RouteUserRow[]> {
+  if (isBackendConfigured()) {
+    const response = await getPortalUsers(tenantId);
+    return (response.data.users || []).map((user) => normalizeRouteUser(user));
+  }
+
+  return listTenantMembers(tenantId).map((user) =>
+    normalizeRouteUser({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      tenantRole: user.tenantRole
+    })
+  );
+}
+
 export async function GET() {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
+  const policy = getUserManagementPolicy(guard.ctx || {});
+  if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const tenantId = guard.ctx?.tenantId as string;
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
         users: [],
-        source: "empty_real_tenant"
+        source: "empty_real_tenant",
+        meta: {
+          allowedRoles: policy.allowedRoles,
+          subaccountCount: 0,
+          primaryAccountCount: 0,
+          futureLimitKey: "tenant_portal_users"
+        }
       },
       { status: 200 }
     );
@@ -129,28 +197,57 @@ export async function GET() {
     if (backendRequirement) return backendRequirement;
     try {
       const response = await getPortalUsers(tenantId);
+      const users = (response.data.users || []).map((user) => normalizeRouteUser(user));
       return NextResponse.json({
-        users: (response.data.users || []).map((user) => ({
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          tenantRole: user.role
-        }))
+        users,
+        meta: {
+          allowedRoles: policy.allowedRoles,
+          subaccountCount: users.filter((user) => user.accountKind === "subaccount").length,
+          primaryAccountCount: users.filter((user) => user.accountKind === "primary").length,
+          futureLimitKey: "tenant_portal_users"
+        }
       });
     } catch (error) {
       return proxyUsersBackendError("list_users", tenantId, error);
     }
   }
 
-  return NextResponse.json({ users: listTenantMembers(tenantId).map((user) => ({ ...user, tenantRole: user.tenantRole })) });
+  const users = listTenantMembers(tenantId).map((user) =>
+    normalizeRouteUser({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      tenantRole: user.tenantRole
+    })
+  );
+  return NextResponse.json({
+    users,
+    meta: {
+      allowedRoles: policy.allowedRoles,
+      subaccountCount: users.filter((user) => user.accountKind === "subaccount").length,
+      primaryAccountCount: users.filter((user) => user.accountKind === "primary").length,
+      futureLimitKey: "tenant_portal_users"
+    }
+  });
 }
 
 export async function POST(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
+  const policy = getUserManagementPolicy(guard.ctx || {});
+  if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!policy.allowedRoles.includes(parsed.data.role)) {
+    return NextResponse.json(
+      {
+        error: "role_not_allowed_for_actor",
+        detail: "Solo la cuenta principal puede crear subcuentas operativas de vendedor o visualizador."
+      },
+      { status: 403 }
+    );
+  }
 
   const tenantId = guard.ctx?.tenantId as string;
   const email = parsed.data.email.toLowerCase();
@@ -258,11 +355,34 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
+  const policy = getUserManagementPolicy(guard.ctx || {});
+  if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const parsed = updateRoleSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!policy.allowedRoles.includes(parsed.data.role)) {
+    return NextResponse.json(
+      {
+        error: "role_not_allowed_for_actor",
+        detail: "No puedes asignar ese rol desde esta cuenta."
+      },
+      { status: 403 }
+    );
+  }
 
   const tenantId = guard.ctx?.tenantId as string;
+  const currentUsers = await listRouteUsers(tenantId);
+  const targetUser = currentUsers.find((user) => user.id === parsed.data.userId);
+  if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canManageTargetRole(policy, targetUser.tenantRole)) {
+    return NextResponse.json(
+      {
+        error: "target_user_not_manageable",
+        detail: "La cuenta principal no puede modificar otra cuenta principal ni roles elevados."
+      },
+      { status: 403 }
+    );
+  }
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
@@ -314,12 +434,26 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
+  const policy = getUserManagementPolicy(guard.ctx || {});
+  if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const userId = new URL(request.url).searchParams.get("id") || "";
   if (!userId) return NextResponse.json({ error: "Missing user id" }, { status: 400 });
 
   const tenantId = guard.ctx?.tenantId as string;
   const currentUserId = guard.ctx?.userId as string;
+  const currentUsers = await listRouteUsers(tenantId);
+  const targetUser = currentUsers.find((user) => user.id === userId);
+  if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canManageTargetRole(policy, targetUser.tenantRole)) {
+    return NextResponse.json(
+      {
+        error: "target_user_not_manageable",
+        detail: "La cuenta principal no puede eliminar otra cuenta principal ni roles elevados."
+      },
+      { status: 403 }
+    );
+  }
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {

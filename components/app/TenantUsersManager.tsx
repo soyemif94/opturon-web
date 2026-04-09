@@ -9,6 +9,8 @@ type Props = {
   initialUsers: UserRow[];
   canManage: boolean;
   currentUserId?: string;
+  currentTenantRole?: string;
+  currentGlobalRole?: string;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -22,13 +24,25 @@ function roleLabel(role: string) {
   return ROLE_LABELS[role] || role;
 }
 
-export function TenantUsersManager({ initialUsers, canManage, currentUserId }: Props) {
+function accountKindLabel(role: string) {
+  return role === "owner" ? "cuenta principal" : "subcuenta";
+}
+
+export function TenantUsersManager({ initialUsers, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
+  const isStaffManager = currentGlobalRole === "superadmin" || currentGlobalRole === "ops_admin";
+  const allowedRoles = isStaffManager ? ["owner", "manager", "seller", "viewer"] : ["seller", "viewer"];
+  const subaccountCount = users.filter((user) => user.tenantRole !== "owner").length;
+
+  function canManageTarget(user: UserRow) {
+    if (isStaffManager) return true;
+    return user.tenantRole === "seller" || user.tenantRole === "viewer";
+  }
 
   async function invite(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -150,15 +164,25 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
       {canManage ? (
         <form className="rounded-2xl border border-[color:var(--border)] bg-card p-4" onSubmit={invite}>
           <h3 className="font-semibold">Invitar usuario</h3>
-          <p className="mt-1 text-sm text-muted">Crea un acceso con rol y password temporal para el portal.</p>
+          <p className="mt-1 text-sm text-muted">
+            {isStaffManager
+              ? "Crea accesos del portal con el rol que corresponda."
+              : currentTenantRole === "owner"
+                ? "La cuenta principal del negocio solo puede crear subcuentas operativas de vendedor o visualizador."
+                : "Solo la cuenta principal puede gestionar usuarios de este espacio."}
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            Cuenta principal: propietario. Subcuentas activas hoy: {subaccountCount}. Punto futuro para plan: limite por tenant sobre subcuentas.
+          </p>
           <div className="mt-3 grid gap-2 md:grid-cols-4">
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Nombre" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
             <select className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
-              <option value="owner">propietario</option>
-              <option value="manager">gerente</option>
-              <option value="seller">vendedor</option>
-              <option value="viewer">visualizador</option>
+              {allowedRoles.map((role) => (
+                <option key={role} value={role}>
+                  {roleLabel(role)}
+                </option>
+              ))}
             </select>
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Password temporal" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
           </div>
@@ -179,6 +203,7 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
             <tr>
               <th className="px-4 py-3">Nombre</th>
               <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Rol</th>
               {canManage ? <th className="px-4 py-3 text-right">Acciones</th> : null}
             </tr>
@@ -190,18 +215,20 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
                 <tr key={user.id} className="border-t border-[color:var(--border)]">
                   <td className="px-4 py-3">{user.name}</td>
                   <td className="px-4 py-3">{user.email}</td>
+                  <td className="px-4 py-3">{accountKindLabel(user.tenantRole)}</td>
                   <td className="px-4 py-3 capitalize">
-                    {canManage ? (
+                    {canManage && canManageTarget(user) ? (
                       <select
                         className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm"
                         value={user.tenantRole}
                         disabled={pendingRoleUserId === user.id}
                         onChange={(event) => void updateRole(user.id, event.target.value)}
                       >
-                        <option value="owner">propietario</option>
-                        <option value="manager">gerente</option>
-                        <option value="seller">vendedor</option>
-                        <option value="viewer">visualizador</option>
+                        {allowedRoles.map((role) => (
+                          <option key={role} value={role}>
+                            {roleLabel(role)}
+                          </option>
+                        ))}
                       </select>
                     ) : (
                       roleLabel(user.tenantRole)
@@ -212,9 +239,15 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
                       <button
                         type="button"
                         onClick={() => void removeUser(user.id)}
-                        disabled={removingUserId === user.id || isCurrentUser}
+                        disabled={removingUserId === user.id || isCurrentUser || !canManageTarget(user)}
                         className="text-xs text-red-300 hover:underline disabled:opacity-50"
-                        title={isCurrentUser ? "No puedes eliminar tu propio usuario activo." : "Eliminar usuario"}
+                        title={
+                          isCurrentUser
+                            ? "No puedes eliminar tu propio usuario activo."
+                            : !canManageTarget(user)
+                              ? "Esta cuenta no puede gestionar otra cuenta principal ni roles elevados."
+                              : "Eliminar usuario"
+                        }
                       >
                         {removingUserId === user.id ? "Eliminando..." : "Eliminar usuario"}
                       </button>
