@@ -18,11 +18,11 @@ export function InboxLayout({
   onBackToList?: () => void;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col pb-1">
-      <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.45fr)_minmax(320px,0.92fr)] 2xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.55fr)_minmax(340px,0.95fr)]">
+    <div className="flex flex-col pb-1 xl:min-h-[calc(100vh-13rem)]">
+      <div className="grid grid-cols-1 gap-3 xl:min-h-[calc(100vh-13rem)] xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.45fr)_minmax(320px,0.92fr)] 2xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.55fr)_minmax(340px,0.95fr)]">
         <aside
           className={cn(
-            "h-full min-h-[320px] min-w-0 overflow-hidden",
+            "min-h-[320px] min-w-0 overflow-hidden xl:min-h-0",
             hasDetail ? "hidden xl:block xl:min-h-0" : "block xl:min-h-0"
           )}
         >
@@ -31,7 +31,7 @@ export function InboxLayout({
 
         <main
           className={cn(
-            "flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-hidden",
+            "min-w-0 flex-col gap-3 overflow-hidden xl:flex xl:min-h-0",
             hasDetail ? "flex" : "hidden xl:flex"
           )}
         >
@@ -48,7 +48,7 @@ export function InboxLayout({
             </div>
           ) : null}
 
-          <section className="h-full min-h-[420px] min-w-0 flex-1 overflow-hidden xl:min-h-0">{center}</section>
+          <section className="min-h-[420px] min-w-0 overflow-hidden xl:min-h-0 xl:flex-1">{center}</section>
         </main>
 
         <aside
@@ -57,8 +57,8 @@ export function InboxLayout({
             hasDetail ? "block" : "hidden xl:block"
           )}
         >
-          <section className="h-full min-h-[320px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-            <div className="h-full overflow-y-auto p-4">{right}</div>
+          <section className="min-h-[320px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)] xl:h-full">
+            <div className="overflow-y-auto p-4 xl:h-full">{right}</div>
           </section>
         </aside>
       </div>

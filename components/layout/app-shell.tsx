@@ -536,14 +536,14 @@ export function AppShell({
   const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
-    <section className="h-screen w-full overflow-hidden bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
-      <div className="flex h-full w-full items-stretch">
+    <section className="min-h-screen w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
+      <div className="flex min-h-[calc(100vh-1.5rem)] w-full items-stretch md:min-h-[calc(100vh-2.5rem)]">
         <div className="flex min-w-0 flex-1">
           <div
             className={cn(
-              "flex h-full min-h-0 min-w-0 flex-1 flex-col",
+              "flex min-h-[calc(100vh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100vh-2.5rem)]",
               isInboxRoute
-                ? "overflow-hidden"
+                ? "overflow-visible"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
             )}
           >
@@ -594,10 +594,10 @@ export function AppShell({
 
             <main
               className={cn(
-                "min-h-0 flex-1",
+                "flex-1",
                 isInboxRoute
-                  ? "overflow-hidden bg-transparent p-0"
-                  : "overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
+                  ? "overflow-visible bg-transparent p-0"
+                  : "overflow-visible bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
               )}
             >
               {children}

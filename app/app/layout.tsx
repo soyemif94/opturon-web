@@ -40,7 +40,7 @@ export default async function ClientPortalLayout({ children }: { children: React
       tenantRole={ctx.tenantRole}
       userId={ctx.userId}
     >
-      <div className="flex h-screen w-full overflow-hidden">
+      <div className="min-h-screen w-full">
         <AppShell
           tenantId={ctx.tenantId}
           tenantLabel={tenantLabel}
