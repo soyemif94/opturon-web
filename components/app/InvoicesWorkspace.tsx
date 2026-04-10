@@ -30,6 +30,10 @@ type InvoiceFilterState = {
   dateTo: string;
 };
 
+type InvoiceListMode = "main" | "archive";
+
+const PRIMARY_INVOICES_LIMIT = 20;
+
 const EMPTY_FILTERS: InvoiceFilterState = {
   search: "",
   receivableStatus: "all",
@@ -55,6 +59,7 @@ export function InvoicesWorkspace({
   const [invoices, setInvoices] = useState<PortalInvoice[]>(initialInvoices);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [listMode, setListMode] = useState<InvoiceListMode>("main");
 
   const contactOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -97,7 +102,9 @@ export function InvoicesWorkspace({
     });
   }, [filters, invoices]);
 
-  const allVisibleSelected = filteredInvoices.length > 0 && filteredInvoices.every((invoice) => selectedIds.includes(invoice.id));
+  const visibleInvoices = listMode === "main" ? filteredInvoices.slice(0, PRIMARY_INVOICES_LIMIT) : filteredInvoices;
+  const archivedInvoicesCount = Math.max(filteredInvoices.length - PRIMARY_INVOICES_LIMIT, 0);
+  const allVisibleSelected = visibleInvoices.length > 0 && visibleInvoices.every((invoice) => selectedIds.includes(invoice.id));
   const selectedCount = selectedIds.length;
 
   const exportHref = useMemo(() => {
@@ -118,7 +125,7 @@ export function InvoicesWorkspace({
   }
 
   function toggleSelectAllVisible() {
-    const visibleIds = filteredInvoices.map((invoice) => invoice.id);
+    const visibleIds = visibleInvoices.map((invoice) => invoice.id);
     setSelectedIds((current) => {
       if (visibleIds.every((id) => current.includes(id))) {
         return current.filter((id) => !visibleIds.includes(id));
@@ -199,7 +206,8 @@ export function InvoicesWorkspace({
         action={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Badge variant="warning">{NO_FISCAL_LEGEND}</Badge>
-            <Badge variant="muted">{filteredInvoices.length} visibles</Badge>
+            <Badge variant="muted">{visibleInvoices.length} visibles</Badge>
+            {listMode === "main" && archivedInvoicesCount > 0 ? <Badge variant="warning">{archivedInvoicesCount} en archivo</Badge> : null}
             <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto">
               <a href={exportHref}>
                 <Download className="mr-2 h-4 w-4" />
@@ -255,10 +263,18 @@ export function InvoicesWorkspace({
           <Input type="date" value={filters.dateTo} onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))} />
         </div>
 
-        <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={filters.incompleteOnly} onChange={(event) => setFilters((current) => ({ ...current, incompleteOnly: event.target.checked }))} />
-            Solo incompletos
+          <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="inline-flex rounded-2xl border border-[color:var(--border)] bg-bg/50 p-1 text-xs">
+              <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
+                Principal
+              </Button>
+              <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
+                Archivo
+              </Button>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <input type="checkbox" checked={filters.incompleteOnly} onChange={(event) => setFilters((current) => ({ ...current, incompleteOnly: event.target.checked }))} />
+              Solo incompletos
           </label>
           {!readOnly ? (
             <>
@@ -286,12 +302,18 @@ export function InvoicesWorkspace({
           ) : null}
         </div>
 
-        {!filteredInvoices.length ? (
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
+          {listMode === "main"
+            ? `Principal enfocada en los ultimos ${PRIMARY_INVOICES_LIMIT} comprobantes. Usa Archivo para consultar el resto con los mismos filtros, descargas y exportaciones.`
+            : "Archivo de comprobantes con filtros, exportacion y descarga de lotes sin sobrecargar la vista diaria."}
+        </div>
+
+        {!visibleInvoices.length ? (
           <EmptyState title="No hay comprobantes para este filtro" description="Prueba con otro estado contable, cliente, tipo de documento o flags de faltantes." />
         ) : (
           <>
             <div className="space-y-3 md:hidden">
-              {filteredInvoices.map((invoice) => (
+              {visibleInvoices.map((invoice) => (
                 <div key={invoice.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -342,7 +364,7 @@ export function InvoicesWorkspace({
                 <span>Fechas</span>
                 <span>Accion</span>
               </div>
-              {filteredInvoices.map((invoice) => (
+              {visibleInvoices.map((invoice) => (
                 <div key={invoice.id} className="grid grid-cols-[60px_160px_180px_minmax(260px,1.2fr)_150px_170px_180px_180px_220px] gap-5 border-b border-[color:var(--border)] px-5 py-4 transition-colors hover:bg-surface/35 last:border-b-0">
                   <div className="flex items-center">
                     {!readOnly ? <input type="checkbox" checked={selectedIds.includes(invoice.id)} onChange={() => toggleSelection(invoice.id)} /> : null}

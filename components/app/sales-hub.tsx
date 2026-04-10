@@ -1,9 +1,16 @@
-import { ArrowUpRight, CirclePercent, ClipboardList, HandCoins, MessageSquareText, TrendingUp } from "lucide-react";
+"use client";
+
+import { useMemo, useState } from "react";
+import { ArrowUpRight, CirclePercent, ClipboardList, HandCoins, MessageSquareText, Search, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import type { PortalSalesMetrics, PortalSalesOpportunity, PortalSalesSummary } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { formatMoney, formatDateTimeLabel, relativeDateLabel, titleCaseLabel } from "@/lib/billing";
+
+const PRIMARY_OPPORTUNITY_LIMIT = 20;
 
 type SalesHubProps = {
   summary: PortalSalesSummary;
@@ -11,7 +18,12 @@ type SalesHubProps = {
   opportunities: PortalSalesOpportunity[];
 };
 
+type SalesListMode = "main" | "archive";
+
 export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
+  const [listMode, setListMode] = useState<SalesListMode>("main");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const stats = [
     {
       label: "Ventas del dia",
@@ -44,6 +56,30 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
       icon: ArrowUpRight
     }
   ];
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredOpportunities = useMemo(() => {
+    if (!normalizedSearch) return opportunities;
+    return opportunities.filter((item) => {
+      const haystack = [
+        item.customer.name,
+        item.customer.phone,
+        item.contactId,
+        item.source,
+        item.responsible?.name,
+        item.commercialStage,
+        item.collectionStatusLabel
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, opportunities]);
+
+  const visibleOpportunities = listMode === "main" ? filteredOpportunities.slice(0, PRIMARY_OPPORTUNITY_LIMIT) : filteredOpportunities;
+  const archivedCount = Math.max(filteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0);
 
   return (
     <div className="space-y-6">
@@ -121,16 +157,57 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
       </section>
 
       <Card className="border-white/6 bg-card/90">
-        <CardHeader>
+        <CardHeader
+          action={
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <Badge variant="muted">{visibleOpportunities.length} visibles</Badge>
+              {listMode === "main" && archivedCount > 0 ? <Badge variant="warning">{archivedCount} en archivo</Badge> : null}
+            </div>
+          }
+        >
           <div>
             <CardTitle className="text-xl">Pipeline comercial activo</CardTitle>
-            <CardDescription>Vista operativa para seguir oportunidades, cierres logrados y cobros pendientes desde una sola mesa.</CardDescription>
+            <CardDescription>
+              La vista principal se enfoca en lo reciente. El resto queda en archivo con buscador para no convertir ventas en una lista infinita.
+            </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
-          {!opportunities.length ? (
+        <CardContent className="space-y-4 pt-0">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="inline-flex rounded-2xl border border-[color:var(--border)] bg-surface/60 p-1">
+              <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
+                Principal
+              </Button>
+              <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
+                Archivo
+              </Button>
+            </div>
+            <div className="relative w-full max-w-md">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <Input
+                className="pl-10"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Buscar por nombre, telefono, responsable u origen"
+              />
+            </div>
+          </div>
+
+          {listMode === "main" ? (
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
+              Mostrando hasta {PRIMARY_OPPORTUNITY_LIMIT} oportunidades recientes en principal. Usa archivo para consultar el historico sin sobrecargar la operacion diaria.
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
+              Archivo comercial buscable. Mantiene todo el historico visible sin ensuciar la mesa operativa principal.
+            </div>
+          )}
+
+          {!visibleOpportunities.length ? (
             <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-6 text-sm leading-7 text-muted">
-              Todavia no hay oportunidades visibles. Cuando el equipo empiece a registrar operaciones y cobrar ventas, este modulo va a mostrar ritmo comercial y seguimiento real.
+              {filteredOpportunities.length === 0 && normalizedSearch
+                ? "No encontramos oportunidades para esa busqueda."
+                : "Todavia no hay oportunidades visibles. Cuando el equipo empiece a registrar operaciones y cobrar ventas, este modulo va a mostrar ritmo comercial y seguimiento real."}
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
@@ -142,7 +219,7 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
                 <span>Origen</span>
                 <span>Seguimiento</span>
               </div>
-              {opportunities.map((item) => (
+              {visibleOpportunities.map((item) => (
                 <div key={item.id} className="border-b border-[color:var(--border)] px-4 py-4 last:border-b-0">
                   <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_170px_150px_170px_130px_150px] lg:items-center lg:gap-4">
                     <div className="min-w-0">

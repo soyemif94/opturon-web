@@ -90,6 +90,9 @@ const initialForm: OrderFormState = {
 };
 
 type OrdersViewMode = "all" | "pending_validation";
+type OrdersSurfaceMode = "main" | "archive";
+
+const PRIMARY_ORDERS_LIMIT = 20;
 
 type SellerInsight = {
   id: string;
@@ -120,6 +123,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     initialOrders.find((order) => order.id === initialOrderId) || initialOrders[0] || null
   );
   const [viewMode, setViewMode] = useState<OrdersViewMode>("all");
+  const [surfaceMode, setSurfaceMode] = useState<OrdersSurfaceMode>("main");
   const [searchQuery, setSearchQuery] = useState("");
   const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
   const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
@@ -192,15 +196,20 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     };
   }, [orders]);
 
-  const visibleOrders = useMemo(
-    () => (viewMode === "pending_validation" ? orders.filter((order) => isPendingTransferValidation(order)) : orders),
-    [orders, viewMode]
-  );
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredOrders = useMemo(() => {
-    if (!normalizedSearch) return visibleOrders;
+    const sourceOrders =
+      surfaceMode === "archive"
+        ? orders.filter((order) => !isOperationalOrder(order))
+        : viewMode === "pending_validation"
+          ? orders.filter((order) => isPendingTransferValidation(order))
+          : orders.filter((order) => isOperationalOrder(order));
 
-    return visibleOrders.filter((order) => {
+    if (!normalizedSearch) {
+      return surfaceMode === "main" ? sourceOrders.slice(0, PRIMARY_ORDERS_LIMIT) : sourceOrders;
+    }
+
+    const searched = sourceOrders.filter((order) => {
       const haystack = [
         order.id,
         order.customerName,
@@ -218,7 +227,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
 
       return haystack.includes(normalizedSearch);
     });
-  }, [normalizedSearch, visibleOrders]);
+    return surfaceMode === "main" ? searched.slice(0, PRIMARY_ORDERS_LIMIT) : searched;
+  }, [normalizedSearch, orders, surfaceMode, viewMode]);
+  const operationalOrdersCount = useMemo(() => orders.filter((order) => isOperationalOrder(order)).length, [orders]);
+  const archivedOrdersCount = Math.max(orders.length - operationalOrdersCount, 0);
   const selectedConversationHref = selectedOrder?.conversationPreview?.conversationId
     ? `/app/inbox/${selectedOrder.conversationPreview.conversationId}`
     : selectedOrder?.conversationId
@@ -487,7 +499,12 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     const nextOrders = Array.isArray(json?.orders) ? (json.orders as PortalOrder[]) : [];
     setOrders(nextOrders);
 
-    const preferredPool = viewMode === "pending_validation" ? nextOrders.filter((order) => isPendingTransferValidation(order)) : nextOrders;
+    const preferredPool =
+      surfaceMode === "archive"
+        ? nextOrders.filter((order) => !isOperationalOrder(order))
+        : viewMode === "pending_validation"
+          ? nextOrders.filter((order) => isPendingTransferValidation(order))
+          : nextOrders.filter((order) => isOperationalOrder(order));
     const preferredOrder =
       preferredPool.find((order) => order.id === preferredOrderId) ||
       preferredPool.find((order) => order.id === selectedOrder?.id) ||
@@ -515,7 +532,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     if (!selectedOrder || !isPendingTransferValidation(selectedOrder)) {
       setSelectedOrder(nextVisible[0]);
     }
-  }, [initialOrderId, orders, selectedOrder, viewMode]);
+  }, [initialOrderId, orders, selectedOrder, surfaceMode, viewMode]);
 
   useEffect(() => {
     if (!initialOrderId) return;
@@ -1104,43 +1121,71 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-        <div className="space-y-6">
+        <div className="order-2 space-y-6 xl:order-2">
           <Card className="border-white/6 bg-card/90">
             <CardHeader action={<Badge variant={readOnly ? "warning" : "success"}>{readOnly ? "Solo lectura" : "Operativo"}</Badge>}>
               <div>
-                <CardTitle className="text-xl">Pedidos activos</CardTitle>
-                <CardDescription>Consulta pedidos, revisa su estado y entra al detalle para prepararlos desde el panel.</CardDescription>
+                <CardTitle className="text-xl">{surfaceMode === "main" ? "Pedidos operativos" : "Archivo de pedidos"}</CardTitle>
+                <CardDescription>
+                  {surfaceMode === "main"
+                    ? "La vista principal se enfoca en pendientes, rechazos, inconvenientes y pedidos recientes que todavia requieren accion."
+                    : "El archivo conserva pedidos resueltos o historicos para consulta sin ensuciar la operacion diaria."}
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant={viewMode === "all" ? "primary" : "secondary"} onClick={() => setViewMode("all")}>
-                  Todos
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" variant={surfaceMode === "main" ? "primary" : "secondary"} onClick={() => setSurfaceMode("main")}>
+                  Principal
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={viewMode === "pending_validation" ? "primary" : "secondary"}
-                  onClick={() => setViewMode("pending_validation")}
-                >
-                  Pendientes de validacion
+                <Button type="button" size="sm" variant={surfaceMode === "archive" ? "primary" : "secondary"} onClick={() => setSurfaceMode("archive")}>
+                  Archivo
                 </Button>
+                <Badge variant="muted">{filteredOrders.length} visibles</Badge>
+                <Badge variant="outline">{archivedOrdersCount} historicos</Badge>
               </div>
+
+              {surfaceMode === "main" ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant={viewMode === "all" ? "primary" : "secondary"} onClick={() => setViewMode("all")}>
+                      Todos los operativos
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={viewMode === "pending_validation" ? "primary" : "secondary"}
+                      onClick={() => setViewMode("pending_validation")}
+                    >
+                      Pendientes de validacion
+                    </Button>
+                  </div>
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
+                    La principal muestra hasta {PRIMARY_ORDERS_LIMIT} pedidos operativos para mantener la operacion del dia rapida y limpia.
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
+                  El archivo mantiene el historico consultable. Puedes buscar por cliente, telefono o identificador del pedido.
+                </div>
+              )}
 
               <Input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Buscar por pedido, cliente o teléfono"
+                placeholder="Buscar por pedido, cliente o telefono"
                 aria-label="Buscar pedidos"
               />
 
               {filteredOrders.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                  {visibleOrders.length > 0 && normalizedSearch
-                    ? "No encontramos pedidos para esa búsqueda."
-                    : viewMode === "pending_validation"
-                      ? "No hay comprobantes pendientes de validacion manual en este momento."
-                      : "Todavia no hay pedidos cargados. Usa el formulario lateral para registrar el primero y dejar visible el flujo completo en el panel."}
+                  {normalizedSearch
+                    ? "No encontramos pedidos para esa busqueda."
+                    : surfaceMode === "archive"
+                      ? "No hay pedidos historicos para mostrar con este criterio."
+                      : viewMode === "pending_validation"
+                        ? "No hay comprobantes pendientes de validacion manual en este momento."
+                        : "No hay pedidos operativos pendientes ahora mismo. Usa Registrar pedido para cargar uno nuevo o revisa el Archivo para consultar historico."}
                 </div>
               ) : (
                 filteredOrders.map((order) => (
@@ -1201,7 +1246,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="order-1 space-y-6 xl:order-1">
           <Card className="border-white/6 bg-card/90">
             <CardHeader action={<Badge variant="muted">Alta desde catalogo</Badge>}>
               <div>
@@ -1855,6 +1900,11 @@ function labelForOrderSource(order: PortalOrder) {
   if (order.source === "inbox") return "Inbox";
   if (order.source === "api") return "API";
   return order.source || "Sin definir";
+}
+
+function isOperationalOrder(order: PortalOrder) {
+  if (isPendingTransferValidation(order)) return true;
+  return ["new", "pending_payment", "preparing", "ready"].includes(order.orderStatus);
 }
 
 function labelForPaymentDestinationType(type: string | null | undefined) {
