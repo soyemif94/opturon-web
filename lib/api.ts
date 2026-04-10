@@ -1900,12 +1900,15 @@ export async function openPortalCashSession(
     openingAmount: number;
     openedByUserId: string;
     notes?: string | null;
-  }
+  },
+  actorUserId?: string | null
 ) {
+  const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
   return backendPortalFetch<{ success: boolean; data: PortalCashSession }>(
     `/portal/tenants/${tenantId}/cash-sessions`,
     {
       method: "POST",
+      headers,
       body: JSON.stringify(payload)
     }
   );
@@ -1918,12 +1921,15 @@ export async function closePortalCashSession(
     countedAmount: number;
     closedByUserId: string;
     notes?: string | null;
-  }
+  },
+  actorUserId?: string | null
 ) {
+  const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
   return backendPortalFetch<{ success: boolean; data: PortalCashSession }>(
     `/portal/tenants/${tenantId}/cash-sessions/${sessionId}/close`,
     {
       method: "POST",
+      headers,
       body: JSON.stringify(payload)
     }
   );

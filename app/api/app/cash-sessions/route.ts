@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getBackendErrorBody,
   getBackendErrorStatus,
+  getPortalAuthUserByEmail,
   getPortalCashOverview,
   isBackendConfigured,
   openPortalCashSession
@@ -57,13 +58,22 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
     const tenantId = String(guard.ctx?.tenantId || "").trim();
-    const openedByUserId = String(guard.ctx?.userId || "").trim();
+    const actorEmail = String(guard.ctx?.session?.user?.email || "").trim().toLowerCase();
+    if (!actorEmail) {
+      return noStore(NextResponse.json({ error: "cash_open_actor_email_missing" }, { status: 401 }));
+    }
+    const actorLookup = await getPortalAuthUserByEmail(actorEmail);
+    const actorUser = actorLookup.data;
+    if (!actorUser || String(actorUser.tenantId || "").trim() !== tenantId) {
+      return noStore(NextResponse.json({ error: "cash_open_actor_not_allowed" }, { status: 403 }));
+    }
+    const openedByUserId = String(actorUser.id || "").trim();
     const result = await openPortalCashSession(tenantId, {
       paymentDestinationId: String(body?.paymentDestinationId || ""),
       openingAmount: Number(body?.openingAmount || 0),
       openedByUserId,
       notes: typeof body?.notes === "string" ? body.notes : null
-    });
+    }, openedByUserId);
 
     return noStore(NextResponse.json({ ok: true, session: result.data }, { status: 201 }));
   } catch (error) {
