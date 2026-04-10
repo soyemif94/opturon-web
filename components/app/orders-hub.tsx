@@ -127,8 +127,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [searchQuery, setSearchQuery] = useState("");
   const [metricsRange, setMetricsRange] = useState<PortalOrderPaymentMetricsRange>("last_7_days");
   const [paymentMetrics, setPaymentMetrics] = useState<PortalOrderPaymentMetrics>(defaultPaymentMetrics);
-  const [sellerMetrics, setSellerMetrics] = useState<PortalSellerMetrics>(defaultSellerMetrics);
-  const [selectedSellerMetricId, setSelectedSellerMetricId] = useState<string>("");
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
@@ -138,7 +136,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [contactsLoading, setContactsLoading] = useState(true);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(true);
-  const [sellerMetricsLoading, setSellerMetricsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
@@ -231,87 +228,28 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   }, [normalizedSearch, orders, surfaceMode, viewMode]);
   const operationalOrdersCount = useMemo(() => orders.filter((order) => isOperationalOrder(order)).length, [orders]);
   const archivedOrdersCount = Math.max(orders.length - operationalOrdersCount, 0);
+  const sellerMetrics: any = defaultSellerMetrics;
+  const sellerMetricsLoading = false;
+  const selectedSellerMetricId = "";
+  const setSelectedSellerMetricId = (_value: string) => {};
+  const topSellerUserId = "";
+  const maxSellerRevenue = 0;
+  const maxSellerPaidOrders = 0;
+  const selectedSellerMetric: any = {
+    sellerUserId: "",
+    sellerName: "",
+    sellerRole: "",
+    totalOrders: 0,
+    totalPaidOrders: 0,
+    totalRevenue: 0,
+    averageTicket: 0
+  };
+  const sellerInsights: SellerInsight[] = [];
   const selectedConversationHref = selectedOrder?.conversationPreview?.conversationId
     ? `/app/inbox/${selectedOrder.conversationPreview.conversationId}`
     : selectedOrder?.conversationId
       ? `/app/inbox/${selectedOrder.conversationId}`
       : null;
-  const topSellerUserId = sellerMetrics.sellerMetrics[0]?.sellerUserId || "";
-  const maxSellerRevenue = useMemo(
-    () => sellerMetrics.sellerMetrics.reduce((max, metric) => Math.max(max, Number(metric.totalRevenue || 0)), 0),
-    [sellerMetrics.sellerMetrics]
-  );
-  const maxSellerPaidOrders = useMemo(
-    () => sellerMetrics.sellerMetrics.reduce((max, metric) => Math.max(max, Number(metric.totalPaidOrders || 0)), 0),
-    [sellerMetrics.sellerMetrics]
-  );
-  const selectedSellerMetric = useMemo(
-    () => sellerMetrics.sellerMetrics.find((metric) => metric.sellerUserId === selectedSellerMetricId) || sellerMetrics.sellerMetrics[0] || null,
-    [selectedSellerMetricId, sellerMetrics.sellerMetrics]
-  );
-  const sellerInsights = useMemo(() => {
-    const metrics = sellerMetrics.sellerMetrics;
-    if (!metrics.length && sellerMetrics.ordersWithoutSeller <= 0) return [] as SellerInsight[];
-
-    const insights: SellerInsight[] = [];
-    const topSeller = metrics[0] || null;
-    const rankedByConversion = metrics
-      .filter((metric) => metric.totalOrders > 0)
-      .map((metric) => ({
-        ...metric,
-        conversionRate: metric.totalPaidOrders / metric.totalOrders
-      }))
-      .sort((left, right) => right.conversionRate - left.conversionRate || right.totalPaidOrders - left.totalPaidOrders);
-    const bestConversion = rankedByConversion[0] || null;
-    const lowConversionCandidate = rankedByConversion
-      .filter((metric) => metric.totalOrders >= 3 && metric.conversionRate < 0.5)
-      .sort((left, right) => left.conversionRate - right.conversionRate || right.totalOrders - left.totalOrders)[0] || null;
-    const topAverageTicket = metrics
-      .filter((metric) => metric.totalPaidOrders > 0)
-      .sort((left, right) => right.averageTicket - left.averageTicket || right.totalRevenue - left.totalRevenue)[0] || null;
-
-    if (sellerMetrics.ordersWithoutSeller > 0) {
-      insights.push({
-        id: "unassigned_orders",
-        tone: "alert",
-        message: `Tenes ${sellerMetrics.ordersWithoutSeller} pedidos sin vendedor asignado`
-      });
-    }
-
-    if (lowConversionCandidate) {
-      insights.push({
-        id: "low_conversion",
-        tone: "alert",
-        message: `${lowConversionCandidate.sellerName || "Este vendedor"} tiene margen de mejora en cierres`
-      });
-    }
-
-    if (bestConversion && bestConversion.totalPaidOrders > 0) {
-      insights.push({
-        id: "best_conversion",
-        tone: "positive",
-        message: `${bestConversion.sellerName || "Este vendedor"} convierte el ${Math.round(bestConversion.conversionRate * 100)}% de sus ventas`
-      });
-    }
-
-    if (topSeller && topSeller.totalRevenue > 0) {
-      insights.push({
-        id: "top_seller",
-        tone: "highlight",
-        message: `${topSeller.sellerName || "Este vendedor"} lidera en ventas`
-      });
-    }
-
-    if (topAverageTicket && (!topSeller || topAverageTicket.sellerUserId !== topSeller.sellerUserId)) {
-      insights.push({
-        id: "top_ticket",
-        tone: "positive",
-        message: `${topAverageTicket.sellerName || "Este vendedor"} tiene el ticket promedio mas alto`
-      });
-    }
-
-    return insights.slice(0, 5);
-  }, [sellerMetrics.ordersWithoutSeller, sellerMetrics.sellerMetrics]);
 
   async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
     setMetricsLoading(true);
@@ -330,29 +268,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       });
     } finally {
       setMetricsLoading(false);
-    }
-  }
-
-  async function loadSellerMetrics() {
-    setSellerMetricsLoading(true);
-    try {
-      const response = await fetch("/api/app/orders/seller-metrics", { cache: "no-store" });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(json?.details || json?.error || "No se pudieron cargar las metricas por vendedor.");
-      }
-
-      setSellerMetrics({
-        salesCriteria: {
-          countedOrderStatuses: String(json?.salesCriteria?.countedOrderStatuses || "status != cancelled"),
-          paidOrderCriteria: String(json?.salesCriteria?.paidOrderCriteria || "paymentStatus = paid")
-        },
-        sellerMetrics: Array.isArray(json?.sellerMetrics) ? json.sellerMetrics : [],
-        ordersWithoutSeller: Number(json?.ordersWithoutSeller || 0),
-        currency: typeof json?.currency === "string" && json.currency ? json.currency : "ARS"
-      });
-    } finally {
-      setSellerMetricsLoading(false);
     }
   }
 
@@ -467,21 +382,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   useEffect(() => {
     void loadPaymentMetrics(metricsRange);
   }, [metricsRange]);
-
-  useEffect(() => {
-    void loadSellerMetrics();
-  }, []);
-
-  useEffect(() => {
-    if (!sellerMetrics.sellerMetrics.length) {
-      if (selectedSellerMetricId) setSelectedSellerMetricId("");
-      return;
-    }
-
-    if (!selectedSellerMetricId || !sellerMetrics.sellerMetrics.some((metric) => metric.sellerUserId === selectedSellerMetricId)) {
-      setSelectedSellerMetricId(sellerMetrics.sellerMetrics[0]?.sellerUserId || "");
-    }
-  }, [selectedSellerMetricId, sellerMetrics.sellerMetrics]);
 
   useEffect(() => {
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
@@ -655,7 +555,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       } else if (createdOrder) {
         setSelectedOrder(createdOrder);
       }
-      await Promise.all([reloadProducts(form.productId), loadSellerMetrics()]);
+      await reloadProducts(form.productId);
       setForm((current) => ({
         ...initialForm,
         customerType: current.customerType,
@@ -697,8 +597,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       setSelectedOrder((current) => (current?.id === updatedOrder.id ? updatedOrder : current));
       setDetailPaymentDestinationId(updatedOrder.paymentDestinationId || "");
       await Promise.all([
-        reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined),
-        loadSellerMetrics()
+        reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined)
       ]);
       setFeedback({ tone: "success", text: "Estado del pedido actualizado." });
     } catch (error) {
@@ -770,7 +669,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder(updatedOrder);
       setDetailSellerUserId(updatedOrder.sellerUserId || "");
-      await loadSellerMetrics();
       setFeedback({ tone: "success", text: "Vendedor del pedido actualizado." });
     } catch (error) {
       setFeedback({
@@ -803,7 +701,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
 
       const updatedOrder = json.order as PortalOrder;
       const notificationOk = json.notification?.status === "sent" || json.notification?.ok === true;
-      await Promise.all([reloadOrders(updatedOrder.id), loadPaymentMetrics(metricsRange), loadSellerMetrics()]);
+      await Promise.all([reloadOrders(updatedOrder.id), loadPaymentMetrics(metricsRange)]);
       setSelectedOrder(updatedOrder);
       setPaymentRejectionReason(updatedOrder.transferPayment?.rejectionReason || "");
       setFeedback({
@@ -829,68 +727,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={ClipboardList} label="Pedidos registrados" value={String(stats.count)} helper="Pedidos internos visibles en el portal." />
-        <MetricCard icon={Receipt} label="Facturacion potencial" value={formatCurrency(stats.totalRevenue)} helper="Total bruto de los pedidos registrados." />
-        <MetricCard icon={ShoppingBag} label="Pendientes" value={String(stats.pending)} helper="Pedidos nuevos o esperando pago." />
-        <MetricCard
-          icon={Package}
-          label="Pagos por validar"
-          value={String(stats.pendingValidation)}
-          helper="Comprobantes de transferencia pendientes de revision manual."
-        />
-      </section>
-
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Metricas operativas de pagos</CardTitle>
-            <CardDescription>Conteos simples del flujo de validacion manual por transferencia.</CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant={metricsRange === "today" ? "primary" : "secondary"} onClick={() => setMetricsRange("today")}>
-              Hoy
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={metricsRange === "last_7_days" ? "primary" : "secondary"}
-              onClick={() => setMetricsRange("last_7_days")}
-            >
-              7 dias
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={metricsRange === "last_30_days" ? "primary" : "secondary"}
-              onClick={() => setMetricsRange("last_30_days")}
-            >
-              30 dias
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <MetricCard
-            icon={Package}
-            label="Pendientes"
-            value={metricsLoading ? "..." : String(paymentMetrics.pending)}
-            helper="Basado en proofSubmittedAt."
-          />
-          <MetricCard
-            icon={Receipt}
-            label="Aprobados"
-            value={metricsLoading ? "..." : String(paymentMetrics.approved)}
-            helper="Basado en validatedAt."
-          />
-          <MetricCard
-            icon={ShoppingBag}
-            label="Rechazados"
-            value={metricsLoading ? "..." : String(paymentMetrics.rejected)}
-            helper="Basado en validatedAt."
-          />
-        </CardContent>
-      </Card>
-
+      {false ? (
       <Card>
         <CardHeader>
           <div>
@@ -934,7 +771,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              {sellerMetrics.sellerMetrics.map((metric, index) => {
+              {sellerMetrics.sellerMetrics.map((metric: any, index: number) => {
                 const revenue = Number(metric.totalRevenue || 0);
                 const paidOrders = Number(metric.totalPaidOrders || 0);
                 const revenueRatio = maxSellerRevenue > 0 ? Math.max((revenue / maxSellerRevenue) * 100, revenue > 0 ? 8 : 0) : 0;
@@ -1001,7 +838,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                   <h3 className="mt-2 text-lg font-semibold text-foreground">{selectedSellerMetric.sellerName}</h3>
                   <p className="mt-1 text-sm text-muted">
                     {labelForSellerRole(selectedSellerMetric.sellerRole)} · ranking{" "}
-                    {sellerMetrics.sellerMetrics.findIndex((metric) => metric.sellerUserId === selectedSellerMetric.sellerUserId) + 1}
+                    {sellerMetrics.sellerMetrics.findIndex((metric: any) => metric.sellerUserId === selectedSellerMetric.sellerUserId) + 1}
                   </p>
                 </div>
                 {selectedSellerMetric.sellerUserId === topSellerUserId ? <Badge variant="success">Mejor facturacion actual</Badge> : null}
@@ -1102,6 +939,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
       {feedback ? (
         <div className="rounded-2xl border border-[color:var(--border)] bg-surface/70 px-4 py-3">
@@ -1725,6 +1563,68 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
           </Card>
         </div>
       </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon={ClipboardList} label="Pedidos registrados" value={String(stats.count)} helper="Pedidos internos visibles en el portal." />
+        <MetricCard icon={Receipt} label="Facturacion potencial" value={formatCurrency(stats.totalRevenue)} helper="Total bruto de los pedidos registrados." />
+        <MetricCard icon={ShoppingBag} label="Pendientes" value={String(stats.pending)} helper="Pedidos nuevos o esperando pago." />
+        <MetricCard
+          icon={Package}
+          label="Pagos por validar"
+          value={String(stats.pendingValidation)}
+          helper="Comprobantes de transferencia pendientes de revision manual."
+        />
+      </section>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Metricas operativas de pagos</CardTitle>
+            <CardDescription>Conteos simples del flujo de validacion manual por transferencia.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant={metricsRange === "today" ? "primary" : "secondary"} onClick={() => setMetricsRange("today")}>
+              Hoy
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={metricsRange === "last_7_days" ? "primary" : "secondary"}
+              onClick={() => setMetricsRange("last_7_days")}
+            >
+              7 dias
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={metricsRange === "last_30_days" ? "primary" : "secondary"}
+              onClick={() => setMetricsRange("last_30_days")}
+            >
+              30 dias
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            icon={Package}
+            label="Pendientes"
+            value={metricsLoading ? "..." : String(paymentMetrics.pending)}
+            helper="Basado en proofSubmittedAt."
+          />
+          <MetricCard
+            icon={Receipt}
+            label="Aprobados"
+            value={metricsLoading ? "..." : String(paymentMetrics.approved)}
+            helper="Basado en validatedAt."
+          />
+          <MetricCard
+            icon={ShoppingBag}
+            label="Rechazados"
+            value={metricsLoading ? "..." : String(paymentMetrics.rejected)}
+            helper="Basado en validatedAt."
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
