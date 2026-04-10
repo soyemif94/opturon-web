@@ -176,6 +176,163 @@ const navItems: Array<{
 
 const APP_THEME_STORAGE_KEY = "opturon-app-theme";
 
+function SidebarPanel({
+  pathname,
+  visibleNavItems,
+  tenantLabel,
+  buildMarker,
+  buildLabel,
+  sidebarChannelTone,
+  sidebarChannelStatusLabel,
+  sidebarWhatsAppState,
+  sidebarActionLabel,
+  showManageShortcut,
+  showUsersShortcut,
+  onNavigate,
+  onSignOut
+}: {
+  pathname: string;
+  visibleNavItems: typeof navItems;
+  tenantLabel?: string;
+  buildMarker?: string;
+  buildLabel: string;
+  sidebarChannelTone: string;
+  sidebarChannelStatusLabel: string;
+  sidebarWhatsAppState: string;
+  sidebarActionLabel: string;
+  showManageShortcut: boolean;
+  showUsersShortcut: boolean;
+  onNavigate?: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
+
+      <div className="relative min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="rounded-[24px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.94))] p-5">
+          <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
+            Portal cliente
+          </Badge>
+          <h2 className="mt-4 text-2xl font-semibold tracking-tight">Espacio de trabajo Opturon</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Conversaciones, agenda operativa y canal WhatsApp en una vista simple para el negocio.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
+            <Badge variant="success">Espacio activo</Badge>
+            {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
+          </div>
+          {buildLabel ? (
+            <p className="mt-3 font-mono text-[11px] font-medium tracking-[0.12em] text-muted" title={buildLabel}>
+              {buildLabel}
+            </p>
+          ) : null}
+        </div>
+
+        <nav className="mt-6 space-y-2">
+          {visibleNavItems.map((item) => {
+            const active = item.match(pathname);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  "group flex items-start gap-3 rounded-2xl border px-4 py-3 transition-all duration-200",
+                  active
+                    ? "border-brand/35 bg-brand/10 text-text shadow-[0_0_0_1px_rgba(192,80,0,0.12)]"
+                    : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/70 hover:text-text"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors",
+                    active
+                      ? "border-brand/30 bg-brand/15 text-brandBright"
+                      : "border-[color:var(--border)] bg-surface text-muted group-hover:text-text"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{item.label}</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-muted">{item.description}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="mt-6 rounded-[24px] border border-[color:var(--border)] bg-surface/75 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted">Canal principal</p>
+              <p className="mt-1 text-sm font-medium">Conecta tu WhatsApp en 2 minutos</p>
+            </div>
+            <Headset className="h-4 w-4 text-brandBright" />
+          </div>
+          <div className="mt-4 space-y-3 text-sm text-muted">
+            <div className="flex items-center justify-between">
+              <span>Estado del canal</span>
+              <span className={sidebarChannelTone}>{sidebarChannelStatusLabel}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Inbox</span>
+              <span className="text-text">Centralizado</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Bot</span>
+              <span className="text-text">Configurable</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Integraciones</span>
+              <span className={sidebarWhatsAppState === "connected" ? "text-emerald-300" : "text-amber-300"}>
+                {sidebarWhatsAppState === "connected" ? "WhatsApp listo" : "Configurar canal"}
+              </span>
+            </div>
+          </div>
+          {showManageShortcut ? (
+            <Link
+              href="/app/integrations"
+              onClick={onNavigate}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+            >
+              <PhoneCall className="h-4 w-4" />
+              {sidebarActionLabel}
+            </Link>
+          ) : null}
+          {!showManageShortcut && showUsersShortcut ? (
+            <Link
+              href="/app/users"
+              onClick={onNavigate}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+            >
+              <PhoneCall className="h-4 w-4" />
+              Gestionar usuarios
+            </Link>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm font-medium text-muted transition-colors hover:text-text"
+        >
+          <LogOut className="h-4 w-4" />
+          Cerrar sesion
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ThemeToggleButton() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -244,7 +401,7 @@ export function AppShell({
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const previousPathnameRef = useRef(pathname);
   const activePathnameRef = useRef(pathname);
   const opsLockSentRef = useRef(false);
@@ -287,6 +444,8 @@ export function AppShell({
     if (pathname.startsWith("/app/ops")) {
       opsLockSentRef.current = false;
     }
+
+    setSidebarOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -378,131 +537,7 @@ export function AppShell({
 
   return (
     <section className="h-screen w-full overflow-hidden bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
-      <div className="flex h-full w-full items-stretch gap-3 md:gap-5">
-        <aside className="hidden w-[304px] shrink-0 xl:block">
-          <div className="flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
-
-            <div className="relative min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="rounded-[24px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.94))] p-5">
-                <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
-                  Portal cliente
-                </Badge>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight">Espacio de trabajo Opturon</h2>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Conversaciones, agenda operativa y canal WhatsApp en una vista simple para el negocio.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
-                  <Badge variant="success">Espacio activo</Badge>
-                  {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
-                </div>
-                {buildLabel ? (
-                  <p className="mt-3 font-mono text-[11px] font-medium tracking-[0.12em] text-muted" title={buildLabel}>
-                    {buildLabel}
-                  </p>
-                ) : null}
-              </div>
-
-              <nav className="mt-6 space-y-2">
-                {visibleNavItems.map((item) => {
-                  const active = item.match(pathname);
-                  const Icon = item.icon;
-
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      className={cn(
-                        "group flex items-start gap-3 rounded-2xl border px-4 py-3 transition-all duration-200",
-                        active
-                          ? "border-brand/35 bg-brand/10 text-text shadow-[0_0_0_1px_rgba(192,80,0,0.12)]"
-                          : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/70 hover:text-text"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors",
-                          active
-                            ? "border-brand/30 bg-brand/15 text-brandBright"
-                            : "border-[color:var(--border)] bg-surface text-muted group-hover:text-text"
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="font-medium">{item.label}</span>
-                          <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" />
-                        </span>
-                        <span className="mt-1 block text-xs leading-5 text-muted">{item.description}</span>
-                      </span>
-                    </Link>
-                  );
-                })}
-              </nav>
-
-              <div className="mt-6 rounded-[24px] border border-[color:var(--border)] bg-surface/75 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted">Canal principal</p>
-                    <p className="mt-1 text-sm font-medium">Conecta tu WhatsApp en 2 minutos</p>
-                  </div>
-                  <Headset className="h-4 w-4 text-brandBright" />
-                </div>
-                <div className="mt-4 space-y-3 text-sm text-muted">
-                  <div className="flex items-center justify-between">
-                    <span>Estado del canal</span>
-                    <span className={sidebarChannelTone}>{sidebarChannelStatusLabel}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Inbox</span>
-                    <span className="text-text">Centralizado</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Bot</span>
-                    <span className="text-text">Configurable</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Integraciones</span>
-                    <span className={sidebarWhatsAppState === "connected" ? "text-emerald-300" : "text-amber-300"}>
-                      {sidebarWhatsAppState === "connected" ? "WhatsApp listo" : "Configurar canal"}
-                    </span>
-                  </div>
-                </div>
-                {showManageShortcut ? (
-                  <Link
-                    href="/app/integrations"
-                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
-                  >
-                    <PhoneCall className="h-4 w-4" />
-                    {sidebarActionLabel}
-                  </Link>
-                ) : null}
-                {!showManageShortcut && showUsersShortcut ? (
-                  <Link
-                    href="/app/users"
-                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
-                  >
-                    <PhoneCall className="h-4 w-4" />
-                    Gestionar usuarios
-                  </Link>
-                ) : null}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void signOut({ callbackUrl: "/login" })}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm font-medium text-muted transition-colors hover:text-text"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar sesion
-              </button>
-            </div>
-          </div>
-        </aside>
-
+      <div className="flex h-full w-full items-stretch">
         <div className="flex min-w-0 flex-1">
           <div
             className={cn(
@@ -513,36 +548,39 @@ export function AppShell({
             )}
           >
             <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
-              {topbar || (
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setMobileNavOpen(true)}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-card/70 text-muted transition-colors hover:text-text xl:hidden"
-                      aria-label="Abrir menu de navegacion"
-                    >
-                      <Menu className="h-4.5 w-4.5" />
-                    </button>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal del cliente</p>
-                      <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
-                        Gestiona conversaciones, automatizaciones y crecimiento
-                      </h1>
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-card/70 text-muted transition-colors hover:text-text"
+                  aria-label="Abrir menu de navegacion"
+                >
+                  <Menu className="h-4.5 w-4.5" />
+                </button>
+
+                <div className="min-w-0 flex-1">
+                  {topbar || (
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal del cliente</p>
+                        <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
+                          Gestiona conversaciones, automatizaciones y crecimiento
+                        </h1>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ThemeToggleButton />
+                        <Badge variant="muted">Espacio del cliente</Badge>
+                        <Badge variant="success">Portal activo</Badge>
+                        <Badge variant="outline" className="gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Operacion en vivo
+                        </Badge>
+                        {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ThemeToggleButton />
-                    <Badge variant="muted">Espacio del cliente</Badge>
-                    <Badge variant="success">Portal activo</Badge>
-                    <Badge variant="outline" className="gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Operacion en vivo
-                    </Badge>
-                    {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
             </header>
 
             {buildLabel ? (
@@ -568,76 +606,27 @@ export function AppShell({
         </div>
       </div>
 
-      <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <DialogContent className="left-0 top-0 h-screen max-w-[320px] translate-x-0 translate-y-0 rounded-none border-l-0 border-t-0 border-b-0 border-r border-[color:var(--border)] bg-card/98 p-0 shadow-[0_28px_80px_rgba(0,0,0,0.38)]">
-          <div className="flex h-full flex-col">
-            <DialogHeader className="border-b border-[color:var(--border)] px-5 py-4">
-              <DialogTitle>Menu del portal</DialogTitle>
-              <DialogDescription>Navega por todos los modulos del espacio desde telefono o tablet.</DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-y-auto px-4 py-4">
-              <div className="mb-4 rounded-[20px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.94))] p-4">
-                <p className="text-sm font-semibold">Espacio de trabajo Opturon</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
-                  <Badge variant="success">Portal activo</Badge>
-                  {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
-                </div>
-              </div>
-
-              <nav className="space-y-2">
-                {visibleNavItems.map((item) => {
-                  const active = item.match(pathname);
-                  const Icon = item.icon;
-
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      onClick={() => setMobileNavOpen(false)}
-                      className={cn(
-                        "group flex items-start gap-3 rounded-2xl border px-4 py-3 transition-all duration-200",
-                        active
-                          ? "border-brand/35 bg-brand/10 text-text shadow-[0_0_0_1px_rgba(192,80,0,0.12)]"
-                          : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/70 hover:text-text"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors",
-                          active
-                            ? "border-brand/30 bg-brand/15 text-brandBright"
-                            : "border-[color:var(--border)] bg-surface text-muted group-hover:text-text"
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="font-medium">{item.label}</span>
-                          <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" />
-                        </span>
-                        <span className="mt-1 block text-xs leading-5 text-muted">{item.description}</span>
-                      </span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-
-            <div className="border-t border-[color:var(--border)] px-4 py-4">
-              <button
-                type="button"
-                onClick={() => void signOut({ callbackUrl: "/login" })}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm font-medium text-muted transition-colors hover:text-text"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar sesion
-              </button>
-            </div>
-          </div>
+      <Dialog open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <DialogContent className="left-0 top-0 h-screen max-w-[340px] translate-x-0 translate-y-0 rounded-none border-l-0 border-t-0 border-b-0 border-r border-[color:var(--border)] bg-transparent p-3 shadow-none sm:max-w-[360px] md:p-5">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Menu del portal</DialogTitle>
+            <DialogDescription>Navega por todos los modulos del espacio de trabajo.</DialogDescription>
+          </DialogHeader>
+          <SidebarPanel
+            pathname={pathname}
+            visibleNavItems={visibleNavItems}
+            tenantLabel={tenantLabel}
+            buildMarker={buildMarker}
+            buildLabel={buildLabel}
+            sidebarChannelTone={sidebarChannelTone}
+            sidebarChannelStatusLabel={sidebarChannelStatusLabel}
+            sidebarWhatsAppState={sidebarWhatsAppState}
+            sidebarActionLabel={sidebarActionLabel}
+            showManageShortcut={showManageShortcut}
+            showUsersShortcut={showUsersShortcut}
+            onNavigate={() => setSidebarOpen(false)}
+            onSignOut={() => void signOut({ callbackUrl: "/login" })}
+          />
         </DialogContent>
       </Dialog>
     </section>
