@@ -1221,7 +1221,10 @@ export type PortalCashSession = {
   closedByUserId: string | null;
   closedByNameSnapshot: string | null;
   closedAt: string | null;
+  cashCountedAmount: number | null;
+  transferCountedAmount: number | null;
   countedAmount: number | null;
+  totalCountedAmount: number | null;
   expectedAmount: number | null;
   differenceAmount: number | null;
   notes: string | null;
@@ -1918,6 +1921,9 @@ export async function closePortalCashSession(
   tenantId: string,
   sessionId: string,
   payload: {
+    cashCountedAmount?: number | null;
+    transferCountedAmount?: number | null;
+    totalCountedAmount?: number | null;
     countedAmount: number;
     closedByUserId: string;
     notes?: string | null;

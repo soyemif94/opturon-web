@@ -37,6 +37,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     }
     const closedByUserId = String(actorUser.id || "").trim();
     const result = await closePortalCashSession(tenantId, id, {
+      cashCountedAmount: Number(body?.cashCountedAmount || 0),
+      transferCountedAmount: Number(body?.transferCountedAmount || 0),
+      totalCountedAmount: Number(body?.totalCountedAmount || body?.countedAmount || 0),
       countedAmount: Number(body?.countedAmount || 0),
       closedByUserId,
       notes: typeof body?.notes === "string" ? body.notes : null

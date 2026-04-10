@@ -25,7 +25,7 @@ export default async function AppCashPage() {
   return (
     <ClientPageShell
       title="Caja"
-      description="Abre cajas, controla el esperado durante el turno y cierra con diferencia visible sin salir del portal."
+      description="Abre sesiones de caja, controla el esperado durante el turno y cierra cada sesion con diferencia visible."
       badge="Operacion de caja"
     >
       <CashHub

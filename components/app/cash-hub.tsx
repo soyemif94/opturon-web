@@ -25,7 +25,14 @@ type OpenFormState = {
   notes: string;
 };
 
-type CloseFormState = Record<string, { countedAmount: string; notes: string }>;
+type CloseFormState = Record<
+  string,
+  {
+    cashAmount: string;
+    transferAmount: string;
+    notes: string;
+  }
+>;
 
 const EMPTY_OPEN_FORM: OpenFormState = {
   paymentDestinationId: "",
@@ -60,6 +67,20 @@ function differenceVariant(value: number | null | undefined) {
   const numeric = Number(value || 0);
   if (numeric === 0) return "success" as const;
   return numeric > 0 ? "warning" as const : "danger" as const;
+}
+
+function getCloseFormTotals(form?: { cashAmount: string; transferAmount: string; notes: string }) {
+  const cashAmount = Number(form?.cashAmount || 0);
+  const transferAmount = Number(form?.transferAmount || 0);
+  return {
+    cashAmount,
+    transferAmount,
+    countedAmount: cashAmount + transferAmount
+  };
+}
+
+function formatCountedBreakdown(value: number | null | undefined) {
+  return value === null || value === undefined ? "No registrado" : formatCurrency(value);
 }
 
 export function CashHub({
@@ -109,7 +130,7 @@ export function CashHub({
   async function openCashSession() {
     const openingAmount = Number(openForm.openingAmount || 0);
     if (!openForm.paymentDestinationId) {
-      toast.error("Selecciona una caja", "Elige una caja activa para abrir el turno.");
+      toast.error("Selecciona una caja", "Elige una caja disponible para abrir la sesion.");
       return;
     }
     if (!Number.isFinite(openingAmount) || openingAmount < 0) {
@@ -130,7 +151,7 @@ export function CashHub({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo abrir la caja."));
+        throw new Error(String(json?.error || "No se pudo abrir la sesion de caja."));
       }
 
       await refreshCashOverview();
@@ -138,21 +159,28 @@ export function CashHub({
         ...EMPTY_OPEN_FORM,
         paymentDestinationId: ""
       });
-      toast.success("Caja abierta");
+      toast.success("Sesion abierta");
     } catch (error) {
-      toast.error("No se pudo abrir la caja", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo abrir la sesion", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
   }
 
   async function closeCashSession(sessionId: string) {
-    const form = closeForms[sessionId] || { countedAmount: "", notes: "" };
-    const countedAmount = Number(form.countedAmount || 0);
-    if (!Number.isFinite(countedAmount) || countedAmount < 0) {
-      toast.error("Monto contado invalido", "Indica un monto contado valido.");
+    const form = closeForms[sessionId] || { cashAmount: "", transferAmount: "", notes: "" };
+    const { cashAmount, transferAmount, countedAmount } = getCloseFormTotals(form);
+    if (!Number.isFinite(cashAmount) || cashAmount < 0 || !Number.isFinite(transferAmount) || transferAmount < 0) {
+      toast.error("Cierre invalido", "Indica montos validos para efectivo y transferencias.");
       return;
     }
+
+    const notes = [
+      form.notes.trim() || null,
+      transferAmount > 0 ? `Transferencias declaradas: ${formatCurrency(transferAmount)}` : null
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     setBusyAction(sessionId);
     try {
@@ -160,13 +188,16 @@ export function CashHub({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          cashCountedAmount: cashAmount,
+          transferCountedAmount: transferAmount,
+          totalCountedAmount: countedAmount,
           countedAmount,
-          notes: form.notes.trim() || null
+          notes: notes || null
         })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo cerrar la caja."));
+        throw new Error(String(json?.error || "No se pudo cerrar la sesion."));
       }
 
       await refreshCashOverview();
@@ -175,9 +206,9 @@ export function CashHub({
         delete next[sessionId];
         return next;
       });
-      toast.success("Caja cerrada");
+      toast.success("Sesion cerrada");
     } catch (error) {
-      toast.error("No se pudo cerrar la caja", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo cerrar la sesion", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setBusyAction(null);
     }
@@ -191,9 +222,9 @@ export function CashHub({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Store} label="Cajas activas" value={String(activeCashBoxes.length)} helper="Destinos tipo caja disponibles." />
+        <MetricCard icon={Store} label="Cajas activas" value={String(activeCashBoxes.length)} helper="Cajas fisicas habilitadas para operar." />
         <MetricCard icon={UnlockKeyhole} label="Sesiones abiertas" value={String(openSessions.length)} helper="Turnos de caja en curso." />
-        <MetricCard icon={Wallet} label="Esperado en cajas" value={formatCurrency(totalExpectedOpen)} helper="Monto esperado actual en sesiones abiertas." />
+        <MetricCard icon={Wallet} label="Esperado en sesion" value={formatCurrency(totalExpectedOpen)} helper="Suma esperada de todas las sesiones abiertas." />
         <MetricCard icon={LockKeyhole} label="Sesiones cerradas" value={String(recentClosedSessions.length)} helper="Ultimos cierres visibles en el historial." />
       </section>
 
@@ -212,15 +243,15 @@ export function CashHub({
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="warning">Apertura</Badge>}>
             <div>
-              <CardTitle className="text-xl">Abrir caja</CardTitle>
-              <CardDescription>Solo se pueden abrir cajas activas sin una sesion en curso.</CardDescription>
+              <CardTitle className="text-xl">Abrir sesion de caja</CardTitle>
+              <CardDescription>Elige una caja disponible, define monto inicial y abre el turno operativo.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
             {!availableCashBoxes.length ? (
               <EmptyState
                 title="No hay cajas disponibles para abrir"
-                description="Crea una caja activa o cierra una sesion abierta para volver a iniciar un turno."
+                description="Todas las cajas activas ya tienen una sesion abierta o estan inactivas."
               />
             ) : (
               <>
@@ -251,7 +282,7 @@ export function CashHub({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nota opcional</label>
+                  <label className="text-sm font-medium">Observaciones</label>
                   <Textarea
                     className="min-h-[104px]"
                     value={openForm.notes}
@@ -262,7 +293,7 @@ export function CashHub({
                 </div>
                 <Button onClick={() => void openCashSession()} disabled={readOnly || busyAction !== null}>
                   {busyAction === "open" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UnlockKeyhole className="mr-2 h-4 w-4" />}
-                  Abrir caja
+                  Abrir sesion
                 </Button>
               </>
             )}
@@ -273,7 +304,7 @@ export function CashHub({
           <CardHeader action={<Badge variant="muted">{cashBoxes.length} cajas</Badge>}>
             <div>
               <CardTitle className="text-xl">Estado de cajas</CardTitle>
-              <CardDescription>Lectura rapida de cajas disponibles, abiertas o sin sesion operativa.</CardDescription>
+              <CardDescription>Las cajas fisicas pueden estar disponibles, con sesion abierta o inactivas.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -291,11 +322,15 @@ export function CashHub({
                   <div>
                     <p className="font-medium">{box.name}</p>
                     <p className="text-sm text-muted">
-                      {box.isActive ? "Activa" : "Inactiva"} · {box.currentSession ? "Sesion abierta" : "Sin sesion"}
+                      {box.currentSession
+                        ? `Sesion abierta desde ${formatDate(box.currentSession.openedAt)}`
+                        : box.isActive
+                          ? "Disponible"
+                          : "Inactiva"}
                     </p>
                   </div>
                   <Badge variant={box.currentSession ? "success" : box.isActive ? "muted" : "warning"}>
-                    {box.currentSession ? "Abierta" : box.isActive ? "Disponible" : "Inactiva"}
+                    {box.currentSession ? "Sesion abierta" : box.isActive ? "Disponible" : "Inactiva"}
                   </Badge>
                 </div>
               ))
@@ -308,33 +343,38 @@ export function CashHub({
         <CardHeader action={<Badge variant="success">{openSessions.length} abiertas</Badge>}>
           <div>
             <CardTitle className="text-xl">Sesiones abiertas</CardTitle>
-            <CardDescription>Durante el turno se calcula esperado actual como monto inicial + pedidos pagados imputados a esa caja.</CardDescription>
+            <CardDescription>Cada sesion abierta muestra apertura, esperado actual y cierre del turno.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           {!openSessions.length ? (
             <EmptyState
               title="No hay sesiones abiertas"
-              description="Abre una caja para empezar a controlar esperado, ventas imputadas y cierre."
+              description="Abre una sesion para empezar a operar y luego cerrarla con diferencia visible."
             />
           ) : (
             openSessions.map((session) => {
-              const closeForm = closeForms[session.id] || { countedAmount: "", notes: "" };
+              const closeForm = closeForms[session.id] || { cashAmount: "", transferAmount: "", notes: "" };
+              const { countedAmount } = getCloseFormTotals(closeForm);
+              const expectedAmount = Number(session.metrics?.expectedAmountCurrent || 0);
+              const closeDifference = countedAmount - expectedAmount;
+
               return (
                 <div key={session.id} className="rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-lg font-semibold">{session.paymentDestination?.name || "Caja"}</p>
-                        <Badge variant="success">Abierta</Badge>
+                        <Badge variant="success">Sesion abierta</Badge>
                       </div>
                       <p className="mt-2 text-sm text-muted">
-                        Abierta por {session.openedByNameSnapshot || "Equipo"} · {formatDate(session.openedAt)}
+                        Apertura: {formatDate(session.openedAt)} · Monto inicial: {formatCurrency(session.openingAmount)}
                       </p>
+                      <p className="mt-1 text-sm text-muted">Responsable: {session.openedByNameSnapshot || "Equipo"}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-muted">Esperado actual</p>
-                      <p className="text-xl font-semibold">{formatCurrency(session.metrics?.expectedAmountCurrent)}</p>
+                      <p className="text-sm text-muted">Total esperado del turno</p>
+                      <p className="text-xl font-semibold">{formatCurrency(expectedAmount)}</p>
                     </div>
                   </div>
 
@@ -342,12 +382,12 @@ export function CashHub({
                     <DetailStat label="Monto inicial" value={formatCurrency(session.openingAmount)} />
                     <DetailStat label="Ventas imputadas" value={formatCurrency(session.metrics?.salesAmount)} />
                     <DetailStat label="Pedidos contados" value={String(session.metrics?.ordersCount || 0)} />
-                    <DetailStat label="Esperado" value={formatCurrency(session.metrics?.expectedAmountCurrent)} />
+                    <DetailStat label="Esperado" value={formatCurrency(expectedAmount)} />
                   </div>
 
                   {session.metrics?.recentOrders?.length ? (
                     <div className="mt-4 rounded-[22px] border border-[color:var(--border)] bg-card/80 p-4">
-                      <p className="text-sm font-semibold">Ventas que estan contando</p>
+                      <p className="text-sm font-semibold">Movimientos imputados a esta sesion</p>
                       <div className="mt-3 space-y-3">
                         {session.metrics.recentOrders.map((order) => (
                           <div key={order.id} className="flex items-start justify-between gap-3 text-sm">
@@ -363,51 +403,91 @@ export function CashHub({
                       </div>
                     </div>
                   ) : (
-                    <p className="mt-4 text-sm text-muted">Todavia no hay pedidos pagados imputados a esta caja dentro de la sesion.</p>
+                    <p className="mt-4 text-sm text-muted">Todavia no hay pedidos pagados imputados a esta sesion.</p>
                   )}
 
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Monto contado</label>
-                      <Input
-                        value={closeForm.countedAmount}
-                        onChange={(event) =>
-                          setCloseForms((current) => ({
-                            ...current,
-                            [session.id]: {
-                              countedAmount: event.target.value,
-                              notes: current[session.id]?.notes || ""
-                            }
-                          }))
-                        }
-                        inputMode="decimal"
-                        placeholder="0"
-                        disabled={readOnly || busyAction !== null}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Nota de cierre</label>
-                      <Textarea
-                        className="min-h-[92px]"
-                        value={closeForm.notes}
-                        onChange={(event) =>
-                          setCloseForms((current) => ({
-                            ...current,
-                            [session.id]: {
-                              countedAmount: current[session.id]?.countedAmount || "",
-                              notes: event.target.value
-                            }
-                          }))
-                        }
-                        placeholder="Diferencia encontrada, retiro, observaciones."
-                        disabled={readOnly || busyAction !== null}
-                      />
-                    </div>
-                    <div className="flex items-end">
+                  <div className="mt-4 rounded-[22px] border border-[color:var(--border)] bg-card/70 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">Cerrar sesion</p>
+                        <p className="text-sm text-muted">Carga lo contado del turno y guarda la diferencia del cierre.</p>
+                      </div>
                       <Button onClick={() => void closeCashSession(session.id)} disabled={readOnly || busyAction !== null}>
                         {busyAction === session.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
-                        Cerrar caja
+                        Cerrar sesion
                       </Button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <DetailStat label="Esperado" value={formatCurrency(expectedAmount)} />
+                      <DetailStat label="Contado total" value={formatCurrency(countedAmount)} />
+                      <div className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Diferencia</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Badge variant={differenceVariant(closeDifference)}>{formatDifference(closeDifference)}</Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,200px)_minmax(0,200px)_minmax(0,1fr)]">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Efectivo contado</label>
+                        <Input
+                          value={closeForm.cashAmount}
+                          onChange={(event) =>
+                            setCloseForms((current) => ({
+                              ...current,
+                              [session.id]: {
+                                cashAmount: event.target.value,
+                                transferAmount: current[session.id]?.transferAmount || "",
+                                notes: current[session.id]?.notes || ""
+                              }
+                            }))
+                          }
+                          inputMode="decimal"
+                          placeholder="0"
+                          disabled={readOnly || busyAction !== null}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Transferencias</label>
+                        <Input
+                          value={closeForm.transferAmount}
+                          onChange={(event) =>
+                            setCloseForms((current) => ({
+                              ...current,
+                              [session.id]: {
+                                cashAmount: current[session.id]?.cashAmount || "",
+                                transferAmount: event.target.value,
+                                notes: current[session.id]?.notes || ""
+                              }
+                            }))
+                          }
+                          inputMode="decimal"
+                          placeholder="0"
+                          disabled={readOnly || busyAction !== null}
+                        />
+                        <p className="text-xs text-muted">Se suma al total contado y queda asentado en observaciones.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Observaciones</label>
+                        <Textarea
+                          className="min-h-[92px]"
+                          value={closeForm.notes}
+                          onChange={(event) =>
+                            setCloseForms((current) => ({
+                              ...current,
+                              [session.id]: {
+                                cashAmount: current[session.id]?.cashAmount || "",
+                                transferAmount: current[session.id]?.transferAmount || "",
+                                notes: event.target.value
+                              }
+                            }))
+                          }
+                          placeholder="Diferencia encontrada, retiro, observaciones."
+                          disabled={readOnly || busyAction !== null}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -421,20 +501,20 @@ export function CashHub({
         <CardHeader action={<Badge variant="muted">{recentClosedSessions.length} sesiones</Badge>}>
           <div>
             <CardTitle className="text-xl">Historico de cierres</CardTitle>
-            <CardDescription>Ultimas sesiones cerradas con esperado, contado y diferencia de caja.</CardDescription>
+            <CardDescription>Ultimas sesiones cerradas con esperado, contado y diferencia del turno.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
           {!recentClosedSessions.length ? (
             <EmptyState
               title="Todavia no hay cierres"
-              description="Cuando cierres una caja, el historico va a quedar visible aca."
+              description="Cuando cierres una sesion, el resumen del turno va a quedar visible aca."
             />
           ) : (
             recentClosedSessions.map((session) => (
               <div
                 key={session.id}
-                className="grid gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4 lg:grid-cols-[minmax(0,1fr)_150px_150px_150px]"
+                className="grid gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4 lg:grid-cols-[minmax(0,1fr)_140px_140px_150px_150px_150px]"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -448,8 +528,10 @@ export function CashHub({
                     Abierta por {session.openedByNameSnapshot || "Equipo"} · Cerrada por {session.closedByNameSnapshot || "Equipo"}
                   </p>
                 </div>
+                <DetailStat label="Efectivo" value={formatCountedBreakdown(session.cashCountedAmount)} />
+                <DetailStat label="Transferencias" value={formatCountedBreakdown(session.transferCountedAmount)} />
+                <DetailStat label="Total contado" value={formatCurrency(session.totalCountedAmount ?? session.countedAmount)} />
                 <DetailStat label="Esperado" value={formatCurrency(session.expectedAmount)} />
-                <DetailStat label="Contado" value={formatCurrency(session.countedAmount)} />
                 <div className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-4">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Diferencia</p>
                   <div className="mt-2 flex items-center gap-2">
