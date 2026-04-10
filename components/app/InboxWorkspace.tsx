@@ -1292,6 +1292,7 @@ export function InboxWorkspace({
               onAssignToChange={setAssignTo}
               sellerOptions={sellerOptions}
               assigningSeller={assigningSeller}
+              onTakeConversation={() => void takeConversation()}
               leadStatus={detail?.conversation?.leadStatus || "NEW"}
               leadStatusBusy={leadStatusBusy}
               onLeadStatusChange={(value) => {
@@ -1320,6 +1321,8 @@ export function InboxWorkspace({
               onToggleBot={() => void runAction("toggle_bot")}
               onMarkHot={() => void runAction("mark_hot")}
               onClose={() => void runAction("close")}
+              onBotFlowLockChange={(value) => void changeBotFlowLock(value)}
+              onBotDomainOverrideChange={(value) => void changeBotDomainOverride(value)}
               noteText={noteText}
               onNoteTextChange={setNoteText}
               onAddNote={() => void addNote()}

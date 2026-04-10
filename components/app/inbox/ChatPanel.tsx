@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Hand, PauseCircle, PhoneCall, Sparkles, UserRound } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
 import { InboxBadge } from "@/components/app/inbox/Badge";
@@ -18,24 +18,6 @@ function statusLabel(detail: DetailPayload) {
   if (detail.conversation.status === "closed") return "resuelta";
   if (detail.conversation.unreadCount > 0) return "esperando respuesta";
   return "activa";
-}
-
-function responseMode(detail: DetailPayload) {
-  if (detail.conversation.assignedTo) return "humano";
-  if (!detail.conversation.botEnabled) return "derivada";
-  return "bot";
-}
-
-function botDomainLabel(value?: BotDomainOverride) {
-  if (value === "agenda") return "Agenda";
-  if (value === "commerce") return "Ventas";
-  return "Automatico";
-}
-
-function botFlowLockLabel(value?: BotFlowLock) {
-  if (value === "agenda") return "Agenda";
-  if (value === "commerce") return "Ventas";
-  return "Automatico";
 }
 
 type ChatPanelProps = {
@@ -68,12 +50,7 @@ export function ChatPanel({
   suggestions,
   onSelectSuggestion,
   autoSuggestions,
-  onRegenerateAutoSuggestions,
-  onToggleBot,
-  onTakeConversation,
-  onArchive,
-  onBotFlowLockChange,
-  onBotDomainOverrideChange
+  onRegenerateAutoSuggestions
 }: ChatPanelProps) {
   const COLLAPSED_TIMELINE_ITEMS = 12;
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -120,102 +97,37 @@ export function ChatPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="sticky top-0 z-10 shrink-0 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/92 px-4 py-4 backdrop-blur">
         {detail ? (
-          <div className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="truncate text-lg font-semibold">{detail.contact?.name || "Conversacion"}</h2>
-                  <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
-                </div>
-                <p className="mt-0.5 text-xs text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <InboxBadge>
-                  {responseMode(detail) === "bot" ? <Bot className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
-                  {responseMode(detail)}
-                </InboxBadge>
-                <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
-                {detail.conversation.priority === "hot" ? <InboxBadge className="text-brandBright">prospecto caliente</InboxBadge> : null}
-                {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
-              </div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">{detail.contact?.name || "Conversacion"}</h2>
+              <p className="mt-0.5 text-xs text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <label className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
-                <span>{`Flujo: ${botFlowLockLabel(detail.conversation.botFlowLock)}`}</span>
-                <select
-                  value={detail.conversation.botFlowLock || "automatic"}
-                  onChange={(event) => onBotFlowLockChange(event.target.value as BotFlowLock)}
-                  disabled={readOnly}
-                  className="rounded-full border border-[color:var(--border)] bg-surface px-2 py-1 text-[11px] text-text outline-none disabled:opacity-40"
-                >
-                  <option value="automatic">Automatico</option>
-                  <option value="agenda">Agenda</option>
-                  <option value="commerce">Ventas</option>
-                </select>
-              </label>
-              <label className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
-                <span>{`Modo bot: ${botDomainLabel(detail.conversation.botDomainOverride)}`}</span>
-                <select
-                  value={detail.conversation.botDomainOverride || "automatic"}
-                  onChange={(event) => onBotDomainOverrideChange(event.target.value as BotDomainOverride)}
-                  disabled={readOnly}
-                  className="rounded-full border border-[color:var(--border)] bg-surface px-2 py-1 text-[11px] text-text outline-none disabled:opacity-40"
-                >
-                  <option value="automatic">Automatico</option>
-                  <option value="agenda">Agenda</option>
-                  <option value="commerce">Ventas</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={onToggleBot}
-                disabled={readOnly}
-                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text disabled:opacity-40"
-              >
-                <PauseCircle className="h-3.5 w-3.5" />
-                {detail.conversation.botEnabled ? "Pausar bot" : "Reactivar bot"}
-              </button>
-              <button
-                type="button"
-                onClick={onTakeConversation}
-                disabled={readOnly}
-                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text disabled:opacity-40"
-              >
-                <Hand className="h-3.5 w-3.5" />
-                Tomar conversacion
-              </button>
-              <button
-                type="button"
-                onClick={onArchive}
-                disabled={readOnly}
-                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text disabled:opacity-40"
-              >
-                <PhoneCall className="h-3.5 w-3.5" />
-                Archivar
-              </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
+              <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
+              {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
             </div>
           </div>
         ) : (
-          <h2 className="text-lg font-semibold">Inbox cliente</h2>
+          <h2 className="text-lg font-semibold">Inbox</h2>
         )}
       </header>
 
       <div
         ref={scrollViewportRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_24%)] p-3"
+        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.06),transparent_24%)] px-4 py-5"
       >
         {loading && !detail ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
                 key={`message-loading-${idx}`}
-                className={`max-w-[70%] rounded-2xl px-3 py-2.5 ${idx % 2 === 0 ? "border border-[color:var(--border)] bg-card" : "ml-auto bg-muted"}`}
+                className={`max-w-[70%] rounded-2xl px-4 py-3 ${idx % 2 === 0 ? "border border-[color:var(--border)] bg-card" : "ml-auto bg-muted"}`}
               >
                 <div className="h-3 w-32 animate-pulse rounded bg-surface" />
-                <div className="mt-1.5 h-3 w-20 animate-pulse rounded bg-surface" />
+                <div className="mt-2 h-3 w-20 animate-pulse rounded bg-surface" />
               </div>
             ))}
           </div>
@@ -225,23 +137,18 @@ export function ChatPanel({
           <div className="flex h-full min-h-[340px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[color:var(--border)] bg-card/40 text-center">
             <MessageSquareEmpty />
             <p className="mt-3 text-base font-semibold">Selecciona una conversacion</p>
-            <p className="mt-1 max-w-sm text-xs leading-6 text-muted">Abre una fila de la izquierda para ver el hilo, responder y gestionar el contacto.</p>
+            <p className="mt-1 max-w-sm text-xs leading-6 text-muted">Abre una fila de la izquierda para leer el hilo, responder y seguir el contacto.</p>
           </div>
         ) : null}
 
         {detail ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {loading ? (
               <div className="rounded-[18px] border border-[color:var(--border)] bg-card/55 px-3 py-2 text-[11px] text-muted">
                 Actualizando conversacion...
               </div>
             ) : null}
-            <div className="rounded-[20px] border border-[color:var(--border)] bg-card/60 px-3 py-2">
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-                <Sparkles className="h-3.5 w-3.5 text-brandBright" />
-                <span>Acciones rapidas disponibles para responder, pausar el bot o derivar la conversacion.</span>
-              </div>
-            </div>
+
             {hasCollapsibleHistory ? (
               <div className="rounded-[18px] border border-[color:var(--border)] bg-card/45 px-3 py-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -260,6 +167,7 @@ export function ChatPanel({
                 </div>
               </div>
             ) : null}
+
             {visibleTimeline.map((item) =>
               item.kind === "message" ? (
                 <MessageBubble
@@ -279,7 +187,7 @@ export function ChatPanel({
       </div>
 
       {detail ? (
-        <div className="shrink-0 space-y-1.5 px-2.5 pb-2.5">
+        <div className="shrink-0 space-y-2 border-t border-[color:var(--border)] bg-surface/88 px-3 pb-3 pt-2">
           <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />
           <Composer
             value={composer}

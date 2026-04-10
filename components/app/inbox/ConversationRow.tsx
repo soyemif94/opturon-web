@@ -1,8 +1,8 @@
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { getConversationPriority } from "@/components/app/inbox/conversation-priority";
-import { cn } from "@/lib/cn";
-import type { ConversationRowData } from "@/components/app/inbox/types";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
+import type { ConversationRowData } from "@/components/app/inbox/types";
+import { cn } from "@/lib/cn";
 
 function formatAgo(iso: string) {
   const date = new Date(iso).getTime();
@@ -15,19 +15,6 @@ function formatAgo(iso: string) {
   if (hours < 24) return `hace ${hours}h`;
   const days = Math.floor(hours / 24);
   return `hace ${days}d`;
-}
-
-function slaTone(slaMinutes: number) {
-  if (slaMinutes > 120) return "text-red-300";
-  if (slaMinutes > 30) return "text-yellow-300";
-  return "text-green-300";
-}
-
-function statusLabel(status: ConversationRowData["status"], unreadCount: number) {
-  if (status === "new") return "Nueva";
-  if (status === "closed") return "Resuelta";
-  if (unreadCount > 0) return "Esperando respuesta";
-  return "Activa";
 }
 
 function leadStatusUi(leadStatus: ConversationRowData["leadStatus"]) {
@@ -47,7 +34,7 @@ function followUpUi(nextActionAt?: string | null) {
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate();
   if (date.getTime() < now.getTime()) {
-    return { label: "Atrasado", className: "border-red-400/30 bg-red-400/10 text-red-100" };
+    return { label: "Vencido", className: "border-red-400/30 bg-red-400/10 text-red-100" };
   }
   if (isToday) {
     return { label: "Hoy", className: "border-amber-400/30 bg-amber-400/10 text-amber-100" };
@@ -80,36 +67,26 @@ export function ConversationRow({
   const contact = row.contact?.name || "Sin nombre";
   const meta = row.contact?.phone || row.contact?.email || "Sin contacto";
   const preview = row.lastMessagePreview?.trim() || "Sin mensajes recientes";
+  const ownerLabel = row.assignedSellerName || row.assignedTo || "Sin owner";
   const hasUnread = row.unreadCount > 0;
-  const ownerLabel = row.assignedSellerName || row.assignedTo || "Sin asignar";
   const derivedPriority = getConversationPriority(row);
   const leadStatus = leadStatusUi(row.leadStatus);
   const followUp = followUpUi(row.nextActionAt);
-  const priorityUi =
+
+  const priorityAccent =
     derivedPriority === "high"
-      ? {
-          label: "Alta",
-          dotClassName: "bg-red-400 shadow-[0_0_0_4px_rgba(248,113,113,0.18)]",
-          rowClassName: "border-red-400/35 bg-red-400/[0.08] hover:bg-red-400/[0.12]"
-        }
+      ? "before:bg-red-400"
       : derivedPriority === "medium"
-        ? {
-            label: "Reciente",
-            dotClassName: "bg-amber-300 shadow-[0_0_0_4px_rgba(252,211,77,0.12)]",
-            rowClassName: "border-amber-300/20 bg-amber-300/[0.04] hover:bg-amber-300/[0.08]"
-          }
-        : {
-            label: "Normal",
-            dotClassName: "bg-slate-400",
-            rowClassName: "border-[color:var(--border)] hover:bg-muted/50"
-          };
+        ? "before:bg-amber-300"
+        : "before:bg-slate-500";
 
   return (
     <div
       className={cn(
-        "group rounded-2xl border p-3 transition-colors",
-        selected ? "border-brand/40 bg-muted/10 ring-1 ring-brand/30" : priorityUi.rowClassName,
-        hasUnread && !selected ? "bg-brand/5" : ""
+        "group relative overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-card/55 p-3.5 transition-colors before:absolute before:left-0 before:top-0 before:h-full before:w-1.5 before:content-[''] hover:bg-card/80",
+        priorityAccent,
+        selected ? "border-brand/40 bg-brand/8 ring-1 ring-brand/30" : "",
+        hasUnread && !selected ? "border-brand/20 bg-brand/5" : ""
       )}
     >
       <div className="flex items-start gap-3">
@@ -127,60 +104,51 @@ export function ConversationRow({
         ) : null}
 
         <button onClick={onSelect} className="w-full text-left" type="button">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
               <SimpleAvatar
                 src={row.contact?.profileImageUrl}
                 name={contact}
-                className="h-11 w-11 rounded-2xl border border-[color:var(--border)] bg-brand/10 text-sm text-brandBright"
+                className="h-11 w-11 rounded-[18px] border border-[color:var(--border)] bg-brand/10 text-sm text-brandBright"
                 fallbackClassName="bg-brand/10 text-brandBright"
               />
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
                   <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
-                  <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
-                  <InboxBadge className={cn("text-[11px]", leadStatus.className)}>{leadStatus.label}</InboxBadge>
-                  <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
-                  {row.priority === "hot" ? <InboxBadge className="text-[11px]">Prioritaria</InboxBadge> : null}
-                  {followUp ? <InboxBadge className={cn("text-[11px]", followUp.className)}>{followUp.label}</InboxBadge> : null}
-                  {row.transferPaymentStatus === "payment_pending_validation" ? (
-                    <InboxBadge className="text-[11px]">Pago pendiente</InboxBadge>
+                  {hasUnread ? (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-semibold text-white">
+                      {row.unreadCount}
+                    </span>
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-xs text-muted">{meta}</p>
-                <p className="mt-1 text-[11px] text-muted">Owner: {ownerLabel}</p>
-                {row.nextActionNote ? <p className="mt-1 line-clamp-1 text-[11px] text-muted">Seguimiento: {row.nextActionNote}</p> : null}
               </div>
             </div>
             <div className="shrink-0 text-right">
-              <div className="inline-flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">
-                <span className={cn("inline-flex h-2.5 w-2.5 rounded-full", priorityUi.dotClassName)} />
-                <span>{priorityUi.label}</span>
-              </div>
               <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
-              {hasUnread ? (
-                <span className="mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-2 text-[11px] font-semibold text-white">
-                  {row.unreadCount}
-                </span>
-              ) : null}
+              <p className="mt-1 text-[11px] text-muted">{ownerLabel}</p>
             </div>
           </div>
 
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <p className={cn("line-clamp-2 min-w-0 text-xs leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
-            <span className={cn("text-xs", slaTone(row.slaMinutes))}>SLA {row.slaMinutes}m</span>
+          <p className={cn("mt-3 line-clamp-2 text-sm leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <InboxBadge className={leadStatus.className}>{leadStatus.label}</InboxBadge>
+            {row.priority === "hot" ? <InboxBadge className="text-brandBright">Caliente</InboxBadge> : null}
+            {followUp ? <InboxBadge className={followUp.className}>{followUp.label}</InboxBadge> : null}
+            {row.transferPaymentStatus === "payment_pending_validation" ? <InboxBadge>Pago pendiente</InboxBadge> : null}
           </div>
         </button>
       </div>
 
-      <div className="mt-2 flex gap-2 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto">
+      <div className="pointer-events-none mt-3 flex gap-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         <button
           type="button"
           onClick={onMarkHot}
           disabled={disabled}
           className="rounded-full border border-[color:var(--border)] px-2.5 py-1 text-xs text-muted hover:text-text disabled:opacity-40"
         >
-          Marcar prioridad
+          Marcar caliente
         </button>
         <button
           type="button"
@@ -188,7 +156,7 @@ export function ConversationRow({
           disabled={disabled}
           className="rounded-full border border-[color:var(--border)] px-2.5 py-1 text-xs text-muted hover:text-text disabled:opacity-40"
         >
-          Cerrar
+          Archivar
         </button>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp, MessageSquareText, Search, SlidersHorizontal } 
 import { useMemo, useState } from "react";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ConversationRow } from "@/components/app/inbox/ConversationRow";
-import { getConversationPriority, sortConversationsByPriority } from "@/components/app/inbox/conversation-priority";
+import { sortConversationsByPriority } from "@/components/app/inbox/conversation-priority";
 import { ConversationListSkeleton } from "@/components/app/inbox/Skeleton";
 import type { ConversationRowData, FilterKey } from "@/components/app/inbox/types";
 import { normalizeText } from "@/lib/search/normalize";
@@ -34,8 +34,7 @@ export function ConversationList({
   onClose,
   readOnly,
   onClearFilters,
-  onRetry
-  ,
+  onRetry,
   visibility,
   onVisibilityChange,
   selectedIds,
@@ -73,152 +72,118 @@ export function ConversationList({
   onRestoreSelected: () => void;
   restoreBusy?: boolean;
 }) {
-  const unread = rows.reduce((acc, row) => acc + row.unreadCount, 0);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
-    pending: false,
-    recent: false,
-    all: true
-  });
-
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const normalizedQuery = useMemo(() => normalizeText(search).join(" "), [search]);
 
   const visibleRows = useMemo(() => {
-    if (!normalizedQuery) return rows;
-    return rows.filter((row) => buildSearchHaystack(row).includes(normalizedQuery));
+    const filtered = !normalizedQuery ? rows : rows.filter((row) => buildSearchHaystack(row).includes(normalizedQuery));
+    return sortConversationsByPriority(filtered);
   }, [normalizedQuery, rows]);
-
-  const prioritizedRows = useMemo(() => sortConversationsByPriority(visibleRows), [visibleRows]);
-
-  const groupedRows = useMemo(
-    () => [
-      {
-        key: "pending",
-        title: "Pagos pendientes",
-        description: "Conversaciones que tienen comprobante pendiente de validacion manual.",
-        rows: prioritizedRows.filter((row) => getConversationPriority(row) === "high"),
-        emptyLabel: "No hay pagos pendientes en este momento."
-      },
-      {
-        key: "recent",
-        title: "Recientes",
-        description: "Actividad reciente para seguir respondiendo sin recorrer todo el historial.",
-        rows: prioritizedRows.filter((row) => getConversationPriority(row) === "medium"),
-        emptyLabel: "No hay conversaciones recientes para mostrar."
-      },
-      {
-        key: "all",
-        title: "Todas",
-        description: "Resto del historial operativo del inbox.",
-        rows: prioritizedRows.filter((row) => getConversationPriority(row) === "low"),
-        emptyLabel: "No quedan conversaciones fuera de los grupos prioritarios."
-      }
-    ],
-    [prioritizedRows]
-  );
 
   const hasSearchResults = visibleRows.length > 0;
   const isSearching = search.trim().length > 0;
   const visibleIds = useMemo(() => visibleRows.map((row) => row.id), [visibleRows]);
-  const selectedVisibleCount = useMemo(
-    () => visibleIds.filter((id) => selectedIds.includes(id)).length,
-    [selectedIds, visibleIds]
-  );
+  const selectedVisibleCount = useMemo(() => visibleIds.filter((id) => selectedIds.includes(id)).length, [selectedIds, visibleIds]);
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
   const showingArchived = visibility === "archived";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/85 p-3.5">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/88 p-4 backdrop-blur">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">Inbox</p>
-            <h2 className="mt-1 text-base font-semibold">Conversaciones</h2>
-            <p className="mt-1 text-[11px] text-muted">WhatsApp en tiempo real, con prioridad visible y mejor encontrabilidad operativa.</p>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Inbox</p>
+            <h2 className="mt-1 text-lg font-semibold">Conversaciones</h2>
+            <p className="mt-1 text-xs text-muted">Elegi rapido un hilo, revisa estado y entra a actuar sin ruido extra.</p>
           </div>
-          <InboxBadge active={readOnly}>Demo</InboxBadge>
+          {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2.5">
-          <div className="rounded-2xl border border-[color:var(--border)] bg-card/70 p-2.5">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Activas</p>
-            <p className="mt-1.5 text-lg font-semibold">{rows.length}</p>
-          </div>
-          <div className="rounded-2xl border border-[color:var(--border)] bg-card/70 p-2.5">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">No leidas</p>
-            <p className="mt-1.5 text-lg font-semibold">{unread}</p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-bg/70 px-3 py-2">
+        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-bg/70 px-3 py-2.5">
           <Search className="h-4 w-4 text-muted" />
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar por nombre o telefono"
+            placeholder="Buscar por nombre, telefono o mensaje"
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
         </div>
 
-        <div className="mt-3">
-          <div className="mb-2 flex flex-wrap gap-2">
-            <button type="button" onClick={() => onVisibilityChange("active")}>
-              <InboxBadge active={!showingArchived}>Activas</InboxBadge>
-            </button>
-            <button type="button" onClick={() => onVisibilityChange("archived")}>
-              <InboxBadge active={showingArchived}>Archivadas</InboxBadge>
-            </button>
-          </div>
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Filtros
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {FILTERS.map((item) => (
-              <button key={item.key} type="button" onClick={() => onFilterChange(item.key)}>
-                <InboxBadge active={filter === item.key}>{item.label}</InboxBadge>
-              </button>
-            ))}
-          </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => onVisibilityChange("active")}>
+            <InboxBadge active={!showingArchived}>Activas</InboxBadge>
+          </button>
+          <button type="button" onClick={() => onVisibilityChange("archived")}>
+            <InboxBadge active={showingArchived}>Archivadas</InboxBadge>
+          </button>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-card/60 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-muted">
-              {selectedIds.length > 0
-                ? `${selectedIds.length} conversaciones seleccionadas`
-                : showingArchived
-                  ? "Selecciona conversaciones archivadas para restaurarlas al inbox activo."
-                  : "Selecciona conversaciones para ocultarlas del panel sin borrar historial."}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => (allVisibleSelected ? onClearSelection() : onSelectVisible(visibleIds))}
-                className="rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text"
-                disabled={!visibleIds.length}
-              >
-                {allVisibleSelected ? "Limpiar visibles" : "Seleccionar visibles"}
-              </button>
-              <button
-                type="button"
-                onClick={showingArchived ? onRestoreSelected : onArchiveSelected}
-                className={`rounded-full border px-3 py-1.5 text-xs disabled:opacity-40 ${
-                  showingArchived
-                    ? "border-emerald-400/30 text-emerald-100 hover:text-white"
-                    : "border-red-400/30 text-red-100 hover:text-white"
-                }`}
-                disabled={readOnly || selectedIds.length === 0 || archiveBusy || restoreBusy}
-              >
-                {showingArchived
-                  ? restoreBusy ? "Restaurando..." : "Restaurar seleccionadas"
-                  : archiveBusy ? "Ocultando..." : "Ocultar seleccionadas"}
-              </button>
+        <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/50">
+          <button
+            type="button"
+            onClick={() => setFiltersExpanded((current) => !current)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros
+            </div>
+            <span className="inline-flex items-center gap-2 text-xs text-muted">
+              {FILTERS.find((item) => item.key === filter)?.label || "Todas"}
+              {filtersExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </span>
+          </button>
+          {filtersExpanded ? (
+            <div className="border-t border-[color:var(--border)] px-4 pb-4 pt-3">
+              <div className="flex flex-wrap gap-2">
+                {FILTERS.map((item) => (
+                  <button key={item.key} type="button" onClick={() => onFilterChange(item.key)}>
+                    <InboxBadge active={filter === item.key}>{item.label}</InboxBadge>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {selectedIds.length > 0 || showingArchived ? (
+          <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/55 px-3 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted">
+                {selectedIds.length > 0
+                  ? `${selectedIds.length} conversaciones seleccionadas`
+                  : showingArchived
+                    ? "Selecciona conversaciones archivadas para restaurarlas."
+                    : "Selecciona conversaciones para ocultarlas del inbox."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => (allVisibleSelected ? onClearSelection() : onSelectVisible(visibleIds))}
+                  className="rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text"
+                  disabled={!visibleIds.length}
+                >
+                  {allVisibleSelected ? "Limpiar visibles" : "Seleccionar visibles"}
+                </button>
+                <button
+                  type="button"
+                  onClick={showingArchived ? onRestoreSelected : onArchiveSelected}
+                  className={`rounded-full border px-3 py-1.5 text-xs disabled:opacity-40 ${
+                    showingArchived
+                      ? "border-emerald-400/30 text-emerald-100 hover:text-white"
+                      : "border-red-400/30 text-red-100 hover:text-white"
+                  }`}
+                  disabled={readOnly || selectedIds.length === 0 || archiveBusy || restoreBusy}
+                >
+                  {showingArchived ? (restoreBusy ? "Restaurando..." : "Restaurar") : archiveBusy ? "Ocultando..." : "Archivar"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </header>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {loading ? <ConversationListSkeleton /> : null}
 
         {!loading && errorMessage ? (
@@ -236,7 +201,7 @@ export function ConversationList({
         ) : null}
 
         {!loading && hasLoaded && !errorMessage && !hasSearchResults ? (
-          <div className="flex h-full min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-card/40 px-5 text-center">
+          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-card/40 px-5 text-center">
             <MessageSquareText className="h-8 w-8 text-muted" />
             <p className="mt-3 text-base font-semibold">
               {isSearching
@@ -247,10 +212,10 @@ export function ConversationList({
             </p>
             <p className="mt-1 text-xs leading-6 text-muted">
               {isSearching
-                ? "Proba con otro nombre, apellido, telefono o limpia la busqueda para volver al listado completo."
+                ? "Proba con otro nombre, telefono o limpia la busqueda."
                 : showingArchived
-                  ? "Cuando ocultes conversaciones desde el inbox activo, vas a poder restaurarlas desde esta vista."
-                  : "Cuando entren mensajes por WhatsApp o limpies los filtros actuales, las conversaciones van a aparecer aca para gestionarlas desde el portal."}
+                  ? "Cuando archives conversaciones desde la vista activa, apareceran aca."
+                  : "Cuando entren mensajes o limpies filtros, las conversaciones apareceran aca para operarlas."}
             </p>
             <button
               type="button"
@@ -262,81 +227,30 @@ export function ConversationList({
           </div>
         ) : null}
 
-        {!loading && hasSearchResults
-          ? groupedRows.map((group) => {
-              const isCollapsed = collapsedGroups[group.key] ?? false;
-              return (
-                <section key={group.key} className="rounded-2xl border border-[color:var(--border)] bg-card/40">
-                  <button
-                    type="button"
-                    onClick={() => setCollapsedGroups((current) => ({ ...current, [group.key]: !isCollapsed }))}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold">{group.title}</p>
-                        <InboxBadge active={group.key === "pending"}>{group.rows.length}</InboxBadge>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-muted">{group.description}</p>
-                    </div>
-                    <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
-                      {isCollapsed ? (
-                        <>
-                          Expandir
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        </>
-                      ) : (
-                        <>
-                          Colapsar
-                          <ChevronUp className="h-3.5 w-3.5" />
-                        </>
-                      )}
-                    </span>
-                  </button>
-
-                  {!isCollapsed ? (
-                    <div className="border-t border-[color:var(--border)] px-3 pb-3 pt-2">
-                      {group.rows.length ? (
-                        <div className="space-y-2.5">
-                          {group.rows.map((row) => (
-                            <ConversationRow
-                              key={row.id}
-                              row={row}
-                              selected={selectedId === row.id}
-                              bulkSelected={selectedIds.includes(row.id)}
-                              onSelect={() => onSelect(row.id)}
-                              onToggleSelect={() => onToggleSelect(row.id)}
-                              onMarkHot={() => onMarkHot(row.id)}
-                              onClose={() => onClose(row.id)}
-                              disabled={readOnly}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/40 px-4 py-3 text-xs text-muted">
-                          {group.emptyLabel}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                </section>
-              );
-            })
-          : null}
+        {!loading && hasSearchResults ? (
+          <div className="space-y-2.5">
+            {visibleRows.map((row) => (
+              <ConversationRow
+                key={row.id}
+                row={row}
+                selected={selectedId === row.id}
+                bulkSelected={selectedIds.includes(row.id)}
+                onSelect={() => onSelect(row.id)}
+                onToggleSelect={() => onToggleSelect(row.id)}
+                onMarkHot={() => onMarkHot(row.id)}
+                onClose={() => onClose(row.id)}
+                disabled={readOnly}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function buildSearchHaystack(row: ConversationRowData) {
-  const values = [
-    row.contact?.name,
-    row.contact?.phone,
-    row.contact?.email,
-    row.contact?.id,
-    row.lastMessagePreview,
-    row.transferPaymentOrderId
-  ]
+  const values = [row.contact?.name, row.contact?.phone, row.contact?.email, row.contact?.id, row.lastMessagePreview, row.transferPaymentOrderId]
     .filter(Boolean)
     .join(" ");
 

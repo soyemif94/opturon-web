@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronUp } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ChevronLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/ui/cn";
 
 export function InboxLayout({
@@ -17,11 +17,9 @@ export function InboxLayout({
   hasDetail?: boolean;
   onBackToList?: () => void;
 }) {
-  const [contextExpanded, setContextExpanded] = useState(false);
-
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col pb-1">
-      <div className="grid h-full min-h-0 flex-1 grid-cols-1 items-stretch gap-3 xl:min-h-0 xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.4fr)] 2xl:grid-cols-[minmax(400px,1fr)_minmax(0,1.45fr)]">
+      <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.45fr)_minmax(320px,0.92fr)] 2xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.55fr)_minmax(340px,0.95fr)]">
         <aside
           className={cn(
             "h-full min-h-[320px] min-w-0 overflow-hidden",
@@ -30,6 +28,7 @@ export function InboxLayout({
         >
           {left}
         </aside>
+
         <main
           className={cn(
             "flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-hidden",
@@ -50,41 +49,18 @@ export function InboxLayout({
           ) : null}
 
           <section className="h-full min-h-[420px] min-w-0 flex-1 overflow-hidden xl:min-h-0">{center}</section>
-          <section className="shrink-0 overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.015))] shadow-[0_16px_40px_rgba(0,0,0,0.14)]">
-            <button
-              type="button"
-              onClick={() => setContextExpanded((prev) => !prev)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-            >
-              <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Contexto</p>
-                <p className="mt-1 text-sm text-muted">
-                  {contextExpanded
-                    ? "Asignacion, estado y metadata de la conversacion."
-                    : "Mostra asignacion, estado, notas y tareas sin quitar foco al hilo."}
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted">
-                {contextExpanded ? (
-                  <>
-                    Ocultar contexto
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  </>
-                ) : (
-                  <>
-                    Ver contexto
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </>
-                )}
-              </span>
-            </button>
-            <div className={contextExpanded ? "border-t border-[color:var(--border)]" : "hidden"}>
-              <div className="max-h-[240px] overflow-y-auto p-4 xl:max-h-[220px]">
-                {right}
-              </div>
-            </div>
-          </section>
         </main>
+
+        <aside
+          className={cn(
+            "min-h-0 min-w-0 overflow-hidden",
+            hasDetail ? "block" : "hidden xl:block"
+          )}
+        >
+          <section className="h-full min-h-[320px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
+            <div className="h-full overflow-y-auto p-4">{right}</div>
+          </section>
+        </aside>
       </div>
     </div>
   );
