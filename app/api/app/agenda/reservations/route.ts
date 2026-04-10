@@ -122,7 +122,17 @@ export async function POST(request: NextRequest) {
       title: String(body?.title || ""),
       description: typeof body?.description === "string" ? body.description : null,
       contactId: typeof body?.contactId === "string" ? body.contactId : null,
-      status: body?.status || "pending"
+      conversationId: typeof body?.conversationId === "string" ? body.conversationId : null,
+      assignedUserId: typeof body?.assignedUserId === "string" ? body.assignedUserId : null,
+      assignedUserName: typeof body?.assignedUserName === "string" ? body.assignedUserName : null,
+      status: body?.status || "pending",
+      commercialActionType: body?.commercialActionType || null,
+      commercialOutcome: body?.commercialOutcome || null,
+      origin: typeof body?.origin === "string" ? body.origin : null,
+      location: typeof body?.location === "string" ? body.location : null,
+      resultNote: typeof body?.resultNote === "string" ? body.resultNote : null,
+      nextStepNote: typeof body?.nextStepNote === "string" ? body.nextStepNote : null,
+      nextActionAt: typeof body?.nextActionAt === "string" ? body.nextActionAt : null
     });
     return noStore(NextResponse.json(result, { status: 201 }));
   } catch (error) {

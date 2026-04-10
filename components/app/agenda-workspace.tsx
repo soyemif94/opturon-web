@@ -249,20 +249,28 @@ function commercialOutcomeVariant(outcome?: AgendaItem["commercialOutcome"] | ""
   return "outline" as const;
 }
 
+function isCommercialAgendaItem(item: Pick<AgendaItem, "commercialActionType" | "origin" | "type" | "title">) {
+  if (item.commercialActionType) return true;
+  if (item.origin === "lead_comercial_bot_handoff") return true;
+  if (item.type !== "appointment") return false;
+  return /visita comercial|demo comercial|seguimiento comercial/i.test(String(item.title || ""));
+}
+
 function isTodayKey(dateKey: string) {
   return dateKey === toDateKey(new Date());
 }
 
 function isCommercialAttentionItem(item: Pick<AgendaItem, "commercialActionType" | "status" | "nextActionAt" | "date">) {
-  if (!item.commercialActionType) return false;
+  if (!("origin" in item) && !item.commercialActionType) return false;
+  if (!isCommercialAgendaItem(item as Pick<AgendaItem, "commercialActionType" | "origin" | "type" | "title"> & Pick<AgendaItem, "status" | "nextActionAt" | "date">)) return false;
   if (item.status === "reschedule" || item.status === "pending") return true;
   if (item.status === "confirmed" && isTodayKey(item.date)) return true;
   if (!item.nextActionAt) return false;
   return new Date(item.nextActionAt).getTime() <= Date.now();
 }
 
-function commercialPriorityRank(item: Pick<AgendaItem, "commercialActionType" | "status" | "nextActionAt" | "date">) {
-  if (!item.commercialActionType) return 50;
+function commercialPriorityRank(item: Pick<AgendaItem, "commercialActionType" | "origin" | "type" | "title" | "status" | "nextActionAt" | "date">) {
+  if (!isCommercialAgendaItem(item)) return 50;
   if (item.status === "reschedule") return 0;
   if (item.status === "pending" && isTodayKey(item.date)) return 1;
   if (item.status === "confirmed" && isTodayKey(item.date)) return 2;
@@ -273,8 +281,8 @@ function commercialPriorityRank(item: Pick<AgendaItem, "commercialActionType" | 
   return 5;
 }
 
-function commercialSurfaceClass(item: Pick<AgendaItem, "commercialActionType" | "status" | "date" | "nextActionAt" | "assignedUserId">, currentUserId?: string | null) {
-  if (!item.commercialActionType) return "";
+function commercialSurfaceClass(item: Pick<AgendaItem, "commercialActionType" | "origin" | "type" | "title" | "status" | "date" | "nextActionAt" | "assignedUserId">, currentUserId?: string | null) {
+  if (!isCommercialAgendaItem(item)) return "";
   if (item.status === "reschedule") return "border-amber-400/45 bg-amber-500/[0.12]";
   if (item.status === "confirmed") return "border-emerald-400/35 bg-emerald-500/[0.12]";
   if (item.status === "pending" && isTodayKey(item.date)) return "border-brand/55 bg-brand/[0.12]";
@@ -471,7 +479,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
       isToday: dateKey === toDateKey(today),
       isSelected: dateKey === selectedDateKey,
       count: items.filter((item) => item.date === dateKey && item.status !== "cancelled").length,
-      commercialCount: items.filter((item) => item.date === dateKey && item.commercialActionType && item.status !== "cancelled").length,
+      commercialCount: items.filter((item) => item.date === dateKey && isCommercialAgendaItem(item) && item.status !== "cancelled").length,
       attentionCount: items.filter((item) => item.date === dateKey && item.status !== "cancelled" && isCommercialAttentionItem(item)).length
     };
   });
@@ -480,8 +488,8 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
 
   const selectedItems = items
     .filter((item) => item.date === selectedDateKey)
-    .filter((item) => visitScope === "all" || !item.commercialActionType || item.assignedUserId === currentUserId)
-    .filter((item) => commercialView === "all" || Boolean(item.commercialActionType))
+    .filter((item) => visitScope === "all" || !isCommercialAgendaItem(item) || item.assignedUserId === currentUserId)
+    .filter((item) => commercialView === "all" || isCommercialAgendaItem(item))
     .sort((a, b) => {
       const priorityDiff = commercialPriorityRank(a) - commercialPriorityRank(b);
       if (priorityDiff !== 0) return priorityDiff;
@@ -489,10 +497,10 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
     });
 
   const monthItems = items.filter((item) => item.date >= toDateKey(monthStart) && item.date <= toDateKey(monthEnd));
-  const monthCommercialItems = monthItems.filter((item) => item.commercialActionType && item.status !== "cancelled");
-  const myCommercialCount = monthItems.filter((item) => item.commercialActionType && item.status !== "cancelled" && item.assignedUserId === currentUserId).length;
+  const monthCommercialItems = monthItems.filter((item) => isCommercialAgendaItem(item) && item.status !== "cancelled");
+  const myCommercialCount = monthItems.filter((item) => isCommercialAgendaItem(item) && item.status !== "cancelled" && item.assignedUserId === currentUserId).length;
   const appointmentCount = monthItems.filter((item) => item.type === "appointment" && item.status !== "cancelled").length;
-  const commercialCount = monthItems.filter((item) => item.commercialActionType && item.status !== "cancelled").length;
+  const commercialCount = monthItems.filter((item) => isCommercialAgendaItem(item) && item.status !== "cancelled").length;
   const interestedCount = monthCommercialItems.filter((item) => item.commercialOutcome === "interested").length;
   const proposalRequestedCount = monthCommercialItems.filter((item) => item.commercialOutcome === "proposal_requested").length;
   const wonCount = monthCommercialItems.filter((item) => item.commercialOutcome === "won").length;
@@ -503,7 +511,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
   const selectedAvailability = selectedItems.filter((item) => item.type === "availability" && item.status !== "cancelled");
   const selectedBlocked = selectedItems.filter((item) => item.type === "blocked" && item.status !== "cancelled");
   const selectedAppointments = selectedItems.filter((item) => item.type === "appointment" && item.status !== "cancelled");
-  const selectedCommercial = selectedItems.filter((item) => item.commercialActionType);
+  const selectedCommercial = selectedItems.filter((item) => isCommercialAgendaItem(item));
   const selectedAttentionItems = selectedCommercial.filter((item) => isCommercialAttentionItem(item));
   const selectedConfirmed = selectedCommercial.filter((item) => item.status === "confirmed");
   const selectedTodayCommercial = selectedCommercial.filter((item) => isTodayKey(item.date));
@@ -1047,9 +1055,10 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
               {selectedItems.length ? (
                 selectedItems.map((item) => {
                   const meta = typeMeta(item.type);
-                  const status = statusMeta(item.status, Boolean(item.commercialActionType));
+                  const isCommercial = isCommercialAgendaItem(item);
+                  const status = statusMeta(item.status, isCommercial);
                   const isBusy = mutationBusyId === item.id;
-                  const commercialLabel = commercialActionLabel(item.commercialActionType);
+                  const commercialLabel = commercialActionLabel(item.commercialActionType) || (isCommercial ? "Accion comercial" : null);
                   const outcomeLabel = commercialOutcomeLabel(item.commercialOutcome);
                   const requiresAttention = isCommercialAttentionItem(item);
 
@@ -1065,7 +1074,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                             {commercialLabel ? <Badge variant="warning">{commercialLabel}</Badge> : null}
                             {outcomeLabel ? <Badge variant={commercialOutcomeVariant(item.commercialOutcome)}>{outcomeLabel}</Badge> : null}
                             {requiresAttention ? <Badge variant="danger">Requiere accion</Badge> : null}
-                            {item.commercialActionType && isTodayKey(item.date) ? <Badge variant="outline">Hoy</Badge> : null}
+                            {isCommercial && isTodayKey(item.date) ? <Badge variant="outline">Hoy</Badge> : null}
                             {item.assignedUserName ? <Badge variant="outline">Responsable: {item.assignedUserName}</Badge> : null}
                           </div>
                         </div>
@@ -1143,7 +1152,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                         <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "pending")} disabled={isBusy || item.status === "pending"}>
                           Pendiente
                         </Button>
-                        {item.commercialActionType ? (
+                        {isCommercial ? (
                           <>
                             <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "confirmed")} disabled={isBusy || item.status === "confirmed"}>
                               Confirmada
@@ -1161,7 +1170,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                           </Button>
                         )}
                         <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "cancelled")} disabled={isBusy || item.status === "cancelled"}>
-                          {item.commercialActionType ? "Cancelada" : "Cancelar"}
+                          {isCommercial ? "Cancelada" : "Cancelar"}
                         </Button>
                       </div>
                     </div>
@@ -1169,7 +1178,9 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                 })
               ) : (
                 <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/35 p-4 text-sm leading-6 text-muted">
-                  Todavia no hay items para este dia. Puedes guardar una nota, un seguimiento, una tarea, una franja disponible o un bloqueo simple.
+                  {commercialView === "commercial"
+                    ? "Todavia no hay items comerciales para este dia. Si registras una visita, demo o seguimiento comercial, va a quedar visible aca."
+                    : "Todavia no hay items para este dia. Puedes guardar una nota, un seguimiento, una tarea, una franja disponible o un bloqueo simple."}
                 </div>
               )}
 
@@ -1366,7 +1377,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
           </Card>
 
           <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant="warning">CRUD basico</Badge>}>
+            <CardHeader action={<Badge variant="warning">Creacion manual</Badge>}>
               <div>
                 <CardTitle className="text-xl">Crear item del dia</CardTitle>
                 <CardDescription>La experiencia visual se mantiene y ahora tambien puedes registrar una visita o demo comercial vinculada al lead.</CardDescription>
@@ -1526,37 +1537,6 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
             </CardContent>
           </Card>
 
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant="outline">Preparado</Badge>}>
-              <div>
-                <CardTitle className="text-xl">Direccion de producto</CardTitle>
-                <CardDescription>Lo que esta fase deja listo para crecer sin mezclar todavia bot, Google Calendar ni scheduling avanzado.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-3 pt-0">
-              {[
-                { icon: NotebookPen, title: "Notas y contexto", detail: "Cada dia puede concentrar comentarios internos y proximos pasos." },
-                { icon: UserRound, title: "Contacto asociado", detail: "Cada item ya puede quedar vinculado a un cliente real del workspace sin forzarlo." },
-                { icon: Clock3, title: "Turnos y bloqueos", detail: "Ya puedes guardar franjas con horario y evitar inconsistencias obvias entre bloqueos y turnos." },
-                { icon: CalendarDays, title: "Futura integracion con bot", detail: "Mas adelante podra leer disponibilidad base, detectar bloques y reservar sobre esta misma estructura." }
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.title} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                        <Icon className="h-4 w-4 text-brandBright" />
-                      </span>
-                      <div>
-                        <p className="font-medium">{item.title}</p>
-                        <p className="mt-1 text-sm leading-6 text-muted">{item.detail}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
         </div>
       </section>
     </div>

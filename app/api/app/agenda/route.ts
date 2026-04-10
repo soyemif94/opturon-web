@@ -188,10 +188,20 @@ export async function POST(request: NextRequest) {
       startTime: body?.startTime || null,
       endTime: body?.endTime || null,
       contactId: typeof body?.contactId === "string" ? body.contactId : null,
+      conversationId: typeof body?.conversationId === "string" ? body.conversationId : null,
+      assignedUserId: typeof body?.assignedUserId === "string" ? body.assignedUserId : null,
+      assignedUserName: typeof body?.assignedUserName === "string" ? body.assignedUserName : null,
       type: (body?.type || "note") as "note" | "follow_up" | "task" | "appointment" | "blocked" | "availability",
       title: String(body?.title || ""),
       description: typeof body?.description === "string" ? body.description : null,
-      status: body?.status || "pending"
+      status: body?.status || "pending",
+      commercialActionType: body?.commercialActionType || null,
+      commercialOutcome: body?.commercialOutcome || null,
+      origin: typeof body?.origin === "string" ? body.origin : null,
+      location: typeof body?.location === "string" ? body.location : null,
+      resultNote: typeof body?.resultNote === "string" ? body.resultNote : null,
+      nextStepNote: typeof body?.nextStepNote === "string" ? body.nextStepNote : null,
+      nextActionAt: typeof body?.nextActionAt === "string" ? body.nextActionAt : null
     });
     return noStore(NextResponse.json(result, { status: 201 }));
   } catch (error) {

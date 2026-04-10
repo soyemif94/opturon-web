@@ -1809,10 +1809,20 @@ export async function createPortalAgendaItem(
     startTime?: string | null;
     endTime?: string | null;
     contactId?: string | null;
+    conversationId?: string | null;
+    assignedUserId?: string | null;
+    assignedUserName?: string | null;
     type: PortalAgendaItem["type"];
     title: string;
     description?: string | null;
     status?: PortalAgendaItem["status"];
+    commercialActionType?: PortalAgendaItem["commercialActionType"];
+    commercialOutcome?: PortalAgendaItem["commercialOutcome"];
+    origin?: string | null;
+    location?: string | null;
+    resultNote?: string | null;
+    nextStepNote?: string | null;
+    nextActionAt?: string | null;
   }
 ) {
   return backendPortalFetch<{
@@ -1852,7 +1862,17 @@ export async function createPortalAgendaReservation(
     title: string;
     description?: string | null;
     contactId?: string | null;
+    conversationId?: string | null;
+    assignedUserId?: string | null;
+    assignedUserName?: string | null;
     status?: PortalAgendaItem["status"];
+    commercialActionType?: PortalAgendaItem["commercialActionType"];
+    commercialOutcome?: PortalAgendaItem["commercialOutcome"];
+    origin?: string | null;
+    location?: string | null;
+    resultNote?: string | null;
+    nextStepNote?: string | null;
+    nextActionAt?: string | null;
   }
 ) {
   return backendPortalFetch<{
@@ -1872,10 +1892,20 @@ export async function patchPortalAgendaItem(
     startTime: string | null;
     endTime: string | null;
     contactId: string | null;
+    conversationId: string | null;
+    assignedUserId: string | null;
+    assignedUserName: string | null;
     type: PortalAgendaItem["type"];
     title: string;
     description: string | null;
     status: PortalAgendaItem["status"];
+    commercialActionType: PortalAgendaItem["commercialActionType"];
+    commercialOutcome: PortalAgendaItem["commercialOutcome"];
+    origin: string | null;
+    location: string | null;
+    resultNote: string | null;
+    nextStepNote: string | null;
+    nextActionAt: string | null;
   }>
 ) {
   return backendPortalFetch<{
