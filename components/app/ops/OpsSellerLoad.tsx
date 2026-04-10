@@ -9,6 +9,11 @@ export type OpsSellerLoadItem = {
   totalActiveLeads: number;
   overdueLeads: number;
   followUpLeads: number;
+  totalOrders?: number;
+  totalPaidOrders?: number;
+  totalRevenue?: number;
+  averageTicket?: number;
+  currency?: string;
 };
 
 export function OpsSellerLoad({
@@ -30,7 +35,12 @@ export function OpsSellerLoad({
             Todavia no hay leads asignados a vendedores.
           </div>
         ) : (
-          items.map((item) => (
+          items.map((item) => {
+            const paidOrders = Number(item.totalPaidOrders || 0);
+            const totalOrders = Number(item.totalOrders || 0);
+            const paidRate = totalOrders > 0 ? Math.round((paidOrders / totalOrders) * 100) : 0;
+
+            return (
             <div
               key={item.sellerUserId}
               className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4"
@@ -47,19 +57,40 @@ export function OpsSellerLoad({
                 <Metric label="Vencidos" value={item.overdueLeads} />
                 <Metric label="Con seguimiento" value={item.followUpLeads} />
               </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <Metric label="Ventas" value={totalOrders} />
+                <Metric label="Total vendido" value={formatCurrency(item.totalRevenue || 0, item.currency || "ARS")} compact />
+                <Metric label="Ticket promedio" value={formatCurrency(item.averageTicket || 0, item.currency || "ARS")} compact />
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>
+                  {item.overdueLeads > 0 ? "Necesita seguimiento" : "Carga estable"}
+                </Badge>
+                <span>Conversion pagada: {paidRate}%</span>
+                {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
+              </div>
             </div>
-          ))
+          );
+          })
         )}
       </CardContent>
     </Card>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value, compact = false }: { label: string; value: number | string; compact?: boolean }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-3">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-2 text-lg font-semibold">{value}</p>
+      <p className={`mt-2 font-semibold ${compact ? "text-sm" : "text-lg"}`}>{value}</p>
     </div>
   );
+}
+
+function formatCurrency(value: number, currency = "ARS") {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0
+  }).format(Number.isFinite(value) ? value : 0);
 }
