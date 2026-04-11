@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
-import type { PortalAutomation } from "@/lib/api";
+import type { PortalAutomation, PortalAutomationCatalogItem, PortalBusinessSettings } from "@/lib/api";
 
 const recommendedModules: AutomationModule[] = [
   {
@@ -94,6 +94,22 @@ const recommendedModules: AutomationModule[] = [
   }
 ];
 
+const BUSINESS_TYPE_OPTIONS = [
+  { value: "dental_clinic", label: "Clinica odontologica" },
+  { value: "medical_clinic", label: "Clinica medica" },
+  { value: "retail_products", label: "Comercio con productos" },
+  { value: "services_general", label: "Servicios generales" },
+  { value: "beauty_salon", label: "Peluqueria / estetica" }
+] as const;
+
+const CAPABILITY_OPTIONS = [
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "contacts", label: "Contactos" },
+  { value: "agenda", label: "Agenda" },
+  { value: "catalog", label: "Catalogo" },
+  { value: "payments", label: "Cobros" }
+] as const;
+
 function summarizeTrigger(automation: PortalAutomation) {
   if (automation.trigger.type === "keyword") {
     return automation.trigger.keyword ? `Cuando detecta la palabra "${automation.trigger.keyword}"` : "Cuando detecta una palabra clave";
@@ -120,14 +136,34 @@ function summarizeActions(automation: PortalAutomation) {
     .join(" | ");
 }
 
-export function AutomationsHub({ automations }: { automations: PortalAutomation[] }) {
+export function AutomationsHub({
+  automations,
+  catalog,
+  businessProfile
+}: {
+  automations: PortalAutomation[];
+  catalog: PortalAutomationCatalogItem[];
+  businessProfile: PortalBusinessSettings | null;
+}) {
   const [items, setItems] = useState(automations);
+  const [catalogItems, setCatalogItems] = useState(catalog);
+  const [profile, setProfile] = useState<PortalBusinessSettings | null>(businessProfile);
   const [pendingAutomationId, setPendingAutomationId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"toggle" | "delete" | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [pendingTemplateKey, setPendingTemplateKey] = useState<string | null>(null);
 
   useEffect(() => {
     setItems(automations);
   }, [automations]);
+
+  useEffect(() => {
+    setCatalogItems(catalog);
+  }, [catalog]);
+
+  useEffect(() => {
+    setProfile(businessProfile);
+  }, [businessProfile]);
 
   const modules = useMemo<AutomationModule[]>(
     () =>
@@ -160,6 +196,16 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
     const recommended = recommendedModules.filter((item) => item.state === "recomendada").length;
     return { active, pending, recommended };
   }, [modules]);
+
+  const compatibleCatalog = useMemo(
+    () => catalogItems.filter((item) => item.compatible),
+    [catalogItems]
+  );
+
+  const incompatibleCatalog = useMemo(
+    () => catalogItems.filter((item) => !item.compatible),
+    [catalogItems]
+  );
 
   async function handleToggleEnabled(module: AutomationModule) {
     const nextEnabled = module.state !== "activa";
@@ -217,6 +263,87 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
     }
   }
 
+  async function saveBusinessProfile(patch: Partial<PortalBusinessSettings>) {
+    setSavingProfile(true);
+    try {
+      const response = await fetch("/api/app/business", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessType: patch.businessType ?? profile?.businessType ?? "services_general",
+          capabilities: patch.capabilities ?? profile?.capabilities ?? []
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.detail || json?.error || "business_profile_update_failed"));
+      }
+
+      setProfile((current) => ({
+        ...(current || {
+          tenantId: "",
+          clinicId: null,
+          clinicName: null,
+          profileImageUrl: "",
+          legalName: "",
+          taxId: "",
+          taxIdType: "NONE",
+          vatCondition: "",
+          grossIncomeNumber: "",
+          fiscalAddress: "",
+          city: "",
+          province: "",
+          pointOfSaleSuggested: "",
+          defaultSuggestedFiscalVoucherType: "NONE",
+          accountantEmail: "",
+          accountantName: "",
+          openingHours: "",
+          address: "",
+          deliveryZones: "",
+          paymentMethods: "",
+          policies: "",
+          businessType: "services_general",
+          capabilities: []
+        }),
+        ...(json?.settings || {}),
+        businessType: json?.settings?.businessType || patch.businessType || current?.businessType || "services_general",
+        capabilities: Array.isArray(json?.settings?.capabilities)
+          ? json.settings.capabilities
+          : patch.capabilities || current?.capabilities || []
+      }));
+      toast.success("Perfil de automatizacion actualizado");
+      window.location.reload();
+    } catch (error) {
+      toast.error("No se pudo guardar el perfil", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleToggleTemplate(template: PortalAutomationCatalogItem) {
+    const nextEnabled = !template.tenantEnabled;
+    setPendingTemplateKey(template.key);
+    try {
+      const response = await fetch(`/api/app/automations/catalog/${encodeURIComponent(template.key)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.success || !json?.data?.template) {
+        throw new Error(String(json?.error || "automation_template_update_failed"));
+      }
+
+      setCatalogItems((current) => current.map((item) => (item.key === template.key ? json.data.template : item)));
+      toast.success(nextEnabled ? "Template habilitado" : "Template deshabilitado");
+      window.location.reload();
+    } catch (error) {
+      toast.error("No se pudo actualizar el template", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setPendingTemplateKey(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
@@ -255,6 +382,137 @@ export function AutomationsHub({ automations }: { automations: PortalAutomation[
             <StatBlock label="Automatizaciones activas" value={String(stats.active)} />
             <StatBlock label="Pendientes de configuracion" value={String(stats.pending)} />
             <StatBlock label="Recomendadas" value={String(stats.recommended)} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="outline">Perfil del tenant</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Compatibilidad por rubro</CardTitle>
+              <CardDescription>Define el tipo de negocio y las capacidades disponibles para mostrar solo automatizaciones coherentes.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de negocio</label>
+              <select
+                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                value={profile?.businessType || "services_general"}
+                disabled={savingProfile}
+                onChange={(event) => void saveBusinessProfile({ businessType: event.target.value })}
+              >
+                {BUSINESS_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Capacidades disponibles</p>
+              <div className="flex flex-wrap gap-2">
+                {CAPABILITY_OPTIONS.map((capability) => {
+                  const active = (profile?.capabilities || []).includes(capability.value);
+                  return (
+                    <Button
+                      key={capability.value}
+                      type="button"
+                      size="sm"
+                      variant={active ? "primary" : "secondary"}
+                      disabled={savingProfile}
+                      onClick={() => {
+                        const current = new Set(profile?.capabilities || []);
+                        if (active) {
+                          current.delete(capability.value);
+                        } else {
+                          current.add(capability.value);
+                        }
+                        void saveBusinessProfile({ capabilities: Array.from(current) });
+                      }}
+                    >
+                      {capability.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted">
+                WhatsApp y Contactos pueden resolverse automaticamente por el workspace. Agenda, Catalogo y Cobros marcan compatibilidad funcional.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="warning">Catalogo maestro</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Automatizaciones disponibles</CardTitle>
+              <CardDescription>Este listado ordena lo que Opturon ofrece globalmente y separa lo compatible de lo que todavia no aplica a este negocio.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            {compatibleCatalog.length > 0 ? (
+              <div className="space-y-3">
+                {compatibleCatalog.map((template) => (
+                  <div key={template.key} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold">{template.name}</p>
+                          <Badge variant={template.effectiveEnabled ? "success" : "muted"}>
+                            {template.effectiveEnabled ? "Activa" : "Disponible"}
+                          </Badge>
+                          <Badge variant="outline">{template.category}</Badge>
+                          <Badge variant="muted">{template.managedBy === "hybrid" ? "Conectada al runtime" : "Catalogo estructural"}</Badge>
+                        </div>
+                        <p className="text-sm leading-6 text-muted">{template.description}</p>
+                        <p className="text-xs text-muted">
+                          Requiere: {template.requiredCapabilities.length ? template.requiredCapabilities.join(", ") : "sin requisitos extra"}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={template.tenantEnabled ? "secondary" : "primary"}
+                        disabled={pendingTemplateKey === template.key}
+                        onClick={() => void handleToggleTemplate(template)}
+                      >
+                        {pendingTemplateKey === template.key
+                          ? "Guardando..."
+                          : template.tenantEnabled
+                            ? "Deshabilitar"
+                            : "Habilitar"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                Todavia no hay automatizaciones compatibles con el perfil actual. Ajusta rubro o capacidades para destrabar opciones.
+              </div>
+            )}
+
+            {incompatibleCatalog.length > 0 ? (
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                <p className="text-sm font-semibold">Fuera de compatibilidad por ahora</p>
+                <div className="mt-3 space-y-2">
+                  {incompatibleCatalog.map((template) => (
+                    <div key={template.key} className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{template.name}</span>
+                        <Badge variant="muted">{template.category}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-muted">
+                        {template.businessTypeMatch ? "Faltan capacidades: " : "No aplica a este rubro. "}
+                        {template.businessTypeMatch ? template.missingCapabilities.join(", ") : template.businessTypes.join(", ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </section>

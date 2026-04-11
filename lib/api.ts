@@ -878,6 +878,8 @@ export type PortalBusinessSettings = {
   deliveryZones: string;
   paymentMethods: string;
   policies: string;
+  businessType?: string;
+  capabilities?: string[];
 };
 
 export type PortalBotTransferConfig = {
@@ -1656,6 +1658,28 @@ export type PortalAutomation = {
   updatedAt: string;
 };
 
+export type PortalAutomationCatalogItem = {
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  businessTypes: string[];
+  requiredCapabilities: string[];
+  defaultEnabled: boolean;
+  status: string;
+  configSchema: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  linkedAutomationIds: string[];
+  linkedAutomationCount: number;
+  managedBy: string;
+  compatible: boolean;
+  tenantEnabled: boolean;
+  runtimeEnabled: boolean;
+  effectiveEnabled: boolean;
+  businessTypeMatch: boolean;
+  missingCapabilities: string[];
+};
+
 export async function getPortalOrders(tenantId: string) {
   return backendFetch<{
     success: boolean;
@@ -2277,6 +2301,14 @@ export async function getPortalAutomations(tenantId: string) {
     data: {
       tenantId: string;
       automations: PortalAutomation[];
+      businessProfile?: {
+        clinicId: string | null;
+        clinicName: string | null;
+        businessType: string;
+        capabilities: string[];
+        resolvedCapabilities: string[];
+      };
+      catalog?: PortalAutomationCatalogItem[];
     };
   }>(`/portal/tenants/${tenantId}/automations`);
 }
@@ -2457,6 +2489,25 @@ export async function patchPortalAutomation(
       automation: PortalAutomation;
     };
   }>(`/portal/tenants/${tenantId}/automations/${automationId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function patchPortalAutomationTemplate(
+  tenantId: string,
+  templateKey: string,
+  payload: {
+    enabled: boolean;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      template: PortalAutomationCatalogItem;
+    };
+  }>(`/portal/tenants/${tenantId}/automations/catalog/${templateKey}`, {
     method: "PATCH",
     body: JSON.stringify(payload)
   });

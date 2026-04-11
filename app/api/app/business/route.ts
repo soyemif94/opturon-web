@@ -28,7 +28,9 @@ const schema = z.object({
   address: z.string().optional(),
   deliveryZones: z.string().optional(),
   paymentMethods: z.string().optional(),
-  policies: z.string().optional()
+  policies: z.string().optional(),
+  businessType: z.string().optional(),
+  capabilities: z.array(z.string()).optional()
 });
 
 function emptySettings(tenantId: string) {
@@ -51,7 +53,9 @@ function emptySettings(tenantId: string) {
     address: "",
     deliveryZones: "",
     paymentMethods: "",
-    policies: ""
+    policies: "",
+    businessType: "services_general",
+    capabilities: []
   };
 }
 
@@ -147,7 +151,9 @@ export async function PATCH(request: NextRequest) {
         address: String(parsed.data.address || ""),
         deliveryZones: String(parsed.data.deliveryZones || ""),
         paymentMethods: String(parsed.data.paymentMethods || ""),
-        policies: String(parsed.data.policies || "")
+        policies: String(parsed.data.policies || ""),
+        businessType: String(parsed.data.businessType || "services_general"),
+        capabilities: Array.isArray(parsed.data.capabilities) ? parsed.data.capabilities.map((item) => String(item || "")) : []
       };
       const result = await patchPortalBusinessSettings(tenantId, normalizedPayload);
       return noStore(NextResponse.json({ ok: true, settings: result.data.settings, source: "backend_real_tenant" }));
