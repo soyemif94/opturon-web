@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatExpirationDate, getExpirationBadgePresentation } from "@/lib/product-expiration";
+import { formatExpirationDate, getExpirationBadgePresentation, getProductExpirationStatus } from "@/lib/product-expiration";
 import { getInventoryAlerts, getStockState } from "@/lib/stock-state";
 import { toast } from "@/components/ui/toast";
 
@@ -35,6 +35,8 @@ type ProductCategory = {
   name: string;
   isActive: boolean;
 };
+
+type ExpirationFilter = "all" | "expiring_soon" | "critical" | "expired";
 
 type Draft = {
   name: string;
@@ -122,6 +124,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [expirationFilter, setExpirationFilter] = useState<ExpirationFilter>("all");
+  const [sortByUrgency, setSortByUrgency] = useState(true);
   const [listExpanded, setListExpanded] = useState(true);
   const [categoryName, setCategoryName] = useState("");
   const [categorySaving, setCategorySaving] = useState(false);
@@ -174,10 +178,40 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       return haystack.includes(query);
     });
   }, [products, search, categoryFilter]);
+  const riskCount = useMemo(
+    () =>
+      filteredProducts.filter((product) => {
+        const status = getProductExpirationStatus(product.expirationDate);
+        return status?.state === "critical" || status?.state === "expiring_soon";
+      }).length,
+    [filteredProducts]
+  );
+  const visibleProducts = useMemo(() => {
+    const expirationFiltered = filteredProducts.filter((product) => {
+      if (expirationFilter === "all") return true;
+      const status = getProductExpirationStatus(product.expirationDate);
+      if (expirationFilter === "critical") return status?.state === "critical";
+      if (expirationFilter === "expired") return status?.state === "expired";
+      if (expirationFilter === "expiring_soon") return status?.state === "expiring_soon";
+      return true;
+    });
+
+    if (!sortByUrgency) return expirationFiltered;
+
+    return [...expirationFiltered].sort((left, right) => {
+      const priorityLeft = getExpirationPriority(left);
+      const priorityRight = getExpirationPriority(right);
+      if (priorityLeft !== priorityRight) return priorityLeft - priorityRight;
+
+      const updatedLeft = new Date(left.updatedAt || left.createdAt || 0).getTime();
+      const updatedRight = new Date(right.updatedAt || right.createdAt || 0).getTime();
+      return updatedRight - updatedLeft;
+    });
+  }, [expirationFilter, filteredProducts, sortByUrgency]);
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
-  const allVisibleSelected = filteredProducts.length > 0 && filteredProducts.every((product) => selectedIds.includes(product.id));
-  const selectedVisibleCount = filteredProducts.filter((product) => selectedIds.includes(product.id)).length;
+  const allVisibleSelected = visibleProducts.length > 0 && visibleProducts.every((product) => selectedIds.includes(product.id));
+  const selectedVisibleCount = visibleProducts.filter((product) => selectedIds.includes(product.id)).length;
   const hasActiveSearch = search.trim().length > 0;
   const isFilteredCategoryEmpty = Boolean(activeCategory && activeCategoryProductCount === 0);
 
@@ -271,13 +305,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   function toggleSelectAllVisible() {
     if (allVisibleSelected) {
-      setSelectedIds((current) => current.filter((id) => !filteredProducts.some((product) => product.id === id)));
+      setSelectedIds((current) => current.filter((id) => !visibleProducts.some((product) => product.id === id)));
       return;
     }
 
     setSelectedIds((current) => {
       const next = new Set(current);
-      filteredProducts.forEach((product) => next.add(product.id));
+      visibleProducts.forEach((product) => next.add(product.id));
       return Array.from(next);
     });
   }
@@ -794,7 +828,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           <CardHeader
             action={
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <Badge variant="muted">{filteredProducts.length} visibles</Badge>
+                <Badge variant="muted">{visibleProducts.length} visibles</Badge>
+                {riskCount > 0 ? <Badge variant="warning">{riskCount} en riesgo</Badge> : null}
                 {categoryFilter ? <Badge variant="outline">Categoria filtrada</Badge> : null}
                 <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setListExpanded((current) => !current)}>
                   {listExpanded ? "Colapsar" : "Expandir"}
@@ -843,7 +878,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     </Badge>
                   </div>
                   <p className="text-sm text-muted">
-                    {filteredProducts.length} visibles de {activeCategoryProductCount} producto{activeCategoryProductCount === 1 ? "" : "s"} en esta categoria.
+                    {visibleProducts.length} visibles de {activeCategoryProductCount} producto{activeCategoryProductCount === 1 ? "" : "s"} en esta categoria.
                   </p>
                 </div>
                 {!readOnly ? (
@@ -860,7 +895,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <span className="text-sm font-medium">Todas las categorias</span>
                   </div>
                   <p className="text-sm text-muted">
-                    {filteredProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catalogo actual.
+                    {visibleProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catalogo actual.
                   </p>
                 </div>
               </div>
@@ -886,6 +921,29 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 </div>
               </div>
             ) : null}
+            <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Vencimiento</Badge>
+                <Button type="button" variant={expirationFilter === "all" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("all")}>
+                  Todos
+                </Button>
+                <Button type="button" variant={expirationFilter === "expiring_soon" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("expiring_soon")}>
+                  Próximos a vencer
+                </Button>
+                <Button type="button" variant={expirationFilter === "critical" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("critical")}>
+                  Críticos
+                </Button>
+                <Button type="button" variant={expirationFilter === "expired" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("expired")}>
+                  Vencidos
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
+                <span>{riskCount > 0 ? `${riskCount} productos en riesgo` : "Sin productos en riesgo en esta vista"}</span>
+                <Button type="button" variant={sortByUrgency ? "secondary" : "ghost"} size="sm" onClick={() => setSortByUrgency((current) => !current)}>
+                  {sortByUrgency ? "Urgencia primero" : "Orden original"}
+                </Button>
+              </div>
+            </div>
             {!listExpanded && products.length > 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
                 Listado colapsado para ahorrar espacio operativo. Mantienes buscador y acciones masivas listas para expandir cuando necesites revisar productos.
@@ -894,7 +952,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
                 Todavia no hay productos. Crea el primero desde el panel lateral o pega varias lineas en carga masiva para poblar rapido el catalogo.
               </div>
-            ) : filteredProducts.length === 0 ? (
+            ) : visibleProducts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
                 {activeCategory && !hasActiveSearch && isFilteredCategoryEmpty
                   ? `La categoria ${activeCategory.name} todavia no tiene productos. Agrega uno nuevo en esta categoria para empezar a organizar el catalogo.`
@@ -902,10 +960,12 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     ? `No encontramos coincidencias para "${search.trim()}" dentro de ${activeCategory.name}. Ajusta la busqueda o revisa otra categoria.`
                     : !activeCategory && hasActiveSearch
                       ? `No encontramos productos para "${search.trim()}". Prueba con otro nombre o SKU.`
-                      : "No encontramos productos para el criterio actual."}
+                      : expirationFilter !== "all"
+                        ? "No hay productos para este filtro de vencimiento."
+                        : "No encontramos productos para el criterio actual."}
               </div>
             ) : (
-              filteredProducts.map((product) => (
+              visibleProducts.map((product) => (
                 <div
                   key={product.id}
                   className={`rounded-[22px] border p-4 transition-colors ${
@@ -1493,6 +1553,15 @@ function resolveStock(product: Product) {
 function resolveStatus(product: Product) {
   if (product.status) return product.status;
   return product.active === false ? "archived" : "active";
+}
+
+function getExpirationPriority(product: Product) {
+  const status = getProductExpirationStatus(product.expirationDate);
+  if (status?.state === "expired") return 0;
+  if (status?.state === "critical") return 1;
+  if (status?.state === "expiring_soon") return 2;
+  if (status?.state === "normal") return 3;
+  return 4;
 }
 
 function MetricCard({
