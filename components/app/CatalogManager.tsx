@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatExpirationDate, getExpirationBadgePresentation } from "@/lib/product-expiration";
 import { getInventoryAlerts, getStockState } from "@/lib/stock-state";
 import { toast } from "@/components/ui/toast";
 
@@ -24,6 +25,7 @@ type Product = {
   active?: boolean;
   categoryId?: string | null;
   categoryName?: string | null;
+  expirationDate?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -42,6 +44,7 @@ type Draft = {
   stock: string;
   currency: string;
   categoryId: string;
+  expirationDate: string;
 };
 
 type BulkPreviewRow = {
@@ -91,7 +94,8 @@ const EMPTY_DRAFT: Draft = {
   price: "",
   stock: "0",
   currency: "ARS",
-  categoryId: ""
+  categoryId: "",
+  expirationDate: ""
 };
 
 const BULK_EXAMPLE = [
@@ -185,7 +189,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       price: product ? String(resolvePrice(product)) : "",
       stock: product ? String(resolveStock(product)) : "0",
       currency: product?.currency || "ARS",
-      categoryId: product?.categoryId || ""
+      categoryId: product?.categoryId || "",
+      expirationDate: product?.expirationDate || ""
     };
   }
 
@@ -330,7 +335,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           vatRate: 0,
           stock,
           currency: draft.currency.trim() || "ARS",
-          categoryId: draft.categoryId || null
+          categoryId: draft.categoryId || null,
+          expirationDate: draft.expirationDate || null
         })
       });
       const json = await response.json().catch(() => null);
@@ -925,9 +931,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           <Badge variant={getStockState(resolveStock(product)).variant}>
                             {getStockState(resolveStock(product)).label}
                           </Badge>
+                          <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
+                            {getExpirationBadgePresentation(product.expirationDate).label}
+                          </Badge>
                         </div>
                         <p className="mt-2 text-sm text-muted">
                           {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          Vencimiento {formatExpirationDate(product.expirationDate)}
+                          {product.expirationDate ? ` · ${getExpirationBadgePresentation(product.expirationDate).helper}` : ""}
                         </p>
                         <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
                       </button>
@@ -1136,6 +1149,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">Vencimiento opcional</label>
+                    <Input
+                      type="date"
+                      value={draft.expirationDate}
+                      onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Descripcion</label>
                     <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
                   </div>
@@ -1300,12 +1322,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <Badge variant={getStockState(resolveStock(selectedProduct)).variant}>
                       {getStockState(resolveStock(selectedProduct)).label}
                     </Badge>
+                    <Badge variant={getExpirationBadgePresentation(selectedProduct.expirationDate).variant}>
+                      {getExpirationBadgePresentation(selectedProduct.expirationDate).label}
+                    </Badge>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <DetailStat label="Precio" value={formatCurrency(resolvePrice(selectedProduct), selectedProduct.currency || "ARS")} />
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                     <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
+                    <DetailStat label="Vencimiento" value={formatExpirationDate(selectedProduct.expirationDate)} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>
                   {!readOnly ? (
@@ -1322,6 +1348,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   {getStockState(resolveStock(selectedProduct)).isOutOfStock ? (
                     <p className="text-sm text-red-300">Este producto no tiene stock disponible en este momento.</p>
                   ) : null}
+                  <p className={`text-sm ${
+                    getExpirationBadgePresentation(selectedProduct.expirationDate).variant === "danger"
+                      ? "text-red-300"
+                      : getExpirationBadgePresentation(selectedProduct.expirationDate).variant === "warning"
+                        ? "text-amber-300"
+                        : "text-muted"
+                  }`}>
+                    {getExpirationBadgePresentation(selectedProduct.expirationDate).helper}
+                  </p>
                   <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
                     <p className="text-sm font-semibold">Descripcion</p>
                     <p className="mt-2 text-sm leading-7 text-muted">{selectedProduct.description || "Sin descripcion cargada."}</p>

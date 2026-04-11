@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       stock: Number(body?.stock ?? body?.stockQty ?? 0),
       sku: body?.sku || null,
       categoryId: body?.categoryId || null,
+      expirationDate: body?.expirationDate || null,
       status:
         typeof body?.status === "string"
           ? body.status

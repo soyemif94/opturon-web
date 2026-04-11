@@ -21,6 +21,7 @@ type ProductDraft = {
   vatRate: string;
   status: string;
   categoryId: string;
+  expirationDate: string;
 };
 
 function buildInitialState(product: PortalProduct): ProductDraft {
@@ -33,7 +34,8 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     currency: product.currency || "ARS",
     vatRate: String(product.vatRate ?? product.taxRate ?? 0),
     status: product.status || "active",
-    categoryId: product.categoryId || ""
+    categoryId: product.categoryId || "",
+    expirationDate: product.expirationDate || ""
   };
 }
 
@@ -105,6 +107,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           description: draft.description.trim() || null,
           sku: sku || null,
           categoryId: draft.categoryId || null,
+          expirationDate: draft.expirationDate || null,
           price,
           stock,
           currency: draft.currency.trim().toUpperCase() || "ARS",
@@ -189,6 +192,12 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
               </option>
             ))}
           </select>
+          <Input
+            type="date"
+            value={draft.expirationDate}
+            onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
+            disabled={saving}
+          />
           <Textarea
             className="md:col-span-2"
             rows={6}
