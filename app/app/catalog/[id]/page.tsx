@@ -7,6 +7,7 @@ import { canManageCatalog } from "@/lib/app-permissions";
 import { getPortalProductDetail, isBackendConfigured } from "@/lib/api";
 import { formatMoney, formatDateTimeLabel, titleCaseLabel } from "@/lib/billing";
 import { formatExpirationDate, getExpirationBadgePresentation } from "@/lib/product-expiration";
+import { getDiscountedPrice } from "@/lib/product-pricing";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function CatalogProductDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +38,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
   }
 
   const expiration = getExpirationBadgePresentation(product.expirationDate);
+  const pricing = getDiscountedPrice(product.price, product.discountPercentage);
 
   return (
     <ClientPageShell
@@ -51,6 +53,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
               <div className="flex items-center gap-2">
                 <Badge variant={product.status === "active" ? "success" : "muted"}>{titleCaseLabel(product.status)}</Badge>
                 <Badge variant={expiration.variant}>{expiration.label}</Badge>
+                {pricing.hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
                 {!readOnly ? (
                   <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                     <Link href={`/app/catalog/${product.id}/edit`}>Editar producto</Link>
@@ -61,18 +64,22 @@ export default async function CatalogProductDetail({ params }: { params: Promise
           >
             <div>
               <CardTitle className="text-xl">{product.name}</CardTitle>
-              <CardDescription>{product.sku || "Sin codigo"} - {formatMoney(product.price, product.currency)}</CardDescription>
+              <CardDescription>
+                {product.sku || "Sin codigo"} - {pricing.hasDiscount ? formatMoney(pricing.finalPrice, product.currency) : formatMoney(product.price, product.currency)}
+              </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3">
             <DetailTile label="Codigo / SKU" value={product.sku || "-"} />
-            <DetailTile label="Precio" value={formatMoney(product.price, product.currency)} />
+            <DetailTile label="Precio base" value={formatMoney(pricing.originalPrice, product.currency)} />
+            <DetailTile label="Precio final" value={formatMoney(pricing.finalPrice, product.currency)} />
             <DetailTile label="IVA" value={`${Number(product.vatRate ?? product.taxRate ?? 0)}%`} />
             <DetailTile label="Moneda" value={product.currency || "ARS"} />
             <DetailTile label="Stock" value={String(product.stock ?? 0)} />
             <DetailTile label="Categoria" value={product.categoryName || "Sin categoria"} />
             <DetailTile label="Estado" value={titleCaseLabel(product.status)} />
             <DetailTile label="Vencimiento" value={formatExpirationDate(product.expirationDate)} />
+            <DetailTile label="Descuento" value={product.discountPercentage != null ? `${product.discountPercentage}%` : "Sin descuento"} />
             <DetailTile label="Creado" value={formatDateTimeLabel(product.createdAt)} />
             <DetailTile label="Actualizado" value={formatDateTimeLabel(product.updatedAt)} />
             <DetailTile label="Descripcion" value={product.description || "Sin descripcion cargada."} className="md:col-span-2 xl:col-span-3" />
@@ -87,7 +94,8 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <MetricTile label="Precio actual" value={formatMoney(product.price, product.currency)} />
+            <MetricTile label="Precio actual" value={formatMoney(pricing.finalPrice, product.currency)} />
+            <MetricTile label="Precio base" value={formatMoney(pricing.originalPrice, product.currency)} />
             <MetricTile label="Stock disponible" value={String(product.stock ?? 0)} />
             <MetricTile label="Carga fiscal" value={`${Number(product.vatRate ?? product.taxRate ?? 0)}%`} />
             <MetricTile label="Control de vencimiento" value={expiration.label} />

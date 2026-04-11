@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatExpirationDate, getExpirationBadgePresentation, getProductExpirationStatus } from "@/lib/product-expiration";
+import { getDiscountedPrice, normalizeDiscountPercentage } from "@/lib/product-pricing";
 import { getInventoryAlerts, getStockState } from "@/lib/stock-state";
 import { toast } from "@/components/ui/toast";
 
@@ -26,6 +27,7 @@ type Product = {
   categoryId?: string | null;
   categoryName?: string | null;
   expirationDate?: string | null;
+  discountPercentage?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -127,6 +129,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [expirationFilter, setExpirationFilter] = useState<ExpirationFilter>("all");
   const [sortByUrgency, setSortByUrgency] = useState(true);
   const [listExpanded, setListExpanded] = useState(true);
+  const [discountEditorId, setDiscountEditorId] = useState<string | null>(null);
+  const [discountDraft, setDiscountDraft] = useState("");
+  const [discountSavingId, setDiscountSavingId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categorySaving, setCategorySaving] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -689,6 +694,50 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
   }
 
+  function openDiscountEditor(product: Product) {
+    setDiscountEditorId(product.id);
+    setDiscountDraft(product.discountPercentage != null ? String(product.discountPercentage) : getSuggestedDiscount(product));
+  }
+
+  function closeDiscountEditor() {
+    setDiscountEditorId(null);
+    setDiscountDraft("");
+  }
+
+  async function saveDiscount(product: Product, rawValue = discountDraft) {
+    if (readOnly) return;
+    const normalized = normalizeDiscountPercentage(rawValue);
+    if (String(rawValue || "").trim() && normalized == null) {
+      setFeedback({ tone: "warning", text: "Ingresa un porcentaje valido mayor a cero." });
+      return;
+    }
+
+    setDiscountSavingId(product.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/catalog/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discountPercentage: normalized })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo actualizar el descuento."));
+
+      setProducts((current) => current.map((item) => (item.id === product.id ? json.product : item)));
+      if (selectedId === product.id) {
+        setSelectedId(json.product.id);
+      }
+      closeDiscountEditor();
+      toast.success(normalized == null ? "Promocion removida" : "Descuento aplicado");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo actualizar el descuento.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al actualizar descuento", message);
+    } finally {
+      setDiscountSavingId(null);
+    }
+  }
+
   async function deleteSelectedProducts() {
     if (readOnly || selectedIds.length === 0) return;
 
@@ -994,6 +1043,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
                             {getExpirationBadgePresentation(product.expirationDate).label}
                           </Badge>
+                          {getProductPricing(product).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
                         </div>
                         <p className="mt-2 text-sm text-muted">
                           {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
@@ -1007,7 +1057,31 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
+                      <div className="text-right">
+                        {getProductPricing(product).hasDiscount ? (
+                          <>
+                            <p className="text-xs text-muted line-through">
+                              {formatCurrency(getProductPricing(product).originalPrice, product.currency || "ARS")}
+                            </p>
+                            <p className="text-sm font-semibold">
+                              {formatCurrency(getProductPricing(product).finalPrice, product.currency || "ARS")}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
+                        )}
+                      </div>
+                      {canApplyDirectDiscount(product) ? (
+                        <Button
+                          type="button"
+                          variant={getProductPricing(product).hasDiscount ? "secondary" : "primary"}
+                          size="sm"
+                          disabled={readOnly}
+                          onClick={() => openDiscountEditor(product)}
+                        >
+                          {getProductPricing(product).hasDiscount ? "Editar descuento" : "Aplicar descuento"}
+                        </Button>
+                      ) : null}
                       <Button asChild variant="secondary" size="sm">
                         <Link href={`/app/catalog/${product.id}/edit`}>
                           <PencilLine className="mr-1 h-4 w-4" />
@@ -1029,6 +1103,51 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       </Button>
                     </div>
                   </div>
+                  {discountEditorId === product.id ? (
+                    <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/85 p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="space-y-2">
+                          <label htmlFor={`discount-${product.id}`} className="text-sm font-medium">
+                            Descuento %
+                          </label>
+                          <Input
+                            id={`discount-${product.id}`}
+                            value={discountDraft}
+                            onChange={(event) => setDiscountDraft(event.target.value)}
+                            inputMode="decimal"
+                            placeholder={getSuggestedDiscount(product)}
+                            className="w-full lg:w-40"
+                            disabled={discountSavingId === product.id}
+                          />
+                          <p className="text-xs text-muted">
+                            Precio final: {formatCurrency(getDiscountedPrice(resolvePrice(product), discountDraft).finalPrice, product.currency || "ARS")}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" variant="ghost" size="sm" onClick={closeDiscountEditor} disabled={discountSavingId === product.id}>
+                            Cancelar
+                          </Button>
+                          {product.discountPercentage != null ? (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setDiscountDraft("");
+                                void saveDiscount(product, "");
+                              }}
+                              disabled={discountSavingId === product.id}
+                            >
+                              Quitar descuento
+                            </Button>
+                          ) : null}
+                          <Button type="button" size="sm" onClick={() => void saveDiscount(product)} disabled={discountSavingId === product.id}>
+                            {discountSavingId === product.id ? "Guardando..." : "Guardar descuento"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}
@@ -1385,13 +1504,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <Badge variant={getExpirationBadgePresentation(selectedProduct.expirationDate).variant}>
                       {getExpirationBadgePresentation(selectedProduct.expirationDate).label}
                     </Badge>
+                    {getProductPricing(selectedProduct).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <DetailStat label="Precio" value={formatCurrency(resolvePrice(selectedProduct), selectedProduct.currency || "ARS")} />
+                    <DetailStat label="Precio base" value={formatCurrency(getProductPricing(selectedProduct).originalPrice, selectedProduct.currency || "ARS")} />
+                    <DetailStat label="Precio final" value={formatCurrency(getProductPricing(selectedProduct).finalPrice, selectedProduct.currency || "ARS")} />
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                     <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Vencimiento" value={formatExpirationDate(selectedProduct.expirationDate)} />
+                    <DetailStat label="Descuento" value={selectedProduct.discountPercentage != null ? `${selectedProduct.discountPercentage}%` : "Sin descuento"} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>
                   {!readOnly ? (
@@ -1546,6 +1668,10 @@ function resolvePrice(product: Product) {
   return Number(product.price || 0);
 }
 
+function getProductPricing(product: Product) {
+  return getDiscountedPrice(resolvePrice(product), product.discountPercentage);
+}
+
 function resolveStock(product: Product) {
   return Number((product.stock ?? product.stockQty) || 0);
 }
@@ -1562,6 +1688,19 @@ function getExpirationPriority(product: Product) {
   if (status?.state === "expiring_soon") return 2;
   if (status?.state === "normal") return 3;
   return 4;
+}
+
+function canApplyDirectDiscount(product: Product) {
+  const status = getProductExpirationStatus(product.expirationDate);
+  if (product.discountPercentage != null) return true;
+  return status?.state === "critical" || status?.state === "expiring_soon";
+}
+
+function getSuggestedDiscount(product: Product) {
+  const status = getProductExpirationStatus(product.expirationDate);
+  if (status?.state === "critical") return "30";
+  if (status?.state === "expiring_soon") return "15";
+  return "10";
 }
 
 function MetricCard({

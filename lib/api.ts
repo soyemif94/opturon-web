@@ -1329,6 +1329,7 @@ export type PortalProduct = {
   categoryId?: string | null;
   categoryName?: string | null;
   expirationDate?: string | null;
+  discountPercentage?: number | null;
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -2522,6 +2523,7 @@ export async function createPortalProduct(
     sku?: string | null;
     categoryId?: string | null;
     expirationDate?: string | null;
+    discountPercentage?: number | null;
     status?: string;
     metadata?: Record<string, unknown>;
   }
@@ -2567,6 +2569,7 @@ export async function patchPortalProduct(
     sku?: string | null;
     categoryId?: string | null;
     expirationDate?: string | null;
+    discountPercentage?: number | null;
     status?: string;
     metadata?: Record<string, unknown>;
   }

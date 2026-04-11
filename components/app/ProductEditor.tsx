@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { PortalProduct, PortalProductCategory } from "@/lib/api";
+import { getDiscountedPrice } from "@/lib/product-pricing";
 
 type ProductDraft = {
   name: string;
@@ -22,6 +23,7 @@ type ProductDraft = {
   status: string;
   categoryId: string;
   expirationDate: string;
+  discountPercentage: string;
 };
 
 function buildInitialState(product: PortalProduct): ProductDraft {
@@ -35,7 +37,8 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     vatRate: String(product.vatRate ?? product.taxRate ?? 0),
     status: product.status || "active",
     categoryId: product.categoryId || "",
-    expirationDate: product.expirationDate || ""
+    expirationDate: product.expirationDate || "",
+    discountPercentage: product.discountPercentage != null ? String(product.discountPercentage) : ""
   };
 }
 
@@ -75,6 +78,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const price = Number(draft.price);
     const stock = Number(draft.stock || 0);
     const vatRate = Number(draft.vatRate || 0);
+    const discountPercentage = draft.discountPercentage.trim() ? Number(draft.discountPercentage) : null;
 
     if (!name) {
       toast.error("Nombre requerido", "Completa el nombre del producto antes de guardar.");
@@ -96,6 +100,10 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
       toast.error("Stock invalido", "Ingresa un stock valido mayor o igual a cero.");
       return;
     }
+    if (discountPercentage !== null && (!Number.isFinite(discountPercentage) || discountPercentage <= 0 || discountPercentage > 100)) {
+      toast.error("Descuento invalido", "Ingresa un descuento mayor a 0 y menor o igual a 100.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -108,6 +116,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           sku: sku || null,
           categoryId: draft.categoryId || null,
           expirationDate: draft.expirationDate || null,
+          discountPercentage,
           price,
           stock,
           currency: draft.currency.trim().toUpperCase() || "ARS",
@@ -198,6 +207,16 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
             disabled={saving}
           />
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder="Descuento %"
+            value={draft.discountPercentage}
+            onChange={(event) => setDraft((current) => ({ ...current, discountPercentage: event.target.value }))}
+            disabled={saving}
+          />
           <Textarea
             className="md:col-span-2"
             rows={6}
@@ -206,6 +225,11 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
             disabled={saving}
           />
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
+            Precio final visible: {new Intl.NumberFormat("es-AR", { style: "currency", currency: draft.currency || "ARS", maximumFractionDigits: 2 }).format(
+              getDiscountedPrice(Number(draft.price || 0), draft.discountPercentage).finalPrice
+            )}
+          </div>
         </CardContent>
       </Card>
 

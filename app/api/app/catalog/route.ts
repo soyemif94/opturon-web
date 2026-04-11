@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       sku: body?.sku || null,
       categoryId: body?.categoryId || null,
       expirationDate: body?.expirationDate || null,
+      discountPercentage: body?.discountPercentage ?? null,
       status:
         typeof body?.status === "string"
           ? body.status
