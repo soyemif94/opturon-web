@@ -1332,6 +1332,17 @@ export type PortalProduct = {
   categoryName?: string | null;
   expirationDate?: string | null;
   discountPercentage?: number | null;
+  riskDiscountSuggestion?: {
+    key: "catalog_risk_discount";
+    status: "critical" | "expiring_soon";
+    suggestedDiscountPercentage: number;
+    currentDiscountPercentage: number | null;
+    deltaPercentage: number;
+    hasManualDiscount: boolean;
+    canApply: boolean;
+    label: string;
+    helper: string;
+  } | null;
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

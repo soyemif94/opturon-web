@@ -28,6 +28,17 @@ type Product = {
   categoryName?: string | null;
   expirationDate?: string | null;
   discountPercentage?: number | null;
+  riskDiscountSuggestion?: {
+    key: "catalog_risk_discount";
+    status: "critical" | "expiring_soon";
+    suggestedDiscountPercentage: number;
+    currentDiscountPercentage: number | null;
+    deltaPercentage: number;
+    hasManualDiscount: boolean;
+    canApply: boolean;
+    label: string;
+    helper: string;
+  } | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -696,7 +707,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   function openDiscountEditor(product: Product) {
     setDiscountEditorId(product.id);
-    setDiscountDraft(product.discountPercentage != null ? String(product.discountPercentage) : getSuggestedDiscount(product));
+    setDiscountDraft(
+      product.discountPercentage != null
+        ? String(product.discountPercentage)
+        : product.riskDiscountSuggestion
+          ? String(product.riskDiscountSuggestion.suggestedDiscountPercentage)
+          : ""
+    );
   }
 
   function closeDiscountEditor() {
@@ -1044,6 +1061,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                             {getExpirationBadgePresentation(product.expirationDate).label}
                           </Badge>
                           {getProductPricing(product).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
+                          {product.riskDiscountSuggestion ? <Badge variant="warning">{product.riskDiscountSuggestion.label}</Badge> : null}
                         </div>
                         <p className="mt-2 text-sm text-muted">
                           {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
@@ -1052,6 +1070,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           Vencimiento {formatExpirationDate(product.expirationDate)}
                           {product.expirationDate ? ` · ${getExpirationBadgePresentation(product.expirationDate).helper}` : ""}
                         </p>
+                        {product.riskDiscountSuggestion ? (
+                          <p className="mt-1 text-xs text-amber-300">
+                            {product.riskDiscountSuggestion.helper}
+                            {product.riskDiscountSuggestion.currentDiscountPercentage != null
+                              ? ` Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%.`
+                              : ` Sugerido ${product.riskDiscountSuggestion.suggestedDiscountPercentage}%.`}
+                          </p>
+                        ) : null}
                         <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
                       </button>
                     </div>
@@ -1079,7 +1105,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           disabled={readOnly}
                           onClick={() => openDiscountEditor(product)}
                         >
-                          {getProductPricing(product).hasDiscount ? "Editar descuento" : "Aplicar descuento"}
+                          {product.riskDiscountSuggestion && !getProductPricing(product).hasDiscount ? "Aplicar sugerencia" : getProductPricing(product).hasDiscount ? "Editar descuento" : "Aplicar descuento"}
                         </Button>
                       ) : null}
                       <Button asChild variant="secondary" size="sm">
@@ -1105,6 +1131,18 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   </div>
                   {discountEditorId === product.id ? (
                     <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/85 p-4">
+                      {product.riskDiscountSuggestion ? (
+                        <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3">
+                          <p className="text-sm font-medium text-amber-100">{product.riskDiscountSuggestion.label}</p>
+                          <p className="mt-1 text-xs text-amber-200/90">{product.riskDiscountSuggestion.helper}</p>
+                          <p className="mt-2 text-xs text-amber-200/80">
+                            Sugerido {product.riskDiscountSuggestion.suggestedDiscountPercentage}%
+                            {product.riskDiscountSuggestion.currentDiscountPercentage != null
+                              ? ` · Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%`
+                              : ""}
+                          </p>
+                        </div>
+                      ) : null}
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                         <div className="space-y-2">
                           <label htmlFor={`discount-${product.id}`} className="text-sm font-medium">
@@ -1115,7 +1153,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                             value={discountDraft}
                             onChange={(event) => setDiscountDraft(event.target.value)}
                             inputMode="decimal"
-                            placeholder={getSuggestedDiscount(product)}
+                            placeholder={product.riskDiscountSuggestion ? String(product.riskDiscountSuggestion.suggestedDiscountPercentage) : ""}
                             className="w-full lg:w-40"
                             disabled={discountSavingId === product.id}
                           />
@@ -1127,6 +1165,21 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           <Button type="button" variant="ghost" size="sm" onClick={closeDiscountEditor} disabled={discountSavingId === product.id}>
                             Cancelar
                           </Button>
+                          {product.riskDiscountSuggestion && product.riskDiscountSuggestion.canApply ? (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                const suggested = String(product.riskDiscountSuggestion?.suggestedDiscountPercentage || "");
+                                setDiscountDraft(suggested);
+                                void saveDiscount(product, suggested);
+                              }}
+                              disabled={discountSavingId === product.id}
+                            >
+                              Aplicar sugerencia
+                            </Button>
+                          ) : null}
                           {product.discountPercentage != null ? (
                             <Button
                               type="button"
@@ -1505,6 +1558,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       {getExpirationBadgePresentation(selectedProduct.expirationDate).label}
                     </Badge>
                     {getProductPricing(selectedProduct).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
+                    {selectedProduct.riskDiscountSuggestion ? <Badge variant="warning">{selectedProduct.riskDiscountSuggestion.label}</Badge> : null}
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <DetailStat label="Precio base" value={formatCurrency(getProductPricing(selectedProduct).originalPrice, selectedProduct.currency || "ARS")} />
@@ -1514,8 +1568,24 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Vencimiento" value={formatExpirationDate(selectedProduct.expirationDate)} />
                     <DetailStat label="Descuento" value={selectedProduct.discountPercentage != null ? `${selectedProduct.discountPercentage}%` : "Sin descuento"} />
+                    <DetailStat
+                      label="Sugerencia automatica"
+                      value={selectedProduct.riskDiscountSuggestion ? `${selectedProduct.riskDiscountSuggestion.suggestedDiscountPercentage}%` : "Sin sugerencia"}
+                    />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>
+                  {selectedProduct.riskDiscountSuggestion ? (
+                    <div className="rounded-[22px] border border-amber-400/20 bg-amber-500/10 p-4">
+                      <p className="text-sm font-semibold text-amber-100">Sugerencia automatica de descuento</p>
+                      <p className="mt-2 text-sm text-amber-200/90">{selectedProduct.riskDiscountSuggestion.helper}</p>
+                      <p className="mt-2 text-xs text-amber-200/80">
+                        Sugerido {selectedProduct.riskDiscountSuggestion.suggestedDiscountPercentage}%
+                        {selectedProduct.riskDiscountSuggestion.currentDiscountPercentage != null
+                          ? ` · Actual ${selectedProduct.riskDiscountSuggestion.currentDiscountPercentage}%`
+                          : ""}
+                      </p>
+                    </div>
+                  ) : null}
                   {!readOnly ? (
                     <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                       <Link href={`/app/catalog/${selectedProduct.id}/edit`}>
@@ -1691,16 +1761,10 @@ function getExpirationPriority(product: Product) {
 }
 
 function canApplyDirectDiscount(product: Product) {
-  const status = getProductExpirationStatus(product.expirationDate);
+  if (product.riskDiscountSuggestion) return true;
   if (product.discountPercentage != null) return true;
-  return status?.state === "critical" || status?.state === "expiring_soon";
-}
-
-function getSuggestedDiscount(product: Product) {
   const status = getProductExpirationStatus(product.expirationDate);
-  if (status?.state === "critical") return "30";
-  if (status?.state === "expiring_soon") return "15";
-  return "10";
+  return status?.state === "critical" || status?.state === "expiring_soon";
 }
 
 function MetricCard({

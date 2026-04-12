@@ -54,6 +54,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
                 <Badge variant={product.status === "active" ? "success" : "muted"}>{titleCaseLabel(product.status)}</Badge>
                 <Badge variant={expiration.variant}>{expiration.label}</Badge>
                 {pricing.hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
+                {product.riskDiscountSuggestion ? <Badge variant="warning">{product.riskDiscountSuggestion.label}</Badge> : null}
                 {!readOnly ? (
                   <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                     <Link href={`/app/catalog/${product.id}/edit`}>Editar producto</Link>
@@ -80,6 +81,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <DetailTile label="Estado" value={titleCaseLabel(product.status)} />
             <DetailTile label="Vencimiento" value={formatExpirationDate(product.expirationDate)} />
             <DetailTile label="Descuento" value={product.discountPercentage != null ? `${product.discountPercentage}%` : "Sin descuento"} />
+            <DetailTile label="Sugerencia automatica" value={product.riskDiscountSuggestion ? `${product.riskDiscountSuggestion.suggestedDiscountPercentage}%` : "Sin sugerencia"} />
             <DetailTile label="Creado" value={formatDateTimeLabel(product.createdAt)} />
             <DetailTile label="Actualizado" value={formatDateTimeLabel(product.updatedAt)} />
             <DetailTile label="Descripcion" value={product.description || "Sin descripcion cargada."} className="md:col-span-2 xl:col-span-3" />
@@ -99,6 +101,18 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <MetricTile label="Stock disponible" value={String(product.stock ?? 0)} />
             <MetricTile label="Carga fiscal" value={`${Number(product.vatRate ?? product.taxRate ?? 0)}%`} />
             <MetricTile label="Control de vencimiento" value={expiration.label} />
+            {product.riskDiscountSuggestion ? (
+              <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                <p className="font-medium">{product.riskDiscountSuggestion.label}</p>
+                <p className="mt-2">{product.riskDiscountSuggestion.helper}</p>
+                <p className="mt-2 text-xs text-amber-200/80">
+                  Sugerido {product.riskDiscountSuggestion.suggestedDiscountPercentage}%
+                  {product.riskDiscountSuggestion.currentDiscountPercentage != null
+                    ? ` · Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
               {product.status === "active"
                 ? "El producto esta activo y listo para usarse en catalogo, pedidos y futuras automatizaciones."
