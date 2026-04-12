@@ -1357,6 +1357,20 @@ export type PortalProductCategory = {
   updatedAt: string | null;
 };
 
+export type PortalAutomationActionMetricEvent = {
+  id: string;
+  clinicId: string;
+  externalTenantId: string | null;
+  templateKey: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  suggestedValue: Record<string, unknown>;
+  appliedValue: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  createdAt: string | null;
+};
+
 export type PortalInvoiceItem = {
   id: string;
   productId: string | null;
@@ -2632,6 +2646,12 @@ export async function patchPortalProduct(
     categoryId?: string | null;
     expirationDate?: string | null;
     discountPercentage?: number | null;
+    automationAttribution?: {
+      templateKey: string;
+      action: "apply_suggestion";
+      suggestedDiscountPercentage: number;
+      source?: string;
+    } | null;
     status?: string;
     metadata?: Record<string, unknown>;
   }
@@ -2644,6 +2664,27 @@ export async function patchPortalProduct(
     },
     false
   );
+}
+
+export async function getPortalAutomationTemplateMetrics(tenantId: string, templateKey: string, options?: { limit?: number }) {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set("limit", String(options.limit));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      template: {
+        key: string;
+        name: string;
+      };
+      summary: {
+        totalEvents: number;
+        appliedSuggestions: number;
+      };
+      events: PortalAutomationActionMetricEvent[];
+    };
+  }>(`/portal/tenants/${tenantId}/automations/catalog/${templateKey}/metrics${suffix}`, undefined, false);
 }
 
 export async function patchPortalProductCategory(

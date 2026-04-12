@@ -721,7 +721,18 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     setDiscountDraft("");
   }
 
-  async function saveDiscount(product: Product, rawValue = discountDraft) {
+  async function saveDiscount(
+    product: Product,
+    rawValue = discountDraft,
+    options?: {
+      automationAttribution?: {
+        templateKey: "catalog_risk_discount";
+        action: "apply_suggestion";
+        suggestedDiscountPercentage: number;
+        source?: string;
+      };
+    }
+  ) {
     if (readOnly) return;
     const normalized = normalizeDiscountPercentage(rawValue);
     if (String(rawValue || "").trim() && normalized == null) {
@@ -735,7 +746,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       const response = await fetch(`/api/app/catalog/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discountPercentage: normalized })
+        body: JSON.stringify({
+          discountPercentage: normalized,
+          automationAttribution: options?.automationAttribution || null
+        })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(String(json?.error || "No se pudo actualizar el descuento."));
@@ -1173,7 +1187,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                               onClick={() => {
                                 const suggested = String(product.riskDiscountSuggestion?.suggestedDiscountPercentage || "");
                                 setDiscountDraft(suggested);
-                                void saveDiscount(product, suggested);
+                                void saveDiscount(product, suggested, {
+                                  automationAttribution: {
+                                    templateKey: "catalog_risk_discount",
+                                    action: "apply_suggestion",
+                                    suggestedDiscountPercentage: product.riskDiscountSuggestion?.suggestedDiscountPercentage || 0,
+                                    source: "catalog_manager"
+                                  }
+                                });
                               }}
                               disabled={discountSavingId === product.id}
                             >

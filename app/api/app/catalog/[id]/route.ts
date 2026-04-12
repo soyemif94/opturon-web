@@ -70,6 +70,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body?.categoryId !== undefined) payload.categoryId = body.categoryId || null;
     if (body?.expirationDate !== undefined) payload.expirationDate = body.expirationDate || null;
     if (body?.discountPercentage !== undefined) payload.discountPercentage = body.discountPercentage ?? null;
+    if (body?.automationAttribution !== undefined) payload.automationAttribution = body.automationAttribution || null;
     if (body?.status !== undefined) payload.status = String(body.status);
     if (body?.active !== undefined && body?.status === undefined) payload.status = body.active ? "active" : "inactive";
 
