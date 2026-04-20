@@ -14,7 +14,8 @@ export default async function AppUsersPage({ searchParams }: { searchParams: Pro
   const ctx = await requireAppPage({ permission: "manage_users" });
   const { tenantId: requestedTenantId } = await searchParams;
   const data = !ctx.tenantId ? readSaasData() : null;
-  const tenantId = ctx.tenantId || requestedTenantId || data?.tenants[0]?.id || "";
+  const canUseRequestedTenant = Boolean(requestedTenantId && ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(ctx.globalRole || "")));
+  const tenantId = (canUseRequestedTenant ? requestedTenantId : "") || ctx.tenantId || data?.tenants[0]?.id || "";
   const canManage = canManageUsers(ctx);
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 

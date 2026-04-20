@@ -190,8 +190,9 @@ function getUserManagementPolicy(ctx: { globalRole?: string; tenantRole?: string
 
 function resolveTargetTenantId(ctx: { globalRole?: string; tenantId?: string | null }, requestedTenantId?: string | null) {
   const ownTenantId = String(ctx.tenantId || "").trim();
+  const targetTenantId = String(requestedTenantId || "").trim();
+  if (isStaffRole(ctx.globalRole as any) && targetTenantId) return targetTenantId;
   if (ownTenantId) return ownTenantId;
-  if (isStaffRole(ctx.globalRole as any)) return String(requestedTenantId || "").trim();
   return "";
 }
 
