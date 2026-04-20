@@ -63,6 +63,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const unlimitedSubaccounts = Boolean(meta.unlimitedSubaccounts || meta.limitScope === "opturon_admin");
   const usedPct = !unlimitedSubaccounts && Number(subaccountLimit) > 0 ? Math.min(100, Math.round((subaccountCount / Number(subaccountLimit)) * 100)) : 0;
   const inviteBlockedByLimit = !unlimitedSubaccounts && form.role !== "owner" && Number(remainingSubaccounts) <= 0;
+  const usersEndpoint = targetTenantId ? `/api/app/users?tenantId=${encodeURIComponent(targetTenantId)}` : "/api/app/users";
 
   function canManageTarget(user: UserRow) {
     if (isStaffManager) return true;
@@ -102,7 +103,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
     setFeedback({ tone: null, text: "" });
 
     try {
-      const response = await fetch("/api/app/users", {
+      const response = await fetch(usersEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, email, name, tenantId: targetTenantId })
@@ -130,8 +131,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   }
 
   async function reloadUsers() {
-    const query = targetTenantId ? `?tenantId=${encodeURIComponent(targetTenantId)}` : "";
-    const response = await fetch(`/api/app/users${query}`, { cache: "no-store" });
+    const response = await fetch(usersEndpoint, { cache: "no-store" });
     if (!response.ok) return;
     const json = await response.json();
     setUsers((json.users || []).map((user: UserRow) => ({
@@ -147,7 +147,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
     setPendingRoleUserId(userId);
     setFeedback({ tone: null, text: "" });
     try {
-      const response = await fetch("/api/app/users", {
+      const response = await fetch(usersEndpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, role, tenantId: targetTenantId })
@@ -183,7 +183,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
     setFeedback({ tone: null, text: "" });
 
     try {
-      const response = await fetch("/api/app/users", {
+      const response = await fetch(usersEndpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, tenantId: targetTenantId })
