@@ -19,13 +19,39 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
   role: z.enum(["owner", "manager", "seller", "viewer"]),
-  password: z.string().min(6).optional()
+  password: z.string().min(6).optional(),
+  tenantId: z.string().min(1).optional()
 });
 
 const updateRoleSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(["owner", "manager", "seller", "viewer"])
+  role: z.enum(["owner", "manager", "seller", "viewer"]),
+  tenantId: z.string().min(1).optional()
 });
+
+const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+
+function resolveRequestedTenantId(request: NextRequest, bodyTenantId?: string) {
+  const urlTenantId = new URL(request.url).searchParams.get("tenantId") || "";
+  return String(bodyTenantId || urlTenantId || "").trim();
+}
+
+function resolveUsersTenantId(ctx: { tenantId?: string | null; globalRole?: string | null }, requestedTenantId?: string) {
+  const sessionTenantId = String(ctx.tenantId || "").trim();
+  const targetTenantId = String(requestedTenantId || "").trim();
+  const isStaff = STAFF_ROLES.has(String(ctx.globalRole || ""));
+
+  if (targetTenantId && targetTenantId !== sessionTenantId && !isStaff) {
+    return { error: NextResponse.json({ error: "tenant_target_forbidden" }, { status: 403 }) };
+  }
+
+  const tenantId = targetTenantId || sessionTenantId;
+  if (!tenantId) {
+    return { error: NextResponse.json({ error: "missing_tenant_id" }, { status: 400 }) };
+  }
+
+  return { tenantId };
+}
 
 function resolveBackendBaseUrl() {
   return (
@@ -109,11 +135,13 @@ function safeAppendUsersAuditLog(entry: Parameters<typeof appendAuditLog>[0]) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantContext = resolveUsersTenantId(guard.ctx || {}, resolveRequestedTenantId(request));
+  if (tenantContext.error) return tenantContext.error;
+  const tenantId = tenantContext.tenantId;
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
@@ -152,7 +180,9 @@ export async function POST(request: NextRequest) {
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantContext = resolveUsersTenantId(guard.ctx || {}, resolveRequestedTenantId(request, parsed.data.tenantId));
+  if (tenantContext.error) return tenantContext.error;
+  const tenantId = tenantContext.tenantId;
   const email = parsed.data.email.toLowerCase();
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
@@ -262,7 +292,9 @@ export async function PATCH(request: NextRequest) {
   const parsed = updateRoleSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantContext = resolveUsersTenantId(guard.ctx || {}, resolveRequestedTenantId(request, parsed.data.tenantId));
+  if (tenantContext.error) return tenantContext.error;
+  const tenantId = tenantContext.tenantId;
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
@@ -318,7 +350,9 @@ export async function DELETE(request: NextRequest) {
   const userId = new URL(request.url).searchParams.get("id") || "";
   if (!userId) return NextResponse.json({ error: "Missing user id" }, { status: 400 });
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantContext = resolveUsersTenantId(guard.ctx || {}, resolveRequestedTenantId(request));
+  if (tenantContext.error) return tenantContext.error;
+  const tenantId = tenantContext.tenantId;
   const currentUserId = guard.ctx?.userId as string;
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(

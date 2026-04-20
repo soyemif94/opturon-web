@@ -3,10 +3,13 @@ import { getPortalUsers, isBackendConfigured, isPortalInternalAuthConfigured } f
 import { requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
 
-export default async function AppUsersPage() {
+export default async function AppUsersPage({ searchParams }: { searchParams?: Promise<{ tenantId?: string }> }) {
+  const sp = searchParams ? await searchParams : {};
   const ctx = await requireAppPage({ permission: "manage_users" });
   const data = !ctx.tenantId ? readSaasData() : null;
-  const tenantId = ctx.tenantId || data?.tenants[0]?.id || "";
+  const requestedTenantId = String(sp?.tenantId || "").trim();
+  const canUseRequestedTenant = Boolean(requestedTenantId && ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(ctx.globalRole || "")));
+  const tenantId = (canUseRequestedTenant ? requestedTenantId : "") || ctx.tenantId || data?.tenants[0]?.id || "";
   const canManage = ctx.tenantRole === "owner" || ctx.globalRole === "superadmin";
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 
@@ -34,5 +37,5 @@ export default async function AppUsersPage() {
     }
   }
 
-  return <TenantUsersManager initialUsers={users} canManage={canManage} currentUserId={ctx.userId} />;
+  return <TenantUsersManager initialUsers={users} canManage={canManage} currentUserId={ctx.userId} tenantId={tenantId} />;
 }

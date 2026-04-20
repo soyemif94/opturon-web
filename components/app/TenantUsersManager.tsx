@@ -9,6 +9,7 @@ type Props = {
   initialUsers: UserRow[];
   canManage: boolean;
   currentUserId?: string;
+  tenantId?: string;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -22,7 +23,7 @@ function roleLabel(role: string) {
   return ROLE_LABELS[role] || role;
 }
 
-export function TenantUsersManager({ initialUsers, canManage, currentUserId }: Props) {
+export function TenantUsersManager({ initialUsers, canManage, currentUserId, tenantId }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,10 +57,10 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
     setFeedback({ tone: null, text: "" });
 
     try {
-      const response = await fetch("/api/app/users", {
+      const response = await fetch(usersApiUrl(tenantId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, email, name })
+        body: JSON.stringify({ ...form, email, name, tenantId: selectedTenantId(tenantId) })
       });
 
       if (!response.ok) {
@@ -83,7 +84,7 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
   }
 
   async function reloadUsers() {
-    const response = await fetch("/api/app/users", { cache: "no-store" });
+    const response = await fetch(usersApiUrl(tenantId), { cache: "no-store" });
     if (!response.ok) return;
     const json = await response.json();
     setUsers((json.users || []).map((user: UserRow) => ({ ...user, tenantRole: user.tenantRole === "editor" ? "seller" : user.tenantRole })));
@@ -93,10 +94,10 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
     setPendingRoleUserId(userId);
     setFeedback({ tone: null, text: "" });
     try {
-      const response = await fetch("/api/app/users", {
+      const response = await fetch(usersApiUrl(tenantId), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role })
+        body: JSON.stringify({ userId, role, tenantId: selectedTenantId(tenantId) })
       });
       if (!response.ok) {
         const json = await safeJson(response);
@@ -123,7 +124,7 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
     setRemovingUserId(userId);
     setFeedback({ tone: null, text: "" });
     try {
-      const response = await fetch(`/api/app/users?id=${encodeURIComponent(userId)}`, { method: "DELETE" });
+      const response = await fetch(usersApiUrl(tenantId, { id: userId }), { method: "DELETE" });
       if (!response.ok) {
         const json = await safeJson(response);
         const message = json?.error || "No se pudo eliminar el usuario.";
@@ -228,6 +229,19 @@ export function TenantUsersManager({ initialUsers, canManage, currentUserId }: P
       </div>
     </div>
   );
+}
+
+function selectedTenantId(fallbackTenantId?: string) {
+  if (typeof window === "undefined") return fallbackTenantId || "";
+  return new URLSearchParams(window.location.search).get("tenantId") || fallbackTenantId || "";
+}
+
+function usersApiUrl(fallbackTenantId?: string, params?: { id?: string }) {
+  const query = new URLSearchParams();
+  const currentTenantId = selectedTenantId(fallbackTenantId);
+  if (currentTenantId) query.set("tenantId", currentTenantId);
+  if (params?.id) query.set("id", params.id);
+  return `/api/app/users${query.toString() ? `?${query.toString()}` : ""}`;
 }
 
 async function safeJson(response: Response) {
