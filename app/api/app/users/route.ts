@@ -142,6 +142,13 @@ function safeAppendUsersAuditLog(entry: Parameters<typeof appendAuditLog>[0]) {
   }
 }
 
+function resolveBackendActorUserId(userId?: string | null) {
+  const safeUserId = String(userId || "").trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(safeUserId)
+    ? safeUserId
+    : null;
+}
+
 function resolvePortalUserPassword(password?: string) {
   const explicitPassword = password?.trim();
   if (explicitPassword) return explicitPassword;
@@ -373,7 +380,7 @@ export async function POST(request: NextRequest) {
         name: parsed.data.name,
         role: parsed.data.role,
         password: resolvedPassword
-      }, guard.ctx?.userId || null);
+      }, resolveBackendActorUserId(guard.ctx?.userId));
 
       safeAppendUsersAuditLog({
         tenantId,
@@ -520,7 +527,7 @@ export async function PATCH(request: NextRequest) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
-      const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role, guard.ctx?.userId || null);
+      const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role, resolveBackendActorUserId(guard.ctx?.userId));
       safeAppendUsersAuditLog({
         tenantId,
         userId: guard.ctx?.userId,
@@ -587,7 +594,7 @@ export async function PUT(request: NextRequest) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
-      const response = await patchPortalPrimaryUser(tenantId, parsed.data.userId, guard.ctx?.userId || null);
+      const response = await patchPortalPrimaryUser(tenantId, parsed.data.userId, resolveBackendActorUserId(guard.ctx?.userId));
       safeAppendUsersAuditLog({
         tenantId,
         userId: guard.ctx?.userId,
@@ -629,6 +636,7 @@ export async function DELETE(request: NextRequest) {
   const tenantId = resolveTargetTenantId(guard.ctx || {}, new URL(request.url).searchParams.get("tenantId"));
   if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   const currentUserId = guard.ctx?.userId as string;
+  const backendActorUserId = resolveBackendActorUserId(currentUserId);
   const currentUsers = await listRouteUsers(tenantId);
   const targetUser = currentUsers.find((user) => user.id === userId);
   if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -655,7 +663,7 @@ export async function DELETE(request: NextRequest) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
-      const response = await deletePortalUser(tenantId, userId, currentUserId);
+      const response = await deletePortalUser(tenantId, userId, backendActorUserId || undefined);
       safeAppendUsersAuditLog({
         tenantId,
         userId: currentUserId,
