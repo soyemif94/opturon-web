@@ -19,6 +19,8 @@ export default async function OpsTenantsPage({ searchParams }: { searchParams: P
       status: tenant.status,
       daysActive: daysActive(tenant),
       crm: tenant.crmEnabled ? tenant.crmName || "Si" : "No",
+      plan: tenant.plan || "trial",
+      subaccountLimit: tenant.subaccountLimit || 5,
       salesTeamSize: tenant.salesTeamSize,
       lastActivityAt: metrics?.lastActivityAt || "",
       healthScore: health.score,

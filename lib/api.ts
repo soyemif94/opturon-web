@@ -528,11 +528,14 @@ export type PortalUsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
   primaryPortalUserId?: string | null;
-  subaccountLimit: number;
-  remainingSubaccounts: number;
+  subaccountLimit: number | null;
+  remainingSubaccounts: number | null;
   futureLimitKey: string;
-  limitScope: "subaccounts";
+  limitScope: "subaccounts" | "opturon_admin";
   limitSource?: string | null;
+  limitApplies?: boolean;
+  accountScope?: string;
+  unlimitedSubaccounts?: boolean;
 };
 
 export type PortalUserAuditEvent = {

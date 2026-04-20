@@ -24,6 +24,9 @@ export type Tenant = {
   crmName: string;
   crmEnabled: boolean;
   salesTeamSize: number;
+  plan?: string;
+  subaccountLimit?: number;
+  capabilities?: string[];
   website?: string;
   city?: string;
   country?: string;

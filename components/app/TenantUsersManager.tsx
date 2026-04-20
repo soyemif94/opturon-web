@@ -9,11 +9,14 @@ type UsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
   primaryPortalUserId?: string | null;
-  subaccountLimit: number;
-  remainingSubaccounts: number;
+  subaccountLimit: number | null;
+  remainingSubaccounts: number | null;
   futureLimitKey: string;
-  limitScope: "subaccounts";
+  limitScope: "subaccounts" | "opturon_admin";
   limitSource?: string | null;
+  limitApplies?: boolean;
+  accountScope?: string;
+  unlimitedSubaccounts?: boolean;
 };
 
 type Props = {
@@ -24,6 +27,7 @@ type Props = {
   currentUserId?: string;
   currentTenantRole?: string;
   currentGlobalRole?: string;
+  targetTenantId?: string;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -41,7 +45,7 @@ function accountKindLabel(accountKind?: string) {
   return accountKind === "primary" ? "cuenta principal" : "subcuenta";
 }
 
-export function TenantUsersManager({ initialUsers, initialMeta, initialActivity, canManage, currentUserId, currentTenantRole, currentGlobalRole }: Props) {
+export function TenantUsersManager({ initialUsers, initialMeta, initialActivity, canManage, currentUserId, currentTenantRole, currentGlobalRole, targetTenantId }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [meta, setMeta] = useState(initialMeta);
   const [activity, setActivity] = useState(initialActivity);
@@ -56,8 +60,9 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const subaccountCount = meta.subaccountCount;
   const subaccountLimit = meta.subaccountLimit;
   const remainingSubaccounts = meta.remainingSubaccounts;
-  const usedPct = subaccountLimit > 0 ? Math.min(100, Math.round((subaccountCount / subaccountLimit) * 100)) : 0;
-  const inviteBlockedByLimit = form.role !== "owner" && remainingSubaccounts <= 0;
+  const unlimitedSubaccounts = Boolean(meta.unlimitedSubaccounts || meta.limitScope === "opturon_admin");
+  const usedPct = !unlimitedSubaccounts && Number(subaccountLimit) > 0 ? Math.min(100, Math.round((subaccountCount / Number(subaccountLimit)) * 100)) : 0;
+  const inviteBlockedByLimit = !unlimitedSubaccounts && form.role !== "owner" && Number(remainingSubaccounts) <= 0;
 
   function canManageTarget(user: UserRow) {
     if (isStaffManager) return true;
@@ -100,7 +105,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
       const response = await fetch("/api/app/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, email, name })
+        body: JSON.stringify({ ...form, email, name, tenantId: targetTenantId })
       });
 
       if (!response.ok) {
@@ -125,7 +130,8 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   }
 
   async function reloadUsers() {
-    const response = await fetch("/api/app/users", { cache: "no-store" });
+    const query = targetTenantId ? `?tenantId=${encodeURIComponent(targetTenantId)}` : "";
+    const response = await fetch(`/api/app/users${query}`, { cache: "no-store" });
     if (!response.ok) return;
     const json = await response.json();
     setUsers((json.users || []).map((user: UserRow) => ({
@@ -144,7 +150,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
       const response = await fetch("/api/app/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role })
+        body: JSON.stringify({ userId, role, tenantId: targetTenantId })
       });
       if (!response.ok) {
         const json = await safeJson(response);
@@ -180,7 +186,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
       const response = await fetch("/api/app/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({ userId, tenantId: targetTenantId })
       });
 
       if (!response.ok) {
@@ -207,7 +213,8 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
     setRemovingUserId(userId);
     setFeedback({ tone: null, text: "" });
     try {
-      const response = await fetch(`/api/app/users?id=${encodeURIComponent(userId)}`, { method: "DELETE" });
+      const query = targetTenantId ? `&tenantId=${encodeURIComponent(targetTenantId)}` : "";
+      const response = await fetch(`/api/app/users?id=${encodeURIComponent(userId)}${query}`, { method: "DELETE" });
       if (!response.ok) {
         const json = await safeJson(response);
         const message = json?.error || "No se pudo eliminar el usuario.";
@@ -236,10 +243,12 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
           <div>
             <h3 className="font-semibold">Plan y cupo de usuarios</h3>
             <p className="mt-1 text-sm text-muted">
-              {subaccountCount} / {subaccountLimit} usuarios utilizados
+              {unlimitedSubaccounts ? `${subaccountCount} subcuentas activas` : `${subaccountCount} / ${subaccountLimit} subcuentas utilizadas`}
             </p>
             <p className="mt-1 text-xs text-muted">
-              Disponibles: {remainingSubaccounts}. La cuenta principal no consume cupo.
+              {unlimitedSubaccounts
+                ? "Cuenta administradora global de Opturon: no consume cupo de cliente."
+                : `Disponibles: ${remainingSubaccounts}. La cuenta principal no consume cupo.`}
             </p>
             {meta.primaryPortalUserId ? (
               <p className="mt-1 text-xs text-muted">
@@ -250,7 +259,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
           <div className="w-full max-w-xs">
             <div className="flex items-center justify-between text-xs text-muted">
               <span>Uso del plan</span>
-              <span>{usedPct}%</span>
+              <span>{unlimitedSubaccounts ? "Ilimitado" : `${usedPct}%`}</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface">
               <div

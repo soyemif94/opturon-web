@@ -47,11 +47,13 @@ export default async function AppSettingsPage() {
                 icon={<Bell className="h-4 w-4 text-brandBright" />}
                 title="Preferencias"
                 description="Ajustes generales del portal y futuras opciones de notificaciones del espacio."
+                status="Proximamente"
               />
               <SettingsStaticCard
                 icon={<Shield className="h-4 w-4 text-brandBright" />}
                 title="Seguridad"
                 description="Base para accesos, cambios de cuenta y futuras configuraciones de seguridad."
+                status="Proximamente"
               />
             </div>
           </CardContent>
@@ -111,20 +113,25 @@ function SettingsLinkCard({
 function SettingsStaticCard({
   icon,
   title,
-  description
+  description,
+  status
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  status: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+    <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 opacity-80" aria-disabled="true">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
           {icon}
         </span>
         <div>
-          <p className="font-medium">{title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">{title}</p>
+            <Badge variant="muted">{status}</Badge>
+          </div>
           <p className="mt-1 text-sm leading-6 text-muted">{description}</p>
         </div>
       </div>

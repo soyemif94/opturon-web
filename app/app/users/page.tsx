@@ -10,10 +10,11 @@ const DEFAULT_SUBACCOUNT_LIMIT = (() => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
 })();
 
-export default async function AppUsersPage() {
+export default async function AppUsersPage({ searchParams }: { searchParams: Promise<{ tenantId?: string }> }) {
   const ctx = await requireAppPage({ permission: "manage_users" });
+  const { tenantId: requestedTenantId } = await searchParams;
   const data = !ctx.tenantId ? readSaasData() : null;
-  const tenantId = ctx.tenantId || data?.tenants[0]?.id || "";
+  const tenantId = ctx.tenantId || requestedTenantId || data?.tenants[0]?.id || "";
   const canManage = canManageUsers(ctx);
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 
@@ -66,6 +67,7 @@ export default async function AppUsersPage() {
       currentUserId={ctx.userId}
       currentTenantRole={ctx.tenantRole}
       currentGlobalRole={ctx.globalRole}
+      targetTenantId={tenantId}
       initialMeta={initialMeta}
       initialActivity={initialActivity}
     />

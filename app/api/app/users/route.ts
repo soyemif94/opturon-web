@@ -21,12 +21,14 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
   role: z.enum(["owner", "manager", "seller", "viewer"]),
-  password: z.string().min(6).optional()
+  password: z.string().min(6).optional(),
+  tenantId: z.string().min(1).optional()
 });
 
 const updateRoleSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(["owner", "manager", "seller", "viewer"])
+  role: z.enum(["owner", "manager", "seller", "viewer"]),
+  tenantId: z.string().min(1).optional()
 });
 
 const CLIENT_SUBACCOUNT_ROLES = ["seller", "viewer"] as const;
@@ -48,11 +50,14 @@ type RouteUsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
   primaryPortalUserId?: string | null;
-  subaccountLimit: number;
-  remainingSubaccounts: number;
+  subaccountLimit: number | null;
+  remainingSubaccounts: number | null;
   futureLimitKey: "tenant_portal_users";
-  limitScope: "subaccounts";
+  limitScope: "subaccounts" | "opturon_admin";
   limitSource: string;
+  limitApplies?: boolean;
+  accountScope?: string;
+  unlimitedSubaccounts?: boolean;
 };
 
 function resolveBackendBaseUrl() {
@@ -183,6 +188,13 @@ function getUserManagementPolicy(ctx: { globalRole?: string; tenantRole?: string
   };
 }
 
+function resolveTargetTenantId(ctx: { globalRole?: string; tenantId?: string | null }, requestedTenantId?: string | null) {
+  const ownTenantId = String(ctx.tenantId || "").trim();
+  if (ownTenantId) return ownTenantId;
+  if (isStaffRole(ctx.globalRole as any)) return String(requestedTenantId || "").trim();
+  return "";
+}
+
 function canManageTargetRole(policy: ReturnType<typeof getUserManagementPolicy>, targetRole?: string) {
   const normalized = String(targetRole || "").trim().toLowerCase();
   if (policy.isStaff) return true;
@@ -219,16 +231,25 @@ function buildRouteUsersMeta(
     subaccountCount?: number;
     primaryAccountCount?: number;
     primaryPortalUserId?: string | null;
-    subaccountLimit?: number;
-    remainingSubaccounts?: number;
+    subaccountLimit?: number | null;
+    remainingSubaccounts?: number | null;
     limitSource?: string | null;
+    limitScope?: "subaccounts" | "opturon_admin";
+    limitApplies?: boolean;
+    accountScope?: string;
+    unlimitedSubaccounts?: boolean;
   } | null
 ): RouteUsersMeta {
   const subaccountCount = sourceMeta?.subaccountCount ?? users.filter((user) => user.accountKind === "subaccount").length;
   const primaryAccountCount = sourceMeta?.primaryAccountCount ?? users.filter((user) => user.accountKind === "primary").length;
-  const subaccountLimit = Number(sourceMeta?.subaccountLimit) > 0 ? Number(sourceMeta?.subaccountLimit) : DEFAULT_SUBACCOUNT_LIMIT;
+  const unlimitedSubaccounts = Boolean(sourceMeta?.unlimitedSubaccounts || sourceMeta?.limitScope === "opturon_admin");
+  const subaccountLimit = unlimitedSubaccounts
+    ? null
+    : Number(sourceMeta?.subaccountLimit) > 0
+      ? Number(sourceMeta?.subaccountLimit)
+      : DEFAULT_SUBACCOUNT_LIMIT;
   const remainingSubaccounts =
-    sourceMeta?.remainingSubaccounts ?? Math.max(0, subaccountLimit - subaccountCount);
+    unlimitedSubaccounts ? null : sourceMeta?.remainingSubaccounts ?? Math.max(0, Number(subaccountLimit) - subaccountCount);
 
   return {
     allowedRoles,
@@ -238,18 +259,23 @@ function buildRouteUsersMeta(
     subaccountLimit,
     remainingSubaccounts,
     futureLimitKey: "tenant_portal_users",
-    limitScope: "subaccounts",
-    limitSource: sourceMeta?.limitSource || "default_env"
+    limitScope: unlimitedSubaccounts ? "opturon_admin" : "subaccounts",
+    limitSource: sourceMeta?.limitSource || "default_env",
+    limitApplies: !unlimitedSubaccounts,
+    accountScope: sourceMeta?.accountScope || (unlimitedSubaccounts ? "opturon_admin" : "client"),
+    unlimitedSubaccounts
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const guard = await requireAppApi({ permission: "manage_users" });
   if (guard.error) return guard.error;
   const policy = getUserManagementPolicy(guard.ctx || {});
   if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const requestedTenantId = new URL(request.url).searchParams.get("tenantId");
+  const tenantId = resolveTargetTenantId(guard.ctx || {}, requestedTenantId);
+  if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   if (tenantId && !isBackendConfigured()) {
     return NextResponse.json(
       {
@@ -311,7 +337,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantId = resolveTargetTenantId(guard.ctx || {}, parsed.data.tenantId);
+  if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   const email = parsed.data.email.toLowerCase();
   const countsAsSubaccount = parsed.data.role !== "owner";
   const resolvedPassword = resolvePortalUserPassword(parsed.data.password);
@@ -387,7 +414,7 @@ export async function POST(request: NextRequest) {
     })
   );
   const currentMeta = buildRouteUsersMeta(currentUsers, policy.allowedRoles);
-  if (countsAsSubaccount && currentMeta.subaccountCount >= currentMeta.subaccountLimit) {
+  if (countsAsSubaccount && currentMeta.limitApplies !== false && currentMeta.subaccountCount >= Number(currentMeta.subaccountLimit)) {
     return NextResponse.json(
       {
         error: "tenant_subaccount_limit_reached",
@@ -464,7 +491,8 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantId = resolveTargetTenantId(guard.ctx || {}, parsed.data.tenantId);
+  if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   const currentUsers = await listRouteUsers(tenantId);
   const targetUser = currentUsers.find((user) => user.id === parsed.data.userId);
   if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -526,7 +554,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 const updatePrimarySchema = z.object({
-  userId: z.string().min(1)
+  userId: z.string().min(1),
+  tenantId: z.string().min(1).optional()
 });
 
 export async function PUT(request: NextRequest) {
@@ -538,7 +567,8 @@ export async function PUT(request: NextRequest) {
   const parsed = updatePrimarySchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantId = resolveTargetTenantId(guard.ctx || {}, parsed.data.tenantId);
+  if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   const currentUsers = await listRouteUsers(tenantId);
   const targetUser = currentUsers.find((user) => user.id === parsed.data.userId);
   if (!targetUser) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -595,7 +625,8 @@ export async function DELETE(request: NextRequest) {
   const userId = new URL(request.url).searchParams.get("id") || "";
   if (!userId) return NextResponse.json({ error: "Missing user id" }, { status: 400 });
 
-  const tenantId = guard.ctx?.tenantId as string;
+  const tenantId = resolveTargetTenantId(guard.ctx || {}, new URL(request.url).searchParams.get("tenantId"));
+  if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   const currentUserId = guard.ctx?.userId as string;
   const currentUsers = await listRouteUsers(tenantId);
   const targetUser = currentUsers.find((user) => user.id === userId);

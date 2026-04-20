@@ -24,6 +24,8 @@ type TenantRow = {
   daysActive: number;
   crm: string;
   salesTeamSize: number;
+  plan?: string;
+  subaccountLimit?: number;
   lastActivityAt: string;
   healthScore: number;
   healthStatus: "verde" | "amarillo" | "rojo";
@@ -55,6 +57,8 @@ export function TenantsDataTable({ rows }: { rows: TenantRow[] }) {
         },
         { key: "daysActive", header: "Dias activos", sortable: true },
         { key: "crm", header: "CRM", sortable: true },
+        { key: "plan", header: "Plan", sortable: true, cell: (row) => <Badge variant="muted">{row.plan || "trial"}</Badge> },
+        { key: "subaccountLimit", header: "Cupo", sortable: true, cell: (row) => row.subaccountLimit || 5 },
         { key: "salesTeamSize", header: "Equipo", sortable: true },
         {
           key: "lastActivityAt",

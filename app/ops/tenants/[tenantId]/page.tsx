@@ -34,6 +34,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ t
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 text-sm">
           <Info label="CRM" value={tenant.crmEnabled ? tenant.crmName || "Conectado" : "No conectado"} />
+          <Info label="Plan" value={tenant.plan || "trial"} />
+          <Info label="Cupo usuarios" value={String(tenant.subaccountLimit || 5)} />
           <Info label="Equipo comercial" value={String(tenant.salesTeamSize)} />
           <Info label="Inicio" value={new Date(tenant.startAt).toLocaleDateString()} />
           <Info label="Días activos" value={String(daysActive(tenant))} />

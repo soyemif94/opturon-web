@@ -8,6 +8,9 @@ const updateSchema = z.object({
   crmName: z.string().optional(),
   crmEnabled: z.boolean().optional(),
   salesTeamSize: z.number().int().min(0).optional(),
+  plan: z.string().optional(),
+  subaccountLimit: z.number().int().min(1).optional(),
+  capabilities: z.array(z.string()).optional(),
   website: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional()
