@@ -327,6 +327,27 @@ export async function getPortalTenantContext(tenantId: string) {
   return backendFetch<{ success: boolean; data: PortalTenantContext }>(`/portal/tenants/${tenantId}/context`, undefined, false);
 }
 
+export async function provisionPortalTenant(
+  tenantId: string,
+  payload: { name: string; timezone?: string | null }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinic: {
+        id: string;
+        name: string | null;
+        timezone: string | null;
+        externalTenantId: string | null;
+      };
+    };
+  }>(`/portal/tenants/${tenantId}/provision`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getPortalWhatsAppEmbeddedSignupStatus(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;

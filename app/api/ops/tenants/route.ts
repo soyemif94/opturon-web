@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOpsApi } from "@/lib/saas/access";
+import { getBackendErrorBody, getBackendErrorStatus, isBackendConfigured, isPortalInternalAuthConfigured, provisionPortalTenant } from "@/lib/api";
 import { appendAuditLog, applyIndustryTemplate, calculateHealthScore, daysActive, newId, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 import type { TenantStatus } from "@/lib/saas/types";
 
@@ -86,6 +87,33 @@ export async function POST(request: NextRequest) {
     activeConversations: 0,
     lastActivityAt: now
   });
+
+  if (isBackendConfigured()) {
+    if (!isPortalInternalAuthConfigured()) {
+      return NextResponse.json(
+        {
+          error: "portal_internal_key_missing",
+          detail: "No se provisiono el tenant real porque falta PORTAL_INTERNAL_KEY en opturon-web."
+        },
+        { status: 503 }
+      );
+    }
+
+    try {
+      await provisionPortalTenant(tenantId, {
+        name: input.name,
+        timezone: "America/Argentina/Buenos_Aires"
+      });
+    } catch (error) {
+      return NextResponse.json(
+        getBackendErrorBody(error) || {
+          error: "tenant_backend_provision_failed",
+          detail: error instanceof Error ? error.message : "No se pudo crear el workspace real limpio."
+        },
+        { status: getBackendErrorStatus(error) || 502 }
+      );
+    }
+  }
 
   writeSaasData(data);
 
