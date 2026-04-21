@@ -158,7 +158,11 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (token.email) {
-          if (isPersistentPortalIdentityEnabled() && token.authSource === "backend") {
+          const tokenGlobalRole = normalizeGlobalRole(String(token.globalRole || token.role || "client"));
+          const shouldHydratePersistentPortalIdentity =
+            isPersistentPortalIdentityEnabled() && !isStaffGlobalRole(tokenGlobalRole);
+
+          if (shouldHydratePersistentPortalIdentity) {
             try {
               const response = await getPortalAuthUserByEmail(String(token.email));
               const hydratedUser = response.data;
@@ -170,14 +174,11 @@ export const authOptions: NextAuthOptions = {
                 token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
                 token.authSource = "backend";
               } else {
-                const shouldInvalidateBackendSession = token.authSource === "backend" && !isStaffGlobalRole(String(token.globalRole || token.role || ""));
-                if (shouldInvalidateBackendSession) {
-                  token.userId = undefined;
-                  token.tenantId = undefined;
-                  token.tenantRole = undefined;
-                  token.globalRole = "client";
-                  token.role = "client";
-                }
+                token.userId = undefined;
+                token.tenantId = undefined;
+                token.tenantRole = undefined;
+                token.globalRole = "client";
+                token.role = "client";
               }
             } catch (error) {
               console.error("JWT_BACKEND_HYDRATE_ERROR", { msg: String(error) });
