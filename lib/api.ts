@@ -1713,6 +1713,7 @@ export type PortalAutomationCatalogItem = {
   description: string | null;
   category: string;
   businessTypes: string[];
+  compatibleBusinessTypes?: string[];
   requiredCapabilities: string[];
   defaultEnabled: boolean;
   status: string;
