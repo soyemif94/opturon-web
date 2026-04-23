@@ -1354,8 +1354,13 @@ export type PortalProduct = {
   sku: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
+  subcategory?: string | null;
   expirationDate?: string | null;
   discountPercentage?: number | null;
+  attributes?: Array<{
+    name: string;
+    options: string[];
+  }>;
   riskDiscountSuggestion?: {
     key: "catalog_risk_discount";
     status: "critical" | "expiring_soon";
@@ -2623,6 +2628,8 @@ export async function createPortalProduct(
     stock?: number;
     sku?: string | null;
     categoryId?: string | null;
+    subcategory?: string | null;
+    attributes?: Array<{ name: string; options: string[] }>;
     expirationDate?: string | null;
     discountPercentage?: number | null;
     status?: string;
@@ -2669,6 +2676,8 @@ export async function patchPortalProduct(
     stock?: number;
     sku?: string | null;
     categoryId?: string | null;
+    subcategory?: string | null;
+    attributes?: Array<{ name: string; options: string[] }>;
     expirationDate?: string | null;
     discountPercentage?: number | null;
     automationAttribution?: {
@@ -2771,6 +2780,8 @@ export async function createPortalProductsBulk(
       stock: number;
       description?: string | null;
       categoryName?: string | null;
+      subcategory?: string | null;
+      attributes?: Array<{ name: string; options: string[] }>;
       currency?: string;
     }>;
   }

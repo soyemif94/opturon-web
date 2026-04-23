@@ -26,6 +26,8 @@ type Product = {
   active?: boolean;
   categoryId?: string | null;
   categoryName?: string | null;
+  subcategory?: string | null;
+  attributes?: Array<{ name: string; options: string[] }>;
   expirationDate?: string | null;
   discountPercentage?: number | null;
   riskDiscountSuggestion?: {
@@ -59,7 +61,9 @@ type Draft = {
   stock: string;
   currency: string;
   categoryId: string;
+  subcategory: string;
   expirationDate: string;
+  attributesText: string;
 };
 
 type BulkPreviewRow = {
@@ -110,7 +114,9 @@ const EMPTY_DRAFT: Draft = {
   stock: "0",
   currency: "ARS",
   categoryId: "",
-  expirationDate: ""
+  subcategory: "",
+  expirationDate: "",
+  attributesText: ""
 };
 
 const BULK_EXAMPLE = [
@@ -240,7 +246,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       stock: product ? String(resolveStock(product)) : "0",
       currency: product?.currency || "ARS",
       categoryId: product?.categoryId || "",
-      expirationDate: product?.expirationDate || ""
+      subcategory: product?.subcategory || "",
+      expirationDate: product?.expirationDate || "",
+      attributesText: formatAttributesText(product?.attributes)
     };
   }
 
@@ -358,6 +366,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     const price = Number(draft.price);
     const stock = Number.parseInt(draft.stock, 10);
+    const attributes = parseAttributesText(draft.attributesText);
 
     if (!draft.name.trim()) {
       setFeedback({ tone: "warning", text: "El producto necesita al menos un nombre." });
@@ -386,7 +395,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           stock,
           currency: draft.currency.trim() || "ARS",
           categoryId: draft.categoryId || null,
-          expirationDate: draft.expirationDate || null
+          subcategory: draft.subcategory.trim() || null,
+          expirationDate: draft.expirationDate || null,
+          attributes
         })
       });
       const json = await response.json().catch(() => null);
@@ -1068,6 +1079,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                             {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
                           </Badge>
                           {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
+                          {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
                           <Badge variant={getStockState(resolveStock(product)).variant}>
                             {getStockState(resolveStock(product)).label}
                           </Badge>
@@ -1093,6 +1105,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           </p>
                         ) : null}
                         <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
+                        {product.attributes?.length ? (
+                          <p className="mt-2 text-xs text-muted">Atributos: {formatAttributesText(product.attributes)}</p>
+                        ) : null}
                       </button>
                     </div>
 
@@ -1391,6 +1406,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       ))}
                     </select>
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Subcategoria</label>
+                    <Input
+                      value={draft.subcategory}
+                      onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
+                      placeholder="Ej. Remeras, Celulares, Reparaciones"
+                      disabled={readOnly}
+                    />
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Precio</label>
@@ -1413,6 +1437,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Descripcion</label>
                     <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Atributos configurables</label>
+                    <Textarea
+                      className="min-h-[120px]"
+                      value={draft.attributesText}
+                      onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
+                      placeholder={"Uno por linea\nTalle: M, L, XL\nColor: Negro, Blanco"}
+                      disabled={readOnly}
+                    />
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button type="button" variant="ghost" onClick={() => startCreate(categoryFilter || null)} disabled={readOnly}>
@@ -1586,6 +1620,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <DetailStat label="Precio final" value={formatCurrency(getProductPricing(selectedProduct).finalPrice, selectedProduct.currency || "ARS")} />
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                     <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
+                    <DetailStat label="Subcategoria" value={selectedProduct.subcategory || "Sin subcategoria"} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Vencimiento" value={formatExpirationDate(selectedProduct.expirationDate)} />
                     <DetailStat label="Descuento" value={selectedProduct.discountPercentage != null ? `${selectedProduct.discountPercentage}%` : "Sin descuento"} />
@@ -1593,6 +1628,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       label="Sugerencia automatica"
                       value={selectedProduct.riskDiscountSuggestion ? `${selectedProduct.riskDiscountSuggestion.suggestedDiscountPercentage}%` : "Sin sugerencia"}
                     />
+                    <DetailStat label="Atributos" value={formatAttributesText(selectedProduct.attributes) || "Sin atributos"} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
                   </div>
                   {selectedProduct.riskDiscountSuggestion ? (
@@ -1840,6 +1876,32 @@ function formatDate(value?: string | null) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function parseAttributesText(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [namePart, optionsPart = ""] = line.split(":");
+      return {
+        name: namePart?.trim() || "",
+        options: optionsPart
+          .split(",")
+          .map((option) => option.trim())
+          .filter(Boolean)
+      };
+    })
+    .filter((attribute) => attribute.name && attribute.options.length > 0);
+}
+
+function formatAttributesText(attributes?: Product["attributes"]) {
+  if (!Array.isArray(attributes) || attributes.length === 0) return "";
+  return attributes
+    .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
+    .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+    .join(" | ");
 }
 
 

@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
       stock: Number(body?.stock ?? body?.stockQty ?? 0),
       sku: body?.sku || null,
       categoryId: body?.categoryId || null,
+      subcategory: body?.subcategory || null,
+      attributes: Array.isArray(body?.attributes) ? body.attributes : [],
       expirationDate: body?.expirationDate || null,
       discountPercentage: body?.discountPercentage ?? null,
       status:

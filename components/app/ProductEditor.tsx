@@ -22,8 +22,10 @@ type ProductDraft = {
   vatRate: string;
   status: string;
   categoryId: string;
+  subcategory: string;
   expirationDate: string;
   discountPercentage: string;
+  attributesText: string;
 };
 
 function buildInitialState(product: PortalProduct): ProductDraft {
@@ -37,8 +39,10 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     vatRate: String(product.vatRate ?? product.taxRate ?? 0),
     status: product.status || "active",
     categoryId: product.categoryId || "",
+    subcategory: product.subcategory || "",
     expirationDate: product.expirationDate || "",
-    discountPercentage: product.discountPercentage != null ? String(product.discountPercentage) : ""
+    discountPercentage: product.discountPercentage != null ? String(product.discountPercentage) : "",
+    attributesText: formatAttributesText(product.attributes)
   };
 }
 
@@ -79,6 +83,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const stock = Number(draft.stock || 0);
     const vatRate = Number(draft.vatRate || 0);
     const discountPercentage = draft.discountPercentage.trim() ? Number(draft.discountPercentage) : null;
+    const attributes = parseAttributesText(draft.attributesText);
 
     if (!name) {
       toast.error("Nombre requerido", "Completa el nombre del producto antes de guardar.");
@@ -115,6 +120,8 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           description: draft.description.trim() || null,
           sku: sku || null,
           categoryId: draft.categoryId || null,
+          subcategory: draft.subcategory.trim() || null,
+          attributes,
           expirationDate: draft.expirationDate || null,
           discountPercentage,
           price,
@@ -202,6 +209,12 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             ))}
           </select>
           <Input
+            placeholder="Subcategoria"
+            value={draft.subcategory}
+            onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
+            disabled={saving}
+          />
+          <Input
             type="date"
             value={draft.expirationDate}
             onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
@@ -223,6 +236,14 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Descripcion comercial del producto"
             value={draft.description}
             onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+            disabled={saving}
+          />
+          <Textarea
+            className="md:col-span-2"
+            rows={4}
+            placeholder={"Atributos configurables (uno por linea)\nTalle: M, L, XL\nColor: Negro, Blanco"}
+            value={draft.attributesText}
+            onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
             disabled={saving}
           />
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
@@ -249,4 +270,30 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
       </Card>
     </form>
   );
+}
+
+function parseAttributesText(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [namePart, optionsPart = ""] = line.split(":");
+      return {
+        name: namePart?.trim() || "",
+        options: optionsPart
+          .split(",")
+          .map((option) => option.trim())
+          .filter(Boolean)
+      };
+    })
+    .filter((attribute) => attribute.name && attribute.options.length > 0);
+}
+
+function formatAttributesText(attributes?: PortalProduct["attributes"]) {
+  if (!Array.isArray(attributes) || attributes.length === 0) return "";
+  return attributes
+    .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
+    .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+    .join("\n");
 }

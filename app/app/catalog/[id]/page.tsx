@@ -78,10 +78,12 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <DetailTile label="Moneda" value={product.currency || "ARS"} />
             <DetailTile label="Stock" value={String(product.stock ?? 0)} />
             <DetailTile label="Categoria" value={product.categoryName || "Sin categoria"} />
+            <DetailTile label="Subcategoria" value={product.subcategory || "Sin subcategoria"} />
             <DetailTile label="Estado" value={titleCaseLabel(product.status)} />
             <DetailTile label="Vencimiento" value={formatExpirationDate(product.expirationDate)} />
             <DetailTile label="Descuento" value={product.discountPercentage != null ? `${product.discountPercentage}%` : "Sin descuento"} />
             <DetailTile label="Sugerencia automatica" value={product.riskDiscountSuggestion ? `${product.riskDiscountSuggestion.suggestedDiscountPercentage}%` : "Sin sugerencia"} />
+            <DetailTile label="Atributos" value={formatProductAttributes(product.attributes)} />
             <DetailTile label="Creado" value={formatDateTimeLabel(product.createdAt)} />
             <DetailTile label="Actualizado" value={formatDateTimeLabel(product.updatedAt)} />
             <DetailTile label="Descripcion" value={product.description || "Sin descripcion cargada."} className="md:col-span-2 xl:col-span-3" />
@@ -144,4 +146,12 @@ function MetricTile({ label, value }: { label: string; value: string }) {
       <p className="mt-3 text-lg font-semibold">{value}</p>
     </div>
   );
+}
+
+function formatProductAttributes(attributes?: Array<{ name: string; options: string[] }>) {
+  if (!Array.isArray(attributes) || attributes.length === 0) return "Sin atributos";
+  return attributes
+    .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
+    .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+    .join(" | ");
 }
