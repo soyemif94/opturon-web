@@ -30,16 +30,11 @@ type Props = {
   targetTenantId?: string;
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "propietario",
-  manager: "gerente",
-  seller: "vendedor",
-  viewer: "visualizador"
-};
-
-function roleLabel(role: string) {
-  return ROLE_LABELS[role] || role;
-}
+const ADMIN_ROLE_OPTIONS = [
+  { value: "owner", label: "Cliente" },
+  { value: "seller", label: "Vendedor" }
+];
+const CLIENT_ROLE_OPTIONS = [{ value: "seller", label: "Vendedor" }];
 
 function accountKindLabel(accountKind?: string) {
   return accountKind === "primary" ? "cuenta principal" : "subcuenta";
@@ -49,14 +44,15 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const [users, setUsers] = useState(initialUsers);
   const [meta, setMeta] = useState(initialMeta);
   const [activity, setActivity] = useState(initialActivity);
-  const [form, setForm] = useState({ email: "", name: "", role: "viewer", password: "" });
+  const [form, setForm] = useState({ email: "", name: "", role: "seller", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
   const [pendingPrimaryUserId, setPendingPrimaryUserId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
   const isStaffManager = currentGlobalRole === "superadmin" || currentGlobalRole === "ops_admin";
-  const allowedRoles = isStaffManager ? ["owner", "manager", "seller", "viewer"] : ["seller", "viewer"];
+  const isOpturonAdminScope = meta.accountScope === "opturon_admin";
+  const roleOptions = isOpturonAdminScope ? ADMIN_ROLE_OPTIONS : CLIENT_ROLE_OPTIONS;
   const subaccountCount = meta.subaccountCount;
   const subaccountLimit = meta.subaccountLimit;
   const remainingSubaccounts = meta.remainingSubaccounts;
@@ -66,15 +62,30 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const usersEndpoint = targetTenantId ? `/api/app/users?tenantId=${encodeURIComponent(targetTenantId)}` : "/api/app/users";
 
   function canManageTarget(user: UserRow) {
+    if (!isOpturonAdminScope && user.accountKind === "primary") return false;
     if (isStaffManager) return true;
-    if (user.accountKind === "primary") return false;
     return user.tenantRole === "seller" || user.tenantRole === "viewer";
   }
 
   function canPromoteToPrimary(user: UserRow) {
+    if (isOpturonAdminScope) return false;
     if (user.accountKind === "primary") return false;
     if (isStaffManager) return true;
     return user.tenantRole === "seller" || user.tenantRole === "viewer";
+  }
+
+  function roleLabel(role: string, accountKind?: string) {
+    if (isOpturonAdminScope) {
+      return role === "owner" || accountKind === "primary" ? "Cliente" : "Vendedor";
+    }
+    return "Vendedor";
+  }
+
+  function visibleRoleValue(user: UserRow) {
+    if (isOpturonAdminScope) {
+      return user.tenantRole === "owner" || user.accountKind === "primary" ? "owner" : "seller";
+    }
+    return "seller";
   }
 
   async function invite(event?: FormEvent<HTMLFormElement>) {
@@ -119,7 +130,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
       }
 
       await reloadUsers();
-      setForm({ email: "", name: "", role: "viewer", password: "" });
+      setForm({ email: "", name: "", role: "seller", password: "" });
       setFeedback({ tone: "success", text: "Usuario invitado correctamente." });
       toast.success("Invitacion enviada");
     } catch {
@@ -305,9 +316,9 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Nombre" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
             <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
             <select className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
-              {allowedRoles.map((role) => (
-                <option key={role} value={role}>
-                  {roleLabel(role)}
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
                 </option>
               ))}
             </select>
@@ -347,18 +358,18 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
                     {canManage && canManageTarget(user) ? (
                       <select
                         className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm"
-                        value={user.tenantRole}
+                        value={visibleRoleValue(user)}
                         disabled={pendingRoleUserId === user.id}
                         onChange={(event) => void updateRole(user.id, event.target.value)}
                       >
-                        {allowedRoles.map((role) => (
-                          <option key={role} value={role}>
-                            {roleLabel(role)}
+                        {roleOptions.map((role) => (
+                          <option key={role.value} value={role.value}>
+                            {role.label}
                           </option>
                         ))}
                       </select>
                     ) : (
-                      roleLabel(user.tenantRole)
+                      roleLabel(user.tenantRole, user.accountKind)
                     )}
                   </td>
                   {canManage ? (
@@ -436,7 +447,7 @@ function formatActivityMessage(entry: PortalUserAuditEvent) {
     const previousRole = String(payload.previousRole || "").trim();
     const nextRole = String(payload.nextRole || "").trim();
     if (previousRole && nextRole) {
-      return `${actor} cambio el rol de ${target} de ${roleLabel(previousRole)} a ${roleLabel(nextRole)}.`;
+      return `${actor} cambio el rol de ${target} de ${previousRole} a ${nextRole}.`;
     }
     return `${actor} actualizo el rol de ${target}.`;
   }
