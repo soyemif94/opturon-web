@@ -7,6 +7,7 @@ import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
 
 const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+const OPTURON_ADMIN_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin"]);
 
 function resolveDemoTenantId(requestedTenantId?: string) {
   if (requestedTenantId) return requestedTenantId;
@@ -33,6 +34,13 @@ export async function requireOpsPage() {
   return ctx;
 }
 
+export async function requireOpturonAdminPage(callbackUrl = "/app/client-management") {
+  const ctx = await getSessionContext();
+  if (!ctx.session) redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(ctx.globalRole)) redirect("/app");
+  return ctx;
+}
+
 export async function requireAppPage(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
@@ -48,6 +56,15 @@ export async function requireOpsApi() {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   if (!ctx.globalRole || !STAFF_ROLES.has(ctx.globalRole)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  return { ctx };
+}
+
+export async function requireOpturonAdminApi() {
+  const ctx = await getSessionContext();
+  if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(ctx.globalRole)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ctx };

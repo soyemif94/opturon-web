@@ -1,0 +1,159 @@
+const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
+const PROD_BACKEND_FALLBACK = "https://opturon-api.onrender.com";
+
+type BackendError = Error & {
+  status?: number;
+  body?: unknown;
+};
+
+export type TenantPolicy = {
+  planCode: string;
+  limits: {
+    maxPortalUsers: number;
+    maxAutomations: number;
+    maxContacts: number;
+  };
+  capabilities: string[];
+  enabledModules: Record<string, boolean>;
+  source?: string;
+};
+
+export type AdminTenantPolicyRow = {
+  id: string;
+  name: string;
+  tenantId: string;
+  externalTenantId: string;
+  timezone?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  policy: TenantPolicy;
+};
+
+function getApiBase() {
+  const candidates = [
+    process.env.BACKEND_BASE_URL,
+    process.env.API_BASE_URL,
+    process.env.NEXT_PUBLIC_API_BASE_URL
+  ];
+
+  const resolved = candidates
+    .map((value) => String(value || "").trim().replace(/\/$/, ""))
+    .find(Boolean);
+
+  if (resolved) {
+    try {
+      const hostname = new URL(resolved).hostname.toLowerCase();
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
+      if (!(process.env.NODE_ENV === "production" && isLocalHost)) {
+        return resolved;
+      }
+    } catch {
+      return resolved;
+    }
+  }
+
+  return process.env.NODE_ENV === "production" ? PROD_BACKEND_FALLBACK : "";
+}
+
+function getPortalInternalKey() {
+  return String(process.env.PORTAL_INTERNAL_KEY || "").trim();
+}
+
+export function getBackendErrorStatus(error: unknown): number | undefined {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = Number((error as BackendError).status);
+    if (Number.isInteger(status) && status >= 400) {
+      return status;
+    }
+  }
+  return undefined;
+}
+
+export function getBackendErrorBody(error: unknown): unknown {
+  if (error && typeof error === "object" && "body" in error) {
+    return (error as BackendError).body;
+  }
+  return undefined;
+}
+
+async function backendPortalFetch<T>(path: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS): Promise<T> {
+  const apiBase = getApiBase();
+  if (!apiBase) throw new Error("API base URL is not configured");
+
+  const portalKey = getPortalInternalKey();
+  if (!portalKey) throw new Error("PORTAL_INTERNAL_KEY is not configured");
+
+  const headers = new Headers(init?.headers || {});
+  headers.set("Content-Type", "application/json");
+  headers.set("x-portal-key", portalKey);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
+
+  try {
+    const response = await fetch(`${apiBase}${path}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+      signal: controller.signal
+    });
+    const text = await response.text();
+    const json = text ? JSON.parse(text) : null;
+
+    if (!response.ok) {
+      const error = new Error(json?.error || `API request failed (${response.status})`) as BackendError;
+      error.status = response.status;
+      error.body = json;
+      throw error;
+    }
+
+    return json as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function getAdminTenantPolicies() {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      tenants: AdminTenantPolicyRow[];
+    };
+  }>("/api/admin/tenants");
+}
+
+export async function getAdminTenantPolicy(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      tenantId: string;
+      clinic: {
+        id: string;
+        name: string | null;
+        externalTenantId: string | null;
+      };
+      policy: TenantPolicy;
+    };
+  }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`);
+}
+
+export async function patchAdminTenantPolicy(tenantId: string, payload: Partial<TenantPolicy>) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      tenantId: string;
+      clinic: {
+        id: string;
+        name: string | null;
+        externalTenantId: string | null;
+      };
+      policy: TenantPolicy;
+    };
+  }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}

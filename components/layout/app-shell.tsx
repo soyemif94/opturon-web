@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChartColumn,
   ChevronRight,
+  Building2,
   ContactRound,
   Headset,
   House,
@@ -36,6 +37,7 @@ const navItems: Array<{
   description: string;
   icon: any;
   module: AppModule;
+  adminOnly?: boolean;
   match: (pathname: string) => boolean;
 }> = [
   {
@@ -133,6 +135,15 @@ const navItems: Array<{
     icon: Settings2,
     module: "settings",
     match: (pathname: string) => pathname.startsWith("/app/settings")
+  },
+  {
+    href: "/app/client-management",
+    label: "Gesti\u00f3n de clientes",
+    description: "Planes, l\u00edmites, m\u00f3dulos y capacidades por tenant",
+    icon: Building2,
+    module: "settings",
+    adminOnly: true,
+    match: (pathname: string) => pathname.startsWith("/app/client-management")
   }
 ];
 
@@ -202,7 +213,8 @@ export function AppShell({
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
   const accessContext = { globalRole, tenantRole };
-  const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module));
+  const isOpturonAdmin = globalRole === "superadmin" || globalRole === "ops_admin";
+  const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module) && (!item.adminOnly || isOpturonAdmin));
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
