@@ -53,6 +53,10 @@ function clonePolicy(policy: TenantPolicy): TenantPolicy {
   };
 }
 
+function getTenantLabel(tenant: AdminTenantPolicyRow) {
+  return tenant.displayName || tenant.name || tenant.primaryEmail || tenant.tenantId;
+}
+
 export function AdminClientConfiguration({ initialTenants }: { initialTenants: AdminTenantPolicyRow[] }) {
   const [tenants, setTenants] = useState(
     initialTenants.map((tenant) => ({ ...tenant, policy: normalizePolicy(tenant.policy) }))
@@ -130,8 +134,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{tenant.name}</p>
-                    <p className="mt-1 truncate font-mono text-xs text-muted">{tenant.tenantId}</p>
+                    <p className="truncate font-medium">{getTenantLabel(tenant)}</p>
+                    <p className="mt-1 truncate text-xs text-muted">{tenant.primaryEmail || tenant.tenantId}</p>
                   </div>
                   <Badge variant={tenant.policy.source === "settings.portal.policy" ? "success" : "warning"}>
                     {tenant.policy.planCode}
@@ -150,8 +154,11 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
         <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold">{selectedTenant.name}</h2>
-              <p className="mt-1 font-mono text-xs text-muted">{selectedTenant.tenantId}</p>
+              <h2 className="text-xl font-semibold">{getTenantLabel(selectedTenant)}</h2>
+              <p className="mt-1 text-xs text-muted">
+                {selectedTenant.primaryEmail ? `${selectedTenant.primaryEmail} · ` : ""}
+                <span className="font-mono">{selectedTenant.tenantId}</span>
+              </p>
             </div>
             <Button onClick={savePolicy} disabled={saving} className="gap-2">
               <Save className="h-4 w-4" />

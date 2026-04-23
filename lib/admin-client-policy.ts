@@ -21,6 +21,8 @@ export type TenantPolicy = {
 export type AdminTenantPolicyRow = {
   id: string;
   name: string;
+  displayName?: string | null;
+  primaryEmail?: string | null;
   tenantId: string;
   externalTenantId: string;
   timezone?: string | null;
