@@ -28,6 +28,11 @@ type Product = {
   categoryName?: string | null;
   subcategory?: string | null;
   attributes?: Array<{ name: string; options: string[] }>;
+  image?: {
+    url: string;
+    alt?: string | null;
+    source?: string | null;
+  } | null;
   expirationDate?: string | null;
   discountPercentage?: number | null;
   riskDiscountSuggestion?: {
@@ -62,6 +67,8 @@ type Draft = {
   currency: string;
   categoryId: string;
   subcategory: string;
+  imageUrl: string;
+  imageAlt: string;
   expirationDate: string;
   attributesText: string;
 };
@@ -115,6 +122,8 @@ const EMPTY_DRAFT: Draft = {
   currency: "ARS",
   categoryId: "",
   subcategory: "",
+  imageUrl: "",
+  imageAlt: "",
   expirationDate: "",
   attributesText: ""
 };
@@ -247,6 +256,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       currency: product?.currency || "ARS",
       categoryId: product?.categoryId || "",
       subcategory: product?.subcategory || "",
+      imageUrl: product?.image?.url || "",
+      imageAlt: product?.image?.alt || "",
       expirationDate: product?.expirationDate || "",
       attributesText: formatAttributesText(product?.attributes)
     };
@@ -367,6 +378,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     const price = Number(draft.price);
     const stock = Number.parseInt(draft.stock, 10);
     const attributes = parseAttributesText(draft.attributesText);
+    const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt);
 
     if (!draft.name.trim()) {
       setFeedback({ tone: "warning", text: "El producto necesita al menos un nombre." });
@@ -378,6 +390,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
     if (!Number.isInteger(stock) || stock < 0) {
       setFeedback({ tone: "warning", text: "El stock debe ser cero o mayor." });
+      return;
+    }
+    if (draft.imageUrl.trim() && !image) {
+      setFeedback({ tone: "warning", text: "La imagen principal debe ser una URL valida con http o https." });
       return;
     }
 
@@ -396,6 +412,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           currency: draft.currency.trim() || "ARS",
           categoryId: draft.categoryId || null,
           subcategory: draft.subcategory.trim() || null,
+          image,
           expirationDate: draft.expirationDate || null,
           attributes
         })
@@ -1072,6 +1089,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                         className="mt-1 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
                         aria-label={`Seleccionar ${product.name}`}
                       />
+                      <CatalogProductImage product={product} />
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-base font-semibold">{product.name}</p>
@@ -1415,6 +1433,30 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       disabled={readOnly}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Imagen principal URL</label>
+                    <Input
+                      value={draft.imageUrl}
+                      onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))}
+                      placeholder="https://..."
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Texto alternativo</label>
+                    <Input
+                      value={draft.imageAlt}
+                      onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
+                      placeholder="Ej. Foto principal del producto"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                    <p className="text-sm font-medium">Preview</p>
+                    <div className="mt-3">
+                      <CatalogProductImage product={{ image: buildCatalogImagePayload(draft.imageUrl, draft.imageAlt) }} size="lg" />
+                    </div>
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Precio</label>
@@ -1601,6 +1643,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 </div>
               ) : (
                 <>
+                  <div className="overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-surface/55">
+                    <CatalogProductImage product={selectedProduct} size="detail" />
+                  </div>
                   <DetailStat label="Producto" value={selectedProduct.name} />
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>
@@ -1621,6 +1666,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                     <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
                     <DetailStat label="Subcategoria" value={selectedProduct.subcategory || "Sin subcategoria"} />
+                    <DetailStat label="Imagen principal" value={selectedProduct.image?.url || "Sin imagen"} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Vencimiento" value={formatExpirationDate(selectedProduct.expirationDate)} />
                     <DetailStat label="Descuento" value={selectedProduct.discountPercentage != null ? `${selectedProduct.discountPercentage}%` : "Sin descuento"} />
@@ -1858,6 +1904,56 @@ function DetailStat({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-sm font-medium">{value}</p>
     </div>
   );
+}
+
+function buildCatalogImagePayload(imageUrl: string, imageAlt: string) {
+  const rawUrl = String(imageUrl || "").trim();
+  if (!rawUrl) return null;
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return {
+      url: parsed.toString(),
+      alt: String(imageAlt || "").trim() || null,
+      source: "external_url"
+    };
+  } catch {
+    return null;
+  }
+}
+
+function CatalogProductImage({
+  product,
+  size = "sm"
+}: {
+  product: { name?: string; image?: Product["image"] | null };
+  size?: "sm" | "lg" | "detail";
+}) {
+  const image = product?.image;
+  const hasImage = Boolean(image?.url);
+  const alt = image?.alt || product?.name || "Imagen del producto";
+  const className =
+    size === "detail"
+      ? "aspect-[16/10] w-full object-cover"
+      : size === "lg"
+        ? "h-40 w-full rounded-2xl object-cover"
+        : "h-20 w-20 shrink-0 rounded-2xl object-cover";
+  const fallbackClassName =
+    size === "detail"
+      ? "flex aspect-[16/10] w-full items-center justify-center bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted"
+      : size === "lg"
+        ? "flex h-40 w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted"
+        : "flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-xs font-medium uppercase tracking-[0.16em] text-muted";
+
+  if (hasImage) {
+    return <img src={image?.url || ""} alt={alt} className={className} loading="lazy" />;
+  }
+
+  return <div className={fallbackClassName}>{size === "sm" ? "Sin imagen" : "Preview no disponible"}</div>;
 }
 
 function formatCurrency(value: number, currency = "ARS") {

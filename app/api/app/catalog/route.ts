@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       categoryId: body?.categoryId || null,
       subcategory: body?.subcategory || null,
       attributes: Array.isArray(body?.attributes) ? body.attributes : [],
+      image: body?.image || null,
       expirationDate: body?.expirationDate || null,
       discountPercentage: body?.discountPercentage ?? null,
       status:

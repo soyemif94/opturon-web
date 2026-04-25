@@ -23,6 +23,8 @@ type ProductDraft = {
   status: string;
   categoryId: string;
   subcategory: string;
+  imageUrl: string;
+  imageAlt: string;
   expirationDate: string;
   discountPercentage: string;
   attributesText: string;
@@ -40,6 +42,8 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     status: product.status || "active",
     categoryId: product.categoryId || "",
     subcategory: product.subcategory || "",
+    imageUrl: product.image?.url || "",
+    imageAlt: product.image?.alt || "",
     expirationDate: product.expirationDate || "",
     discountPercentage: product.discountPercentage != null ? String(product.discountPercentage) : "",
     attributesText: formatAttributesText(product.attributes)
@@ -84,6 +88,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const vatRate = Number(draft.vatRate || 0);
     const discountPercentage = draft.discountPercentage.trim() ? Number(draft.discountPercentage) : null;
     const attributes = parseAttributesText(draft.attributesText);
+    const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt);
 
     if (!name) {
       toast.error("Nombre requerido", "Completa el nombre del producto antes de guardar.");
@@ -105,6 +110,10 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
       toast.error("Stock invalido", "Ingresa un stock valido mayor o igual a cero.");
       return;
     }
+    if (draft.imageUrl.trim() && !image) {
+      toast.error("Imagen invalida", "Ingresa una URL valida con http o https para la imagen principal.");
+      return;
+    }
     if (discountPercentage !== null && (!Number.isFinite(discountPercentage) || discountPercentage <= 0 || discountPercentage > 100)) {
       toast.error("Descuento invalido", "Ingresa un descuento mayor a 0 y menor o igual a 100.");
       return;
@@ -122,6 +131,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           categoryId: draft.categoryId || null,
           subcategory: draft.subcategory.trim() || null,
           attributes,
+          image,
           expirationDate: draft.expirationDate || null,
           discountPercentage,
           price,
@@ -215,6 +225,20 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             disabled={saving}
           />
           <Input
+            className="md:col-span-2"
+            placeholder="Imagen principal URL (https://...)"
+            value={draft.imageUrl}
+            onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))}
+            disabled={saving}
+          />
+          <Input
+            className="md:col-span-2"
+            placeholder="Texto alternativo de la imagen"
+            value={draft.imageAlt}
+            onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
+            disabled={saving}
+          />
+          <Input
             type="date"
             value={draft.expirationDate}
             onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
@@ -246,6 +270,12 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
             disabled={saving}
           />
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
+            <p className="font-medium text-text">Preview de imagen</p>
+            <div className="mt-3 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-bg/60">
+              <CatalogProductImagePreview image={image} name={draft.name} />
+            </div>
+          </div>
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
             Precio final visible: {new Intl.NumberFormat("es-AR", { style: "currency", currency: draft.currency || "ARS", maximumFractionDigits: 2 }).format(
               getDiscountedPrice(Number(draft.price || 0), draft.discountPercentage).finalPrice
@@ -296,4 +326,42 @@ function formatAttributesText(attributes?: PortalProduct["attributes"]) {
     .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
     .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
     .join("\n");
+}
+
+function buildCatalogImagePayload(imageUrl: string, imageAlt: string) {
+  const rawUrl = String(imageUrl || "").trim();
+  if (!rawUrl) return null;
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return {
+      url: parsed.toString(),
+      alt: String(imageAlt || "").trim() || null,
+      source: "external_url"
+    };
+  } catch {
+    return null;
+  }
+}
+
+function CatalogProductImagePreview({
+  image,
+  name
+}: {
+  image: { url: string; alt?: string | null } | null;
+  name: string;
+}) {
+  if (image?.url) {
+    return <img src={image.url} alt={image.alt || name || "Imagen del producto"} className="aspect-[16/10] w-full object-cover" loading="lazy" />;
+  }
+
+  return (
+    <div className="flex aspect-[16/10] w-full items-center justify-center bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted">
+      Preview no disponible
+    </div>
+  );
 }

@@ -71,6 +71,9 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3">
+            <div className="overflow-hidden rounded-2xl border border-[color:var(--border)] bg-surface/55 md:col-span-2 xl:col-span-3">
+              <ProductImagePreview image={product.image || null} name={product.name} />
+            </div>
             <DetailTile label="Codigo / SKU" value={product.sku || "-"} />
             <DetailTile label="Precio base" value={formatMoney(pricing.originalPrice, product.currency)} />
             <DetailTile label="Precio final" value={formatMoney(pricing.finalPrice, product.currency)} />
@@ -79,6 +82,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <DetailTile label="Stock" value={String(product.stock ?? 0)} />
             <DetailTile label="Categoria" value={product.categoryName || "Sin categoria"} />
             <DetailTile label="Subcategoria" value={product.subcategory || "Sin subcategoria"} />
+            <DetailTile label="Imagen principal" value={product.image?.url || "Sin imagen"} />
             <DetailTile label="Estado" value={titleCaseLabel(product.status)} />
             <DetailTile label="Vencimiento" value={formatExpirationDate(product.expirationDate)} />
             <DetailTile label="Descuento" value={product.discountPercentage != null ? `${product.discountPercentage}%` : "Sin descuento"} />
@@ -154,4 +158,22 @@ function formatProductAttributes(attributes?: Array<{ name: string; options: str
     .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
     .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
     .join(" | ");
+}
+
+function ProductImagePreview({
+  image,
+  name
+}: {
+  image: { url: string; alt?: string | null } | null;
+  name: string;
+}) {
+  if (image?.url) {
+    return <img src={image.url} alt={image.alt || name || "Imagen del producto"} className="aspect-[16/10] w-full object-cover" loading="lazy" />;
+  }
+
+  return (
+    <div className="flex aspect-[16/10] w-full items-center justify-center bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted">
+      Sin imagen principal
+    </div>
+  );
 }

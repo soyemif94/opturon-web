@@ -1365,6 +1365,11 @@ export type PortalProduct = {
     name: string;
     options: string[];
   }>;
+  image?: {
+    url: string;
+    alt?: string | null;
+    source?: string | null;
+  } | null;
   riskDiscountSuggestion?: {
     key: "catalog_risk_discount";
     status: "critical" | "expiring_soon";
@@ -2634,6 +2639,11 @@ export async function createPortalProduct(
     categoryId?: string | null;
     subcategory?: string | null;
     attributes?: Array<{ name: string; options: string[] }>;
+    image?: {
+      url: string;
+      alt?: string | null;
+      source?: string | null;
+    } | null;
     expirationDate?: string | null;
     discountPercentage?: number | null;
     status?: string;
@@ -2682,6 +2692,11 @@ export async function patchPortalProduct(
     categoryId?: string | null;
     subcategory?: string | null;
     attributes?: Array<{ name: string; options: string[] }>;
+    image?: {
+      url: string;
+      alt?: string | null;
+      source?: string | null;
+    } | null;
     expirationDate?: string | null;
     discountPercentage?: number | null;
     automationAttribution?: {
