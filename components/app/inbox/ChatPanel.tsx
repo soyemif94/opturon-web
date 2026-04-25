@@ -173,8 +173,11 @@ export function ChatPanel({
                 <MessageBubble
                   key={item.id}
                   direction={item.payload.direction}
+                  type={item.payload.type}
                   text={item.payload.text}
+                  caption={item.payload.caption}
                   timestamp={item.payload.timestamp}
+                  media={item.payload.media}
                   optimistic={Boolean(item.payload.optimistic)}
                 />
               ) : (

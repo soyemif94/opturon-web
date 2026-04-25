@@ -33,7 +33,26 @@ export type DetailPayload = {
   conversation: ConversationRowData;
   contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; industry?: string; tags: string[] };
   deal?: { id: string; stage: string; value: number; probability: number };
-  messages: Array<{ id: string; direction: string; text: string; timestamp: string; status: string; optimistic?: boolean }>;
+  messages: Array<{
+    id: string;
+    direction: string;
+    type?: string;
+    text: string;
+    caption?: string;
+    timestamp: string;
+    status: string;
+    optimistic?: boolean;
+    media?: {
+      mediaId?: string | null;
+      mimeType?: string | null;
+      filename?: string | null;
+      sha256?: string | null;
+      caption?: string | null;
+      available?: boolean;
+      previewUrl?: string | null;
+      downloadUrl?: string | null;
+    } | null;
+  }>;
   notes: Array<{ id: string; text: string; createdAt: string }>;
   tasks: Array<{ id: string; title: string; status: string; dueDate?: string }>;
   assignee?: { id: string; name: string };

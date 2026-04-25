@@ -61,6 +61,10 @@ function getApiBase() {
   return "";
 }
 
+export function getApiBaseUrl() {
+  return getApiBase();
+}
+
 export function isBackendConfigured() {
   return Boolean(getApiBase());
 }

@@ -16,6 +16,31 @@ const patchSchema = z.object({
   stage: z.enum(["lead", "qualified", "proposal", "won", "lost"]).optional()
 });
 
+function enrichMessagesWithMediaUrls(tenantId: string, conversationId: string, messages: Array<Record<string, any>>) {
+  return (messages || []).map((message) => {
+    const media = message && typeof message.media === "object" ? message.media : null;
+    if (!media || !media.mediaId) {
+      return {
+        ...message,
+        type: message?.type || "text",
+        caption: message?.caption || ""
+      };
+    }
+
+    const mediaPath = `/api/app/inbox/${conversationId}/messages/${message.id}/media?tenantId=${encodeURIComponent(tenantId)}`;
+    return {
+      ...message,
+      type: message?.type || "text",
+      caption: message?.caption || "",
+      media: {
+        ...media,
+        previewUrl: mediaPath,
+        downloadUrl: mediaPath
+      }
+    };
+  });
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const url = new URL(request.url);
@@ -43,7 +68,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
       const result = await getPortalConversationDetail(tenantContext.tenantId, id);
-      return NextResponse.json(result.data, {
+      return NextResponse.json({
+        ...result.data,
+        messages: enrichMessagesWithMediaUrls(tenantContext.tenantId, id, result.data?.messages || [])
+      }, {
         headers: {
           "Cache-Control": "no-store"
         }
@@ -70,6 +98,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({
     readOnly: tenantContext.readOnly,
     ...detail,
+    messages: enrichMessagesWithMediaUrls(tenantContext.tenantId, id, detail.messages || []),
     conversation: {
       ...detail.conversation,
       leadStatus: detail.conversation.leadStatus || "NEW",

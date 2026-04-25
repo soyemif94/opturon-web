@@ -9,17 +9,31 @@ function formatTime(iso: string) {
 
 export function MessageBubble({
   direction,
+  type,
   text,
+  caption,
   timestamp,
+  media,
   optimistic
 }: {
   direction: string;
+  type?: string;
   text: string;
+  caption?: string;
   timestamp: string;
+  media?: {
+    previewUrl?: string | null;
+    downloadUrl?: string | null;
+    mimeType?: string | null;
+    available?: boolean;
+  } | null;
   optimistic?: boolean;
 }) {
   const outbound = direction === "outbound";
   const system = direction === "system";
+  const isImage = type === "image";
+  const mediaUrl = media?.previewUrl || media?.downloadUrl || null;
+  const captionText = caption || text;
 
   return (
     <div className={cn("flex", outbound ? "justify-end" : "justify-start", system ? "justify-center" : "")}>
@@ -40,7 +54,22 @@ export function MessageBubble({
           {outbound ? <UserRound className="h-3 w-3" /> : system ? <Bot className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
           <span>{outbound ? "Humano" : system ? "Evento del bot" : "Contacto"}</span>
         </div>
-        <p className="whitespace-pre-wrap leading-5">{text}</p>
+        {isImage ? (
+          <div className="space-y-2">
+            {mediaUrl ? (
+              <a href={media?.downloadUrl || mediaUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-[color:var(--border)] bg-black/5">
+                <img src={mediaUrl} alt={captionText || "Imagen recibida"} className="max-h-64 w-full object-cover" loading="lazy" />
+              </a>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] px-3 py-4 text-xs text-muted">
+                Imagen recibida. Todavia no se pudo cargar la vista previa.
+              </div>
+            )}
+            {captionText ? <p className="whitespace-pre-wrap leading-5">{captionText}</p> : null}
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap leading-5">{text}</p>
+        )}
         <p className="mt-1.5 text-[10px] text-muted" style={system ? { color: "var(--inbox-system-bubble-muted)" } : undefined}>
           {formatTime(timestamp)}
         </p>
