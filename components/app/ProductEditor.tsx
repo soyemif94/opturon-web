@@ -55,6 +55,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
   const [draft, setDraft] = useState<ProductDraft>(buildInitialState(product));
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<PortalProductCategory[]>([]);
+  const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +89,6 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const vatRate = Number(draft.vatRate || 0);
     const discountPercentage = draft.discountPercentage.trim() ? Number(draft.discountPercentage) : null;
     const attributes = parseAttributesText(draft.attributesText);
-    const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt);
 
     if (!name) {
       toast.error("Nombre requerido", "Completa el nombre del producto antes de guardar.");
