@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, type FormEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type ComponentType, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Boxes, CheckSquare, ChevronDown, ChevronUp, Package, PencilLine, ScanLine, Search, Trash2, Upload, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,7 @@ type Draft = {
   subcategory: string;
   imageUrl: string;
   imageAlt: string;
+  imageSource: "external_url" | "uploaded";
   expirationDate: string;
   attributesText: string;
 };
@@ -124,6 +125,7 @@ const EMPTY_DRAFT: Draft = {
   subcategory: "",
   imageUrl: "",
   imageAlt: "",
+  imageSource: "external_url",
   expirationDate: "",
   attributesText: ""
 };
@@ -145,6 +147,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [bulkPreview, setBulkPreview] = useState<BulkPreviewRow[]>([]);
   const [bulkResult, setBulkResult] = useState<BulkResultSummary | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -164,6 +167,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [categoryUpdatingId, setCategoryUpdatingId] = useState<string | null>(null);
   const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedId) || null,
@@ -258,6 +262,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       subcategory: product?.subcategory || "",
       imageUrl: product?.image?.url || "",
       imageAlt: product?.image?.alt || "",
+      imageSource: product?.image?.source === "uploaded" ? "uploaded" : "external_url",
       expirationDate: product?.expirationDate || "",
       attributesText: formatAttributesText(product?.attributes)
     };
@@ -378,7 +383,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     const price = Number(draft.price);
     const stock = Number.parseInt(draft.stock, 10);
     const attributes = parseAttributesText(draft.attributesText);
-    const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt);
+    const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource);
 
     if (!draft.name.trim()) {
       setFeedback({ tone: "warning", text: "El producto necesita al menos un nombre." });
@@ -436,6 +441,40 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       toast.error("Error al guardar producto", message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file, file.name || "product-image");
+
+      const response = await fetch("/api/app/catalog/image-upload", {
+        method: "POST",
+        body: formData
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.image?.url) {
+        throw new Error(String(json?.error || "No se pudo subir la imagen."));
+      }
+
+      setDraft((current) => ({
+        ...current,
+        imageUrl: String(json.image.url || ""),
+        imageSource: "uploaded"
+      }));
+      toast.success("Imagen subida");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo subir la imagen.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al subir imagen", message);
+    } finally {
+      setUploadingImage(false);
     }
   }
 
@@ -1434,27 +1473,31 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Imagen principal URL</label>
-                    <Input
-                      value={draft.imageUrl}
-                      onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))}
-                      placeholder="https://..."
-                      disabled={readOnly}
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <label className="text-sm font-medium">Texto alternativo</label>
                     <Input
                       value={draft.imageAlt}
                       onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
                       placeholder="Ej. Foto principal del producto"
-                      disabled={readOnly}
+                      disabled={readOnly || uploadingImage}
                     />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Subir imagen</label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void handleImageUpload(event)} />
+                      <Button type="button" variant="secondary" onClick={() => imageInputRef.current?.click()} disabled={readOnly || uploadingImage}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        {uploadingImage ? "Subiendo..." : "Subir imagen"}
+                      </Button>
+                      <p className="text-sm text-muted">
+                        {draft.imageSource === "uploaded" ? "La imagen queda guardada en Opturon." : "Subi una foto para usarla como imagen principal del producto."}
+                      </p>
+                    </div>
                   </div>
                   <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
                     <p className="text-sm font-medium">Preview</p>
                     <div className="mt-3">
-                      <CatalogProductImage product={{ image: buildCatalogImagePayload(draft.imageUrl, draft.imageAlt) }} size="lg" />
+                      <CatalogProductImage product={{ image: buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource) }} size="lg" />
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1491,10 +1534,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     />
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Button type="button" variant="ghost" onClick={() => startCreate(categoryFilter || null)} disabled={readOnly}>
+                    <Button type="button" variant="ghost" onClick={() => startCreate(categoryFilter || null)} disabled={readOnly || uploadingImage}>
                       Limpiar
                     </Button>
-                    <Button type="submit" disabled={readOnly || saving}>
+                    <Button type="submit" disabled={readOnly || saving || uploadingImage}>
                       {saving ? "Guardando..." : "Crear producto"}
                     </Button>
                   </div>
@@ -1906,7 +1949,7 @@ function DetailStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildCatalogImagePayload(imageUrl: string, imageAlt: string) {
+function buildCatalogImagePayload(imageUrl: string, imageAlt: string, imageSource: "external_url" | "uploaded") {
   const rawUrl = String(imageUrl || "").trim();
   if (!rawUrl) return null;
 
@@ -1919,7 +1962,7 @@ function buildCatalogImagePayload(imageUrl: string, imageAlt: string) {
     return {
       url: parsed.toString(),
       alt: String(imageAlt || "").trim() || null,
-      source: "external_url"
+      source: imageSource === "uploaded" ? "uploaded" : "external_url"
     };
   } catch {
     return null;

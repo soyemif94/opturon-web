@@ -1,8 +1,8 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save } from "lucide-react";
+import { Save, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,7 @@ type ProductDraft = {
   subcategory: string;
   imageUrl: string;
   imageAlt: string;
+  imageSource: "external_url" | "uploaded";
   expirationDate: string;
   discountPercentage: string;
   attributesText: string;
@@ -44,6 +45,7 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     subcategory: product.subcategory || "",
     imageUrl: product.image?.url || "",
     imageAlt: product.image?.alt || "",
+    imageSource: product.image?.source === "uploaded" ? "uploaded" : "external_url",
     expirationDate: product.expirationDate || "",
     discountPercentage: product.discountPercentage != null ? String(product.discountPercentage) : "",
     attributesText: formatAttributesText(product.attributes)
@@ -54,8 +56,10 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
   const router = useRouter();
   const [draft, setDraft] = useState<ProductDraft>(buildInitialState(product));
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [categories, setCategories] = useState<PortalProductCategory[]>([]);
-  const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +82,38 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
       cancelled = true;
     };
   }, []);
+
+  async function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file, file.name || "product-image");
+
+      const response = await fetch("/api/app/catalog/image-upload", {
+        method: "POST",
+        body: formData
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.image?.url) {
+        throw new Error(String(json?.error || "No se pudo subir la imagen."));
+      }
+
+      setDraft((current) => ({
+        ...current,
+        imageUrl: String(json.image.url || ""),
+        imageSource: "uploaded"
+      }));
+      toast.success("Imagen subida", "La imagen ya quedo lista para este producto.");
+    } catch (error) {
+      toast.error("No se pudo subir la imagen", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
 
   async function submitProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,8 +202,8 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 pt-0 md:grid-cols-2">
-          <Input placeholder="Nombre del producto" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={saving} />
-          <Input placeholder="Codigo / SKU" value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} disabled={saving} />
+          <Input placeholder="Nombre del producto" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={saving || uploadingImage} />
+          <Input placeholder="Codigo / SKU" value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} disabled={saving || uploadingImage} />
           <Input
             type="number"
             step="0.01"
@@ -175,7 +211,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Precio"
             value={draft.price}
             onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <Input
             type="number"
@@ -184,9 +220,9 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Stock disponible"
             value={draft.stock}
             onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
-          <Input placeholder="Moneda" maxLength={3} value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving} />
+          <Input placeholder="Moneda" maxLength={3} value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving || uploadingImage} />
           <Input
             type="number"
             step="0.01"
@@ -194,13 +230,13 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="IVA %"
             value={draft.vatRate}
             onChange={(event) => setDraft((current) => ({ ...current, vatRate: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <select
             className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
             value={draft.status}
             onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           >
             <option value="active">Activo</option>
             <option value="archived">Archivado</option>
@@ -209,7 +245,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
             value={draft.categoryId}
             onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           >
             <option value="">Sin categoria</option>
             {categories.map((category) => (
@@ -222,27 +258,28 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Subcategoria"
             value={draft.subcategory}
             onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
-            disabled={saving}
-          />
-          <Input
-            className="md:col-span-2"
-            placeholder="Imagen principal URL (https://...)"
-            value={draft.imageUrl}
-            onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <Input
             className="md:col-span-2"
             placeholder="Texto alternativo de la imagen"
             value={draft.imageAlt}
             onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted md:col-span-2">
+            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void handleImageUpload(event)} />
+            <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={saving || uploadingImage}>
+              <Upload className="mr-2 h-4 w-4" />
+              {uploadingImage ? "Subiendo imagen..." : "Subir imagen"}
+            </Button>
+            <span>{draft.imageSource === "uploaded" ? "La imagen ya quedo guardada en Opturon." : "Subi una foto para usarla como imagen principal del producto."}</span>
+          </div>
           <Input
             type="date"
             value={draft.expirationDate}
             onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <Input
             type="number"
@@ -252,7 +289,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Descuento %"
             value={draft.discountPercentage}
             onChange={(event) => setDraft((current) => ({ ...current, discountPercentage: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <Textarea
             className="md:col-span-2"
@@ -260,7 +297,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder="Descripcion comercial del producto"
             value={draft.description}
             onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <Textarea
             className="md:col-span-2"
@@ -268,7 +305,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
             placeholder={"Atributos configurables (uno por linea)\nTalle: M, L, XL\nColor: Negro, Blanco"}
             value={draft.attributesText}
             onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
-            disabled={saving}
+            disabled={saving || uploadingImage}
           />
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
             <p className="font-medium text-text">Preview de imagen</p>
@@ -292,7 +329,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <Button type="submit" className="w-full rounded-2xl" disabled={saving}>
+          <Button type="submit" className="w-full rounded-2xl" disabled={saving || uploadingImage}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Guardando..." : "Guardar producto"}
           </Button>
@@ -328,7 +365,7 @@ function formatAttributesText(attributes?: PortalProduct["attributes"]) {
     .join("\n");
 }
 
-function buildCatalogImagePayload(imageUrl: string, imageAlt: string) {
+function buildCatalogImagePayload(imageUrl: string, imageAlt: string, imageSource: "external_url" | "uploaded") {
   const rawUrl = String(imageUrl || "").trim();
   if (!rawUrl) return null;
 
@@ -341,7 +378,7 @@ function buildCatalogImagePayload(imageUrl: string, imageAlt: string) {
     return {
       url: parsed.toString(),
       alt: String(imageAlt || "").trim() || null,
-      source: "external_url"
+      source: imageSource === "uploaded" ? "uploaded" : "external_url"
     };
   } catch {
     return null;
