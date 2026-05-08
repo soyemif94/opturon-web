@@ -24,6 +24,8 @@ export default async function AppContactEditPage({ params }: { params: Promise<{
       title={contact?.name ? `Editar ${contact.name}` : "Editar contacto"}
       description="Ajusta datos del cliente para mantener el CRM y billing operables desde el portal."
       badge="Edicion de contacto"
+      backHref="/app/contacts"
+      backLabel="Volver a contactos"
     >
       {!contact ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">

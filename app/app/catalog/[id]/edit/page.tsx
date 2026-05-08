@@ -24,6 +24,8 @@ export default async function CatalogProductEditPage({ params }: { params: Promi
       title={product?.name ? `Editar ${product.name}` : "Editar producto"}
       description="Ajusta datos comerciales del producto para mantener el catalogo operativo desde el portal."
       badge="Edicion de producto"
+      backHref="/app/catalog"
+      backLabel="Volver al catalogo"
     >
       {!product ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">

@@ -29,6 +29,8 @@ export default async function AppContactDetailPage({ params }: { params: Promise
       title={contact?.name || "Detalle de contacto"}
       description="Lectura simple del registro CRM para validar identidad, datos fiscales basicos y contexto operativo."
       badge="Contacto"
+      backHref="/app/contacts"
+      backLabel="Volver a contactos"
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">

@@ -45,6 +45,8 @@ export default async function CatalogProductDetail({ params }: { params: Promise
       title={product.name}
       description="Vista simple del producto para validar datos clave antes de usarlo en pedidos o futuras automatizaciones."
       badge="Detalle del producto"
+      backHref="/app/catalog"
+      backLabel="Volver al catalogo"
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
         <Card className="border-white/6 bg-card/90">

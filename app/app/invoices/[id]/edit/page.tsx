@@ -38,6 +38,8 @@ export default async function AppInvoiceDraftEditPage({ params }: { params: Prom
           : "Ajusta items y datos basicos del borrador antes de emitirlo desde el detalle."
       }
       badge={invoice?.type === "credit_note" ? "Editar nota de credito" : "Editar borrador"}
+      backHref="/app/invoices"
+      backLabel="Volver a comprobantes"
     >
       {!invoice ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">

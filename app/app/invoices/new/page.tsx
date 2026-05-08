@@ -45,6 +45,8 @@ export default async function AppInvoiceDraftCreatePage({
           : "Crea un borrador simple con items manuales y dejalo listo para emitir luego desde el modulo de comprobantes."
       }
       badge={isCreditNote ? "Nota de credito" : "Borrador"}
+      backHref="/app/invoices"
+      backLabel="Volver a comprobantes"
     >
       {readOnly ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-8 text-sm text-muted">
