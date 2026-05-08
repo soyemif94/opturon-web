@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Clock3, Flag, History, PauseCircle, Phone, Settings2, Tag, UserRound } from "lucide-react";
+import { Archive, Clock3, Flag, History, PauseCircle, Phone, RotateCcw, Settings2, Tag, UserRound } from "lucide-react";
 import { CardSection } from "@/components/app/inbox/CardSection";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
@@ -87,6 +87,8 @@ type ProfilePanelProps = {
   onToggleBot: () => void;
   onMarkHot: () => void;
   onClose: () => void;
+  onResetConversation: () => void;
+  resetBusy?: boolean;
   noteText: string;
   onNoteTextChange: (value: string) => void;
   onAddNote: () => void;
@@ -125,6 +127,8 @@ export function ProfilePanel({
   onToggleBot,
   onMarkHot,
   onClose,
+  onResetConversation,
+  resetBusy,
   noteText,
   onNoteTextChange,
   onAddNote,
@@ -249,6 +253,16 @@ export function ProfilePanel({
               Archivar
             </button>
           </div>
+          <button
+            type="button"
+            onClick={onResetConversation}
+            disabled={readOnly || resetBusy}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm text-muted hover:text-text disabled:opacity-40"
+          >
+            <RotateCcw className="h-4 w-4" />
+            {resetBusy ? "Reiniciando..." : "Reiniciar conversacion"}
+          </button>
+          <p className="text-xs text-muted">Esto permitira que el bot vuelva a empezar con este contacto.</p>
         </div>
       </CardSection>
 

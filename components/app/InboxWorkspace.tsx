@@ -112,6 +112,7 @@ export function InboxWorkspace({
   const [assigningSeller, setAssigningSeller] = useState(false);
   const [leadStatusBusy, setLeadStatusBusy] = useState(false);
   const [nextActionBusy, setNextActionBusy] = useState(false);
+  const [resetConversationBusy, setResetConversationBusy] = useState(false);
   const [nextActionAtInput, setNextActionAtInput] = useState("");
   const [nextActionNoteInput, setNextActionNoteInput] = useState("");
   const [onlyUnread, setOnlyUnread] = useState(false);
@@ -1169,6 +1170,32 @@ export function InboxWorkspace({
     if (!ok) toast.error("No se pudo ejecutar la accion rapida");
   }
 
+  async function resetConversation() {
+    if (!selectedId || !detail || readOnly || resetConversationBusy) return;
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm("Esto permitira que el bot vuelva a empezar con este contacto. El historial de mensajes se conserva. Deseas continuar?");
+    if (!confirmed) return;
+
+    setResetConversationBusy(true);
+    try {
+      const ok = await mutateConversation(selectedId, "reset_conversation");
+      if (!ok) {
+        throw new Error("conversation_reset_failed");
+      }
+
+      setNextActionAtInput("");
+      setNextActionNoteInput("");
+      toast.success("Conversacion reiniciada", "El proximo mensaje de este contacto volvera a empezar limpio.");
+    } catch (error) {
+      toast.error("No se pudo reiniciar la conversacion", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setResetConversationBusy(false);
+    }
+  }
+
   function applySuggestion(item: SuggestionItem) {
     if (item.type === "template") {
       setComposer(item.text || item.label);
@@ -1329,6 +1356,8 @@ export function InboxWorkspace({
               taskTitle={taskTitle}
               onTaskTitleChange={setTaskTitle}
               onAddTask={() => void addTask()}
+              onResetConversation={() => void resetConversation()}
+              resetBusy={resetConversationBusy}
               historyHref={conversationUrl}
               orderHref={orderHref}
             />

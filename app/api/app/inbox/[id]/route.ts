@@ -5,7 +5,7 @@ import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, applyCommercialBotHandoff, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
 const patchSchema = z.object({
-  action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage", "set_bot_domain_override", "set_bot_flow_lock"]),
+  action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage", "set_bot_domain_override", "set_bot_flow_lock", "reset_conversation"]),
   assignedTo: z.string().optional(),
   botEnabled: z.boolean().optional(),
   botFlowLock: z.enum(["automatic", "agenda", "commerce"]).optional(),
@@ -245,6 +245,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const deal = data.deals.find((item) => item.tenantId === tenantContext.tenantId && item.contactId === conversation.contactId);
       if (!deal) return NextResponse.json({ error: "Deal not found" }, { status: 404 });
       deal.stage = payload.stage;
+      break;
+    }
+    case "reset_conversation": {
+      conversation.status = "open";
+      conversation.leadStatus = "NEW";
+      conversation.nextActionAt = null;
+      conversation.nextActionNote = null;
       break;
     }
     default:
