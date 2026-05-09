@@ -40,6 +40,38 @@ const EMPTY_OPEN_FORM: OpenFormState = {
   notes: ""
 };
 
+function getCashErrorMessage(code: string, action: "open" | "close" | "refresh") {
+  const normalized = String(code || "").trim();
+  if (!normalized) {
+    return action === "refresh"
+      ? "No se pudo actualizar la caja."
+      : action === "open"
+        ? "No se pudo abrir la caja."
+        : "No se pudo cerrar la caja.";
+  }
+
+  switch (normalized) {
+    case "cash_open_actor_not_allowed":
+    case "cash_open_user_not_found":
+      return "No tenes permisos para abrir caja.";
+    case "cash_close_actor_not_allowed":
+    case "cash_close_user_not_found":
+      return "No tenes permisos para cerrar caja.";
+    case "cash_session_already_open":
+      return "Ya existe una caja abierta para esta sucursal.";
+    case "cash_box_destination_not_found":
+      return "La caja seleccionada no esta disponible.";
+    case "cash_box_destination_inactive":
+      return "La caja seleccionada esta inactiva.";
+    case "cash_close_session_not_found":
+      return "La sesion de caja ya no esta disponible.";
+    case "cash_close_session_already_closed":
+      return "La caja ya estaba cerrada.";
+    default:
+      return normalized;
+  }
+}
+
 function formatCurrency(value: number | null | undefined, currency = "ARS") {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -112,7 +144,7 @@ export function CashHub({
     const response = await fetch("/api/app/cash-sessions", { cache: "no-store" });
     const json = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(String(json?.error || "No se pudo refrescar la caja."));
+      throw new Error(getCashErrorMessage(String(json?.error || ""), "refresh"));
     }
 
     const nextCashBoxes = Array.isArray(json?.cashBoxes) ? (json.cashBoxes as PortalCashBoxOverview[]) : [];
@@ -151,7 +183,7 @@ export function CashHub({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo abrir la sesion de caja."));
+        throw new Error(getCashErrorMessage(String(json?.error || ""), "open"));
       }
 
       await refreshCashOverview();
@@ -197,7 +229,7 @@ export function CashHub({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo cerrar la sesion."));
+        throw new Error(getCashErrorMessage(String(json?.error || ""), "close"));
       }
 
       await refreshCashOverview();

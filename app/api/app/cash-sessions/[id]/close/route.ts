@@ -3,7 +3,6 @@ import {
   closePortalCashSession,
   getBackendErrorBody,
   getBackendErrorStatus,
-  getPortalAuthUserByEmail,
   isBackendConfigured
 } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
@@ -26,16 +25,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const body = await request.json().catch(() => null);
     const tenantId = String(guard.ctx?.tenantId || "").trim();
-    const actorEmail = String(guard.ctx?.session?.user?.email || "").trim().toLowerCase();
-    if (!actorEmail) {
-      return noStore(NextResponse.json({ error: "cash_close_actor_email_missing" }, { status: 401 }));
-    }
-    const actorLookup = await getPortalAuthUserByEmail(actorEmail);
-    const actorUser = actorLookup.data;
-    if (!actorUser || String(actorUser.tenantId || "").trim() !== tenantId) {
+    const closedByUserId = String(guard.ctx?.userId || "").trim();
+    if (!tenantId || !closedByUserId) {
       return noStore(NextResponse.json({ error: "cash_close_actor_not_allowed" }, { status: 403 }));
     }
-    const closedByUserId = String(actorUser.id || "").trim();
     const result = await closePortalCashSession(tenantId, id, {
       cashCountedAmount: Number(body?.cashCountedAmount || 0),
       transferCountedAmount: Number(body?.transferCountedAmount || 0),
