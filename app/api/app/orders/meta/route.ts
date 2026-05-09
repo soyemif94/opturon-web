@@ -28,7 +28,8 @@ export async function GET() {
       getPortalPaymentDestinations(tenantId).catch(() => null)
     ]);
     const sellers = (usersResponse.data.users || [])
-      .filter((user) => user && user.role !== "viewer")
+      .filter((user) => user && user.role === "seller")
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "es"))
       .map((user) => ({
         id: user.id,
         name: user.name,

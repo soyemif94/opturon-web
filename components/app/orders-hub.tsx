@@ -245,11 +245,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     averageTicket: 0
   };
   const sellerInsights: SellerInsight[] = [];
-  const selectedConversationHref = selectedOrder?.conversationPreview?.conversationId
-    ? `/app/inbox/${selectedOrder.conversationPreview.conversationId}`
-    : selectedOrder?.conversationId
-      ? `/app/inbox/${selectedOrder.conversationId}`
-      : null;
 
   async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
     setMetricsLoading(true);
@@ -1120,10 +1115,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       onChange={(event) => setForm((current) => ({ ...current, sellerUserId: event.target.value }))}
                       disabled={metaLoading || sellers.length === 0}
                     >
-                      <option value="">{metaLoading ? "Cargando equipo..." : "Selecciona un vendedor"}</option>
+                      <option value="">{metaLoading ? "Cargando vendedores..." : "Selecciona un vendedor"}</option>
                       {sellers.map((seller) => (
                         <option key={seller.id} value={seller.id}>
-                          {seller.name}{seller.role ? ` · ${labelForSellerRole(seller.role)}` : ""}
+                          {seller.name}
                         </option>
                       ))}
                     </select>
@@ -1283,15 +1278,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                 </div>
               ) : (
                 <>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <DetailStat label="Cliente" value={labelForOrderCustomer(selectedOrder)} />
-                    <DetailStat label="Telefono" value={labelForOrderPhone(selectedOrder)} />
-                    <DetailStat label="Tipo de cliente" value={labelForCustomerType(selectedOrder.customerType)} />
-                    <DetailStat label="Vendedor" value={labelForOrderSeller(selectedOrder, sellers)} />
-                    <DetailStat label="Destino de cobro" value={labelForPaymentDestination(selectedOrder)} />
-                    <DetailStat label="Origen" value={labelForOrderSource(selectedOrder)} />
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <DetailStat label="Estado" value={labelForOrderStatus(selectedOrder.orderStatus)} />
                     <DetailStat label="Total" value={formatCurrency(selectedOrder.total, selectedOrder.currency)} />
-                    <DetailStat label="Creado" value={formatDate(selectedOrder.createdAt)} />
+                    <DetailStat label="Vendedor" value={labelForOrderSeller(selectedOrder, sellers)} />
                   </div>
 
                   <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
@@ -1301,15 +1291,18 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                         <div key={item.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
                           <div>
                             <p className="font-medium">{item.nameSnapshot}</p>
-                            <p className="mt-1 text-sm text-muted">
-                              {item.quantity} x {formatCurrency(item.priceSnapshot, selectedOrder.currency)}
-                              {item.productId ? " · Producto del catalogo" : ""}
-                              {item.variant ? ` · ${item.variant}` : ""}
+                            <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted">
+                              <span>Cantidad: {item.quantity}</span>
+                              <span>Precio: {formatCurrency(item.priceSnapshot, selectedOrder.currency)}</span>
+                              {item.variant ? <span>{item.variant}</span> : null}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Subtotal</p>
+                            <p className="mt-2 text-sm font-medium">
+                              {formatCurrency(item.priceSnapshot * item.quantity, selectedOrder.currency)}
                             </p>
                           </div>
-                          <p className="text-sm font-medium">
-                            {formatCurrency(item.priceSnapshot * item.quantity, selectedOrder.currency)}
-                          </p>
                         </div>
                       ))}
                     </div>
@@ -1319,72 +1312,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                     <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
                       <p className="text-sm font-semibold">Notas</p>
                       <p className="mt-2 text-sm leading-7 text-muted">{selectedOrder.notes}</p>
-                    </div>
-                  ) : null}
-
-                  {selectedOrder.conversationPreview ? (
-                    <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">Contexto de conversacion</p>
-                          <p className="mt-1 text-sm text-muted">
-                            Ultimos mensajes relevantes para entender rapido el caso antes de operar el cobro.
-                          </p>
-                        </div>
-                        {selectedConversationHref ? (
-                          <Button asChild type="button" variant="secondary" size="sm">
-                            <Link href={selectedConversationHref}>Ver conversacion completa</Link>
-                          </Button>
-                        ) : null}
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <DetailStat label="Conversacion" value={selectedOrder.conversationPreview.conversationId} />
-                        <DetailStat
-                          label="Estado"
-                          value={labelForConversationState(
-                            selectedOrder.conversationPreview.state,
-                            selectedOrder.conversationPreview.stage
-                          )}
-                        />
-                      </div>
-
-                      {selectedOrder.conversationPreview.messages.length ? (
-                        <div className="space-y-3">
-                          {selectedOrder.conversationPreview.messages.map((message) => (
-                            <div
-                              key={message.id}
-                              className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3 text-sm"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="font-medium">
-                                  {message.direction === "inbound" ? "Cliente" : "Bot / Equipo"}
-                                </span>
-                                <span className="text-xs text-muted">{formatDate(message.timestamp)}</span>
-                              </div>
-                              <p className="mt-2 whitespace-pre-wrap leading-6 text-muted">
-                                {message.text || "(mensaje sin texto)"}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-card/70 p-3 text-sm text-muted">
-                          No encontramos mensajes recientes para previsualizar en este pedido.
-                        </div>
-                      )}
-                    </div>
-                  ) : selectedConversationHref ? (
-                    <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <div>
-                        <p className="text-sm font-semibold">Contexto de conversacion</p>
-                        <p className="mt-1 text-sm text-muted">
-                          Este pedido tiene una conversacion asociada, pero todavia no cargamos mensajes recientes.
-                        </p>
-                      </div>
-                      <Button asChild type="button" variant="secondary" size="sm">
-                        <Link href={selectedConversationHref}>Ver conversacion completa</Link>
-                      </Button>
                     </div>
                   ) : null}
 
@@ -1402,10 +1329,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                           onChange={(event) => setDetailSellerUserId(event.target.value)}
                           disabled={metaLoading || readOnly || !backendReady || sellerUpdatingId === selectedOrder.id || sellers.length === 0}
                         >
-                          <option value="">{metaLoading ? "Cargando equipo..." : "Selecciona un vendedor"}</option>
+                          <option value="">{metaLoading ? "Cargando vendedores..." : "Selecciona un vendedor"}</option>
                           {sellers.map((seller) => (
                             <option key={seller.id} value={seller.id}>
-                              {seller.name}{seller.role ? ` · ${labelForSellerRole(seller.role)}` : ""}
+                              {seller.name}
                             </option>
                           ))}
                         </select>
@@ -1469,42 +1396,12 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2">
-                        <DetailStat label="Pedido asociado" value={selectedOrder.transferPayment.orderId || "Sin pedido"} />
-                        <DetailStat label="Metodo" value={labelForTransferMethod(selectedOrder.transferPayment.paymentMethod)} />
                         <DetailStat
                           label="Comprobante recibido"
                           value={selectedOrder.transferPayment.proofSubmittedAt ? formatDate(selectedOrder.transferPayment.proofSubmittedAt) : "Sin fecha"}
                         />
-                        <DetailStat
-                          label="Archivo"
-                          value={
-                            selectedOrder.transferPayment.proofMetadata?.filename ||
-                            selectedOrder.transferPayment.proofMetadata?.type ||
-                            "Sin metadata"
-                          }
-                        />
+                        <DetailStat label="Estado del pago" value={labelForTransferValidation(selectedOrder.transferPayment.status)} />
                       </div>
-
-                      {selectedOrder.transferPayment.proofMetadata?.caption ? (
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3 text-sm text-muted">
-                          Caption del comprobante: {selectedOrder.transferPayment.proofMetadata.caption}
-                        </div>
-                      ) : null}
-
-                      {selectedOrder.transferPayment.validatedAt ? (
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3 text-sm text-muted">
-                          {selectedOrder.transferPayment.validationDecision === "approved" ? "Aprobado" : "Rechazado"} el{" "}
-                          {formatDate(selectedOrder.transferPayment.validatedAt)}
-                          {selectedOrder.transferPayment.validatedByName
-                            ? ` por ${selectedOrder.transferPayment.validatedByName}`
-                            : selectedOrder.transferPayment.validatedBy
-                              ? ` por ${selectedOrder.transferPayment.validatedBy}`
-                              : ""}
-                          {selectedOrder.transferPayment.rejectionReason
-                            ? ` · Motivo: ${selectedOrder.transferPayment.rejectionReason}`
-                            : ""}
-                        </div>
-                      ) : null}
 
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Motivo de rechazo</label>
@@ -1793,14 +1690,6 @@ function labelForOrderSeller(order: PortalOrder, sellers: AssignableSeller[] = [
   return order.seller?.name || order.sellerNameSnapshot || fallbackSeller?.name || "Sin asignar";
 }
 
-function labelForOrderSource(order: PortalOrder) {
-  if (order.source === "bot") return "Bot";
-  if (order.source === "manual") return "Panel";
-  if (order.source === "automation") return "Automatizacion";
-  if (order.source === "inbox") return "Inbox";
-  if (order.source === "api") return "API";
-  return order.source || "Sin definir";
-}
 
 function isOperationalOrder(order: PortalOrder) {
   if (isPendingTransferValidation(order)) return true;
@@ -1829,12 +1718,6 @@ function labelForPaymentDestination(order: PortalOrder) {
   return `${name}${type ? ` · ${labelForPaymentDestinationType(type)}` : ""}`;
 }
 
-function labelForConversationState(state: string | null | undefined, stage: string | null | undefined) {
-  const safeState = String(state || "").trim();
-  const safeStage = String(stage || "").trim();
-  if (safeState && safeStage) return `${safeState} · ${safeStage}`;
-  return safeState || safeStage || "Sin estado";
-}
 
 function formatCurrency(value: number, currency = "ARS") {
   return new Intl.NumberFormat("es-AR", {
