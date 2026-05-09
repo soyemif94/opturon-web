@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownLeft, Landmark, Loader2, Pencil, Plus, ReceiptText, RotateCcw, Save, Search, Wallet } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +39,15 @@ type DestinationFormState = {
   name: string;
   type: PortalPaymentDestinationType;
 };
+
+type PaymentsSummaryView =
+  | "all"
+  | "payments_today"
+  | "credits_today"
+  | "net_today"
+  | "net_week"
+  | "net_month"
+  | "collected_month";
 
 const EMPTY_DESTINATION_FORM: DestinationFormState = {
   name: "",
@@ -218,6 +229,9 @@ export function PaymentsWorkspace({
   initialPaymentDestinations: PortalPaymentDestination[];
   readOnly?: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [payments, setPayments] = useState(Array.isArray(initialPayments) ? initialPayments : []);
   const [invoices, setInvoices] = useState(Array.isArray(initialInvoices) ? initialInvoices : []);
   const [orders, setOrders] = useState(Array.isArray(initialOrders) ? initialOrders : []);
@@ -229,6 +243,9 @@ export function PaymentsWorkspace({
   const [destinationBusy, setDestinationBusy] = useState<string | null>(null);
   const [editingDestinationId, setEditingDestinationId] = useState<string | null>(null);
   const [editingDestinationDraft, setEditingDestinationDraft] = useState<DestinationFormState>(EMPTY_DESTINATION_FORM);
+  const movementsRef = useRef<HTMLDivElement | null>(null);
+  const creditNotesRef = useRef<HTMLDivElement | null>(null);
+  const activeSummaryView = resolvePaymentsSummaryView(searchParams.get("view"));
 
   const timeContext = useMemo(() => getTodayContext(), []);
 
@@ -262,9 +279,13 @@ export function PaymentsWorkspace({
     return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
   }, [payments]);
 
+  const summaryScopedPayments = useMemo(() => {
+    return payments.filter((payment) => matchesPaymentSummaryView(payment, activeSummaryView, timeContext));
+  }, [activeSummaryView, payments, timeContext]);
+
   const filteredPayments = useMemo(() => {
     const search = normalizeSearchValue(filters.search);
-    return payments.filter((payment) => {
+    return summaryScopedPayments.filter((payment) => {
       if (filters.status !== "all" && payment.status !== filters.status) return false;
       if (filters.method !== "all" && normalizePaymentMethodValue(payment.method) !== filters.method) return false;
       if (filters.contactId !== "all" && payment.contact?.id !== filters.contactId) return false;
@@ -287,7 +308,7 @@ export function PaymentsWorkspace({
 
       return haystack.includes(search);
     });
-  }, [filters, payments]);
+  }, [filters, summaryScopedPayments]);
 
   const financialSummary = useMemo(() => {
     const paymentsToday = recordedPayments.filter((payment) =>
@@ -399,17 +420,38 @@ export function PaymentsWorkspace({
     [paymentDestinations, showInactiveDestinations]
   );
 
-  const recentCreditNotes = useMemo(
-    () =>
-      [...issuedCreditNotes]
-        .sort((left, right) => {
-          const leftDate = coerceDate(invoiceEffectiveDate(left))?.getTime() || 0;
-          const rightDate = coerceDate(invoiceEffectiveDate(right))?.getTime() || 0;
-          return rightDate - leftDate;
-        })
-        .slice(0, 8),
-    [issuedCreditNotes]
-  );
+  const recentCreditNotes = useMemo(() => {
+    return [...issuedCreditNotes]
+      .filter((invoice) => matchesCreditSummaryView(invoice, activeSummaryView, timeContext))
+      .sort((left, right) => {
+        const leftDate = coerceDate(invoiceEffectiveDate(left))?.getTime() || 0;
+        const rightDate = coerceDate(invoiceEffectiveDate(right))?.getTime() || 0;
+        return rightDate - leftDate;
+      })
+      .slice(0, 8);
+  }, [activeSummaryView, issuedCreditNotes, timeContext]);
+
+  useEffect(() => {
+    if (activeSummaryView === "all") return;
+    const targetNode =
+      activeSummaryView === "credits_today"
+        ? creditNotesRef.current
+        : movementsRef.current;
+    if (targetNode) {
+      targetNode.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [activeSummaryView]);
+
+  function setSummaryView(view: PaymentsSummaryView) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === "all") {
+      params.delete("view");
+    } else {
+      params.set("view", view);
+    }
+    const nextQuery = params.toString();
+    router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+  }
 
   async function refreshWorkspace(includeInactive = showInactiveDestinations) {
     const [paymentsResponse, invoicesResponse, ordersResponse, destinationsResponse] = await Promise.all([
@@ -548,42 +590,61 @@ export function PaymentsWorkspace({
           value={formatMoney(financialSummary.grossToday)}
           helper="Cobros del dia de negocio"
           icon={<Wallet className="h-4 w-4" />}
+          href={`${pathname}?view=payments_today`}
+          active={activeSummaryView === "payments_today"}
+          onClick={() => setSummaryView("payments_today")}
         />
         <SummaryCard
           title="Notas de credito del dia"
           value={formatMoney(financialSummary.creditToday)}
           helper="Impacto emitido hoy"
           icon={<ArrowDownLeft className="h-4 w-4" />}
+          href={`${pathname}?view=credits_today`}
+          active={activeSummaryView === "credits_today"}
+          onClick={() => setSummaryView("credits_today")}
         />
         <SummaryCard
           title="Ingreso neto del dia"
           value={formatMoney(financialSummary.netToday)}
           helper="Cobros menos creditos"
           icon={<Landmark className="h-4 w-4" />}
+          href={`${pathname}?view=net_today`}
+          active={activeSummaryView === "net_today"}
+          onClick={() => setSummaryView("net_today")}
         />
         <SummaryCard
           title="Ingreso neto de la semana"
           value={formatMoney(financialSummary.netWeek)}
           helper="Semana en curso"
           icon={<Landmark className="h-4 w-4" />}
+          href={`${pathname}?view=net_week`}
+          active={activeSummaryView === "net_week"}
+          onClick={() => setSummaryView("net_week")}
         />
         <SummaryCard
           title="Ingreso neto del mes"
           value={formatMoney(financialSummary.netMonth)}
           helper="Mes en curso"
           icon={<ReceiptText className="h-4 w-4" />}
+          href={`${pathname}?view=net_month`}
+          active={activeSummaryView === "net_month"}
+          onClick={() => setSummaryView("net_month")}
         />
         <SummaryCard
           title="Total facturado del mes"
           value={formatMoney(financialSummary.invoicedMonth)}
           helper="Facturas emitidas"
           icon={<ReceiptText className="h-4 w-4" />}
+          href="/app/invoices"
         />
         <SummaryCard
           title="Total cobrado del mes"
           value={formatMoney(financialSummary.collectedMonth)}
           helper="Cobros registrados"
           icon={<Wallet className="h-4 w-4" />}
+          href={`${pathname}?view=collected_month`}
+          active={activeSummaryView === "collected_month"}
+          onClick={() => setSummaryView("collected_month")}
         />
       </div>
 
@@ -790,7 +851,8 @@ export function PaymentsWorkspace({
           </CardContent>
         </Card>
 
-        <Card className="border-white/6 bg-card/90">
+        <div ref={creditNotesRef}>
+          <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="muted">{recentCreditNotes.length} visibles</Badge>}>
             <div>
               <CardTitle className="text-xl">Notas de credito</CardTitle>
@@ -829,17 +891,34 @@ export function PaymentsWorkspace({
               />
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
 
-      <Card className="border-white/6 bg-card/90">
-        <CardHeader action={<Badge variant="muted">{filteredPayments.length} visibles</Badge>}>
+      <div ref={movementsRef}>
+        <Card className="border-white/6 bg-card/90">
+        <CardHeader
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="muted">{filteredPayments.length} visibles</Badge>
+              {activeSummaryView !== "all" ? <Badge variant="warning">{labelForSummaryView(activeSummaryView)}</Badge> : null}
+            </div>
+          }
+        >
           <div>
             <CardTitle className="text-xl">Movimientos de cobro</CardTitle>
             <CardDescription>Los cobros siguen leyendo pagos reales y ahora conviven con destinos persistidos para pedidos.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
+          {activeSummaryView !== "all" ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/25 bg-brand/10 px-4 py-3 text-sm text-brandBright">
+              <span>Mostrando {labelForSummaryView(activeSummaryView).toLowerCase()} para operar mas rapido desde cobros.</span>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setSummaryView("all")}>
+                Ver todo
+              </Button>
+            </div>
+          ) : null}
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_180px_180px_220px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
@@ -965,7 +1044,8 @@ export function PaymentsWorkspace({
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -974,15 +1054,29 @@ function SummaryCard({
   title,
   value,
   helper,
-  icon
+  icon,
+  href,
+  active = false,
+  onClick
 }: {
   title: string;
   value: string;
   helper: string;
   icon: React.ReactNode;
+  href: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="border-white/6 bg-card/90">
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`block rounded-2xl border transition-all duration-200 ${
+        active
+          ? "border-brand/35 bg-brand/10 shadow-[0_0_0_1px_rgba(192,80,0,0.12),0_20px_40px_rgba(0,0,0,0.16)]"
+          : "border-white/6 bg-card/90 hover:-translate-y-0.5 hover:border-brand/30 hover:bg-brand/8"
+      }`}
+    >
       <CardContent className="flex items-start justify-between gap-3 p-4">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.16em] text-muted">{title}</p>
@@ -991,8 +1085,83 @@ function SummaryCard({
         </div>
         <div className="rounded-2xl border border-[color:var(--border)] bg-surface/70 p-2 text-muted">{icon}</div>
       </CardContent>
-    </Card>
+    </Link>
   );
+}
+
+function resolvePaymentsSummaryView(value: string | null): PaymentsSummaryView {
+  if (
+    value === "payments_today" ||
+    value === "credits_today" ||
+    value === "net_today" ||
+    value === "net_week" ||
+    value === "net_month" ||
+    value === "collected_month"
+  ) {
+    return value;
+  }
+  return "all";
+}
+
+function matchesPaymentSummaryView(
+  payment: PortalPayment,
+  view: PaymentsSummaryView,
+  timeContext: ReturnType<typeof getTodayContext>
+) {
+  const effectiveDate = paymentEffectiveDate(payment);
+  const dayNumber = getBusinessDayNumber(effectiveDate);
+  const monthKey = getBusinessMonthKey(effectiveDate);
+
+  if (view === "payments_today" || view === "net_today") {
+    return payment.status === "recorded" && isDayInRange(dayNumber, timeContext.todayDayNumber, timeContext.todayDayNumber);
+  }
+  if (view === "net_week") {
+    return payment.status === "recorded" && isDayInRange(dayNumber, timeContext.weekStartDayNumber, timeContext.todayDayNumber);
+  }
+  if (view === "net_month" || view === "collected_month") {
+    return payment.status === "recorded" && monthKey === timeContext.monthKey;
+  }
+  return true;
+}
+
+function matchesCreditSummaryView(
+  invoice: PortalInvoice,
+  view: PaymentsSummaryView,
+  timeContext: ReturnType<typeof getTodayContext>
+) {
+  const effectiveDate = invoiceEffectiveDate(invoice);
+  const dayNumber = getBusinessDayNumber(effectiveDate);
+  const monthKey = getBusinessMonthKey(effectiveDate);
+
+  if (view === "credits_today" || view === "net_today") {
+    return isDayInRange(dayNumber, timeContext.todayDayNumber, timeContext.todayDayNumber);
+  }
+  if (view === "net_week") {
+    return isDayInRange(dayNumber, timeContext.weekStartDayNumber, timeContext.todayDayNumber);
+  }
+  if (view === "net_month") {
+    return monthKey === timeContext.monthKey;
+  }
+  return true;
+}
+
+function labelForSummaryView(view: PaymentsSummaryView) {
+  switch (view) {
+    case "payments_today":
+      return "Cobros del dia";
+    case "credits_today":
+      return "Notas de credito del dia";
+    case "net_today":
+      return "Ingreso neto del dia";
+    case "net_week":
+      return "Ingreso neto semanal";
+    case "net_month":
+      return "Ingreso neto del mes";
+    case "collected_month":
+      return "Cobrado del mes";
+    default:
+      return "Cobros";
+  }
 }
 
 function PaymentAmountStack({ payment }: { payment: PortalPayment }) {
