@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/toast";
 import type { PortalInvoice } from "@/lib/api";
 import {
   badgeToneByStatus,
+  formatInvoiceMissingDataLabel,
   formatDateLabel,
   formatMoney,
   getInvoiceDocumentKindLabel,
@@ -211,7 +212,7 @@ export function InvoicesWorkspace({
             <Button asChild variant="secondary" size="sm" className="w-full rounded-2xl sm:w-auto">
               <a href={exportHref}>
                 <Download className="mr-2 h-4 w-4" />
-                Exportar planilla contable
+                Exportar Excel contable
               </a>
             </Button>
             {!readOnly ? (
@@ -224,7 +225,7 @@ export function InvoicesWorkspace({
       >
         <div>
           <CardTitle className="text-xl">Listado de comprobantes internos</CardTitle>
-          <CardDescription>Pre-facturacion contable con filtros, flags de faltantes y workflow masivo para preparar lotes del contador.</CardDescription>
+          <CardDescription>Preparación contable con filtros, datos pendientes visibles y acciones masivas para ordenar el trabajo administrativo.</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
@@ -305,11 +306,11 @@ export function InvoicesWorkspace({
         <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
           {listMode === "main"
             ? `Principal enfocada en los ultimos ${PRIMARY_INVOICES_LIMIT} comprobantes. Usa Archivo para consultar el resto con los mismos filtros, descargas y exportaciones.`
-            : "Archivo de comprobantes con filtros, exportacion y descarga de lotes sin sobrecargar la vista diaria."}
+            : "Archivo de comprobantes con filtros, exportación y descarga de lotes sin sobrecargar la vista diaria."}
         </div>
 
         {!visibleInvoices.length ? (
-          <EmptyState title="No hay comprobantes para este filtro" description="Prueba con otro estado contable, cliente, tipo de documento o flags de faltantes." />
+          <EmptyState title="No hay comprobantes para este filtro" description="Prueba con otro estado contable, cliente, tipo de documento o datos pendientes." />
         ) : (
           <>
             <div className="space-y-3 md:hidden">
@@ -339,7 +340,7 @@ export function InvoicesWorkspace({
                   {(invoice.missingDataFlags || []).length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {(invoice.missingDataFlags || []).slice(0, 3).map((flag) => (
-                        <Badge key={flag} variant="danger">{titleCaseLabel(flag.replace(/^missing_/, ""))}</Badge>
+                        <Badge key={flag} variant="danger">{formatInvoiceMissingDataLabel(flag)}</Badge>
                       ))}
                     </div>
                   ) : null}
@@ -360,7 +361,7 @@ export function InvoicesWorkspace({
                 <span>Cliente / emisor</span>
                 <span>Total</span>
                 <span>Cobranza</span>
-                <span>Flags</span>
+                <span>Datos pendientes</span>
                 <span>Fechas</span>
                 <span>Accion</span>
               </div>
@@ -392,7 +393,7 @@ export function InvoicesWorkspace({
                   <div className="flex flex-wrap gap-2">
                     {(invoice.missingDataFlags || []).length ? (
                       (invoice.missingDataFlags || []).slice(0, 3).map((flag) => (
-                        <Badge key={flag} variant="danger">{titleCaseLabel(flag.replace(/^missing_/, ""))}</Badge>
+                        <Badge key={flag} variant="danger">{formatInvoiceMissingDataLabel(flag)}</Badge>
                       ))
                     ) : (
                       <Badge variant="success">Completo</Badge>

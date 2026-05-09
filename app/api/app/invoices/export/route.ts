@@ -40,27 +40,29 @@ export async function GET(request: NextRequest) {
       cache: "no-store"
     });
 
-    const text = await response.text();
+    const contentType = response.headers.get("content-type") || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const contentDisposition = response.headers.get("content-disposition") || 'attachment; filename="opturon-comprobantes.xlsx"';
+    const body = Buffer.from(await response.arrayBuffer());
     if (!response.ok) {
-      let body: unknown = null;
+      let errorBody: unknown = null;
       try {
-        body = JSON.parse(text);
+        errorBody = JSON.parse(body.toString("utf8"));
       } catch {
-        body = { error: text || "backend_export_failed" };
+        errorBody = { error: body.toString("utf8") || "backend_export_failed" };
       }
       return noStore(
         NextResponse.json(
-          typeof body === "object" && body ? body : { error: "backend_export_failed" },
+          typeof errorBody === "object" && errorBody ? errorBody : { error: "backend_export_failed" },
           { status: response.status }
         )
       );
     }
 
-    return new NextResponse(text, {
+    return new NextResponse(body, {
       status: 200,
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": response.headers.get("content-disposition") || 'attachment; filename="opturon-prefacturacion.csv"',
+        "Content-Type": contentType,
+        "Content-Disposition": contentDisposition,
         "Cache-Control": "no-store"
       }
     });

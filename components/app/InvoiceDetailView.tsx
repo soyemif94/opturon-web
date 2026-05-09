@@ -14,6 +14,8 @@ import {
   badgeToneByStatus,
   formatDateLabel,
   formatDateTimeLabel,
+  formatFiscalIdTypeLabel,
+  formatInvoiceMissingDataLabel,
   formatMoney,
   getInvoiceDocumentKindLabel,
   parseLocalizedMoneyInput,
@@ -556,7 +558,7 @@ export function InvoiceDetailView({
             <CardHeader>
               <div>
                 <CardTitle className="text-xl">Preparacion contable</CardTitle>
-                <CardDescription>Completa los datos minimos para contador sin mezclar esta operacion con facturacion fiscal real.</CardDescription>
+                <CardDescription>Completa los datos administrativos mínimos para contabilidad sin mezclar esta operación con facturación fiscal real.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -564,7 +566,7 @@ export function InvoiceDetailView({
                 {(invoice.missingDataFlags || []).length ? (
                   <div className="flex flex-wrap gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
                     {(invoice.missingDataFlags || []).map((flag) => (
-                      <Badge key={flag} variant="warning">{titleCaseLabel(flag.replace(/^missing_/, ""))}</Badge>
+                      <Badge key={flag} variant="warning">{formatInvoiceMissingDataLabel(flag)}</Badge>
                     ))}
                   </div>
                 ) : (
@@ -603,7 +605,7 @@ export function InvoiceDetailView({
                     onChange={(event) => setAccountantDraft((current) => ({ ...current, suggestedFiscalVoucherType: event.target.value }))}
                     disabled={busyAction !== null || readOnly}
                   >
-                    <option value="NONE">Comprobante sugerido: NONE</option>
+                    <option value="NONE">Comprobante sugerido: Sin definir</option>
                     <option value="A">Comprobante sugerido: A</option>
                     <option value="B">Comprobante sugerido: B</option>
                     <option value="C">Comprobante sugerido: C</option>
@@ -630,13 +632,13 @@ export function InvoiceDetailView({
                     onChange={(event) => setAccountantDraft((current) => ({ ...current, customerTaxIdType: event.target.value }))}
                     disabled={busyAction !== null || readOnly}
                   >
-                    <option value="NONE">Tipo ID cliente: NONE</option>
-                    <option value="DNI">Tipo ID cliente: DNI</option>
-                    <option value="CUIT">Tipo ID cliente: CUIT</option>
-                    <option value="CUIL">Tipo ID cliente: CUIL</option>
+                    <option value="NONE">Documento fiscal cliente: {formatFiscalIdTypeLabel("NONE")}</option>
+                    <option value="DNI">Documento fiscal cliente: {formatFiscalIdTypeLabel("DNI")}</option>
+                    <option value="CUIT">Documento fiscal cliente: {formatFiscalIdTypeLabel("CUIT")}</option>
+                    <option value="CUIL">Documento fiscal cliente: {formatFiscalIdTypeLabel("CUIL")}</option>
                   </select>
                   <Input
-                    placeholder="Condicion IVA del cliente"
+                    placeholder="Condición fiscal del cliente"
                     value={accountantDraft.customerVatCondition}
                     onChange={(event) => setAccountantDraft((current) => ({ ...current, customerVatCondition: event.target.value }))}
                     disabled={busyAction !== null || readOnly}
@@ -663,13 +665,13 @@ export function InvoiceDetailView({
                     onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerTaxIdType: event.target.value }))}
                     disabled={busyAction !== null || readOnly}
                   >
-                    <option value="NONE">Tipo ID emisor: NONE</option>
-                    <option value="DNI">Tipo ID emisor: DNI</option>
-                    <option value="CUIT">Tipo ID emisor: CUIT</option>
-                    <option value="CUIL">Tipo ID emisor: CUIL</option>
+                    <option value="NONE">Documento fiscal emisor: {formatFiscalIdTypeLabel("NONE")}</option>
+                    <option value="DNI">Documento fiscal emisor: {formatFiscalIdTypeLabel("DNI")}</option>
+                    <option value="CUIT">Documento fiscal emisor: {formatFiscalIdTypeLabel("CUIT")}</option>
+                    <option value="CUIL">Documento fiscal emisor: {formatFiscalIdTypeLabel("CUIL")}</option>
                   </select>
                   <Input
-                    placeholder="Condicion IVA del emisor"
+                    placeholder="Condición fiscal del emisor"
                     value={accountantDraft.issuerVatCondition}
                     onChange={(event) => setAccountantDraft((current) => ({ ...current, issuerVatCondition: event.target.value }))}
                     disabled={busyAction !== null || readOnly}

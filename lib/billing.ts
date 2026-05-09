@@ -211,6 +211,30 @@ export function titleCaseLabel(value: string | null | undefined) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+export function formatInvoiceMissingDataLabel(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  const labels: Record<string, string> = {
+    missing_customer_tax_id: "Falta CUIT / DNI del cliente",
+    missing_customer_vat_condition: "Falta condición fiscal del cliente",
+    missing_customer_legal_name: "Falta nombre o razón social del cliente",
+    missing_issuer_legal_name: "Falta razón social del emisor",
+    missing_issuer_tax_id: "Falta CUIT del emisor",
+    missing_issuer_vat_condition: "Falta condición fiscal del emisor",
+    missing_point_of_sale: "Falta punto de venta",
+    missing_suggested_voucher_type: "Falta comprobante sugerido"
+  };
+  return labels[normalized] || titleCaseLabel(value);
+}
+
+export function formatFiscalIdTypeLabel(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (!normalized || normalized === "NONE") return "Sin definir";
+  if (normalized === "DNI") return "DNI";
+  if (normalized === "CUIT") return "CUIT";
+  if (normalized === "CUIL") return "CUIL";
+  return normalized;
+}
+
 export function quantizeMoney(value: number | string | null | undefined) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
