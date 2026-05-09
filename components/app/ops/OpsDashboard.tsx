@@ -448,6 +448,8 @@ export function OpsDashboard({
           value={unassignedLeads.length}
           helper="Leads que todavia no tienen owner."
           loading={loading}
+          active={unassignedLeads.length > 0}
+          tone="attention"
           onClick={() => scrollToSection("unassigned")}
         />
         <KpiCard
@@ -486,7 +488,7 @@ export function OpsDashboard({
           helper="Sin movimiento reciente ni proximo seguimiento."
           loading={loading}
           active={coldLeads.length > 0}
-          tone="info"
+          tone="calm"
           onClick={() => scrollToSection("cold")}
         />
       </section>
@@ -556,6 +558,7 @@ export function OpsDashboard({
             readOnly={readOnly || !backendReady}
             assigningId={assigningId}
             emptyMessage="No hay leads activos sin asignar."
+            sectionVariant="unassigned"
             onAssign={assignSeller}
           />
         </div>
@@ -621,6 +624,7 @@ export function OpsDashboard({
           emptyMessage="No hay leads frios segun el criterio basico actual."
           showOwner
           showSlaSignals
+          sectionVariant="cold"
           onAssign={assignSeller}
         />
       </div>
@@ -657,13 +661,17 @@ function KpiCard({
   helper: string;
   loading?: boolean;
   active?: boolean;
-  tone?: "default" | "critical" | "info";
+  tone?: "default" | "critical" | "info" | "attention" | "calm";
   href?: string;
   onClick?: () => void;
 }) {
   const toneClassName =
     tone === "critical"
       ? "border-red-500/20 bg-red-500/5"
+      : tone === "attention"
+        ? "border-[#c27a2c]/24 bg-[linear-gradient(180deg,rgba(192,80,0,0.10),rgba(255,255,255,0.02))]"
+      : tone === "calm"
+        ? "border-[#8f633d]/20 bg-[linear-gradient(180deg,rgba(143,99,61,0.10),rgba(255,255,255,0.02))]"
       : tone === "info"
         ? "border-sky-500/20 bg-sky-500/5"
         : "border-white/6 bg-card/90";

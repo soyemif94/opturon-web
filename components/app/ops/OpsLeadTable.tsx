@@ -55,7 +55,30 @@ function isColdLead(row: ConversationRowData, now = new Date()) {
 
 function slaTone(type: "urgent" | "cold") {
   if (type === "urgent") return "border-red-500/30 bg-red-500/10 text-red-100";
-  return "border-slate-400/20 bg-slate-400/10 text-slate-100";
+  return "border-[#8f633d]/35 bg-[#8f633d]/12 text-[#f3dfc8]";
+}
+
+function sectionTone(variant?: "default" | "unassigned" | "cold") {
+  if (variant === "unassigned") {
+    return "border-[#c27a2c]/20 bg-[linear-gradient(180deg,rgba(192,80,0,0.10),rgba(255,255,255,0.02))]";
+  }
+  if (variant === "cold") {
+    return "border-[#8f633d]/18 bg-[linear-gradient(180deg,rgba(143,99,61,0.10),rgba(255,255,255,0.02))]";
+  }
+  return "border-white/6 bg-card/90";
+}
+
+function rowTone(options: { unassigned: boolean; cold: boolean; urgent: boolean }) {
+  if (options.unassigned) {
+    return "border-[#c27a2c]/30 bg-[linear-gradient(135deg,rgba(192,80,0,0.12),rgba(255,255,255,0.02))] shadow-[0_0_0_1px_rgba(192,80,0,0.10),0_20px_40px_rgba(0,0,0,0.12)]";
+  }
+  if (options.cold) {
+    return "border-[#8f633d]/28 bg-[linear-gradient(135deg,rgba(143,99,61,0.12),rgba(255,255,255,0.02))] shadow-[0_0_0_1px_rgba(143,99,61,0.08),0_18px_36px_rgba(0,0,0,0.10)]";
+  }
+  if (options.urgent) {
+    return "border-brand/22 bg-[linear-gradient(135deg,rgba(192,80,0,0.08),rgba(255,255,255,0.02))]";
+  }
+  return "border-[color:var(--border)] bg-surface/55";
 }
 
 export function OpsLeadTable({
@@ -69,6 +92,7 @@ export function OpsLeadTable({
   showOwner = false,
   showFollowUp = false,
   showSlaSignals = true,
+  sectionVariant = "default",
   onAssign
 }: {
   title: string;
@@ -81,6 +105,7 @@ export function OpsLeadTable({
   showOwner?: boolean;
   showFollowUp?: boolean;
   showSlaSignals?: boolean;
+  sectionVariant?: "default" | "unassigned" | "cold";
   onAssign: (conversationId: string, sellerUserId: string) => void;
 }) {
   const router = useRouter();
@@ -104,7 +129,7 @@ export function OpsLeadTable({
   }, [rows]);
 
   return (
-    <Card className="border-white/6 bg-card/90">
+    <Card className={sectionTone(sectionVariant)}>
       <CardHeader>
         <div>
           <CardTitle className="text-xl">{title}</CardTitle>
@@ -123,6 +148,7 @@ export function OpsLeadTable({
             const isBusy = assigningId === row.id;
             const urgent = showSlaSignals && isUrgentLead(row);
             const cold = showSlaSignals && !urgent && isColdLead(row);
+            const unassigned = !row.assignedSellerUserId;
             const inboxHref = row.id ? `/app/inbox/${row.id}` : null;
 
             return (
@@ -142,7 +168,11 @@ export function OpsLeadTable({
                   event.preventDefault();
                   router.push(inboxHref);
                 }}
-                className={`grid gap-4 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4 transition-colors lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] ${
+                className={`grid gap-4 rounded-[22px] border p-4 transition-all lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] ${rowTone({
+                  unassigned,
+                  cold,
+                  urgent
+                })} ${
                   inboxHref ? "cursor-pointer hover:border-brand/35 hover:bg-brand/8 focus:outline-none focus:ring-2 focus:ring-brand/30" : ""
                 }`}
               >
@@ -150,13 +180,14 @@ export function OpsLeadTable({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold">{row.contact?.name || "Sin nombre"}</p>
                     <Badge className={leadTone(row.leadStatus)}>{leadLabel(row.leadStatus)}</Badge>
+                    {unassigned ? <Badge className="border-[#c27a2c]/35 bg-[#c27a2c]/14 text-[#ffd7aa]">Sin asignar</Badge> : null}
                     {urgent ? <Badge className={slaTone("urgent")}>Urgente</Badge> : null}
                     {cold ? <Badge className={slaTone("cold")}>Frio</Badge> : null}
                   </div>
                   <p className="text-xs text-muted">{row.contact?.phone || row.contact?.email || "Sin contacto"}</p>
                   <p className="line-clamp-2 text-sm text-muted">{row.lastMessagePreview || "Sin mensajes recientes"}</p>
                   <div className="flex flex-wrap gap-4 text-xs text-muted">
-                    {showOwner ? <span>Owner: {ownerLabel}</span> : null}
+                    {showOwner ? <span>{unassigned ? "Responsable pendiente" : `Responsable: ${ownerLabel}`}</span> : null}
                     {showFollowUp ? <span>Seguimiento: {formatDateTime(row.nextActionAt)}</span> : null}
                     {showFollowUp && row.nextActionNote ? <span>Nota: {row.nextActionNote}</span> : null}
                     {inboxHref ? <span className="text-brandBright">Click para abrir hilo</span> : null}
