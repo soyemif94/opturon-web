@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, CirclePercent, ClipboardList, HandCoins, MessageSquareText, Search, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PortalSalesMetrics, PortalSalesOpportunity, PortalSalesSummary } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,10 +20,15 @@ type SalesHubProps = {
 };
 
 type SalesListMode = "main" | "archive";
+type SalesOpportunityFilter = "all" | "closed" | "open" | "active_conversations";
 
 export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [listMode, setListMode] = useState<SalesListMode>("main");
   const [searchQuery, setSearchQuery] = useState("");
+  const activeFilter = resolveOpportunityFilter(searchParams.get("view"));
 
   const stats = [
     {
@@ -58,6 +64,10 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
   ];
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
+  const stageFilteredOpportunities = useMemo(() => {
+    return opportunities.filter((item) => matchesOpportunityFilter(item, activeFilter));
+  }, [activeFilter, opportunities]);
+
   const filteredOpportunities = useMemo(() => {
     if (!normalizedSearch) return opportunities;
     return opportunities.filter((item) => {
@@ -77,9 +87,43 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
       return haystack.includes(normalizedSearch);
     });
   }, [normalizedSearch, opportunities]);
+  const visibleFilteredOpportunities = useMemo(() => {
+    if (!normalizedSearch) return stageFilteredOpportunities;
+    return stageFilteredOpportunities.filter((item) => {
+      const haystack = [
+        item.customer.name,
+        item.customer.phone,
+        item.contactId,
+        item.source,
+        item.responsible?.name,
+        item.commercialStage,
+        item.collectionStatusLabel
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-  const visibleOpportunities = listMode === "main" ? filteredOpportunities.slice(0, PRIMARY_OPPORTUNITY_LIMIT) : filteredOpportunities;
-  const archivedCount = Math.max(filteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0);
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, stageFilteredOpportunities]);
+
+  const visibleOpportunities =
+    activeFilter === "all" && listMode === "main"
+      ? visibleFilteredOpportunities.slice(0, PRIMARY_OPPORTUNITY_LIMIT)
+      : visibleFilteredOpportunities;
+  const archivedCount =
+    activeFilter === "all" ? Math.max(visibleFilteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0) : 0;
+
+  function setOpportunityFilter(nextFilter: SalesOpportunityFilter) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextFilter === "all") {
+      params.delete("view");
+    } else {
+      params.set("view", nextFilter);
+    }
+    const nextQuery = params.toString();
+    router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+  }
 
   return (
     <div className="space-y-6">
@@ -114,13 +158,30 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-0 md:grid-cols-3">
-            <PerformanceTile label="Ventas cerradas" value={String(metrics.closedSalesCount)} helper="Operaciones ya cobradas y registradas como cierre real." />
-            <PerformanceTile label="Oportunidades abiertas" value={String(metrics.openOpportunitiesCount)} helper="Cuentas que todavia requieren seguimiento o cobro." />
+            <PerformanceTile
+              label="Ventas cerradas"
+              value={String(metrics.closedSalesCount)}
+              helper="Operaciones ya cobradas y registradas como cierre real."
+              href={`${pathname}?view=closed`}
+              active={activeFilter === "closed"}
+              onClick={() => setOpportunityFilter("closed")}
+            />
+            <PerformanceTile
+              label="Oportunidades abiertas"
+              value={String(metrics.openOpportunitiesCount)}
+              helper="Cuentas que todavia requieren seguimiento o cobro."
+              href={`${pathname}?view=open`}
+              active={activeFilter === "open"}
+              onClick={() => setOpportunityFilter("open")}
+            />
             <PerformanceTile
               label="Conversaciones activas"
               value={String(metrics.activeSalesConversations)}
               helper="Chats abiertos que hoy empujan una oportunidad comercial."
               icon={<MessageSquareText className="h-4 w-4 text-brandBright" />}
+              href={`${pathname}?view=active_conversations`}
+              active={activeFilter === "active_conversations"}
+              onClick={() => setOpportunityFilter("active_conversations")}
             />
           </CardContent>
         </Card>
@@ -162,6 +223,7 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <Badge variant="muted">{visibleOpportunities.length} visibles</Badge>
               {listMode === "main" && archivedCount > 0 ? <Badge variant="warning">{archivedCount} en archivo</Badge> : null}
+              {activeFilter !== "all" ? <Badge variant="warning">{labelForOpportunityFilter(activeFilter)}</Badge> : null}
             </div>
           }
         >
@@ -174,13 +236,20 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="inline-flex rounded-2xl border border-[color:var(--border)] bg-surface/60 p-1">
-              <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
-                Principal
-              </Button>
-              <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
-                Archivo
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-2xl border border-[color:var(--border)] bg-surface/60 p-1">
+                <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
+                  Principal
+                </Button>
+                <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
+                  Archivo
+                </Button>
+              </div>
+              {activeFilter !== "all" ? (
+                <Button type="button" size="sm" variant="secondary" onClick={() => setOpportunityFilter("all")}>
+                  Ver todo
+                </Button>
+              ) : null}
             </div>
             <div className="relative w-full max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
@@ -193,7 +262,11 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
             </div>
           </div>
 
-          {listMode === "main" ? (
+          {activeFilter !== "all" ? (
+            <div className="rounded-2xl border border-brand/25 bg-brand/10 px-4 py-3 text-sm text-brandBright">
+              Mostrando {labelForOpportunityFilter(activeFilter).toLowerCase()} para operar mas rapido desde ventas.
+            </div>
+          ) : listMode === "main" ? (
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
               Mostrando hasta {PRIMARY_OPPORTUNITY_LIMIT} oportunidades recientes en principal. Usa archivo para consultar el historico sin sobrecargar la operacion diaria.
             </div>
@@ -265,21 +338,56 @@ function PerformanceTile({
   label,
   value,
   helper,
-  icon
+  icon,
+  href,
+  active = false,
+  onClick
 }: {
   label: string;
   value: string;
   helper: string;
   icon?: React.ReactNode;
+  href: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`block rounded-2xl border p-4 transition-all duration-200 ${
+        active
+          ? "border-brand/35 bg-brand/10 shadow-[0_0_0_1px_rgba(192,80,0,0.12),0_20px_40px_rgba(0,0,0,0.16)]"
+          : "border-[color:var(--border)] bg-surface/55 hover:border-brand/30 hover:bg-brand/8 hover:-translate-y-0.5"
+      }`}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs uppercase tracking-[0.16em] text-muted">{label}</p>
-        {icon || null}
+        {icon || <ArrowUpRight className="h-4 w-4 text-brandBright" />}
       </div>
       <p className="mt-3 text-2xl font-semibold">{value}</p>
       <p className="mt-2 text-sm text-muted">{helper}</p>
-    </div>
+    </Link>
   );
+}
+
+function resolveOpportunityFilter(value: string | null): SalesOpportunityFilter {
+  if (value === "closed" || value === "open" || value === "active_conversations") return value;
+  return "all";
+}
+
+function matchesOpportunityFilter(item: PortalSalesOpportunity, filter: SalesOpportunityFilter) {
+  if (filter === "closed") return item.commercialStage === "won";
+  if (filter === "open") return item.commercialStage !== "won" && item.commercialStage !== "lost";
+  if (filter === "active_conversations") {
+    return Boolean(item.conversationId) && item.commercialStage !== "won" && item.commercialStage !== "lost" && item.status !== "closed";
+  }
+  return true;
+}
+
+function labelForOpportunityFilter(filter: SalesOpportunityFilter) {
+  if (filter === "closed") return "Ventas cerradas";
+  if (filter === "open") return "Oportunidades abiertas";
+  if (filter === "active_conversations") return "Conversaciones activas";
+  return "Todas las oportunidades";
 }
