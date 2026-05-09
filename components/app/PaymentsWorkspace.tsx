@@ -187,6 +187,28 @@ function destinationTypeLabel(type: string | null | undefined) {
   }
 }
 
+function getVoidPaymentMessage(payment: PortalPayment | null | undefined) {
+  const status = payment?.voidOutcome?.creditNoteStatus;
+  if (status === "generated") {
+    return "Cobro anulado y nota de credito generada.";
+  }
+  if (status === "already_exists") {
+    return "Este cobro ya tiene una nota de credito asociada.";
+  }
+  return "Cobro anulado";
+}
+
+function getVoidPaymentErrorMessage(code: string) {
+  const normalized = String(code || "").trim();
+  if (normalized === "payment_void_credit_note_already_exists") {
+    return "Este cobro ya tiene una nota de credito asociada.";
+  }
+  if (normalized === "payment_already_void") {
+    return "Este cobro ya estaba anulado.";
+  }
+  return normalized || "No se pudo anular el cobro.";
+}
+
 function orderDestinationName(order: PortalOrder) {
   return order.paymentDestination?.name || order.paymentDestinationNameSnapshot || null;
 }
@@ -494,11 +516,11 @@ export function PaymentsWorkspace({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(json?.error || "No se pudo anular el cobro."));
+        throw new Error(getVoidPaymentErrorMessage(String(json?.error || "")));
       }
 
       await refreshWorkspace();
-      toast.success("Cobro anulado");
+      toast.success(getVoidPaymentMessage((json?.payment as PortalPayment | null | undefined) || null));
     } catch (error) {
       toast.error("No se pudo anular el cobro", error instanceof Error ? error.message : "unknown_error");
     } finally {

@@ -1572,6 +1572,39 @@ export type PortalPayment = {
     phone: string | null;
   } | null;
   allocations?: PortalPaymentAllocation[];
+  relatedCreditNotes?: Array<{
+    id: string;
+    invoiceNumber: string | null;
+    type: string;
+    status: string;
+    currency: string;
+    totalAmount: number;
+    issuedAt: string | null;
+    createdAt: string | null;
+    balanceImpact: {
+      affectsOperationalBalance: boolean;
+      sign: string;
+      amount: number;
+    };
+  }>;
+  voidOutcome?: {
+    creditNoteStatus: "generated" | "already_exists" | "not_applicable";
+    relatedCreditNotes?: Array<{
+      id: string;
+      invoiceNumber: string | null;
+      type: string;
+      status: string;
+      currency: string;
+      totalAmount: number;
+      issuedAt: string | null;
+      createdAt: string | null;
+      balanceImpact: {
+        affectsOperationalBalance: boolean;
+        sign: string;
+        amount: number;
+      };
+    }>;
+  };
 };
 
 export type PortalSalesSummary = {
