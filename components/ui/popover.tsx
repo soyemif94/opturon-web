@@ -39,7 +39,7 @@ export function PopoverTrigger({
 
   return (
     <Comp
-      className={cn(!asChild && "rounded-xl border border-[color:var(--border)] bg-bg px-3 py-1.5 text-sm", className)}
+      className={cn(!asChild && "rounded-xl border border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-3 py-1.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]", className)}
       onClick={() => setOpen(!open)}
     >
       {children}
@@ -69,7 +69,7 @@ export function PopoverContent({ className, children }: React.PropsWithChildren<
   return (
     <div
       ref={ref}
-      className={cn("absolute right-0 top-[calc(100%+8px)] z-50 w-80 rounded-2xl border border-[color:var(--border)] bg-card p-2 shadow-lg", className)}
+      className={cn("absolute right-0 top-[calc(100%+8px)] z-50 w-80 rounded-2xl border border-[color:var(--border)] bg-card p-2 shadow-[var(--card-shadow-strong)]", className)}
     >
       {children}
     </div>
@@ -94,7 +94,7 @@ export function CommandPopover({
       <input
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
-        className="mb-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm"
+        className="mb-2 h-10 w-full rounded-xl border border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-3 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]"
         placeholder={placeholder || "Buscar..."}
       />
       <div className="max-h-64 space-y-1 overflow-y-auto">
@@ -102,7 +102,7 @@ export function CommandPopover({
           <button
             key={item.id}
             type="button"
-            className="w-full rounded-xl border border-[color:var(--border)] px-3 py-2 text-left hover:bg-muted/50"
+            className="w-full rounded-xl border border-[color:var(--border)] px-3 py-2 text-left hover:bg-[color:var(--surface-muted)]"
             onClick={() => onSelect(item.id)}
           >
             <p className="text-sm font-medium">{item.label}</p>

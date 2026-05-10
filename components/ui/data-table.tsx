@@ -112,7 +112,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 [String(filter.key)]: event.target.value
               }))
             }
-            className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm"
+            className="h-10 rounded-xl border border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-3 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]"
           >
             <option value="">{filter.label}</option>
             {filter.options.map((option) => (
@@ -124,10 +124,10 @@ export function DataTable<T extends Record<string, unknown>>({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card shadow-[var(--card-shadow)]">
         <div className="max-h-[65vh] overflow-auto">
           <table className="w-full text-left text-sm">
-            <thead className={cn("bg-muted/40 text-xs text-muted-foreground", stickyHeader && "sticky top-0 z-10")}>
+            <thead className={cn("bg-[color:var(--surface-muted)] text-xs text-muted-foreground", stickyHeader && "sticky top-0 z-10")}>
               <tr>
                 {columns.map((column) => (
                   <th key={String(column.key)} className="px-4 py-3" style={{ width: column.width }}>
@@ -164,8 +164,8 @@ export function DataTable<T extends Record<string, unknown>>({
                         key={id}
                         className={cn(
                           "border-t border-[color:var(--border)] transition-colors",
-                          onRowClick ? "cursor-pointer hover:bg-muted/30" : "",
-                          selected ? "bg-muted/30" : ""
+                          onRowClick ? "cursor-pointer hover:bg-[color:var(--surface-muted)]" : "",
+                          selected ? "bg-[color:var(--surface-muted)]" : ""
                         )}
                         onClick={() => {
                           setSelectedId(id);

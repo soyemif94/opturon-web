@@ -22,7 +22,11 @@ type CardProps = React.HTMLAttributes<HTMLDivElement> & {
 export function Card({ className, cardGlow, ...props }: CardProps) {
   return (
     <div
-      className={cn("rounded-2xl border border-[color:var(--border)] bg-card shadow-sm", getCardGlowClass(cardGlow), className)}
+      className={cn(
+        "rounded-2xl border border-[color:var(--border)] bg-card shadow-[var(--card-shadow)]",
+        getCardGlowClass(cardGlow),
+        className
+      )}
       {...props}
     />
   );

@@ -10,8 +10,8 @@ const buttonVariants = cva(
       variant: {
         default: "bg-brand text-white hover:bg-brandBright",
         primary: "bg-brand text-white hover:bg-brandBright",
-        secondary: "border border-[color:var(--border)] bg-card text-text hover:bg-surface",
-        ghost: "bg-transparent text-text hover:bg-muted/50",
+        secondary: "border border-[color:var(--field-border)] bg-[color:var(--field-bg)] text-text hover:bg-[color:var(--surface-muted)]",
+        ghost: "bg-transparent text-text hover:bg-[color:var(--surface-muted)]",
         destructive: "border border-red-500/30 bg-red-500/15 text-red-200 hover:bg-red-500/20"
       },
       size: {

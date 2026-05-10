@@ -21,7 +21,7 @@ export function ClientPageShell({
 }) {
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(192,80,0,0.14),rgba(18,18,18,0.96)_42%,rgba(14,14,14,0.98))] p-6 lg:p-8">
+      <section className="overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] p-6 shadow-[var(--card-shadow)] lg:p-8">
         <div className="max-w-3xl">
           {backHref ? (
             <Button asChild variant="secondary" size="sm" className="rounded-2xl">

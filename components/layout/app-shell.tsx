@@ -217,11 +217,11 @@ function SidebarPanel({
   onSignOut: () => void;
 }) {
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.08),transparent_34%)]" />
+    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/95 p-5 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+      <div className="absolute inset-0 bg-[image:var(--sidebar-overlay)]" />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto pr-1">
-        <div className="rounded-[24px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.94))] p-5">
+        <div className="rounded-[24px] border border-brand/20 bg-[image:var(--sidebar-hero-gradient)] p-5">
           <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
             Portal cliente
           </Badge>
@@ -556,7 +556,7 @@ export function AppShell({
               "flex min-h-[calc(100vh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100vh-2.5rem)]",
               isInboxRoute
                 ? "overflow-visible"
-                : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]"
+                : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
             )}
           >
             <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
@@ -609,7 +609,7 @@ export function AppShell({
                 "flex-1",
                 isInboxRoute
                   ? "overflow-visible bg-transparent p-0"
-                  : "overflow-visible bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8"
+                  : "overflow-visible bg-[image:var(--panel-glow)] p-5 xl:p-8"
               )}
             >
               {children}
