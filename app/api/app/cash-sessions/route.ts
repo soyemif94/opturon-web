@@ -65,7 +65,11 @@ export async function POST(request: NextRequest) {
       paymentDestinationId: String(body?.paymentDestinationId || ""),
       openingAmount: Number(body?.openingAmount || 0),
       openedByUserId,
-      notes: typeof body?.notes === "string" ? body.notes : null
+      notes: typeof body?.notes === "string" ? body.notes : null,
+      actorName: typeof guard.ctx?.session?.user?.name === "string" ? guard.ctx.session.user.name : "",
+      actorEmail: typeof guard.ctx?.session?.user?.email === "string" ? guard.ctx.session.user.email : "",
+      actorGlobalRole: typeof guard.ctx?.globalRole === "string" ? guard.ctx.globalRole : "",
+      actorTenantRole: typeof guard.ctx?.tenantRole === "string" ? guard.ctx.tenantRole : ""
     }, openedByUserId);
 
     return noStore(NextResponse.json({ ok: true, session: result.data }, { status: 201 }));

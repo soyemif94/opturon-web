@@ -35,7 +35,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       totalCountedAmount: Number(body?.totalCountedAmount || body?.countedAmount || 0),
       countedAmount: Number(body?.countedAmount || 0),
       closedByUserId,
-      notes: typeof body?.notes === "string" ? body.notes : null
+      notes: typeof body?.notes === "string" ? body.notes : null,
+      actorName: typeof guard.ctx?.session?.user?.name === "string" ? guard.ctx.session.user.name : "",
+      actorEmail: typeof guard.ctx?.session?.user?.email === "string" ? guard.ctx.session.user.email : "",
+      actorGlobalRole: typeof guard.ctx?.globalRole === "string" ? guard.ctx.globalRole : "",
+      actorTenantRole: typeof guard.ctx?.tenantRole === "string" ? guard.ctx.tenantRole : ""
     }, closedByUserId);
 
     return noStore(NextResponse.json({ ok: true, session: result.data }));

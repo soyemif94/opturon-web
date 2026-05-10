@@ -2058,6 +2058,10 @@ export async function openPortalCashSession(
     openingAmount: number;
     openedByUserId: string;
     notes?: string | null;
+    actorName?: string | null;
+    actorEmail?: string | null;
+    actorGlobalRole?: string | null;
+    actorTenantRole?: string | null;
   },
   actorUserId?: string | null
 ) {
@@ -2082,6 +2086,10 @@ export async function closePortalCashSession(
     countedAmount: number;
     closedByUserId: string;
     notes?: string | null;
+    actorName?: string | null;
+    actorEmail?: string | null;
+    actorGlobalRole?: string | null;
+    actorTenantRole?: string | null;
   },
   actorUserId?: string | null
 ) {
