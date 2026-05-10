@@ -632,7 +632,9 @@ export async function loginPortalUser(email: string, password: string) {
   );
 }
 
-export async function getPortalAuthUserByEmail(email: string) {
+export async function getPortalAuthUserByEmail(email: string, tenantId?: string) {
+  const params = new URLSearchParams({ email });
+  if (tenantId) params.set("tenantId", tenantId);
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -643,7 +645,7 @@ export async function getPortalAuthUserByEmail(email: string) {
       tenantRole: TenantRole;
       globalRole: GlobalRole;
     } | null;
-  }>(`/portal/auth/users/by-email?email=${encodeURIComponent(email)}`, undefined, AUTH_API_TIMEOUT_MS);
+  }>(`/portal/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
 }
 
 export async function patchPortalUserRole(tenantId: string, userId: string, role: TenantRole, actorUserId?: string | null) {

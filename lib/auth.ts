@@ -164,7 +164,10 @@ export const authOptions: NextAuthOptions = {
 
           if (shouldHydratePersistentPortalIdentity) {
             try {
-              const response = await getPortalAuthUserByEmail(String(token.email));
+              const response = await getPortalAuthUserByEmail(
+                String(token.email),
+                token.tenantId ? String(token.tenantId) : undefined
+              );
               const hydratedUser = response.data;
               if (hydratedUser) {
                 token.userId = hydratedUser.id;
