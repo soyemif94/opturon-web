@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Loader2, LockKeyhole, Store, UnlockKeyhole, Wallet } from "lucide-react";
 import type { PortalCashBoxOverview, PortalCashSession } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,8 @@ type CashHubProps = {
   backendReady: boolean;
   readOnly?: boolean;
 };
+
+type CashSectionKey = "boxes" | "sessions" | "history";
 
 type OpenFormState = {
   paymentDestinationId: string;
@@ -129,6 +131,10 @@ export function CashHub({
   }));
   const [closeForms, setCloseForms] = useState<CloseFormState>({});
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<CashSectionKey | null>(null);
+  const boxesSectionRef = useRef<HTMLDivElement | null>(null);
+  const sessionsSectionRef = useRef<HTMLDivElement | null>(null);
+  const historySectionRef = useRef<HTMLDivElement | null>(null);
 
   const activeCashBoxes = useMemo(() => cashBoxes.filter((box) => box.isActive), [cashBoxes]);
   const openSessions = useMemo(
@@ -251,13 +257,52 @@ export function CashHub({
     0
   );
 
+  function scrollToSection(section: CashSectionKey) {
+    setActiveSection(section);
+    const target =
+      section === "boxes"
+        ? boxesSectionRef.current
+        : section === "sessions"
+          ? sessionsSectionRef.current
+          : historySectionRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Store} label="Cajas activas" value={String(activeCashBoxes.length)} helper="Cajas fisicas habilitadas para operar." />
-        <MetricCard icon={UnlockKeyhole} label="Sesiones abiertas" value={String(openSessions.length)} helper="Turnos de caja en curso." />
-        <MetricCard icon={Wallet} label="Esperado en sesion" value={formatCurrency(totalExpectedOpen)} helper="Suma esperada de todas las sesiones abiertas." />
-        <MetricCard icon={LockKeyhole} label="Sesiones cerradas" value={String(recentClosedSessions.length)} helper="Ultimos cierres visibles en el historial." />
+        <MetricCard
+          icon={Store}
+          label="Cajas activas"
+          value={String(activeCashBoxes.length)}
+          helper="Cajas fisicas habilitadas para operar."
+          active={activeSection === "boxes"}
+          onClick={() => scrollToSection("boxes")}
+        />
+        <MetricCard
+          icon={UnlockKeyhole}
+          label="Sesiones abiertas"
+          value={String(openSessions.length)}
+          helper="Turnos de caja en curso."
+          active={activeSection === "sessions"}
+          onClick={() => scrollToSection("sessions")}
+        />
+        <MetricCard
+          icon={Wallet}
+          label="Esperado en sesion"
+          value={formatCurrency(totalExpectedOpen)}
+          helper="Suma esperada de todas las sesiones abiertas."
+          active={activeSection === "sessions"}
+          onClick={() => scrollToSection("sessions")}
+        />
+        <MetricCard
+          icon={LockKeyhole}
+          label="Sesiones cerradas"
+          value={String(recentClosedSessions.length)}
+          helper="Ultimos cierres visibles en el historial."
+          active={activeSection === "history"}
+          onClick={() => scrollToSection("history")}
+        />
       </section>
 
       {!backendReady ? (
@@ -271,7 +316,7 @@ export function CashHub({
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <div ref={boxesSectionRef} className="grid scroll-mt-28 gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant="warning">Apertura</Badge>}>
             <div>
@@ -371,6 +416,7 @@ export function CashHub({
         </Card>
       </div>
 
+      <div ref={sessionsSectionRef} className="scroll-mt-28">
       <Card className="border-white/6 bg-card/90">
         <CardHeader action={<Badge variant="success">{openSessions.length} abiertas</Badge>}>
           <div>
@@ -528,7 +574,9 @@ export function CashHub({
           )}
         </CardContent>
       </Card>
+      </div>
 
+      <div ref={historySectionRef} className="scroll-mt-28">
       <Card className="border-white/6 bg-card/90">
         <CardHeader action={<Badge variant="muted">{recentClosedSessions.length} sesiones</Badge>}>
           <div>
@@ -575,6 +623,7 @@ export function CashHub({
           )}
         </CardContent>
       </Card>
+      </div>
 
       <CashCalculator />
     </div>
@@ -585,15 +634,24 @@ function MetricCard({
   icon: Icon,
   label,
   value,
-  helper
+  helper,
+  active = false,
+  onClick
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   helper: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="border-white/6 bg-card/90">
+    <button type="button" onClick={onClick} className="w-full text-left">
+    <Card
+      className={`border-white/6 bg-card/90 transition duration-200 hover:-translate-y-0.5 hover:border-[color:rgba(245,158,11,0.28)] hover:bg-card ${
+        active ? "border-[color:rgba(245,158,11,0.32)] bg-[rgba(245,158,11,0.08)] shadow-[0_0_0_1px_rgba(245,158,11,0.12),0_18px_45px_-28px_rgba(245,158,11,0.45)]" : ""
+      }`}
+    >
       <CardContent className="flex items-start gap-4 p-5">
         <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-surface/80">
           <Icon className="h-5 w-5 text-brandBright" />
@@ -605,6 +663,7 @@ function MetricCard({
         </div>
       </CardContent>
     </Card>
+    </button>
   );
 }
 
