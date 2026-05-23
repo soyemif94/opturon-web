@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assignPortalConversationSeller, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
+import { isOperationalPortalAssigneeRole } from "@/lib/portal-users";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { appendAuditLog, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 
@@ -41,7 +42,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const data = readSaasData();
   const conversation = data.conversations.find((item) => item.id === id && item.tenantId === tenantContext.tenantId);
   const membership = data.memberships.find(
-    (item) => item.userId === parsed.data.sellerUserId && item.tenantId === tenantContext.tenantId && item.role !== "viewer"
+    (item) =>
+      item.userId === parsed.data.sellerUserId &&
+      item.tenantId === tenantContext.tenantId &&
+      isOperationalPortalAssigneeRole(item.role)
   );
   const user = membership ? data.users.find((item) => item.id === membership.userId) : undefined;
   if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });

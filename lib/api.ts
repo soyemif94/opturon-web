@@ -543,6 +543,7 @@ export type PortalUser = {
   name: string;
   email: string;
   role: string;
+  isOperationalAssignee?: boolean;
   accountKind?: "primary" | "subaccount";
   active: boolean;
   createdAt: string;

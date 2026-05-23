@@ -6,6 +6,7 @@ import {
   getPortalUsers,
   isBackendConfigured
 } from "@/lib/api";
+import { isOperationalPortalAssigneeUser } from "@/lib/portal-users";
 import { requireAppApi } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
@@ -28,7 +29,7 @@ export async function GET() {
       getPortalPaymentDestinations(tenantId).catch(() => null)
     ]);
     const sellers = (usersResponse.data.users || [])
-      .filter((user) => user && user.role === "seller")
+      .filter((user) => isOperationalPortalAssigneeUser(user))
       .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "es"))
       .map((user) => ({
         id: user.id,

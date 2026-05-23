@@ -1,4 +1,5 @@
 import { requireAppPage } from "@/lib/saas/access";
+import { isOperationalPortalAssigneeRole } from "@/lib/portal-users";
 import { listTenantMembers } from "@/lib/saas/store";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { AgendaWorkspace } from "@/components/app/agenda-workspace";
@@ -17,7 +18,7 @@ export default async function AppAgendaPage({ searchParams }: AgendaPageProps) {
   const actionType = getSearchParam(params?.actionType);
   const sellerOptions = ctx.tenantId
     ? listTenantMembers(ctx.tenantId)
-        .filter((member) => member.tenantRole !== "viewer")
+        .filter((member) => isOperationalPortalAssigneeRole(member.tenantRole))
         .map((member) => ({
           id: member.id,
           name: member.name,

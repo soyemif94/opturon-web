@@ -5,6 +5,7 @@ import { OpsDashboard } from "@/components/app/ops/OpsDashboard";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalConversations, getPortalUsers, isBackendConfigured } from "@/lib/api";
 import { hasOpsAccessCookie, isOpsAccessConfigured } from "@/lib/ops-access";
+import { isOperationalPortalAssigneeUser } from "@/lib/portal-users";
 import { requireAppPage } from "@/lib/saas/access";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 
@@ -36,7 +37,7 @@ export default async function AppOpsPage() {
         : [];
       initialSellers = Array.isArray(usersResult.data?.users)
         ? usersResult.data.users
-            .filter((user) => user && user.role !== "viewer")
+            .filter((user) => isOperationalPortalAssigneeUser(user))
             .map((user) => ({
               id: user.id,
               name: user.name,

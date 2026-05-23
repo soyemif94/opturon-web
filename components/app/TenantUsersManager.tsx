@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import type { PortalUserAuditEvent } from "@/lib/api";
+import { normalizePortalUserRole, portalUserRoleLabel } from "@/lib/portal-users";
 import { toast } from "@/components/ui/toast";
 
 type UserRow = { id: string; email: string; name: string; tenantRole: string; accountKind?: "primary" | "subaccount" };
@@ -32,9 +33,14 @@ type Props = {
 
 const ADMIN_ROLE_OPTIONS = [
   { value: "owner", label: "Cliente" },
-  { value: "seller", label: "Vendedor" }
+  { value: "manager", label: "Manager" },
+  { value: "seller", label: "Vendedor" },
+  { value: "viewer", label: "Solo lectura" }
 ];
-const CLIENT_ROLE_OPTIONS = [{ value: "seller", label: "Vendedor" }];
+const CLIENT_ROLE_OPTIONS = [
+  { value: "seller", label: "Vendedor" },
+  { value: "viewer", label: "Solo lectura" }
+];
 
 function accountKindLabel(accountKind?: string) {
   return accountKind === "primary" ? "cuenta principal" : "subcuenta";
@@ -75,17 +81,15 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   }
 
   function roleLabel(role: string, accountKind?: string) {
-    if (isOpturonAdminScope) {
-      return role === "owner" || accountKind === "primary" ? "Cliente" : "Vendedor";
-    }
-    return "Vendedor";
+    return portalUserRoleLabel(role, accountKind);
   }
 
   function visibleRoleValue(user: UserRow) {
+    const normalizedRole = normalizePortalUserRole(user.tenantRole);
     if (isOpturonAdminScope) {
-      return user.tenantRole === "owner" || user.accountKind === "primary" ? "owner" : "seller";
+      return normalizedRole === "owner" || user.accountKind === "primary" ? "owner" : normalizedRole || "viewer";
     }
-    return "seller";
+    return normalizedRole === "viewer" ? "viewer" : "seller";
   }
 
   async function invite(event?: FormEvent<HTMLFormElement>) {
