@@ -7,12 +7,18 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import type { AdminTenantPolicyRow, TenantPolicy } from "@/lib/admin-client-policy";
 
-const PLAN_CODES = ["basic", "growth", "pro", "enterprise"];
+const PLAN_OPTIONS = [
+  { value: "basic", label: "Inicial" },
+  { value: "growth", label: "Crecimiento" },
+  { value: "pro", label: "Empresa" }
+] as const;
+
 const LIMIT_KEYS = [
   { key: "maxPortalUsers", label: "Usuarios portal" },
   { key: "maxAutomations", label: "Automatizaciones" },
   { key: "maxContacts", label: "Contactos" }
 ] as const;
+
 const CAPABILITIES = [
   "whatsapp",
   "contacts",
@@ -24,8 +30,39 @@ const CAPABILITIES = [
   "payments",
   "payments_transfer",
   "loyalty"
-];
-const MODULES = ["inbox", "agenda", "catalog", "automations", "sales", "loyalty", "payments"];
+] as const;
+
+const MODULES = ["inbox", "agenda", "catalog", "automations", "sales", "loyalty", "payments"] as const;
+
+const PLAN_LABELS: Record<string, string> = {
+  basic: "Inicial",
+  growth: "Crecimiento",
+  pro: "Empresa",
+  enterprise: "Empresa (historico)"
+};
+
+const MODULE_LABELS: Record<(typeof MODULES)[number], string> = {
+  inbox: "Inbox",
+  agenda: "Agenda",
+  catalog: "Catalogo",
+  automations: "Automatizaciones",
+  sales: "Ventas",
+  loyalty: "Fidelizacion",
+  payments: "Cobros"
+};
+
+const CAPABILITY_LABELS: Record<(typeof CAPABILITIES)[number], string> = {
+  whatsapp: "WhatsApp",
+  contacts: "Contactos",
+  crm: "CRM",
+  agenda: "Agenda",
+  catalog: "Catalogo",
+  automations: "Automatizaciones",
+  sales: "Ventas",
+  payments: "Cobros",
+  payments_transfer: "Transferencias",
+  loyalty: "Fidelizacion"
+};
 
 function normalizePolicy(policy: TenantPolicy): TenantPolicy {
   return {
@@ -55,6 +92,17 @@ function clonePolicy(policy: TenantPolicy): TenantPolicy {
 
 function getTenantLabel(tenant: AdminTenantPolicyRow) {
   return tenant.displayName || tenant.name || tenant.primaryEmail || tenant.tenantId;
+}
+
+function getPlanLabel(planCode: string) {
+  return PLAN_LABELS[planCode] || PLAN_LABELS.basic;
+}
+
+function getPlanOptions(currentPlanCode: string) {
+  if (currentPlanCode === "enterprise") {
+    return [...PLAN_OPTIONS, { value: "enterprise", label: "Empresa (historico)" }] as const;
+  }
+  return PLAN_OPTIONS;
 }
 
 export function AdminClientConfiguration({ initialTenants }: { initialTenants: AdminTenantPolicyRow[] }) {
@@ -138,11 +186,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     <p className="mt-1 truncate text-xs text-muted">{tenant.primaryEmail || tenant.tenantId}</p>
                   </div>
                   <Badge variant={tenant.policy.source === "settings.portal.policy" ? "success" : "warning"}>
-                    {tenant.policy.planCode}
+                    {getPlanLabel(tenant.policy.planCode)}
                   </Badge>
                 </div>
                 <p className="mt-3 text-xs text-muted">
-                  {tenant.policy.capabilities.length} capabilities · {Object.values(tenant.policy.enabledModules).filter(Boolean).length} módulos
+                  {Object.values(tenant.policy.enabledModules).filter(Boolean).length} modulos activos -
+                  {tenant.policy.limits.maxPortalUsers} usuarios portal
                 </p>
               </button>
             );
@@ -169,7 +218,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
-            <h3 className="font-semibold">Plan y límites</h3>
+            <h3 className="font-semibold">Plan y limites</h3>
             <label className="mt-4 block text-sm text-muted">
               Plan
               <select
@@ -177,11 +226,16 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 onChange={(event) => patchDraft({ planCode: event.target.value })}
                 className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
               >
-                {PLAN_CODES.map((plan) => (
-                  <option key={plan} value={plan}>{plan}</option>
+                {getPlanOptions(draft.planCode).map((plan) => (
+                  <option key={plan.value} value={plan.value}>
+                    {plan.label}
+                  </option>
                 ))}
               </select>
             </label>
+            <p className="mt-2 text-xs text-muted">
+              Se muestran nombres comerciales. El codigo tecnico historico del tenant se conserva por compatibilidad.
+            </p>
 
             <div className="mt-4 grid gap-3">
               {LIMIT_KEYS.map((item) => (
@@ -207,13 +261,19 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </div>
 
           <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
-            <h3 className="font-semibold">Módulos habilitados</h3>
+            <h3 className="font-semibold">Modulos habilitados</h3>
+            <p className="mt-2 text-sm text-muted">
+              Definen que areas del portal quedan disponibles para el cliente en su operacion diaria.
+            </p>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {MODULES.map((moduleName) => {
                 const checked = draft.enabledModules[moduleName] !== false;
                 return (
-                  <label key={moduleName} className="flex items-center justify-between rounded-xl border border-[color:var(--border)] bg-surface/60 px-3 py-2 text-sm">
-                    <span>{moduleName}</span>
+                  <label
+                    key={moduleName}
+                    className="flex items-center justify-between rounded-xl border border-[color:var(--border)] bg-surface/60 px-3 py-2 text-sm"
+                  >
+                    <span>{MODULE_LABELS[moduleName]}</span>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -231,13 +291,27 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
         </div>
 
         <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
-          <h3 className="font-semibold">Capabilities</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold">Capacidades tecnicas</h3>
+            <Badge variant="muted">Interno</Badge>
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            Estas capacidades alimentan compatibilidades del backend y automatizaciones. No reemplazan a los modulos
+            visibles del portal.
+          </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((capability) => {
               const checked = draft.capabilities.includes(capability);
               return (
-                <label key={capability} className="flex items-center gap-3 rounded-xl border border-[color:var(--border)] bg-surface/60 px-3 py-2 text-sm">
-                  <span className={`inline-flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-brand bg-brand text-white" : "border-[color:var(--border)]"}`}>
+                <label
+                  key={capability}
+                  className="flex items-center gap-3 rounded-xl border border-[color:var(--border)] bg-surface/60 px-3 py-2 text-sm"
+                >
+                  <span
+                    className={`inline-flex h-5 w-5 items-center justify-center rounded border ${
+                      checked ? "border-brand bg-brand text-white" : "border-[color:var(--border)]"
+                    }`}
+                  >
                     {checked ? <Check className="h-3.5 w-3.5" /> : null}
                   </span>
                   <input
@@ -252,7 +326,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       })
                     }
                   />
-                  <span>{capability}</span>
+                  <span>{CAPABILITY_LABELS[capability]}</span>
                 </label>
               );
             })}
