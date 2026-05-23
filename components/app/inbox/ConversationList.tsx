@@ -88,18 +88,18 @@ export function ConversationList({
   const showingArchived = visibility === "archived";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/88 p-4 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/90 p-4 backdrop-blur">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Inbox</p>
-            <h2 className="mt-1 text-lg font-semibold">Conversaciones</h2>
-            <p className="mt-1 text-xs text-muted">Elegi rapido un hilo, revisa estado y entra a actuar sin ruido extra.</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Inbox</p>
+            <h2 className="mt-1 text-xl font-semibold">Conversaciones</h2>
+            <p className="mt-1 text-xs text-muted">Elegí rápido un hilo, revisá estado y entrá a actuar sin ruido extra.</p>
           </div>
           {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
         </div>
 
-        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-bg/70 px-3 py-2.5">
+        <div className="mt-4 flex items-center gap-2 rounded-[20px] border border-[color:var(--border)] bg-bg/70 px-3 py-3">
           <Search className="h-4 w-4 text-muted" />
           <input
             value={search}
@@ -118,7 +118,7 @@ export function ConversationList({
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/50">
+        <div className="mt-4 rounded-[22px] border border-[color:var(--border)] bg-card/45">
           <button
             type="button"
             onClick={() => setFiltersExpanded((current) => !current)}
@@ -228,7 +228,7 @@ export function ConversationList({
         ) : null}
 
         {!loading && hasSearchResults ? (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {visibleRows.map((row) => (
               <ConversationRow
                 key={row.id}

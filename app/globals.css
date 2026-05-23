@@ -25,6 +25,7 @@
   --page-hero-gradient: linear-gradient(135deg, rgba(192, 80, 0, 0.14), rgba(18, 18, 18, 0.96) 42%, rgba(14, 14, 14, 0.98));
   --sidebar-hero-gradient: linear-gradient(135deg, rgba(192, 80, 0, 0.18), rgba(16, 16, 16, 0.94));
   --sidebar-overlay: radial-gradient(circle at top left, rgba(192, 80, 0, 0.18), transparent 38%), radial-gradient(circle at bottom right, rgba(176, 80, 0, 0.08), transparent 34%);
+  --rail-overlay: radial-gradient(circle at top, rgba(192, 80, 0, 0.14), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0));
   --body-glow-a: rgba(176, 80, 0, 0.18);
   --body-glow-b: rgba(144, 48, 0, 0.14);
   --success-bg: rgba(16, 185, 129, 0.12);
@@ -69,6 +70,7 @@
   --page-hero-gradient: linear-gradient(135deg, rgba(176, 125, 125, 0.14), rgba(255, 249, 248, 0.98) 46%, rgba(246, 238, 236, 0.98));
   --sidebar-hero-gradient: linear-gradient(135deg, rgba(176, 125, 125, 0.16), rgba(255, 250, 249, 0.96));
   --sidebar-overlay: radial-gradient(circle at top left, rgba(176, 125, 125, 0.12), transparent 38%), radial-gradient(circle at bottom right, rgba(214, 189, 186, 0.2), transparent 36%);
+  --rail-overlay: radial-gradient(circle at top, rgba(176, 125, 125, 0.12), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0));
   --body-glow-a: rgba(176, 125, 125, 0.1);
   --body-glow-b: rgba(214, 189, 186, 0.18);
   --success-bg: rgba(52, 168, 110, 0.12);

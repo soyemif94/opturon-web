@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Clock3, Sparkles } from "lucide-react";
 import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
 import type { BotDomainOverride, BotFlowLock, DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
@@ -96,17 +97,26 @@ export function ChatPanel({
   }, [detail?.conversation.id, lastTimelineKey, timeline.length]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/92 px-4 py-4 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/94 px-4 py-4 backdrop-blur">
         {detail ? (
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">{detail.contact?.name || "Conversacion"}</h2>
-              <p className="mt-0.5 text-xs text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
+            <div className="flex min-w-0 items-start gap-3">
+              <SimpleAvatar
+                src={detail.contact?.profileImageUrl}
+                name={detail.contact?.name || detail.contact?.phone || "Cliente"}
+                className="h-12 w-12 rounded-full border border-white/10 bg-brand/10 text-sm text-brandBright shadow-[0_14px_30px_rgba(0,0,0,0.2)]"
+                fallbackClassName="bg-brand/10 text-brandBright"
+              />
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-semibold">{detail.contact?.name || detail.contact?.phone || "Conversacion"}</h2>
+                <p className="mt-0.5 text-xs text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
+              </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
               <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
+              {!detail.conversation.botEnabled ? <InboxBadge className="border-amber-400/30 bg-amber-400/10 text-amber-100">Bot pausado</InboxBadge> : null}
               {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
             </div>
           </div>
@@ -117,7 +127,7 @@ export function ChatPanel({
 
       <div
         ref={scrollViewportRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.06),transparent_24%)] px-4 py-5"
+        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_22%),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.02))] px-4 py-5"
       >
         {loading && !detail ? (
           <div className="space-y-3">
@@ -150,9 +160,10 @@ export function ChatPanel({
             ) : null}
 
             {hasCollapsibleHistory ? (
-              <div className="rounded-[18px] border border-[color:var(--border)] bg-card/45 px-3 py-2">
+              <div className="rounded-[20px] border border-[color:var(--border)] bg-card/45 px-3 py-2.5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-[11px] text-muted">
+                  <p className="flex items-center gap-2 text-[11px] text-muted">
+                    <Clock3 className="h-3.5 w-3.5" />
                     {historyExpanded
                       ? `Mostrando el historial completo (${timeline.length} mensajes).`
                       : `Mostrando los ultimos ${visibleTimeline.length} mensajes de ${timeline.length}.`}
@@ -190,7 +201,7 @@ export function ChatPanel({
       </div>
 
       {detail ? (
-        <div className="shrink-0 space-y-2 border-t border-[color:var(--border)] bg-surface/88 px-3 pb-3 pt-2">
+        <div className="shrink-0 space-y-2 border-t border-[color:var(--border)] bg-surface/90 px-3 pb-3 pt-2">
           <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />
           <Composer
             value={composer}

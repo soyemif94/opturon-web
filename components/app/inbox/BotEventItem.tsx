@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 export function BotEventItem({ text }: { text: string }) {
   return (
     <div
-      className="mx-auto max-w-[82%] rounded-[20px] border px-3 py-2.5 text-[11px]"
+      className="mx-auto max-w-[82%] rounded-[22px] border px-3.5 py-3 text-[11px] shadow-[0_16px_30px_rgba(0,0,0,0.14)]"
       style={{
         backgroundColor: "var(--inbox-system-bubble-bg)",
         borderColor: "var(--inbox-system-bubble-border)",

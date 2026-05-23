@@ -382,6 +382,94 @@ function ThemeToggleButton() {
   );
 }
 
+function OpturonMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={cn("flex items-center gap-3", compact ? "justify-center" : "")}>
+      <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10 shadow-[0_0_0_1px_rgba(192,80,0,0.08),0_20px_48px_rgba(176,80,0,0.14)]">
+        <span className="inline-flex h-6 w-6 rounded-full border-[6px] border-brandBright border-r-transparent border-t-transparent rotate-45" />
+      </span>
+      {!compact ? (
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Opturon</p>
+          <p className="text-sm font-semibold tracking-[0.02em] text-text">CRM comercial</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DesktopRail({
+  pathname,
+  visibleNavItems,
+  onOpenMenu,
+  onSignOut
+}: {
+  pathname: string;
+  visibleNavItems: typeof navItems;
+  onOpenMenu: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <aside className="sticky top-3 hidden h-[calc(100vh-1.5rem)] w-[92px] shrink-0 xl:flex">
+      <div className="relative flex h-full w-full flex-col items-center rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+        <div className="absolute inset-0 rounded-[30px] bg-[image:var(--rail-overlay)]" />
+        <div className="relative flex h-full flex-col items-center">
+          <OpturonMark compact />
+
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface/80 text-muted transition-colors hover:text-text"
+            aria-label="Abrir menu de navegacion"
+            title="Abrir menu"
+          >
+            <Menu className="h-4.5 w-4.5" />
+          </button>
+
+          <nav className="mt-6 flex flex-1 flex-col items-center gap-2">
+            {visibleNavItems.map((item) => {
+              const active = item.match(pathname);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    "group relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition-all duration-200",
+                    active
+                      ? "border-brand/35 bg-brand/16 text-brandBright shadow-[0_0_0_1px_rgba(192,80,0,0.14),0_18px_40px_rgba(176,80,0,0.18)]"
+                      : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/75 hover:text-text"
+                  )}
+                  aria-label={item.label}
+                  title={item.label}
+                >
+                  <Icon className="h-4.5 w-4.5" />
+                  <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-[color:var(--border)] bg-surface/95 px-3 py-1.5 text-xs font-medium text-text shadow-[0_18px_40px_rgba(0,0,0,0.26)] group-hover:block">
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="group relative mt-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface/72 text-muted transition-colors hover:text-text"
+            aria-label="Cerrar sesion"
+            title="Cerrar sesion"
+          >
+            <LogOut className="h-4.5 w-4.5" />
+            <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-[color:var(--border)] bg-surface/95 px-3 py-1.5 text-xs font-medium text-text shadow-[0_18px_40px_rgba(0,0,0,0.26)] group-hover:block">
+              Cerrar sesion
+            </span>
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export function AppShell({
   children,
   tenantId,
@@ -549,13 +637,20 @@ export function AppShell({
 
   return (
     <section className="min-h-screen w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
-      <div className="flex min-h-[calc(100vh-1.5rem)] w-full items-stretch md:min-h-[calc(100vh-2.5rem)]">
+      <div className="flex min-h-[calc(100vh-1.5rem)] w-full items-stretch gap-3 md:min-h-[calc(100vh-2.5rem)] md:gap-5">
+        <DesktopRail
+          pathname={pathname}
+          visibleNavItems={visibleNavItems}
+          onOpenMenu={() => setSidebarOpen(true)}
+          onSignOut={() => void signOut({ callbackUrl: "/login" })}
+        />
+
         <div className="flex min-w-0 flex-1">
           <div
             className={cn(
               "flex min-h-[calc(100vh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100vh-2.5rem)]",
               isInboxRoute
-                ? "overflow-visible"
+                ? "overflow-visible rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
             )}
           >
@@ -574,7 +669,7 @@ export function AppShell({
                   {topbar || (
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted">Portal del cliente</p>
+                        <p className="text-xs uppercase tracking-[0.24em] text-muted">Portal del cliente</p>
                         <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
                           Gestiona conversaciones, automatizaciones y crecimiento
                         </h1>
@@ -608,7 +703,7 @@ export function AppShell({
               className={cn(
                 "flex-1",
                 isInboxRoute
-                  ? "overflow-visible bg-transparent p-0"
+                  ? "overflow-visible bg-[image:var(--panel-glow)] p-4 xl:p-6"
                   : "overflow-visible bg-[image:var(--panel-glow)] p-5 xl:p-8"
               )}
             >

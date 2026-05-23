@@ -183,7 +183,7 @@ export function ProfilePanel({
             <SimpleAvatar
               src={detail.contact?.profileImageUrl}
               name={detail.contact?.name}
-              className="h-14 w-14 rounded-[20px] border border-brand/20 bg-brand/10 text-sm text-brandBright"
+              className="h-14 w-14 rounded-full border border-brand/20 bg-brand/10 text-sm text-brandBright"
               fallbackClassName="bg-brand/10 text-brandBright"
             />
             <div className="min-w-0 flex-1">
@@ -226,43 +226,43 @@ export function ProfilePanel({
         <div className="grid gap-2">
           <button
             type="button"
-            onClick={onTakeConversation}
+            onClick={onToggleBot}
             disabled={readOnly}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-3 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(176,80,0,0.24)] disabled:opacity-40"
           >
-            <UserRound className="h-4 w-4" />
-            Tomar conversacion
+            <PauseCircle className="h-4 w-4" />
+            {detail.conversation.botEnabled ? "Pausar bot" : "Retomar bot"}
           </button>
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
-              onClick={onToggleBot}
-              disabled={readOnly}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm text-muted hover:text-text disabled:opacity-40"
-            >
-              <PauseCircle className="h-4 w-4" />
-              {detail.conversation.botEnabled ? "Pausar bot" : "Reactivar bot"}
-            </button>
-            <button
-              type="button"
               onClick={onClose}
               disabled={readOnly}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm text-muted hover:text-text disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-3 py-2.5 text-sm text-muted hover:text-text disabled:opacity-40"
             >
               <Archive className="h-4 w-4" />
               Archivar
+            </button>
+            <button
+              type="button"
+              onClick={onTakeConversation}
+              disabled={readOnly}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-3 py-2.5 text-sm text-muted hover:text-text disabled:opacity-40"
+            >
+              <UserRound className="h-4 w-4" />
+              Tomar para mí
             </button>
           </div>
           <button
             type="button"
             onClick={onResetConversation}
             disabled={readOnly || resetBusy}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm text-muted hover:text-text disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-3 py-2.5 text-sm text-muted hover:text-text disabled:opacity-40"
           >
             <RotateCcw className="h-4 w-4" />
             {resetBusy ? "Reiniciando..." : "Reiniciar conversacion"}
           </button>
-          <p className="text-xs text-muted">Esto permitira que el bot vuelva a empezar con este contacto.</p>
+          <p className="text-xs text-muted">Esto hace que el bot vuelva a empezar limpio con este contacto, sin borrar el historial.</p>
         </div>
       </CardSection>
 
@@ -310,7 +310,7 @@ export function ProfilePanel({
         <div className="space-y-4">
           <div className="grid gap-3">
             <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 p-3">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Owner actual</p>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Responsable actual</p>
               <p className="mt-2 text-sm font-medium text-text">{detail.conversation.assignedSellerName || detail.conversation.assignedTo || "Sin asignar"}</p>
             </div>
 

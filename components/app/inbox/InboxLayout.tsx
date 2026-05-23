@@ -19,7 +19,7 @@ export function InboxLayout({
 }) {
   return (
     <div className="flex flex-col pb-1 xl:min-h-[calc(100vh-13rem)]">
-      <div className="grid grid-cols-1 gap-3 xl:min-h-[calc(100vh-13rem)] xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.45fr)_minmax(320px,0.92fr)] 2xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.55fr)_minmax(340px,0.95fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:min-h-[calc(100vh-13rem)] xl:grid-cols-[minmax(340px,0.92fr)_minmax(0,1.52fr)_minmax(320px,0.9fr)] 2xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.58fr)_minmax(340px,0.92fr)]">
         <aside
           className={cn(
             "min-h-[320px] min-w-0 overflow-hidden xl:min-h-0",
@@ -57,7 +57,7 @@ export function InboxLayout({
             hasDetail ? "block" : "hidden xl:block"
           )}
         >
-          <section className="min-h-[320px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] shadow-[0_20px_60px_rgba(0,0,0,0.20)] xl:h-full">
+          <section className="min-h-[320px] overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] shadow-[0_24px_70px_rgba(0,0,0,0.24)] xl:h-full">
             <div className="overflow-y-auto p-4 xl:h-full">{right}</div>
           </section>
         </aside>

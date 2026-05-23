@@ -34,30 +34,36 @@ export function MessageBubble({
   const isImage = type === "image";
   const mediaUrl = media?.previewUrl || media?.downloadUrl || null;
   const captionText = caption || text;
+  const senderLabel = outbound ? "Negocio" : system ? "Evento del bot" : "Cliente";
+  const senderTone = system
+    ? "var(--inbox-system-bubble-muted)"
+    : outbound
+      ? "rgba(233,255,243,0.72)"
+      : "var(--text-muted)";
 
   return (
     <div className={cn("flex", outbound ? "justify-end" : "justify-start", system ? "justify-center" : "")}>
       <div
         className={cn(
-          "max-w-[78%] rounded-[20px] px-3 py-2.5 text-[13px] shadow-[0_8px_24px_rgba(0,0,0,0.10)]",
-          outbound && "bg-[linear-gradient(135deg,rgba(192,80,0,0.24),rgba(176,80,0,0.14))] text-text",
-          !outbound && !system && "border border-[color:var(--border)] bg-card/90 text-text",
+          "max-w-[82%] rounded-[22px] px-3.5 py-3 text-[13px] shadow-[0_14px_30px_rgba(0,0,0,0.16)]",
+          outbound && "border border-[color:var(--whatsapp-accent-border)] bg-[linear-gradient(135deg,rgba(24,100,52,0.98),rgba(16,82,40,0.98))] text-white",
+          !outbound && !system && "border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(36,36,36,0.95),rgba(24,24,24,0.98))] text-text",
           system && "max-w-[82%] border bg-[color:var(--inbox-system-bubble-bg)] text-[color:var(--inbox-system-bubble-text)]",
           optimistic ? "animate-inbox-message" : ""
         )}
         style={system ? { borderColor: "var(--inbox-system-bubble-border)" } : undefined}
       >
         <div
-          className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted"
-          style={system ? { color: "var(--inbox-system-bubble-muted)" } : undefined}
+          className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em]"
+          style={{ color: senderTone }}
         >
           {outbound ? <UserRound className="h-3 w-3" /> : system ? <Bot className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-          <span>{outbound ? "Humano" : system ? "Evento del bot" : "Contacto"}</span>
+          <span>{senderLabel}</span>
         </div>
         {isImage ? (
           <div className="space-y-2">
             {mediaUrl ? (
-              <a href={media?.downloadUrl || mediaUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-[color:var(--border)] bg-black/5">
+              <a href={media?.downloadUrl || mediaUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-white/10 bg-black/10">
                 <img src={mediaUrl} alt={captionText || "Imagen recibida"} className="max-h-64 w-full object-cover" loading="lazy" />
               </a>
             ) : (
@@ -70,7 +76,10 @@ export function MessageBubble({
         ) : (
           <p className="whitespace-pre-wrap leading-5">{text}</p>
         )}
-        <p className="mt-1.5 text-[10px] text-muted" style={system ? { color: "var(--inbox-system-bubble-muted)" } : undefined}>
+        <p
+          className="mt-2 text-[10px]"
+          style={{ color: senderTone }}
+        >
           {formatTime(timestamp)}
         </p>
       </div>
