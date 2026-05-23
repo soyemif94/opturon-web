@@ -386,7 +386,14 @@ function OpturonMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className={cn("flex items-center gap-3", compact ? "justify-center" : "")}>
       <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10 shadow-[0_0_0_1px_rgba(192,80,0,0.08),0_20px_48px_rgba(176,80,0,0.14)]">
-        <span className="inline-flex h-6 w-6 rounded-full border-[6px] border-brandBright border-r-transparent border-t-transparent rotate-45" />
+        <svg
+          viewBox="0 0 32 32"
+          aria-hidden="true"
+          className="h-6 w-6 text-brandBright drop-shadow-[0_4px_10px_rgba(255,122,0,0.18)]"
+        >
+          <circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" strokeWidth="5.5" />
+          <circle cx="16" cy="16" r="3.2" fill="currentColor" opacity="0.16" />
+        </svg>
       </span>
       {!compact ? (
         <div>
