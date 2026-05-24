@@ -407,37 +407,6 @@ export function AppDashboard({
             </Link>
           ))}
         </div>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-[22px] border border-dashed border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.08),rgba(255,255,255,0.02))] px-4 py-3 text-sm text-muted">
-            Personaliza tus accesos en Configuracion y mantene la operacion del equipo alineada.
-          </div>
-
-          <div className="rounded-[22px] border border-[color:var(--border)] bg-card/75 p-4">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
-                <ContactRound className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-text">Contactos recientes</p>
-                <p className="text-xs text-muted">Lectura rapida del CRM</p>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2.5">
-              {contacts.slice(0, 3).map((contact) => (
-                <div key={contact.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-text">{contact.name}</p>
-                      <p className="mt-0.5 text-xs text-muted">{contact.phone}</p>
-                    </div>
-                    <span className="text-xs text-muted">{contact.lastInteraction}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </section>
 
       <section className="space-y-4 rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-4 shadow-[var(--card-shadow)] xl:p-5">
