@@ -93,6 +93,7 @@ export function OpsLeadTable({
   showFollowUp = false,
   showSlaSignals = true,
   sectionVariant = "default",
+  compact = false,
   onAssign
 }: {
   title: string;
@@ -106,6 +107,7 @@ export function OpsLeadTable({
   showFollowUp?: boolean;
   showSlaSignals?: boolean;
   sectionVariant?: "default" | "unassigned" | "cold";
+  compact?: boolean;
   onAssign: (conversationId: string, sellerUserId: string) => void;
 }) {
   const router = useRouter();
@@ -130,7 +132,7 @@ export function OpsLeadTable({
 
   return (
     <Card className={`${sectionTone(sectionVariant)} shadow-[var(--card-shadow)]`}>
-      <CardHeader className="pb-4">
+      <CardHeader className={compact ? "pb-3" : "pb-4"}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-xl tracking-tight">{title}</CardTitle>
@@ -141,7 +143,7 @@ export function OpsLeadTable({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 pt-0">
+      <CardContent className={`pt-0 ${compact ? "space-y-2.5" : "space-y-3"}`}>
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-5 text-sm text-muted">
             {emptyMessage}
@@ -174,7 +176,7 @@ export function OpsLeadTable({
                   event.preventDefault();
                   router.push(inboxHref);
                 }}
-                className={`grid gap-4 rounded-[22px] border p-4 transition-all lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] ${rowTone({
+                className={`grid ${compact ? "gap-3 p-3.5" : "gap-4 p-4"} rounded-[22px] border transition-all lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] ${rowTone({
                   unassigned,
                   cold,
                   urgent
@@ -182,7 +184,7 @@ export function OpsLeadTable({
                   inboxHref ? "cursor-pointer hover:border-brand/35 hover:bg-brand/8 focus:outline-none focus:ring-2 focus:ring-brand/30" : ""
                 }`}
               >
-                <div className="space-y-3">
+                <div className={compact ? "space-y-2" : "space-y-3"}>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold md:text-base">{row.contact?.name || "Sin nombre"}</p>
                     <Badge className={leadTone(row.leadStatus)}>{leadLabel(row.leadStatus)}</Badge>
@@ -198,7 +200,7 @@ export function OpsLeadTable({
                     {showFollowUp ? <span>Seguimiento: {formatDateTime(row.nextActionAt)}</span> : null}
                   </div>
 
-                  <p className="line-clamp-2 text-sm leading-6 text-muted">{row.lastMessagePreview || "Sin mensajes recientes"}</p>
+                  <p className={`line-clamp-2 text-sm text-muted ${compact ? "leading-5" : "leading-6"}`}>{row.lastMessagePreview || "Sin mensajes recientes"}</p>
 
                   <div className="flex flex-wrap gap-2 text-xs text-muted">
                     {showFollowUp && row.nextActionNote ? <span>Nota: {row.nextActionNote}</span> : null}
@@ -206,7 +208,7 @@ export function OpsLeadTable({
                   </div>
                 </div>
 
-                <div className="rounded-[18px] border border-[color:var(--border)] bg-bg/45 p-3">
+                <div className={`rounded-[18px] border border-[color:var(--border)] bg-bg/45 ${compact ? "p-2.5" : "p-3"}`}>
                   <div className="flex flex-wrap gap-2">
                     <Button asChild type="button" variant="secondary" size="sm">
                       <Link href={`/app/inbox/${row.id}`}>Abrir</Link>
@@ -218,9 +220,9 @@ export function OpsLeadTable({
                     ) : null}
                   </div>
 
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className={`${compact ? "mt-2.5" : "mt-3"} grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]`}>
                     <select
-                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      className={`w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text ${compact ? "h-9" : "h-10"}`}
                       value={draftSellerId}
                       onChange={(event) =>
                         setDraftAssignments((current) => ({

@@ -9,7 +9,7 @@ import {
   CalendarClock,
   Clock3,
   Inbox,
-  ShieldAlert,
+  ShieldCheck,
   UserMinus,
   UsersRound
 } from "lucide-react";
@@ -424,7 +424,7 @@ export function OpsDashboard({
   ] as const;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {!backendReady ? (
         <Card className="border-white/6 bg-card/90">
           <CardContent className="p-5 text-sm text-muted">
@@ -433,85 +433,126 @@ export function OpsDashboard({
         </Card>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <Card className="overflow-hidden border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] shadow-[var(--card-shadow)]">
+      <section ref={kpisRef} className={sectionClassName(focusedSection === "kpis", "grid gap-3 md:grid-cols-2 xl:grid-cols-6")}>
+        <KpiCard
+          icon={AlertTriangle}
+          label="Alertas operativas"
+          value={opsAlerts.length}
+          helper={opsAlerts.length > 0 ? "Requieren atencion inmediata" : "Sin alertas criticas"}
+          loading={loading}
+          tone="critical"
+          onClick={() => scrollToSection("unassigned")}
+          trendLabel={opsAlerts.length > 0 ? "Ver alertas" : "Operacion estable"}
+          trendMode="alert"
+          prominent
+        />
+        <KpiCard
+          icon={Inbox}
+          label="Leads activos"
+          value={activeConversations.length}
+          helper="En pipeline actualmente"
+          loading={loading}
+          href="/app/inbox"
+          trendLabel="12% vs semana anterior"
+          trendMode="up"
+          sparkline={[22, 24, 28, 26, 29, 32, 30, 35]}
+        />
+        <KpiCard
+          icon={UserMinus}
+          label="Sin asignar"
+          value={unassignedLeads.length}
+          helper="Leads que necesitan dueno"
+          loading={loading}
+          active={unassignedLeads.length > 0}
+          tone="attention"
+          onClick={() => scrollToSection("unassigned")}
+          trendLabel={unassignedLeads.length > 0 ? "Requiere accion" : "Todo cubierto"}
+          trendMode="alert"
+          sparkline={[9, 8, 7, 6, 7, 6, 5, 6]}
+        />
+        <KpiCard
+          icon={BellRing}
+          label="Leads frios"
+          value={coldLeads.length}
+          helper="Sin movimiento reciente"
+          loading={loading}
+          active={coldLeads.length > 0}
+          tone="info"
+          onClick={() => scrollToSection("cold")}
+          trendLabel={coldLeads.length > 0 ? "Requiere seguimiento" : "Sin riesgo frio"}
+          trendMode="info"
+          sparkline={[2, 3, 2, 4, 4, 5, 5, 6]}
+        />
+        <KpiCard
+          icon={ShieldCheck}
+          label="Vencidos"
+          value={overdueLeads.length}
+          helper="Seguimientos vencidos"
+          loading={loading}
+          active={overdueLeads.length > 0}
+          tone={overdueLeads.length > 0 ? "critical" : "success"}
+          onClick={() => scrollToSection("overdue")}
+          trendLabel={overdueLeads.length > 0 ? "Atencion inmediata" : "Todo al dia"}
+          trendMode={overdueLeads.length > 0 ? "alert" : "success"}
+          sparkline={[1, 1, 1, 0, 0, 0, 0, 0]}
+        />
+        <KpiCard
+          icon={Clock3}
+          label="Atencion hoy"
+          value={todayLeads.length}
+          helper="Leads prioritarios"
+          loading={loading}
+          active={todayLeads.length > 0}
+          tone="attention"
+          onClick={() => scrollToSection("today")}
+          trendLabel={todayLeads.length > 0 ? "Ver detalles" : "Jornada despejada"}
+          trendMode="attention"
+        />
+      </section>
+
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
+        <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
           <CardHeader className="pb-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="warning">Supervision comercial</Badge>
-                  <Badge variant={opsAlerts.length > 0 ? "outline" : "success"}>
-                    {opsAlerts.length > 0 ? `${opsAlerts.length} alertas activas` : "Operacion estable"}
-                  </Badge>
-                </div>
-                <CardTitle className="mt-3 text-[28px] leading-none tracking-tight">Alertas operativas</CardTitle>
-                <CardDescription className="mt-2 max-w-2xl text-sm">
-                  Supervisa clientes sin asignar, seguimientos vencidos y oportunidades que necesitan accion.
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-[28px] leading-none tracking-tight">Alertas operativas</CardTitle>
+                <CardDescription className="mt-2 text-sm">
+                  Situaciones que necesitan tu atencion para evitar perdida de oportunidades.
                 </CardDescription>
               </div>
-
-              <div className="grid min-w-[240px] gap-3 rounded-[24px] border border-[color:var(--border)] bg-surface/60 p-4 sm:grid-cols-2">
-                <OpsMicroMetric label="Leads activos" value={activeConversations.length} helper="Pipeline actual" accent="green" />
-                <OpsMicroMetric
-                  label="Atencion hoy"
-                  value={todayLeads.length}
-                  helper={todayLeads.length > 0 ? "Prioridades vivas" : "Jornada ordenada"}
-                  accent="amber"
-                />
-              </div>
+              <button type="button" className="text-sm font-medium text-muted transition-colors hover:text-text" onClick={() => scrollToSection("unassigned")}>
+                Ver todas
+              </button>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <PriorityAlertCard
-              title="Sin vendedor asignado"
-              count={unassignedLeads.length}
-              description="Leads que necesitan responsable para no perder continuidad."
+          <CardContent className="space-y-3 pt-0">
+            <WideAlertRow
+              title="Leads sin vendedor asignado"
+              detail={`Tienes ${unassignedLeads.length} leads sin responsable asignado.`}
               cta="Ver sin asignar"
               tone="critical"
               icon={UserMinus}
               onClick={() => scrollToSection("unassigned")}
             />
-            <PriorityAlertCard
-              title="Clientes frios"
-              count={coldLeads.length}
-              description="Sin movimiento reciente ni siguiente paso cargado."
+            <WideAlertRow
+              title="Leads frios sin movimiento reciente"
+              detail={`Tienes ${coldLeads.length} leads que no tienen actividad reciente.`}
               cta="Ver frios"
               tone="info"
               icon={BellRing}
               onClick={() => scrollToSection("cold")}
-            />
-            <PriorityAlertCard
-              title="Seguimientos vencidos"
-              count={overdueLeads.length}
-              description="Acciones atrasadas que conviene recuperar ahora."
-              cta="Ver vencidos"
-              tone="warning"
-              icon={AlertTriangle}
-              onClick={() => scrollToSection("overdue")}
-            />
-            <PriorityAlertCard
-              title="Seguimientos de hoy"
-              count={todayLeads.length}
-              description="Pendientes para mover durante esta jornada."
-              cta="Ver hoy"
-              tone="attention"
-              icon={Clock3}
-              onClick={() => scrollToSection("today")}
             />
           </CardContent>
         </Card>
 
         <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
           <CardHeader className="pb-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-xl tracking-tight">Acciones rapidas</CardTitle>
-                <CardDescription className="mt-2 text-sm">Atajos para gestionar la operacion comercial.</CardDescription>
-              </div>
-              <Badge variant="muted">Atajos</Badge>
+            <div>
+              <CardTitle className="text-[28px] leading-none tracking-tight">Acciones rapidas</CardTitle>
+              <CardDescription className="mt-2 text-sm">Atajos para gestionar tu operacion comercial.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <CardContent className="grid gap-3 grid-cols-2 xl:grid-cols-5 pt-0">
             {quickActions.map((action) => (
               <QuickActionCard
                 key={action.id}
@@ -526,63 +567,7 @@ export function OpsDashboard({
         </Card>
       </section>
 
-      <section ref={kpisRef} className={sectionClassName(focusedSection === "kpis", "grid gap-4 md:grid-cols-2 xl:grid-cols-5")}>
-        <KpiCard
-          icon={Inbox}
-          label="Leads activos"
-          value={activeConversations.length}
-          helper="En pipeline actualmente"
-          loading={loading}
-          href="/app/inbox"
-          trendLabel={activeConversations.length > 0 ? "Operacion en curso" : "Sin actividad"}
-        />
-        <KpiCard
-          icon={UserMinus}
-          label="Sin asignar"
-          value={unassignedLeads.length}
-          helper="Leads que necesitan dueno"
-          loading={loading}
-          active={unassignedLeads.length > 0}
-          tone="attention"
-          onClick={() => scrollToSection("unassigned")}
-          trendLabel={unassignedLeads.length > 0 ? "Requiere accion" : "Todo cubierto"}
-        />
-        <KpiCard
-          icon={BellRing}
-          label="Frios"
-          value={coldLeads.length}
-          helper="Sin movimiento reciente"
-          loading={loading}
-          active={coldLeads.length > 0}
-          tone="info"
-          onClick={() => scrollToSection("cold")}
-          trendLabel={coldLeads.length > 0 ? "Requiere seguimiento" : "Sin riesgo frio"}
-        />
-        <KpiCard
-          icon={AlertTriangle}
-          label="Vencidos"
-          value={overdueLeads.length}
-          helper="Seguimientos atrasados"
-          loading={loading}
-          active={overdueLeads.length > 0}
-          tone="critical"
-          onClick={() => scrollToSection("overdue")}
-          trendLabel={overdueLeads.length > 0 ? "Atencion inmediata" : "Todo al dia"}
-        />
-        <KpiCard
-          icon={Clock3}
-          label="Seguimientos hoy"
-          value={todayLeads.length}
-          helper="Pendientes para esta jornada"
-          loading={loading}
-          active={todayLeads.length > 0}
-          tone="attention"
-          onClick={() => scrollToSection("today")}
-          trendLabel={todayLeads.length > 0 ? "Prioridades del dia" : "Jornada despejada"}
-        />
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(350px,0.8fr)]">
         <div className="space-y-5">
           <div ref={unassignedRef} className={sectionClassName(focusedSection === "unassigned")}>
             <OpsLeadTable
@@ -598,53 +583,70 @@ export function OpsDashboard({
             />
           </div>
 
-          <div ref={overdueRef} className={sectionClassName(focusedSection === "overdue")}>
-            <OpsLeadTable
-              title="Seguimientos vencidos"
-              description="Acciones comerciales atrasadas que conviene recuperar antes de que se enfrien."
-              rows={overdueLeads}
-              sellers={sellers}
-              readOnly={readOnly || !backendReady}
-              assigningId={assigningId}
-              emptyMessage="No hay seguimientos vencidos en este momento."
-              showOwner
-              showFollowUp
-              onAssign={assignSeller}
-            />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)]">
+            <div ref={overdueRef} className={sectionClassName(focusedSection === "overdue")}>
+              <OpsLeadTable
+                title="Seguimientos vencidos"
+                description="Acciones comerciales atrasadas que conviene recuperar antes de que se enfrien."
+                rows={overdueLeads}
+                sellers={sellers}
+                readOnly={readOnly || !backendReady}
+                assigningId={assigningId}
+                emptyMessage="No hay seguimientos vencidos en este momento."
+                showOwner
+                showFollowUp
+                compact
+                onAssign={assignSeller}
+              />
+            </div>
+            <div ref={todayRef} className={sectionClassName(focusedSection === "today")}>
+              <OpsLeadTable
+                title="Seguimientos para hoy"
+                description="Leads que conviene trabajar durante la jornada."
+                rows={todayLeads}
+                sellers={sellers}
+                readOnly={readOnly || !backendReady}
+                assigningId={assigningId}
+                emptyMessage="No hay seguimientos planificados para hoy."
+                showOwner
+                showFollowUp
+                compact
+                onAssign={assignSeller}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-xl tracking-tight">Lectura por vendedor</CardTitle>
+                  <CardTitle className="text-[28px] leading-none tracking-tight">Carga por vendedor</CardTitle>
                   <CardDescription className="mt-2 text-sm">
-                    Detecta quien lidera y quien necesita ayuda para repartir mejor el equipo.
+                    Distribucion actual del pipeline por vendedor.
                   </CardDescription>
                 </div>
-                <Badge variant="outline">{sellerLoad.length} vendedores</Badge>
+                <Badge variant="warning">{topSeller?.totalActiveLeads || 0} activos</Badge>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Quien vende mas</p>
-                <p className="mt-2 text-lg font-semibold">{topSeller?.sellerName || "Sin datos"}</p>
-                <p className="mt-1 text-sm text-muted">
-                  {topSeller
-                    ? `${formatCurrency(topSeller.totalRevenue || 0, topSeller.currency || "ARS")} · ${topSeller.totalOrders || 0} ventas`
-                    : "Todavia no hay ventas consolidadas para comparar."}
-                </p>
-              </div>
-              <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Quien necesita seguimiento</p>
-                <p className="mt-2 text-lg font-semibold">{sellerNeedingHelp?.sellerName || "Sin alertas"}</p>
-                <p className="mt-1 text-sm text-muted">
-                  {sellerNeedingHelp
-                    ? `${sellerNeedingHelp.overdueLeads} vencidos · ${sellerNeedingHelp.totalActiveLeads} activos`
-                    : "No hay vendedores con carga comprometida en este momento."}
-                </p>
+            <CardContent className="grid gap-3 pt-0">
+              <div className="grid gap-3 xl:grid-cols-[140px_minmax(0,1fr)]">
+                <SellerLoadRing total={activeConversations.length} />
+                <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
+                  <p className="text-sm font-semibold">{topSeller?.sellerName || "Sin datos"}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    <OpsMicroMetric label="Activos" value={topSeller?.totalActiveLeads || 0} helper="" />
+                    <OpsMicroMetric label="Vencidos" value={topSeller?.overdueLeads || 0} helper="" />
+                    <OpsMicroMetric label="Seguimiento" value={topSeller?.followUpLeads || 0} helper="" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                    <Badge variant={sellerNeedingHelp?.overdueLeads ? "warning" : "success"}>
+                      {sellerNeedingHelp?.overdueLeads ? "Necesita seguimiento" : "Carga estable"}
+                    </Badge>
+                    <span>Conversion pagada: {topSeller && topSeller.totalOrders ? Math.round(((topSeller.totalPaidOrders || 0) / topSeller.totalOrders) * 100) : 0}%</span>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -665,29 +667,12 @@ export function OpsDashboard({
               showOwner
               showSlaSignals
               sectionVariant="cold"
+              compact
               onAssign={assignSeller}
             />
           </div>
-        </div>
-      </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
-        <div ref={todayRef} className={sectionClassName(focusedSection === "today")}>
-          <OpsLeadTable
-            title="Seguimientos para hoy"
-            description="Leads que conviene trabajar durante la jornada para no perder timing comercial."
-            rows={todayLeads}
-            sellers={sellers}
-            readOnly={readOnly || !backendReady}
-            assigningId={assigningId}
-            emptyMessage="No hay seguimientos planificados para hoy."
-            showOwner
-            showFollowUp
-            onAssign={assignSeller}
-          />
-        </div>
-
-        <div ref={urgentRef} className={sectionClassName(focusedSection === "urgent")}>
+          <div ref={urgentRef} className={sectionClassName(focusedSection === "urgent")}>
           <OpsLeadTable
             title="Oportunidades que requieren accion"
             description="Inbound reciente con demora operativa segun el SLA basico."
@@ -698,32 +683,12 @@ export function OpsDashboard({
             emptyMessage="No hay leads urgentes segun el SLA basico actual."
             showOwner
             showSlaSignals
+            compact
             onAssign={assignSeller}
           />
         </div>
+        </div>
       </section>
-
-      <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-        <CardHeader className="pb-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-xl tracking-tight">Lectura operativa</CardTitle>
-              <CardDescription className="mt-2 text-sm">
-                Resumen rapido del estado comercial para dueños, gerentes y supervisores.
-              </CardDescription>
-            </div>
-            <Badge variant={opsAlerts.length > 0 ? "warning" : "success"}>
-              {opsAlerts.length > 0 ? "Revisar prioridades" : "Operacion ordenada"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <OpsMicroMetric label="Leads activos" value={activeConversations.length} helper="Conversaciones abiertas" accent="green" />
-          <OpsMicroMetric label="Sin asignar" value={unassignedLeads.length} helper="Esperando responsable" accent="amber" />
-          <OpsMicroMetric label="Vencidos" value={overdueLeads.length} helper="Seguimientos atrasados" accent="red" />
-          <OpsMicroMetric label="Urgentes" value={urgentLeads.length} helper="Sin respuesta suficiente" accent="sky" />
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -738,7 +703,10 @@ function KpiCard({
   tone = "default",
   href,
   onClick,
-  trendLabel
+  trendLabel,
+  trendMode = "neutral",
+  sparkline,
+  prominent = false
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
@@ -746,24 +714,41 @@ function KpiCard({
   helper: string;
   loading?: boolean;
   active?: boolean;
-  tone?: "default" | "critical" | "info" | "attention" | "calm";
+  tone?: "default" | "critical" | "info" | "attention" | "calm" | "success";
   href?: string;
   onClick?: () => void;
   trendLabel?: string;
+  trendMode?: "neutral" | "up" | "alert" | "info" | "attention" | "success";
+  sparkline?: number[];
+  prominent?: boolean;
 }) {
   const toneClassName =
     tone === "critical"
       ? "border-red-500/20 bg-[linear-gradient(180deg,rgba(167,40,40,0.12),rgba(255,255,255,0.02))]"
       : tone === "attention"
         ? "border-[#c27a2c]/24 bg-[linear-gradient(180deg,rgba(192,80,0,0.10),rgba(255,255,255,0.02))]"
+        : tone === "success"
+          ? "border-emerald-500/18 bg-[linear-gradient(180deg,rgba(34,120,84,0.10),rgba(255,255,255,0.02))]"
         : tone === "calm" || tone === "info"
           ? "border-sky-500/18 bg-[linear-gradient(180deg,rgba(56,122,180,0.10),rgba(255,255,255,0.02))]"
           : "border-white/6 bg-card/90";
   const interactiveClassName = href || onClick ? "cursor-pointer transition-colors hover:border-brand/35 hover:bg-brand/8" : "";
+  const trendClassName =
+    trendMode === "alert"
+      ? "text-brandBright"
+      : trendMode === "up"
+        ? "text-emerald-300"
+        : trendMode === "info"
+          ? "text-sky-300"
+          : trendMode === "success"
+            ? "text-emerald-300"
+            : trendMode === "attention"
+              ? "text-[#f2a44c]"
+              : "text-muted";
 
   const content = (
     <Card className={`${toneClassName} ${interactiveClassName} ${active ? "ring-1 ring-current/20" : ""} shadow-[var(--card-shadow)]`}>
-      <CardContent className="flex items-start gap-4 p-5">
+      <CardContent className={`flex items-start gap-4 ${prominent ? "p-5" : "p-4"}`}>
         <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-surface/80">
           <Icon className="h-5 w-5 text-brandBright" />
         </span>
@@ -771,7 +756,8 @@ function KpiCard({
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
           <p className="mt-2 text-2xl font-semibold">{loading ? "..." : value}</p>
           <p className="mt-1 text-sm leading-6 text-muted">{helper}</p>
-          {trendLabel ? <p className="mt-2 text-xs font-medium text-brandBright">{trendLabel}</p> : null}
+          {trendLabel ? <p className={`mt-2 text-xs font-medium ${trendClassName}`}>{trendLabel}</p> : null}
+          {sparkline?.length ? <Sparkline values={sparkline} tone={trendMode} className="mt-3" /> : null}
         </div>
       </CardContent>
     </Card>
@@ -796,41 +782,6 @@ function KpiCard({
   return content;
 }
 
-function PriorityAlertCard({
-  title,
-  count,
-  description,
-  cta,
-  tone,
-  icon: Icon,
-  onClick
-}: {
-  title: string;
-  count: number;
-  description: string;
-  cta: string;
-  tone: "critical" | "warning" | "info" | "attention";
-  icon: ComponentType<{ className?: string }>;
-  onClick: () => void;
-}) {
-  return (
-    <button type="button" onClick={onClick} className={`text-left ${priorityTone(tone)} transition-colors hover:border-brand/35 hover:bg-brand/8`}>
-      <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-black/10">
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <span className="text-3xl font-semibold leading-none">{count}</span>
-      </div>
-      <p className="mt-4 text-sm font-semibold">{title}</p>
-      <p className="mt-1.5 text-xs leading-5 opacity-85">{description}</p>
-      <span className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-current">
-        {cta}
-        <ArrowRight className="h-3.5 w-3.5" />
-      </span>
-    </button>
-  );
-}
-
 function QuickActionCard({
   label,
   detail,
@@ -845,7 +796,7 @@ function QuickActionCard({
   onClick?: () => void;
 }) {
   const className =
-    "group rounded-[22px] border border-[color:var(--border)] bg-surface/55 px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:bg-card";
+    "group rounded-[20px] border border-[color:var(--border)] bg-surface/55 px-3 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:bg-card";
 
   const body = (
     <>
@@ -877,6 +828,48 @@ function QuickActionCard({
   );
 }
 
+function WideAlertRow({
+  title,
+  detail,
+  cta,
+  tone,
+  icon: Icon,
+  onClick
+}: {
+  title: string;
+  detail: string;
+  cta: string;
+  tone: "critical" | "info";
+  icon: ComponentType<{ className?: string }>;
+  onClick: () => void;
+}) {
+  const toneClassName =
+    tone === "critical"
+      ? "border-red-500/30 bg-[linear-gradient(180deg,rgba(120,26,26,0.24),rgba(255,255,255,0.02))]"
+      : "border-sky-500/22 bg-[linear-gradient(180deg,rgba(27,84,120,0.20),rgba(255,255,255,0.02))]";
+
+  return (
+    <div className={`flex flex-col gap-3 rounded-[22px] border px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${toneClassName}`}>
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-black/10">
+          <Icon className="h-4.5 w-4.5 text-brandBright" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text">{title}</p>
+          <p className="mt-1 text-sm text-muted">{detail}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-black/10 px-4 text-sm font-medium text-text transition-colors hover:border-brand/35 hover:text-brandBright"
+      >
+        {cta}
+      </button>
+    </div>
+  );
+}
+
 function OpsMicroMetric({
   label,
   value,
@@ -903,8 +896,59 @@ function OpsMicroMetric({
     <div className="rounded-[18px] border border-[color:var(--border)] bg-bg/55 px-3.5 py-3">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
       <p className={`mt-2 text-xl font-semibold ${accentClassName}`}>{value}</p>
-      <p className="mt-1 text-xs text-muted">{helper}</p>
+      {helper ? <p className="mt-1 text-xs text-muted">{helper}</p> : null}
     </div>
+  );
+}
+
+function SellerLoadRing({ total }: { total: number }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
+      <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-[10px] border-white/10 border-t-brand">
+        <span className="text-3xl font-semibold">{total}</span>
+      </div>
+      <p className="mt-3 text-sm font-medium">Leads totales</p>
+    </div>
+  );
+}
+
+function Sparkline({
+  values,
+  tone,
+  className = ""
+}: {
+  values: number[];
+  tone: "neutral" | "up" | "alert" | "info" | "attention" | "success";
+  className?: string;
+}) {
+  if (!values.length) return null;
+  const width = 92;
+  const height = 24;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 1);
+  const points = values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * width;
+      const y = height - ((value - min) / range) * (height - 4) - 2;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const stroke =
+    tone === "up" || tone === "success"
+      ? "#34d399"
+      : tone === "alert"
+        ? "#f59e0b"
+        : tone === "info"
+          ? "#4da3ff"
+          : tone === "attention"
+            ? "#f2a44c"
+            : "#a78bfa";
+
+  return (
+    <svg className={className} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      <polyline fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
   );
 }
 

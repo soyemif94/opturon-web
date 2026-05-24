@@ -52,13 +52,13 @@ export function OpsSellerLoad({
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold">{item.sellerName}</p>
+                    <p className="text-base font-semibold">{item.sellerName}</p>
                     <p className="mt-1 text-xs text-muted">Carga viva del pipeline comercial.</p>
                   </div>
                   <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>{item.totalActiveLeads} activos</Badge>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid gap-2 sm:grid-cols-4">
                   <Metric label="Activos" value={item.totalActiveLeads} />
                   <Metric label="Vencidos" value={item.overdueLeads} />
                   <Metric label="Con seguimiento" value={item.followUpLeads} />
@@ -70,6 +70,7 @@ export function OpsSellerLoad({
                     {item.overdueLeads > 0 ? "Necesita seguimiento" : "Carga estable"}
                   </Badge>
                   <span>Total vendido: {formatCurrency(item.totalRevenue || 0, item.currency || "ARS")}</span>
+                  <span>Ticket promedio: {formatCurrency(item.averageTicket || 0, item.currency || "ARS")}</span>
                   <span>Conversion pagada: {paidRate}%</span>
                   {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
                 </div>
@@ -86,7 +87,7 @@ function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-3">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-2 text-lg font-semibold">{value}</p>
+      <p className="mt-2 text-base font-semibold">{value}</p>
     </div>
   );
 }
