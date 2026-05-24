@@ -18,12 +18,45 @@ export function ClientOnboardingChecklist({ steps }: { steps: ClientOnboardingSt
   const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
   const allDone = total > 0 && completedCount === total;
 
+  if (allDone) {
+    return (
+      <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="success">Setup completo</Badge>
+                <p className="text-sm font-medium text-text">Tu espacio ya esta listo para vender, responder y automatizar.</p>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                El onboarding queda visible como referencia de salud y deja de ocupar protagonismo en el inicio.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {steps.map((step) => (
+                <Link
+                  key={step.id}
+                  href={step.href || "#"}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {step.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]">
-      <CardHeader action={<Badge variant={allDone ? "success" : "outline"}>{completedCount}/{total} completado</Badge>}>
+      <CardHeader action={<Badge variant="outline">{completedCount}/{total} completado</Badge>}>
         <div>
           <CardTitle className="text-xl">Onboarding guiado</CardTitle>
-          <CardDescription>Seguí estos pasos para validar que tu cuenta ya está lista para atender clientes.</CardDescription>
+          <CardDescription>Completa estos pasos para dejar el espacio listo para atender, vender y automatizar.</CardDescription>
         </div>
       </CardHeader>
 
@@ -42,12 +75,6 @@ export function ClientOnboardingChecklist({ steps }: { steps: ClientOnboardingSt
             />
           </div>
         </div>
-
-        {allDone ? (
-          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            🎉 Tu asistente ya está listo y atendiendo clientes automáticamente
-          </div>
-        ) : null}
 
         <div className="grid gap-3">
           {steps.map((step) => (
@@ -69,9 +96,7 @@ export function ClientOnboardingChecklist({ steps }: { steps: ClientOnboardingSt
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{step.label}</p>
-                  <Badge variant={step.status === "done" ? "success" : "warning"}>
-                    {step.status === "done" ? "Done" : "Pending"}
-                  </Badge>
+                  <Badge variant={step.status === "done" ? "success" : "warning"}>{step.status === "done" ? "Listo" : "Pendiente"}</Badge>
                 </div>
               </div>
 
