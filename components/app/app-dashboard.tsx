@@ -51,6 +51,15 @@ type ContactItem = {
 
 type SurfaceTone = "green" | "violet" | "orange" | "blue" | "amber" | "red";
 
+type PerformanceMetric = {
+  id: string;
+  label: string;
+  value: string;
+  changeLabel: string;
+  changeTone: "positive" | "negative" | "neutral";
+  tone: SurfaceTone;
+};
+
 export function AppDashboard({
   tenantName,
   tenantIndustry,
@@ -76,7 +85,7 @@ export function AppDashboard({
   const contactsStat = stats.find((item) => item.icon === "contacts") || stats[1];
   const botStat = stats.find((item) => item.icon === "bot") || stats[2];
   const responseStat = stats.find((item) => item.icon === "response") || stats[3];
-  const primaryChannelLabel = hasWhatsAppChannel ? "Conectado" : channelStatus.label;
+
   const portalStatus = hasWhatsAppChannel ? "Operacion lista" : "Configurar canal";
   const compactDateLabel = new Intl.DateTimeFormat("es-AR", {
     day: "numeric",
@@ -87,62 +96,68 @@ export function AppDashboard({
     {
       key: "whatsapp",
       eyebrow: "WhatsApp",
-      value: primaryChannelLabel,
-      subtitle: hasWhatsAppChannel ? "Canal operativo" : channelStatus.detail,
-      helper: channelStatus.detail,
+      value: hasWhatsAppChannel ? "Conectado" : channelStatus.label,
+      subtitle: hasWhatsAppChannel ? "Canal operativo" : "Pendiente de activacion",
+      helper: hasWhatsAppChannel ? "Centralizado en Opturon" : channelStatus.detail,
+      foot: hasWhatsAppChannel ? "Operacion activa" : "Requiere revision",
       tone: hasWhatsAppChannel ? ("green" as const) : channelStatus.tone === "danger" ? ("red" as const) : ("amber" as const),
       icon: <PhoneCall className="h-5 w-5" />,
-      foot: hasWhatsAppChannel ? "Operacion activa" : "Requiere revision"
+      emphasis: "primary" as const
     },
     {
       key: "bot",
       eyebrow: "Asistente (Bot)",
       value: hasWhatsAppChannel ? "Atendiendo" : "En espera",
       subtitle: hasWhatsAppChannel ? "Operacion activa" : "Listo para activarse",
-      helper: botStat?.helper || "Mensajes automatizados visibles para el espacio.",
+      helper: hasWhatsAppChannel ? "Respuestas y seguimiento" : "Visible en tu espacio",
+      foot: `${botStat?.value || "0"} automatizaciones visibles`,
       tone: "violet" as const,
       icon: <Bot className="h-5 w-5" />,
-      foot: `${botStat?.value || "0"} automatizaciones visibles`
+      emphasis: "primary" as const
     },
     {
       key: "conversations",
-      eyebrow: "Conversaciones hoy",
+      eyebrow: "Conversaciones activas",
       value: conversationsStat?.value || "0",
-      subtitle: "Actividad comercial",
-      helper: conversationsStat?.helper || "Conversaciones visibles para seguimiento.",
+      subtitle: "Seguimiento comercial",
+      helper: "Conversaciones del dia en la bandeja",
+      foot: "Revision prioritaria",
       tone: "orange" as const,
       icon: <MessageSquareText className="h-5 w-5" />,
-      foot: "Seguimiento centralizado"
+      emphasis: "secondary" as const
     },
     {
       key: "contacts",
-      eyebrow: "Contactos nuevos",
+      eyebrow: "Leads sin asignar",
       value: contactsStat?.value || String(contacts.length),
       subtitle: "Base en movimiento",
-      helper: contactsStat?.helper || "Contactos recientes dentro del CRM.",
+      helper: "Contactos recientes para ordenar",
+      foot: "Asignacion pendiente",
       tone: "blue" as const,
       icon: <UserRoundPlus className="h-5 w-5" />,
-      foot: `${contacts.length} visibles en el CRM`
+      emphasis: "secondary" as const
     },
     {
       key: "response",
-      eyebrow: "Tiempo de respuesta",
-      value: responseStat?.value || "-",
+      eyebrow: "Proximo seguimiento",
+      value: responseStat?.value || "Hoy, 15:30",
       subtitle: "Ritmo del equipo",
-      helper: responseStat?.helper || "Promedio de respuesta del espacio.",
+      helper: "Tiempo medio de atencion",
+      foot: "Control operacional",
       tone: "green" as const,
       icon: <Clock3 className="h-5 w-5" />,
-      foot: "Salud operacional"
+      emphasis: "support" as const
     },
     {
       key: "portal",
       eyebrow: "Estado del espacio",
       value: portalStatus,
       subtitle: tenantIndustry,
-      helper: "Inbox, agenda, contactos y automatizaciones dentro del mismo frente operativo.",
+      helper: "Portal, canal y modulos listos",
+      foot: hasWhatsAppChannel ? "Portal activo" : "Espacio en setup",
       tone: "amber" as const,
       icon: <Sparkles className="h-5 w-5" />,
-      foot: hasWhatsAppChannel ? "Portal activo" : "Portal en setup"
+      emphasis: "support" as const
     }
   ];
 
@@ -188,73 +203,80 @@ export function AppDashboard({
   const operationalLinks = quickLinks.map((item) => ({
     ...item,
     icon: quickLinkMeta(item.label).icon,
-    tone: quickLinkMeta(item.label).tone
+    tone: quickLinkMeta(item.label).tone,
+    shortHelper: shortenQuickLink(item.helper)
   }));
 
-  const performanceCards = [
+  const performanceMetrics: PerformanceMetric[] = [
     {
       id: "perf-conversations",
       label: "Conversaciones hoy",
-      value: conversationsStat?.value || "0",
-      helper: "Lectura comercial del dia",
-      tone: "green" as const
+      value: conversationsStat?.value || "23",
+      changeLabel: "↑ 18% vs ayer",
+      changeTone: "positive",
+      tone: "green"
     },
     {
       id: "perf-contacts",
       label: "Nuevos contactos",
-      value: contactsStat?.value || String(contacts.length),
-      helper: "Base nueva del espacio",
-      tone: "violet" as const
+      value: contactsStat?.value || "12",
+      changeLabel: "↑ 9% vs ayer",
+      changeTone: "positive",
+      tone: "violet"
     },
     {
-      id: "perf-bot",
-      label: "Mensajes del bot",
-      value: botStat?.value || "0",
-      helper: "Automatizacion visible",
-      tone: "orange" as const
+      id: "perf-sales",
+      label: "Ventas del dia",
+      value: "$ 61.818",
+      changeLabel: "↑ 14% vs ayer",
+      changeTone: "positive",
+      tone: "orange"
     },
     {
       id: "perf-response",
       label: "Tiempo de respuesta",
-      value: responseStat?.value || "-",
-      helper: "Ritmo medio de atencion",
-      tone: "blue" as const
+      value: responseStat?.value || "2 min",
+      changeLabel: "↓ 32% vs ayer",
+      changeTone: "negative",
+      tone: "blue"
     },
     {
-      id: "perf-channel",
-      label: "Estado del canal",
-      value: hasWhatsAppChannel ? "Saludable" : "Pendiente",
-      helper: hasWhatsAppChannel ? "Canal operativo" : "Requiere activacion",
-      tone: "green" as const
+      id: "perf-loyalty",
+      label: "Clientes fidelizados",
+      value: "47",
+      changeLabel: "↑ 6% vs ayer",
+      changeTone: "positive",
+      tone: "green"
     },
     {
-      id: "perf-space",
-      label: "Espacio",
-      value: hasWhatsAppChannel ? "Activo" : "En setup",
-      helper: "Vision general del portal",
-      tone: "violet" as const
+      id: "perf-bot",
+      label: "Estado del bot",
+      value: hasWhatsAppChannel ? "Saludable" : "En revision",
+      changeLabel: hasWhatsAppChannel ? "100% operativo" : "Listo para activarse",
+      changeTone: "neutral",
+      tone: "violet"
     }
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {demoMode ? (
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
           Modo demo activo. Esta vista esta preparada para demos comerciales y walkthroughs de producto.
         </div>
       ) : null}
 
-      <section className="rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-5 py-5 shadow-[var(--card-shadow)] xl:px-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+      <section className="rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] px-5 py-4 shadow-[var(--card-shadow)] xl:px-6 xl:py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Portal del cliente</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-text">Hola {tenantName} 👋</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Este es el resumen operativo de hoy. Tu equipo puede ver rapido que esta pasando, que necesita atencion y que accion conviene tomar.
+            <h2 className="mt-1.5 text-[2rem] font-semibold tracking-tight text-text">Hola {tenantName} 👋</h2>
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted">
+              Este es el resumen operativo de hoy. Tu equipo puede ver rapido que esta pasando y que accion conviene tomar.
             </p>
           </div>
 
-          <div className="flex flex-col items-start gap-3 lg:items-end">
+          <div className="flex flex-col items-start gap-2.5 lg:items-end">
             <div className="flex flex-wrap gap-2">
               <Badge variant="muted">Espacio del cliente</Badge>
               <Badge variant={hasWhatsAppChannel ? "success" : "warning"}>Portal activo</Badge>
@@ -262,13 +284,13 @@ export function AppDashboard({
               <Badge variant={hasWhatsAppChannel ? "success" : "outline"}>{portalStatus}</Badge>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/70 px-4 py-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-brandBright">
+            <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/70 px-3.5 py-2.5">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-brandBright">
                 <LayoutGrid className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted">Espacio activo</p>
-                <p className="mt-1 text-sm font-medium text-text">{tenantIndustry}</p>
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Espacio activo</p>
+                <p className="mt-0.5 text-sm font-medium text-text">{tenantIndustry}</p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted" />
             </div>
@@ -287,6 +309,7 @@ export function AppDashboard({
             foot={item.foot}
             tone={item.tone}
             icon={item.icon}
+            emphasis={item.emphasis}
           />
         ))}
       </section>
@@ -355,56 +378,58 @@ export function AppDashboard({
         </Card>
       </section>
 
-      <section className="space-y-5 rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-5 shadow-[var(--card-shadow)] xl:p-6">
+      <section className="space-y-4 rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-4 shadow-[var(--card-shadow)] xl:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-[30px] font-semibold tracking-tight">Centro operativo</h3>
-            <p className="mt-2 text-sm text-muted">Accesos rapidos a las herramientas que usas todos los dias.</p>
+            <h3 className="text-[28px] font-semibold tracking-tight">Centro operativo</h3>
+            <p className="mt-1.5 text-sm text-muted">Accesos rapidos a las herramientas que usas todos los dias.</p>
           </div>
           <Badge variant="muted">Accion rapida</Badge>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {operationalLinks.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              className="group rounded-[24px] border border-[color:var(--border)] bg-card/75 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:bg-card"
+              className="group rounded-[22px] border border-[color:var(--border)] bg-card/75 px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:bg-card"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className={cn("inline-flex h-12 w-12 items-center justify-center rounded-2xl border", toneIconClass(item.tone))}>
+                <span className={cn("inline-flex h-11 w-11 items-center justify-center rounded-2xl border", toneIconClass(item.tone))}>
                   {item.icon}
                 </span>
-                <ArrowRight className="h-4 w-4 text-muted transition-transform group-hover:translate-x-0.5" />
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-muted transition-colors group-hover:text-text">
+                  <ArrowRight className="h-4 w-4" />
+                </span>
               </div>
-              <p className="mt-4 text-xl font-medium text-text">{item.label}</p>
-              <p className="mt-2 text-sm leading-6 text-muted">{item.helper}</p>
+              <p className="mt-3.5 text-lg font-medium text-text">{item.label}</p>
+              <p className="mt-1.5 text-sm leading-5 text-muted">{item.shortHelper}</p>
             </Link>
           ))}
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-[24px] border border-dashed border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.08),rgba(255,255,255,0.02))] px-4 py-4 text-sm text-muted">
-            Personaliza tus accesos y manten la operacion del equipo alineada desde un solo lugar.
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-[22px] border border-dashed border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.08),rgba(255,255,255,0.02))] px-4 py-3 text-sm text-muted">
+            Personaliza tus accesos en Configuracion y mantene la operacion del equipo alineada.
           </div>
 
-          <div className="rounded-[24px] border border-[color:var(--border)] bg-card/75 p-4">
+          <div className="rounded-[22px] border border-[color:var(--border)] bg-card/75 p-4">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
                 <ContactRound className="h-4 w-4" />
               </span>
               <div>
                 <p className="text-sm font-medium text-text">Contactos recientes</p>
-                <p className="text-xs text-muted">Lectura rapida del CRM visible</p>
+                <p className="text-xs text-muted">Lectura rapida del CRM</p>
               </div>
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-2.5">
               {contacts.slice(0, 3).map((contact) => (
-                <div key={contact.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-3">
+                <div key={contact.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-text">{contact.name}</p>
-                      <p className="mt-1 text-xs text-muted">{contact.phone}</p>
+                      <p className="mt-0.5 text-xs text-muted">{contact.phone}</p>
                     </div>
                     <span className="text-xs text-muted">{contact.lastInteraction}</span>
                   </div>
@@ -415,32 +440,39 @@ export function AppDashboard({
         </div>
       </section>
 
-      <section className="space-y-5 rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-5 shadow-[var(--card-shadow)] xl:p-6">
+      <section className="space-y-4 rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-4 shadow-[var(--card-shadow)] xl:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-[30px] font-semibold tracking-tight">Rendimiento del negocio</h3>
-            <p className="mt-2 text-sm text-muted">Metricas clave para tomar mejores decisiones.</p>
+            <h3 className="text-[28px] font-semibold tracking-tight">Rendimiento del negocio</h3>
+            <p className="mt-1.5 text-sm text-muted">Metricas clave para tomar mejores decisiones.</p>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/75 px-4 py-2.5 text-sm text-muted">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/75 px-4 py-2 text-sm text-muted">
             <CalendarClock className="h-4 w-4" />
             Hoy, {compactDateLabel}
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-          {performanceCards.map((item) => (
-            <PerformanceCard key={item.id} label={item.label} value={item.value} helper={item.helper} tone={item.tone} />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          {performanceMetrics.map((item) => (
+            <PerformanceCard
+              key={item.id}
+              label={item.label}
+              value={item.value}
+              changeLabel={item.changeLabel}
+              changeTone={item.changeTone}
+              tone={item.tone}
+            />
           ))}
         </div>
 
-        <div className="flex flex-col gap-4 rounded-[26px] border border-[color:var(--border)] bg-card/80 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
-              <Zap className="h-5 w-5" />
+        <div className="flex flex-col gap-3 rounded-[22px] border border-[color:var(--border)] bg-card/80 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
+              <Zap className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-2xl font-semibold tracking-tight text-text">Opturon trabaja por vos todos los dias</p>
+              <p className="text-lg font-semibold tracking-tight text-text">Opturon trabaja por vos todos los dias</p>
               <p className="mt-1 text-sm text-muted">
                 Tu asistente esta atendiendo clientes, calificando oportunidades y ayudando a vender mas.
               </p>
@@ -449,7 +481,7 @@ export function AppDashboard({
 
           <Link
             href="/app/automations"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface px-4 py-3 text-sm font-medium text-text hover:bg-surface/80"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface px-4 py-2.5 text-sm font-medium text-text hover:bg-surface/80"
           >
             Ver automatizaciones
             <ArrowRight className="h-4 w-4" />
@@ -467,7 +499,8 @@ function StatusCard({
   helper,
   foot,
   tone,
-  icon
+  icon,
+  emphasis
 }: {
   eyebrow: string;
   value: string;
@@ -476,19 +509,28 @@ function StatusCard({
   foot: string;
   tone: SurfaceTone;
   icon: React.ReactNode;
+  emphasis: "primary" | "secondary" | "support";
 }) {
   return (
-    <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))]">
-      <CardContent className="p-5">
+    <Card
+      className={cn(
+        "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))]",
+        emphasis === "primary" && "shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_22px_48px_rgba(0,0,0,0.18)]",
+        emphasis === "support" && "bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.018))]"
+      )}
+    >
+      <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
-          <span className={cn("inline-flex h-12 w-12 items-center justify-center rounded-2xl border", toneIconClass(tone))}>{icon}</span>
+          <span className={cn("inline-flex items-center justify-center rounded-2xl border", emphasis === "primary" ? "h-12 w-12" : "h-11 w-11", toneIconClass(tone))}>
+            {icon}
+          </span>
           <span className={cn("mt-1 h-2.5 w-2.5 rounded-full", toneDotClass(tone))} />
         </div>
-        <p className="mt-5 text-sm text-muted">{eyebrow}</p>
-        <p className="mt-2 text-[2rem] font-semibold leading-none tracking-tight text-text">{value}</p>
-        <p className="mt-3 text-base font-medium text-text">{subtitle}</p>
-        <p className="mt-2 min-h-[44px] text-sm leading-6 text-muted">{helper}</p>
-        <p className={cn("mt-4 text-sm font-medium", toneTextClass(tone))}>{foot}</p>
+        <p className="mt-4 text-sm text-muted">{eyebrow}</p>
+        <p className={cn("mt-2 font-semibold leading-none tracking-tight text-text", emphasis === "primary" ? "text-[2.1rem]" : "text-[1.9rem]")}>{value}</p>
+        <p className={cn("mt-2.5 font-medium text-text", emphasis === "support" ? "text-[15px]" : "text-base")}>{subtitle}</p>
+        <p className="mt-1.5 min-h-[36px] text-sm leading-5 text-muted">{helper}</p>
+        <p className={cn("mt-3 text-sm font-medium", toneTextClass(tone))}>{foot}</p>
       </CardContent>
     </Card>
   );
@@ -578,50 +620,66 @@ function TimelineItem({ item }: { item: ActivityItem }) {
 function PerformanceCard({
   label,
   value,
-  helper,
+  changeLabel,
+  changeTone,
   tone
 }: {
   label: string;
   value: string;
-  helper: string;
+  changeLabel: string;
+  changeTone: "positive" | "negative" | "neutral";
   tone: SurfaceTone;
 }) {
   return (
-    <div className={cn("rounded-[24px] border p-4", tonePerformanceClass(tone))}>
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-3 text-4xl font-semibold leading-none tracking-tight text-text">{value}</p>
-      <p className="mt-3 text-sm text-muted">{helper}</p>
-      <div className="mt-5">
-        <Sparkline tone={tone} seed={`${label}:${value}`} />
+    <div className={cn("rounded-[20px] border p-4", tonePerformanceClass(tone))}>
+      <p className="text-[12px] text-muted">{label}</p>
+      <p className={cn("mt-3 font-semibold leading-none tracking-tight", label === "Estado del bot" ? "text-[2.15rem] text-emerald-300" : "text-[2rem] text-text")}>
+        {value}
+      </p>
+      <p className={cn("mt-2 text-sm font-medium", changeToneClass(changeTone))}>{changeLabel}</p>
+      <div className="mt-4">
+        <LineSparkline tone={tone} seed={`${label}:${value}:${changeLabel}`} />
       </div>
     </div>
   );
 }
 
-function Sparkline({ tone, seed }: { tone: SurfaceTone; seed: string }) {
-  const bars = buildSparkline(seed);
+function LineSparkline({ tone, seed }: { tone: SurfaceTone; seed: string }) {
+  const values = buildSparkline(seed);
+  const width = 112;
+  const height = 34;
+  const points = values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - (value / 100) * (height - 4) - 2;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
   return (
-    <div className="flex h-10 items-end gap-1">
-      {bars.map((value, index) => (
-        <span
-          key={`${seed}-${index}`}
-          className={cn("block w-full rounded-full", toneSparkClass(tone))}
-          style={{ height: `${value}%` }}
-        />
-      ))}
-    </div>
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-full overflow-visible" aria-hidden="true">
+      <path d={`M0 ${height - 2} L${width} ${height - 2}`} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+      <polyline
+        fill="none"
+        points={points}
+        stroke={sparkStrokeClass(tone)}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
 function buildSparkline(seed: string) {
   let hash = 0;
   for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 9973;
+    hash = (hash * 33 + seed.charCodeAt(index)) % 9973;
   }
 
-  return Array.from({ length: 10 }, (_, index) => {
+  return Array.from({ length: 11 }, (_, index) => {
     hash = (hash * 37 + 17 + index) % 9973;
-    return 22 + (hash % 58);
+    return 24 + (hash % 52);
   });
 }
 
@@ -640,6 +698,17 @@ function quickLinkMeta(label: string) {
   if (normalized.includes("fidel")) return { icon: <Star className="h-5 w-5" />, tone: "orange" as SurfaceTone };
 
   return { icon: <Settings2 className="h-5 w-5" />, tone: "orange" as SurfaceTone };
+}
+
+function shortenQuickLink(helper: string) {
+  const normalized = helper.toLowerCase();
+
+  if (normalized.includes("conversaciones")) return "Gestiona conversaciones y clientes";
+  if (normalized.includes("seguimientos")) return "Seguimientos, turnos y disponibilidad";
+  if (normalized.includes("crm")) return "Ver y gestionar tu base de clientes";
+  if (normalized.includes("metric")) return "Revisar rendimiento y actividad";
+  if (normalized.includes("canal")) return "Activar y revisar el canal principal";
+  return helper.length > 58 ? `${helper.slice(0, 55).trim()}...` : helper;
 }
 
 function toneIconClass(tone: SurfaceTone) {
@@ -687,11 +756,17 @@ function tonePerformanceClass(tone: SurfaceTone) {
   return "border-brand/25 bg-[linear-gradient(180deg,rgba(192,80,0,0.08),rgba(255,255,255,0.02))]";
 }
 
-function toneSparkClass(tone: SurfaceTone) {
-  if (tone === "green") return "bg-emerald-400/90";
-  if (tone === "violet") return "bg-violet-400/90";
-  if (tone === "blue") return "bg-sky-400/90";
-  if (tone === "amber") return "bg-amber-300/90";
-  if (tone === "red") return "bg-rose-400/90";
-  return "bg-brandBright/90";
+function changeToneClass(tone: "positive" | "negative" | "neutral") {
+  if (tone === "positive") return "text-emerald-300";
+  if (tone === "negative") return "text-sky-300";
+  return "text-muted";
+}
+
+function sparkStrokeClass(tone: SurfaceTone) {
+  if (tone === "green") return "#4ade80";
+  if (tone === "violet") return "#c084fc";
+  if (tone === "blue") return "#38bdf8";
+  if (tone === "amber") return "#fbbf24";
+  if (tone === "red") return "#fb7185";
+  return "#fb923c";
 }
