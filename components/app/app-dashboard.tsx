@@ -8,7 +8,10 @@ import {
   CircleCheckBig,
   Clock3,
   ContactRound,
+  Gauge,
+  LayoutGrid,
   MessageSquareText,
+  PhoneCall,
   PlugZap,
   Sparkles
 } from "lucide-react";
@@ -60,6 +63,40 @@ export function AppDashboard({
   contacts: ContactItem[];
   quickLinks: Array<{ label: string; href: string; helper: string }>;
 }) {
+  const primaryStat = stats[0];
+  const secondaryStat = stats[1];
+  const botStat = stats[2];
+  const responseStat = stats[3];
+  const operationalStatus = hasWhatsAppChannel ? "Operacion lista" : "Requiere activacion";
+  const heroSummary = [
+    hasWhatsAppChannel ? "WhatsApp centralizado" : "Canal pendiente",
+    botStat?.value ? `${botStat.value} automatizaciones visibles` : "Bot listo para operar",
+    responseStat?.value ? `Respuesta media ${responseStat.value}` : "Seguimiento operativo"
+  ];
+  const controlItems = [
+    {
+      label: "Canal principal",
+      value: channelStatus.label,
+      detail: channelStatus.detail,
+      tone: channelStatus.tone,
+      icon: <PhoneCall className="h-4 w-4" />
+    },
+    {
+      label: "Bot comercial",
+      value: hasWhatsAppChannel ? "Funcionando" : "En preparacion",
+      detail: botStat?.helper || "La automatizacion queda disponible dentro del espacio.",
+      tone: hasWhatsAppChannel ? ("success" as const) : ("warning" as const),
+      icon: <Bot className="h-4 w-4" />
+    },
+    {
+      label: "Espacio",
+      value: operationalStatus,
+      detail: "Inbox, agenda y CRM simple listos para el equipo.",
+      tone: hasWhatsAppChannel ? ("success" as const) : ("outline" as const),
+      icon: <Gauge className="h-4 w-4" />
+    }
+  ];
+
   return (
     <div className="space-y-8">
       {demoMode ? (
@@ -68,47 +105,71 @@ export function AppDashboard({
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(192,80,0,0.16),rgba(19,19,19,0.96)_42%,rgba(13,13,13,0.98))]">
-        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_360px] lg:gap-8 lg:p-8">
+      <section className="overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(25,25,25,0.97)_42%,rgba(12,12,12,0.99))] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_380px] lg:gap-8 lg:p-8">
           <div>
             <Badge variant="warning" className="mb-4 border-brand/30 bg-brand/10 text-brandBright">
               Portal cliente
             </Badge>
             <h2 className="max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
-              Todo lo importante de tu negocio, tus conversaciones y tu canal WhatsApp en un solo lugar.
+              Todo tu negocio, conversaciones y WhatsApp en un solo lugar.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted lg:mt-4 lg:text-base lg:leading-7">
-              {tenantName} puede seguir conversaciones, ver metricas, ordenar contactos y preparar la conexion de su WhatsApp sin salir del portal.
+              {tenantName} puede ver como viene el dia, detectar lo importante y entrar directo a operar sin perderse entre modulos ni cajas repetidas.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <Badge variant="muted">{tenantIndustry}</Badge>
               <Badge variant={channelStatus.tone}>{channelStatus.label}</Badge>
+              <Badge variant={hasWhatsAppChannel ? "success" : "outline"}>{operationalStatus}</Badge>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {heroSummary.map((item) => (
+                <div key={item} className="rounded-2xl border border-white/10 bg-black/15 px-4 py-4 text-sm text-white/80 backdrop-blur">
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:max-w-3xl">
+              {[primaryStat, secondaryStat].filter(Boolean).map((item) => {
+                if (!item) return null;
+                const Icon = item.icon === "conversations" ? MessageSquareText : ContactRound;
+                return (
+                  <div
+                    key={item.label}
+                    className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-5"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">{item.label}</p>
+                        <p className="mt-3 text-3xl font-semibold text-white sm:text-4xl">{item.value}</p>
+                      </div>
+                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-white/65">{item.helper}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <div className="rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur sm:p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">Estado del portal</p>
-            <div className="mt-5 space-y-4">
-              <SummaryRow
-                icon={<MessageSquareText className="h-4 w-4 text-brandBright" />}
-                title="Inbox centralizado"
-                detail="Lista de conversaciones, panel de chat y ficha del contacto."
-              />
-              <SummaryRow
-                icon={<CalendarClock className="h-4 w-4 text-sky-300" />}
-                title="Agenda nativa"
-                detail="Seguimientos, disponibilidad y base de turnos dentro de Opturon."
-              />
-              <SummaryRow
-                icon={<Bot className="h-4 w-4 text-emerald-300" />}
-                title="Bot y automatizaciones"
-                detail="Base lista para evolucionar a flujos, respuestas y seguimiento."
-              />
-              <SummaryRow
-                icon={<PlugZap className="h-4 w-4 text-sky-300" />}
-                title="WhatsApp y CRM"
-                detail="WhatsApp como canal principal hoy y CRM externo como siguiente capa de integracion."
-              />
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Salud operativa</p>
+                <p className="mt-2 text-lg font-semibold">Panorama rapido del espacio</p>
+              </div>
+              <Badge variant={channelStatus.tone}>{channelStatus.label}</Badge>
+            </div>
+            <div className="mt-5 space-y-3">
+              {controlItems.map((item) => (
+                <SummaryRow key={item.label} icon={item.icon} title={item.value} eyebrow={item.label} detail={item.detail} tone={item.tone} />
+              ))}
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <MiniMetric label={botStat?.label || "Bot"} value={botStat?.value || "-"} helper={botStat?.helper || "Automatizaciones del espacio"} />
+              <MiniMetric label={responseStat?.label || "Respuesta"} value={responseStat?.value || "-"} helper={responseStat?.helper || "Tiempo medio visible"} />
             </div>
           </div>
         </div>
@@ -186,17 +247,17 @@ export function AppDashboard({
         </section>
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader action={<Badge variant={channelStatus.tone}>{channelStatus.label}</Badge>}>
             <div>
               <CardTitle className="text-xl">Actividad reciente</CardTitle>
-              <CardDescription>Eventos de conversaciones, bot y operacion del canal.</CardDescription>
+              <CardDescription>Lo ultimo que paso en conversaciones, canal y operacion del espacio.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             {recentActivity.map((item) => (
-              <div key={item.id} className="flex gap-4 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+              <div key={item.id} className="flex gap-4 rounded-[24px] border border-[color:var(--border)] bg-surface/65 p-4">
                 <div
                   className={cn(
                     "mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border",
@@ -207,7 +268,7 @@ export function AppDashboard({
                 >
                   {item.tone === "success" ? <CircleCheckBig className="h-4 w-4" /> : item.tone === "warning" ? <Clock3 className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 border-l border-white/6 pl-4">
                   <div className="flex items-start justify-between gap-3">
                     <p className="font-medium">{item.title}</p>
                     <span className="shrink-0 text-xs text-muted">{item.timeLabel}</span>
@@ -220,10 +281,10 @@ export function AppDashboard({
         </Card>
 
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="outline">Quick access</Badge>}>
+          <CardHeader action={<Badge variant="outline">Acciones</Badge>}>
             <div>
-              <CardTitle className="text-xl">Accesos rapidos</CardTitle>
-              <CardDescription>Atajos para operar conversaciones, agenda y foco comercial.</CardDescription>
+              <CardTitle className="text-xl">Centro operativo</CardTitle>
+              <CardDescription>Atajos para entrar rapido a lo que mas usas durante el dia.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
@@ -231,27 +292,42 @@ export function AppDashboard({
               <Link
                 key={item.label}
                 href={item.href}
-                className="rounded-2xl border border-[color:var(--border)] bg-surface/70 p-4 transition-colors hover:bg-surface"
+                className="rounded-[24px] border border-[color:var(--border)] bg-surface/70 p-4 transition-colors hover:bg-surface"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{item.label}</p>
                     <p className="mt-1 text-sm leading-6 text-muted">{item.helper}</p>
                   </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <ArrowRight className="h-4 w-4 text-muted" />
+                  </span>
                 </div>
               </Link>
             ))}
+            <div className="rounded-[24px] border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(192,80,0,0.12),rgba(255,255,255,0.02))] p-4">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
+                  <LayoutGrid className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="font-medium">Todo mas ordenado en un solo frente</p>
+                  <p className="mt-1 text-sm leading-6 text-muted">
+                    Inbox, agenda, contactos y automatizaciones mantienen la misma logica, pero ahora con una lectura mucho mas clara.
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">CRM light</Badge>}>
+          <CardHeader action={<Badge variant="muted">CRM simple</Badge>}>
             <div>
               <CardTitle className="text-xl">Contactos recientes</CardTitle>
-              <CardDescription>Vista simple de nombres, telefono, tags y ultima interaccion.</CardDescription>
+              <CardDescription>Contactos visibles para continuar conversaciones y seguimiento comercial.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
@@ -299,28 +375,35 @@ export function AppDashboard({
         </Card>
 
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="warning">Inbox ready</Badge>}>
+          <CardHeader action={<Badge variant="warning">Estado del portal</Badge>}>
             <div>
-              <CardTitle className="text-xl">Base del inbox cliente</CardTitle>
-              <CardDescription>La estructura ya contempla lista, chat y perfil del contacto.</CardDescription>
+              <CardTitle className="text-xl">Estado del portal</CardTitle>
+              <CardDescription>Resumen condensado de los bloques clave para operar y crecer.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             {[
               {
                 icon: <MessageSquareText className="h-4 w-4 text-brandBright" />,
-                title: "Lista de conversaciones",
-                detail: "Panel lateral para filtrar, buscar y priorizar contactos."
+                title: "Inbox centralizado",
+                detail: "Conversaciones, chat y contexto del contacto en la misma experiencia."
               },
               {
                 icon: <Sparkles className="h-4 w-4 text-emerald-300" />,
-                title: "Panel de chat",
-                detail: "Historial, cuadro de respuesta y sugerencias del bot listas para evolucionar."
+                title: "Bot y automatizaciones",
+                detail: "Base lista para responder, acompañar seguimientos y crecer con reglas."
               },
               {
                 icon: <CalendarClock className="h-4 w-4 text-sky-300" />,
-                title: "Perfil del contacto",
-                detail: "Contexto comercial, notas, tareas y seguimiento del prospecto."
+                title: "Agenda y foco comercial",
+                detail: "Seguimientos, tareas y contexto operativo dentro del mismo espacio."
+              },
+              {
+                icon: <PlugZap className="h-4 w-4 text-amber-300" />,
+                title: "Canal principal",
+                detail: hasWhatsAppChannel
+                  ? "WhatsApp ya esta conectado y listo para centralizar la atencion."
+                  : "Conectar WhatsApp habilita conversaciones reales y automatizacion completa."
               }
             ].map((item) => (
               <div key={item.title} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
@@ -339,7 +422,7 @@ export function AppDashboard({
               href="/app/inbox"
               className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface px-4 py-3 text-sm font-medium hover:bg-surface/80"
             >
-              Ir al inbox
+              Abrir inbox
               <ArrowRight className="h-4 w-4" />
             </Link>
           </CardContent>
@@ -349,18 +432,49 @@ export function AppDashboard({
   );
 }
 
-function SummaryRow({ icon, title, detail }: { icon: React.ReactNode; title: string; detail: string }) {
+function SummaryRow({
+  icon,
+  eyebrow,
+  title,
+  detail,
+  tone = "outline"
+}: {
+  icon: React.ReactNode;
+  eyebrow: string;
+  title: string;
+  detail: string;
+  tone?: "success" | "warning" | "danger" | "outline";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+      : tone === "warning"
+        ? "border-amber-500/20 bg-amber-500/10 text-amber-300"
+        : tone === "danger"
+          ? "border-rose-500/20 bg-rose-500/10 text-rose-300"
+          : "border-white/10 bg-black/15 text-brandBright";
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/15">
+        <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-2xl border", toneClass)}>
           {icon}
         </span>
         <div>
-          <p className="font-medium">{title}</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{eyebrow}</p>
+          <p className="mt-1 font-medium">{title}</p>
           <p className="mt-1 text-sm leading-6 text-muted">{detail}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{label}</p>
+      <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-white/60">{helper}</p>
     </div>
   );
 }
