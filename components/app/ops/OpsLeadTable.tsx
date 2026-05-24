@@ -129,14 +129,19 @@ export function OpsLeadTable({
   }, [rows]);
 
   return (
-    <Card className={sectionTone(sectionVariant)}>
-      <CardHeader>
-        <div>
-          <CardTitle className="text-xl">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+    <Card className={`${sectionTone(sectionVariant)} shadow-[var(--card-shadow)]`}>
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-xl tracking-tight">{title}</CardTitle>
+            <CardDescription className="mt-2 text-sm">{description}</CardDescription>
+          </div>
+          <Badge variant="outline">
+            {rows.length} {rows.length === 1 ? "lead" : "leads"}
+          </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 pt-0">
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-5 text-sm text-muted">
             {emptyMessage}
@@ -150,6 +155,7 @@ export function OpsLeadTable({
             const cold = showSlaSignals && !urgent && isColdLead(row);
             const unassigned = !row.assignedSellerUserId;
             const inboxHref = row.id ? `/app/inbox/${row.id}` : null;
+            const lastActivityLabel = formatDateTime(row.lastMessageAt);
 
             return (
               <div
@@ -168,7 +174,7 @@ export function OpsLeadTable({
                   event.preventDefault();
                   router.push(inboxHref);
                 }}
-                className={`grid gap-4 rounded-[22px] border p-4 transition-all lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] ${rowTone({
+                className={`grid gap-4 rounded-[22px] border p-4 transition-all lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] ${rowTone({
                   unassigned,
                   cold,
                   urgent
@@ -176,25 +182,31 @@ export function OpsLeadTable({
                   inboxHref ? "cursor-pointer hover:border-brand/35 hover:bg-brand/8 focus:outline-none focus:ring-2 focus:ring-brand/30" : ""
                 }`}
               >
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold">{row.contact?.name || "Sin nombre"}</p>
+                    <p className="text-sm font-semibold md:text-base">{row.contact?.name || "Sin nombre"}</p>
                     <Badge className={leadTone(row.leadStatus)}>{leadLabel(row.leadStatus)}</Badge>
                     {unassigned ? <Badge className="border-[#c27a2c]/35 bg-[#c27a2c]/14 text-[#ffd7aa]">Sin asignar</Badge> : null}
                     {urgent ? <Badge className={slaTone("urgent")}>Urgente</Badge> : null}
                     {cold ? <Badge className={slaTone("cold")}>Frio</Badge> : null}
                   </div>
-                  <p className="text-xs text-muted">{row.contact?.phone || row.contact?.email || "Sin contacto"}</p>
-                  <p className="line-clamp-2 text-sm text-muted">{row.lastMessagePreview || "Sin mensajes recientes"}</p>
-                  <div className="flex flex-wrap gap-4 text-xs text-muted">
+
+                  <div className="flex flex-wrap gap-3 text-xs text-muted">
+                    <span>{row.contact?.phone || row.contact?.email || "Sin contacto"}</span>
+                    <span>Ultima actividad: {lastActivityLabel}</span>
                     {showOwner ? <span>{unassigned ? "Responsable pendiente" : `Responsable: ${ownerLabel}`}</span> : null}
                     {showFollowUp ? <span>Seguimiento: {formatDateTime(row.nextActionAt)}</span> : null}
+                  </div>
+
+                  <p className="line-clamp-2 text-sm leading-6 text-muted">{row.lastMessagePreview || "Sin mensajes recientes"}</p>
+
+                  <div className="flex flex-wrap gap-2 text-xs text-muted">
                     {showFollowUp && row.nextActionNote ? <span>Nota: {row.nextActionNote}</span> : null}
                     {inboxHref ? <span className="text-brandBright">Click para abrir hilo</span> : null}
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="rounded-[18px] border border-[color:var(--border)] bg-bg/45 p-3">
                   <div className="flex flex-wrap gap-2">
                     <Button asChild type="button" variant="secondary" size="sm">
                       <Link href={`/app/inbox/${row.id}`}>Abrir</Link>
@@ -205,7 +217,8 @@ export function OpsLeadTable({
                       </Button>
                     ) : null}
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <select
                       className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
                       value={draftSellerId}

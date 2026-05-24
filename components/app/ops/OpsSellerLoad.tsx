@@ -22,14 +22,19 @@ export function OpsSellerLoad({
   items: OpsSellerLoadItem[];
 }) {
   return (
-    <Card className="border-white/6 bg-card/90">
-      <CardHeader>
-        <div>
-          <CardTitle className="text-xl">Carga por vendedor</CardTitle>
-          <CardDescription>Ayuda a detectar sobrecarga y distribuir mejor la atencion del pipeline.</CardDescription>
+    <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-xl tracking-tight">Carga por vendedor</CardTitle>
+            <CardDescription className="mt-2 text-sm">
+              Distribucion actual del pipeline para detectar sobrecarga y repartir mejor.
+            </CardDescription>
+          </div>
+          <Badge variant="muted">{items.length} activos</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 pt-0">
         {items.length === 0 ? (
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-5 text-sm text-muted">
             Todavia no hay leads asignados a vendedores.
@@ -41,36 +46,35 @@ export function OpsSellerLoad({
             const paidRate = totalOrders > 0 ? Math.round((paidOrders / totalOrders) * 100) : 0;
 
             return (
-            <div
-              key={item.sellerUserId}
-              className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">{item.sellerName}</p>
-                  <p className="mt-1 text-xs text-muted">Carga viva del pipeline comercial.</p>
+              <div
+                key={item.sellerUserId}
+                className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{item.sellerName}</p>
+                    <p className="mt-1 text-xs text-muted">Carga viva del pipeline comercial.</p>
+                  </div>
+                  <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>{item.totalActiveLeads} activos</Badge>
                 </div>
-                <Badge variant="warning">{item.totalActiveLeads} activos</Badge>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Metric label="Activos" value={item.totalActiveLeads} />
+                  <Metric label="Vencidos" value={item.overdueLeads} />
+                  <Metric label="Con seguimiento" value={item.followUpLeads} />
+                  <Metric label="Ventas" value={totalOrders} />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>
+                    {item.overdueLeads > 0 ? "Necesita seguimiento" : "Carga estable"}
+                  </Badge>
+                  <span>Total vendido: {formatCurrency(item.totalRevenue || 0, item.currency || "ARS")}</span>
+                  <span>Conversion pagada: {paidRate}%</span>
+                  {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
+                </div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <Metric label="Leads activos" value={item.totalActiveLeads} />
-                <Metric label="Vencidos" value={item.overdueLeads} />
-                <Metric label="Con seguimiento" value={item.followUpLeads} />
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <Metric label="Ventas" value={totalOrders} />
-                <Metric label="Total vendido" value={formatCurrency(item.totalRevenue || 0, item.currency || "ARS")} compact />
-                <Metric label="Ticket promedio" value={formatCurrency(item.averageTicket || 0, item.currency || "ARS")} compact />
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>
-                  {item.overdueLeads > 0 ? "Necesita seguimiento" : "Carga estable"}
-                </Badge>
-                <span>Conversion pagada: {paidRate}%</span>
-                {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
-              </div>
-            </div>
-          );
+            );
           })
         )}
       </CardContent>
@@ -78,11 +82,11 @@ export function OpsSellerLoad({
   );
 }
 
-function Metric({ label, value, compact = false }: { label: string; value: number | string; compact?: boolean }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-bg/70 p-3">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className={`mt-2 font-semibold ${compact ? "text-sm" : "text-lg"}`}>{value}</p>
+      <p className="mt-2 text-lg font-semibold">{value}</p>
     </div>
   );
 }
