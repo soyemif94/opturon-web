@@ -1066,7 +1066,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(340px,0.82fr)]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader
             action={
@@ -1211,11 +1211,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               visibleProducts.map((product) => (
                 <div
                   key={product.id}
-                  className={`rounded-[22px] border p-4 transition-colors ${
+                  className={`rounded-[22px] border px-3 py-3 transition-colors ${
                     selectedId === product.id ? "border-brand/35 bg-brand/8" : "border-[color:var(--border)] bg-surface/55"
                   }`}
                 >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                       <input
                         type="checkbox"
@@ -1227,7 +1227,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       <CatalogProductImage product={product} />
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold">{product.name}</p>
+                          <p className="text-[15px] font-semibold">{product.name}</p>
                           <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
                             {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
                           </Badge>
@@ -1264,7 +1264,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <div className="text-right">
                         {getProductPricing(product).hasDiscount ? (
                           <>
@@ -1397,7 +1397,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
 
         <div className="space-y-6">
-          <Card className="border-white/6 bg-card/90">
+          <Card id="catalog-create-section" className="border-white/6 bg-card/90">
             <CardHeader action={<Badge variant="warning">Atajos</Badge>}>
               <div>
                 <CardTitle className="text-xl">Acciones rápidas</CardTitle>
