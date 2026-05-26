@@ -84,11 +84,11 @@ export function OpsShell({ children, topbar }: { children: React.ReactNode; topb
     <section className="container-opt py-5">
       <div className="flex min-h-[calc(100vh-40px)] gap-5">
         <aside className="hidden w-[304px] shrink-0 xl:block">
-          <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/85 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(176,80,0,0.12),transparent_34%)]" />
+          <div className="sticky top-5 overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 p-5 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+            <div className="absolute inset-0 bg-[image:var(--sidebar-overlay)]" />
 
             <div className="relative">
-              <div className="rounded-[24px] border border-brand/20 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(16,16,16,0.92))] p-5">
+              <div className="rounded-[24px] border border-brand/20 bg-[image:var(--sidebar-hero-gradient)] p-5">
                 <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
                   Opturon Ops
                 </Badge>
@@ -169,7 +169,7 @@ export function OpsShell({ children, topbar }: { children: React.ReactNode; topb
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] shadow-[0_32px_120px_rgba(0,0,0,0.30)]">
+          <div className="overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]">
             <header className="border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
               {topbar || (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -189,7 +189,7 @@ export function OpsShell({ children, topbar }: { children: React.ReactNode; topb
               )}
             </header>
 
-            <main className="min-h-[calc(100vh-140px)] bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.10),transparent_26%)] p-5 xl:p-8">
+            <main className="min-h-[calc(100vh-140px)] bg-[image:var(--panel-glow)] p-5 xl:p-8">
               {children}
             </main>
           </div>
