@@ -1215,70 +1215,100 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     selectedId === product.id ? "border-brand/35 bg-brand/8" : "border-[color:var(--border)] bg-surface/55"
                   }`}
                 >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(product.id)}
                         onChange={() => toggleSelection(product.id)}
-                        className="mt-1 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
+                        className="mt-2 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
                         aria-label={`Seleccionar ${product.name}`}
                       />
                       <CatalogProductImage product={product} />
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[15px] font-semibold">{product.name}</p>
-                          <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
-                            {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
-                          </Badge>
-                          {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
-                          {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
-                          <Badge variant={getStockState(resolveStock(product)).variant}>
-                            {getStockState(resolveStock(product)).label}
-                          </Badge>
-                          <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
-                            {getExpirationBadgePresentation(product.expirationDate).label}
-                          </Badge>
-                          {getProductPricing(product).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
-                          {product.riskDiscountSuggestion ? <Badge variant="warning">{product.riskDiscountSuggestion.label}</Badge> : null}
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="truncate text-[15px] font-semibold text-foreground">{product.name}</p>
+                                <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
+                                  {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
+                                </Badge>
+                                {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
+                                {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
+                                {getProductPricing(product).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
+                              </div>
+                            </div>
+                            <div className="shrink-0 rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2 text-left lg:min-w-[170px] lg:text-right">
+                              <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Precio</p>
+                              {getProductPricing(product).hasDiscount ? (
+                                <>
+                                  <p className="mt-1 text-xs text-muted line-through">
+                                    {formatCurrency(getProductPricing(product).originalPrice, product.currency || "ARS")}
+                                  </p>
+                                  <p className="text-base font-semibold text-foreground">
+                                    {formatCurrency(getProductPricing(product).finalPrice, product.currency || "ARS")}
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="mt-1 text-base font-semibold text-foreground">
+                                  {formatCurrency(resolvePrice(product), product.currency || "ARS")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <p className="mt-2 text-sm text-muted">
+                        <p className="sr-only">
                           {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
                         </p>
-                        <p className="mt-1 text-xs text-muted">
+                        <p className="sr-only">
                           Vencimiento {formatExpirationDate(product.expirationDate)}
                           {product.expirationDate ? ` · ${getExpirationBadgePresentation(product.expirationDate).helper}` : ""}
                         </p>
+                        <div className="grid gap-2 text-xs sm:grid-cols-3">
+                          <div className="rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2">
+                            <p className="uppercase tracking-[0.16em] text-muted">SKU</p>
+                            <p className="mt-1 text-sm font-medium text-foreground">{product.sku || "Sin SKU"}</p>
+                            <p className="mt-1 text-[11px] text-muted">
+                              {product.attributes?.length ? formatAttributesText(product.attributes) : "Sin atributos cargados"}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2">
+                            <p className="uppercase tracking-[0.16em] text-muted">Stock</p>
+                            <p className="mt-1 text-sm font-medium text-foreground">{resolveStock(product)} unidades</p>
+                            <p className="mt-1 text-[11px] text-muted">{getStockState(resolveStock(product)).label}</p>
+                          </div>
+                          <div className="rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2">
+                            <p className="uppercase tracking-[0.16em] text-muted">Estado comercial</p>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
+                                {getExpirationBadgePresentation(product.expirationDate).label}
+                              </Badge>
+                              <Badge variant={getStockState(resolveStock(product)).variant}>{getStockState(resolveStock(product)).label}</Badge>
+                              {product.riskDiscountSuggestion ? <Badge variant="warning">{product.riskDiscountSuggestion.label}</Badge> : null}
+                            </div>
+                            <p className="mt-2 text-[11px] text-muted">
+                              Vence {formatExpirationDate(product.expirationDate)}
+                              {product.expirationDate ? ` · ${getExpirationBadgePresentation(product.expirationDate).helper}` : ""}
+                            </p>
+                          </div>
+                        </div>
                         {product.riskDiscountSuggestion ? (
-                          <p className="mt-1 text-xs text-amber-300">
+                          <p className="rounded-2xl border border-amber-400/15 bg-amber-500/8 px-3 py-2 text-xs text-amber-200">
                             {product.riskDiscountSuggestion.helper}
                             {product.riskDiscountSuggestion.currentDiscountPercentage != null
                               ? ` Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%.`
                               : ` Sugerido ${product.riskDiscountSuggestion.suggestedDiscountPercentage}%.`}
                           </p>
                         ) : null}
-                        <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
+                        <p className="line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
                         {product.attributes?.length ? (
-                          <p className="mt-2 text-xs text-muted">Atributos: {formatAttributesText(product.attributes)}</p>
+                          <p className="sr-only">Atributos: {formatAttributesText(product.attributes)}</p>
                         ) : null}
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <div className="text-right">
-                        {getProductPricing(product).hasDiscount ? (
-                          <>
-                            <p className="text-xs text-muted line-through">
-                              {formatCurrency(getProductPricing(product).originalPrice, product.currency || "ARS")}
-                            </p>
-                            <p className="text-sm font-semibold">
-                              {formatCurrency(getProductPricing(product).finalPrice, product.currency || "ARS")}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
-                        )}
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2 xl:max-w-[300px] xl:justify-end">
                       {canApplyDirectDiscount(product) ? (
                         <Button
                           type="button"
@@ -1303,9 +1333,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                         <Trash2 className="mr-1 h-4 w-4" />
                         {deletingId === product.id ? "Eliminando..." : "Eliminar"}
                       </Button>
-                      <Button asChild variant="ghost" size="sm">
+                      <Button asChild variant="secondary" size="sm">
                         <Link href={`/app/catalog/${product.id}`}>
-                          Ver
+                          Ver detalle
                           <ArrowRight className="ml-1 h-4 w-4" />
                         </Link>
                       </Button>
