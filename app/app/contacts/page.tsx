@@ -1,5 +1,5 @@
-import { ClientPageShell } from "@/components/app/client-page-shell";
 import { ContactsWorkspace } from "@/components/app/ContactsWorkspace";
+import { Badge } from "@/components/ui/badge";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalContacts, isBackendConfigured, type PortalContactDetail } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
@@ -45,12 +45,21 @@ export default async function AppContactsPage() {
   }
 
   return (
-    <ClientPageShell
-      title="Contactos"
-      description="Ordena clientes, prospectos y senales comerciales en una sola vista para detectar actividad, prioridad y proximos pasos rapido."
-      badge="CRM comercial"
-    >
+    <div className="space-y-4">
+      <section className="rounded-[26px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] px-5 py-4 shadow-[var(--card-shadow)] xl:px-6">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warning">CRM comercial</Badge>
+            <Badge variant="muted">Base activa</Badge>
+          </div>
+          <h1 className="mt-3 text-[2rem] font-semibold tracking-tight">Contactos</h1>
+          <p className="mt-1.5 text-sm leading-6 text-muted">
+            Ordena actividad, prioridad y contexto comercial en una sola vista para operar rapido.
+          </p>
+        </div>
+      </section>
+
       <ContactsWorkspace initialContacts={contacts} readOnly={!ctx.tenantId || readOnly} />
-    </ClientPageShell>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ClientPageShell } from "@/components/app/client-page-shell";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalContactDetail, isBackendConfigured } from "@/lib/api";
 import Link from "next/link";
@@ -25,13 +24,22 @@ export default async function AppContactDetailPage({ params }: { params: Promise
   }
 
   return (
-    <ClientPageShell
-      title={contact?.name || "Detalle de contacto"}
-      description="Lectura comercial del contacto para validar identidad, contexto operativo y relacion financiera sin salir del CRM."
-      badge="Contacto"
-      backHref="/app/contacts"
-      backLabel="Volver a contactos"
-    >
+    <div className="space-y-4">
+      <section className="rounded-[26px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] px-5 py-4 shadow-[var(--card-shadow)] xl:px-6">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+              <Link href="/app/contacts">Volver a contactos</Link>
+            </Button>
+            <Badge variant="warning">Contacto</Badge>
+          </div>
+          <h1 className="mt-3 text-[2rem] font-semibold tracking-tight">{contact?.name || "Detalle de contacto"}</h1>
+          <p className="mt-1.5 text-sm leading-6 text-muted">
+            Valida identidad, contexto operativo y relacion financiera sin salir del CRM.
+          </p>
+        </div>
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
         <Card className="border-white/6 bg-card/90">
           <CardHeader
@@ -162,7 +170,7 @@ export default async function AppContactDetailPage({ params }: { params: Promise
           </CardContent>
         </Card>
       ) : null}
-    </ClientPageShell>
+    </div>
   );
 }
 

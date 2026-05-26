@@ -305,52 +305,69 @@ export function ContactsWorkspace({
   };
 
   return (
-    <div className="space-y-5">
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard
-          label={showingArchived ? "Archivados visibles" : "Base CRM visible"}
-          value={String(kpis.total)}
-          helper={showingArchived ? "Registros pausados para restaurar o depurar." : "Contactos listos para seguimiento comercial."}
-          foot={focusCopy}
-          tone="orange"
-          icon={<UserRound className="h-5 w-5" />}
-          emphasis
-        />
-        <MetricCard
-          label="Con movimiento"
-          value={String(kpis.active)}
-          helper="Actividad reciente en los ultimos 7 dias."
-          foot={kpis.conversations > 0 ? `${kpis.conversations} con conversaciones visibles` : "Sin conversaciones visibles"}
-          tone="green"
-          icon={<MessageSquareMore className="h-5 w-5" />}
-        />
-        <MetricCard
-          label="Requieren atencion"
-          value={String(kpis.attention)}
-          helper="Contactos con deuda o pagos libres por revisar."
-          foot={kpis.attention > 0 ? "Conviene priorizarlos hoy" : "Sin alertas visibles"}
-          tone="amber"
-          icon={<WalletCards className="h-5 w-5" />}
-        />
-        <MetricCard
-          label="Sin movimiento"
-          value={String(kpis.quiet)}
-          helper="Sin interaccion reciente o sin contexto actualizado."
-          foot={kpis.quiet > 0 ? "Base fria para reactivar" : "Base activa sin rezagos"}
-          tone="sky"
-          icon={<Clock3 className="h-5 w-5" />}
-        />
-        <MetricCard
-          label="Nuevos registros"
-          value={String(kpis.fresh)}
-          helper="Altas recientes con potencial de primer contacto."
-          foot={showingArchived ? "Lectura sobre registros archivados" : "Entraron en los ultimos 7 dias"}
-          tone="violet"
-          icon={<ArrowUpRight className="h-5 w-5" />}
-        />
+    <div className="space-y-4">
+      <section className="grid gap-3 xl:grid-cols-12">
+        <div className="xl:col-span-3">
+          <MetricCard
+            label="Con movimiento"
+            value={String(kpis.active)}
+            helper="Actividad reciente en los ultimos 7 dias."
+            foot={kpis.conversations > 0 ? `${kpis.conversations} con conversaciones visibles` : "Sin conversaciones visibles"}
+            tone="green"
+            icon={<MessageSquareMore className="h-5 w-5" />}
+            emphasis
+            compact={false}
+          />
+        </div>
+        <div className="xl:col-span-3">
+          <MetricCard
+            label="Requieren atencion"
+            value={String(kpis.attention)}
+            helper="Contactos con deuda o pagos libres por revisar."
+            foot={kpis.attention > 0 ? "Conviene priorizarlos hoy" : "Sin alertas visibles"}
+            tone="amber"
+            icon={<WalletCards className="h-5 w-5" />}
+            emphasis
+            compact={false}
+          />
+        </div>
+        <div className="xl:col-span-3">
+          <MetricCard
+            label="Sin movimiento"
+            value={String(kpis.quiet)}
+            helper="Sin interaccion reciente o sin contexto actualizado."
+            foot={kpis.quiet > 0 ? "Base fria para reactivar" : "Base activa sin rezagos"}
+            tone="sky"
+            icon={<Clock3 className="h-5 w-5" />}
+            emphasis
+            compact={false}
+          />
+        </div>
+        <div className="xl:col-span-3">
+          <MetricCard
+            label={showingArchived ? "Archivados visibles" : "Base CRM visible"}
+            value={String(kpis.total)}
+            helper={showingArchived ? "Registros pausados para restaurar o depurar." : "Contactos listos para seguimiento comercial."}
+            foot={focusCopy}
+            tone="orange"
+            icon={<UserRound className="h-5 w-5" />}
+            compact
+          />
+        </div>
+        <div className="md:col-span-2 xl:col-span-3 xl:col-start-10">
+          <MetricCard
+            label="Nuevos registros"
+            value={String(kpis.fresh)}
+            helper="Altas recientes con potencial de primer contacto."
+            foot={showingArchived ? "Lectura sobre registros archivados" : "Entraron en los ultimos 7 dias"}
+            tone="violet"
+            icon={<ArrowUpRight className="h-5 w-5" />}
+            compact
+          />
+        </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.32fr)_380px]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_350px]">
         <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
           <CardHeader action={<Badge variant="muted">{visibleContacts.length} visibles</Badge>}>
             <div>
@@ -358,8 +375,8 @@ export function ContactsWorkspace({
               <CardDescription>Lectura comercial rapida para revisar actividad, detectar frios y abrir el contacto correcto sin ruido.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/60 p-4">
+          <CardContent className="space-y-3.5 pt-0">
+            <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-3.5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant={showingArchived ? "ghost" : "secondary"} size="sm" className="rounded-2xl" onClick={() => setViewMode("active")}>
@@ -376,7 +393,7 @@ export function ContactsWorkspace({
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Buscar por nombre, telefono, email o empresa"
                     aria-label="Buscar contactos"
-                    className="h-11 rounded-2xl border-white/8 bg-bg/70 pl-10"
+                    className="h-10 rounded-2xl border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] pl-10 text-text placeholder:text-muted/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   />
                 </div>
               </div>
@@ -416,7 +433,7 @@ export function ContactsWorkspace({
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/45 px-4 py-3">
+            <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/45 px-4 py-2.5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <p className="text-sm text-muted">
                   {selectedIds.length > 0
@@ -481,7 +498,7 @@ export function ContactsWorkspace({
                 }
               />
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {visibleContacts.map((contact) => {
                   const active = selected?.id === contact.id;
                   const commercialRead = getCommercialRead(contact);
@@ -489,15 +506,15 @@ export function ContactsWorkspace({
                   return (
                     <div
                       key={contact.id}
-                      className={`rounded-[24px] border px-4 py-4 transition-all ${
+                      className={`rounded-[22px] border px-3.5 py-3 transition-all ${
                         active
                           ? "border-brand/35 bg-[linear-gradient(180deg,rgba(192,80,0,0.12),rgba(255,255,255,0.02))] shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
                           : "border-[color:var(--border)] bg-surface/55 hover:bg-surface/70"
                       }`}
                     >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <label className="mt-3 inline-flex items-center">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                          <label className="mt-2.5 inline-flex items-center">
                             <input
                               type="checkbox"
                               checked={selectedIds.includes(contact.id)}
@@ -516,19 +533,19 @@ export function ContactsWorkspace({
                             <SimpleAvatar
                               src={contact.profileImageUrl}
                               name={contact.name}
-                              className="h-14 w-14 rounded-[20px] border border-[color:var(--border)] bg-brand/10 text-brandBright"
+                              className="h-12 w-12 rounded-[18px] border border-[color:var(--border)] bg-brand/10 text-brandBright"
                               fallbackClassName="bg-brand/10 text-brandBright"
                             />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-base font-semibold text-text">{contact.name}</p>
+                                <p className="truncate text-[15px] font-semibold text-text">{contact.name}</p>
                                 <Badge variant={contact.status === "archived" ? "danger" : "success"}>{contact.status || "active"}</Badge>
                                 <OperationalBadge tone={commercialRead.tone}>{commercialRead.label}</OperationalBadge>
                               </div>
-                              <p className="mt-1 truncate text-sm text-muted">
+                              <p className="mt-0.5 truncate text-sm text-muted">
                                 {contact.phone || contact.whatsappPhone || contact.email || "Sin datos de contacto"}
                               </p>
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-2 flex flex-wrap gap-1.5">
                                 <MetaPill label="Canal" value={getChannelLabel(contact)} />
                                 <MetaPill label="Empresa" value={contact.companyName || "Sin empresa"} />
                                 <MetaPill label="Interacciones" value={String(contact.conversationCount || 0)} />
@@ -537,7 +554,7 @@ export function ContactsWorkspace({
                           </button>
                         </div>
 
-                        <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid flex-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                           <InfoMiniBlock
                             label="Ultimo movimiento"
                             value={relativeDateLabel(contact.lastInteractionAt || contact.updatedAt || contact.createdAt)}
@@ -573,7 +590,7 @@ export function ContactsWorkspace({
           </CardContent>
         </Card>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
             <CardHeader
               action={
@@ -596,10 +613,10 @@ export function ContactsWorkspace({
                 <CardDescription>Resumen operativo para validar identidad, senales y proximos pasos sin salir de la base CRM.</CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 pt-0">
+            <CardContent className="space-y-3.5 pt-0">
               {selected ? (
                 <>
-                  <div className="rounded-[24px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.02))] p-4">
+                  <div className="rounded-[22px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.02))] p-3.5">
                     <div className="flex items-start gap-4">
                       <SimpleAvatar
                         src={selected.profileImageUrl}
@@ -609,8 +626,8 @@ export function ContactsWorkspace({
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-lg font-semibold">{selected.name}</p>
-                        <p className="mt-1 text-sm text-muted">{selected.phone || selected.whatsappPhone || selected.email || "Sin dato principal de contacto"}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <p className="mt-0.5 text-sm text-muted">{selected.phone || selected.whatsappPhone || selected.email || "Sin dato principal de contacto"}</p>
+                        <div className="mt-2.5 flex flex-wrap gap-2">
                           <Badge variant={selected.status === "archived" ? "danger" : "success"}>{selected.status || "active"}</Badge>
                           <OperationalBadge tone={selectedRead?.tone || "sky"}>{selectedRead?.label || "Sin lectura"}</OperationalBadge>
                           {selected.companyName ? <Badge variant="muted">{selected.companyName}</Badge> : null}
@@ -619,7 +636,7 @@ export function ContactsWorkspace({
                     </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2.5 sm:grid-cols-2">
                     <DetailRow icon={<Clock3 className="h-4 w-4" />} label="Ultimo movimiento" value={relativeDateLabel(selected.lastInteractionAt || selected.updatedAt || selected.createdAt)} />
                     <DetailRow icon={<MessageSquareMore className="h-4 w-4" />} label="Conversaciones visibles" value={String(selected.conversationCount || 0)} />
                     <DetailRow icon={<Mail className="h-4 w-4" />} label="Email" value={selected.email || "-"} />
@@ -628,9 +645,9 @@ export function ContactsWorkspace({
                     <DetailRow icon={<ReceiptText className="h-4 w-4" />} label="Documento fiscal" value={selected.taxId || "-"} />
                   </div>
 
-                  <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/50 p-4">
+                  <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/50 p-3.5">
                     <p className="text-xs uppercase tracking-[0.16em] text-muted">Contexto comercial</p>
-                    <div className="mt-3 space-y-3">
+                    <div className="mt-2.5 space-y-2.5">
                       <InfoMiniBlock
                         label="Senal financiera"
                         value={getFinancialHeadline(selected)}
@@ -643,7 +660,7 @@ export function ContactsWorkspace({
                         helper={selected.notes ? "Hay notas internas disponibles" : "Todavia sin notas internas"}
                       />
                     </div>
-                    <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-bg/45 p-3">
+                    <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-bg/45 p-3">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">Observaciones</p>
                       <p className="mt-2 text-sm leading-6 text-muted">{selected.notes || "Sin notas cargadas para este contacto."}</p>
                     </div>
@@ -664,24 +681,25 @@ export function ContactsWorkspace({
             <CardHeader action={!readOnly ? <Badge variant="warning">Nuevo</Badge> : <Badge variant="muted">Solo lectura</Badge>}>
               <div>
                 <CardTitle className="text-xl">Crear contacto</CardTitle>
-                <CardDescription>Alta minima para sumar un registro al CRM sin salir del espacio de trabajo.</CardDescription>
+                <CardDescription>Alta breve para sumar un registro al CRM.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <form className="space-y-3" onSubmit={createContact}>
-                <Input placeholder="Nombre completo" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={readOnly || saving} />
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Input placeholder="Email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} disabled={readOnly || saving} />
-                  <Input placeholder="Telefono" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} disabled={readOnly || saving} />
+              <form className="space-y-2.5" onSubmit={createContact}>
+                <Input className="h-10" placeholder="Nombre completo" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={readOnly || saving} />
+                <div className="grid gap-2.5 md:grid-cols-2">
+                  <Input className="h-10" placeholder="Email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} disabled={readOnly || saving} />
+                  <Input className="h-10" placeholder="Telefono" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} disabled={readOnly || saving} />
                 </div>
                 <Input
+                  className="h-10"
                   placeholder="URL de imagen de perfil"
                   value={draft.profileImageUrl}
                   onChange={(event) => setDraft((current) => ({ ...current, profileImageUrl: event.target.value }))}
                   disabled={readOnly || saving}
                 />
                 {draft.profileImageUrl.trim() ? (
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-2.5">
                     <p className="text-xs uppercase tracking-[0.16em] text-muted">Preview</p>
                     <div className="mt-3 flex items-center gap-3">
                       <SimpleAvatar
@@ -696,11 +714,11 @@ export function ContactsWorkspace({
                     </div>
                   </div>
                 ) : null}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Input placeholder="WhatsApp" value={draft.whatsappPhone} onChange={(event) => setDraft((current) => ({ ...current, whatsappPhone: event.target.value }))} disabled={readOnly || saving} />
-                  <Input placeholder="Empresa" value={draft.companyName} onChange={(event) => setDraft((current) => ({ ...current, companyName: event.target.value }))} disabled={readOnly || saving} />
+                <div className="grid gap-2.5 md:grid-cols-2">
+                  <Input className="h-10" placeholder="WhatsApp" value={draft.whatsappPhone} onChange={(event) => setDraft((current) => ({ ...current, whatsappPhone: event.target.value }))} disabled={readOnly || saving} />
+                  <Input className="h-10" placeholder="Empresa" value={draft.companyName} onChange={(event) => setDraft((current) => ({ ...current, companyName: event.target.value }))} disabled={readOnly || saving} />
                 </div>
-                <Input placeholder="Documento fiscal" value={draft.taxId} onChange={(event) => setDraft((current) => ({ ...current, taxId: event.target.value }))} disabled={readOnly || saving} />
+                <Input className="h-10" placeholder="Documento fiscal" value={draft.taxId} onChange={(event) => setDraft((current) => ({ ...current, taxId: event.target.value }))} disabled={readOnly || saving} />
                 <Textarea placeholder="Notas internas" rows={3} value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} disabled={readOnly || saving} />
                 <Button type="submit" className="w-full rounded-2xl" disabled={readOnly || saving}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -722,7 +740,8 @@ function MetricCard({
   foot,
   tone,
   icon,
-  emphasis = false
+  emphasis = false,
+  compact = false
 }: {
   label: string;
   value: string;
@@ -731,18 +750,19 @@ function MetricCard({
   tone: SurfaceTone;
   icon: ReactNode;
   emphasis?: boolean;
+  compact?: boolean;
 }) {
   return (
     <Card className={`${emphasis ? toneSurfaceClass(tone) : "border-white/6 bg-card/90"} shadow-[var(--card-shadow)]`}>
-      <CardContent className="p-4">
+      <CardContent className={compact ? "p-3.5" : "p-4"}>
         <div className="flex items-start justify-between gap-3">
-          <span className={`inline-flex h-12 w-12 items-center justify-center rounded-[20px] border ${toneIconClass(tone)}`}>{icon}</span>
+          <span className={`inline-flex ${compact ? "h-11 w-11 rounded-[18px]" : "h-12 w-12 rounded-[20px]"} items-center justify-center border ${toneIconClass(tone)}`}>{icon}</span>
           <div className="min-w-0 text-right">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
-            <p className="mt-2 text-3xl font-semibold">{value}</p>
+            <p className={`mt-2 font-semibold ${compact ? "text-[1.75rem]" : "text-3xl"}`}>{value}</p>
           </div>
         </div>
-        <p className="mt-4 text-sm text-muted">{helper}</p>
+        <p className={`${compact ? "mt-3" : "mt-4"} text-sm text-muted`}>{helper}</p>
         <p className={`mt-2 text-xs font-medium ${toneValueClass(tone)}`}>{foot}</p>
       </CardContent>
     </Card>
