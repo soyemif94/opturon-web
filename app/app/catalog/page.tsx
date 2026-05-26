@@ -1,4 +1,3 @@
-import { ClientPageShell } from "@/components/app/client-page-shell";
 import { CatalogManager } from "@/components/app/CatalogManager";
 import { canManageCatalog } from "@/lib/app-permissions";
 import { getPortalProducts, isBackendConfigured, type PortalProduct } from "@/lib/api";
@@ -25,13 +24,5 @@ export default async function CatalogPage() {
     }
   }
 
-  return (
-    <ClientPageShell
-      title="Catalogo"
-      description="Registra productos, mantiene precios basicos actualizados y deja lista la base comercial para pedidos y futuras automatizaciones."
-      badge="Productos del negocio"
-    >
-      <CatalogManager initialProducts={products} readOnly={readOnly} />
-    </ClientPageShell>
-  );
+  return <CatalogManager initialProducts={products} readOnly={readOnly} />;
 }

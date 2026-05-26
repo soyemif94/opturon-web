@@ -2,7 +2,23 @@
 
 import Link from "next/link";
 import { type ChangeEvent, type ComponentType, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Boxes, CheckSquare, ChevronDown, ChevronUp, Package, PencilLine, ScanLine, Search, Trash2, Upload, Warehouse } from "lucide-react";
+import {
+  ArrowRight,
+  Boxes,
+  CheckSquare,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FolderCog,
+  Package,
+  PencilLine,
+  Plus,
+  ScanLine,
+  Search,
+  Trash2,
+  Upload,
+  Warehouse
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,6 +308,46 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         categoryId: current.categoryId || nextCategoryId
       };
     });
+  }
+
+  function scrollToSection(sectionId: string) {
+    if (typeof document === "undefined") return;
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openBulkImport() {
+    setMode("bulk");
+    scrollToSection("catalog-load-section");
+  }
+
+  function exportVisibleProducts() {
+    const rows = (visibleProducts.length > 0 ? visibleProducts : filteredProducts).map((product) => {
+      const pricing = getProductPricing(product);
+      return [
+        escapeCsvValue(product.name),
+        escapeCsvValue(product.sku || ""),
+        escapeCsvValue(product.categoryName || ""),
+        escapeCsvValue(product.subcategory || ""),
+        escapeCsvValue(resolveStatus(product) === "active" ? "Activo" : "Archivado"),
+        escapeCsvValue(String(resolveStock(product))),
+        escapeCsvValue(String(pricing.finalPrice)),
+        escapeCsvValue(formatExpirationDate(product.expirationDate))
+      ].join(";");
+    });
+
+    const csv = [
+      "Nombre;SKU;Categoria;Subcategoria;Estado;Stock;Precio;Vencimiento",
+      ...rows
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `catalogo-opturon-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success("Catalogo exportado");
   }
 
   useEffect(() => {
@@ -900,11 +956,51 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   return (
     <div className="space-y-6">
+      <section className="overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] px-5 py-5 shadow-[var(--card-shadow)] lg:px-7 lg:py-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <Badge variant="warning">Catálogo comercial</Badge>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Catálogo</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Gestiona productos, precios y categorías para mantener el catálogo listo para ventas, pedidos y respuestas del bot.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={exportVisibleProducts}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar Excel
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => scrollToSection("catalog-categories")}>
+              <FolderCog className="mr-2 h-4 w-4" />
+              Configuración
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={readOnly}
+              onClick={() => {
+                openQuickCreate(categoryFilter || null);
+                scrollToSection("catalog-create-section");
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo producto
+            </Button>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Boxes} label="Productos cargados" value={String(metrics.total)} helper="Base inicial del catalogo para ventas y pedidos." />
-        <MetricCard icon={Package} label="Activos" value={String(metrics.active)} helper="Productos listos para vender o sumar a un pedido." />
-        <MetricCard icon={ScanLine} label="Archivados" value={String(metrics.archived)} helper="Productos pausados sin borrar el historial comercial." />
-        <MetricCard icon={Warehouse} label="Valor bruto" value={formatCurrency(metrics.stockValue)} helper="Referencia simple de stock valorizado a precio actual." />
+        <MetricCard icon={Boxes} label="Productos cargados" value={String(metrics.total)} helper="Base comercial disponible" accent="emerald" />
+        <MetricCard
+          icon={Package}
+          label="Productos activos"
+          value={String(metrics.active)}
+          helper={`${metrics.total > 0 ? Math.round((metrics.active / metrics.total) * 100) : 0}% del total`}
+          accent="blue"
+        />
+        <MetricCard icon={ScanLine} label="Productos archivados" value={String(metrics.archived)} helper="Pausados sin perder historial" accent="amber" />
+        <MetricCard icon={Warehouse} label="Valor total inventario" value={formatCurrency(metrics.stockValue)} helper="Precio de venta estimado" accent="violet" />
       </section>
 
       {feedback ? (
@@ -986,8 +1082,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             }
           >
             <div>
-              <CardTitle className="text-xl">Catalogo del negocio</CardTitle>
-              <CardDescription>Lista operativa de productos con precio, stock y estado para revisar rapido, seleccionar en bloque y limpiar catalogo sin perder contexto.</CardDescription>
+              <CardTitle className="text-xl">Buscar y filtrar productos</CardTitle>
+              <CardDescription>Revisa el catálogo con foco comercial: nombre, SKU, stock, precio y estado en una sola vista.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -1008,7 +1104,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <Input
                   className="pl-10"
-                  placeholder="Buscar por nombre o codigo SKU"
+                  placeholder="Buscar por nombre, SKU o codigo de barras..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
@@ -1039,10 +1135,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="muted">Vista general</Badge>
-                    <span className="text-sm font-medium">Todas las categorias</span>
+                    <span className="text-sm font-medium">Todas las categorías</span>
                   </div>
                   <p className="text-sm text-muted">
-                    {visibleProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catalogo actual.
+                    {visibleProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catálogo actual.
                   </p>
                 </div>
               </div>
@@ -1302,13 +1398,42 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
         <div className="space-y-6">
           <Card className="border-white/6 bg-card/90">
+            <CardHeader action={<Badge variant="warning">Atajos</Badge>}>
+              <div>
+                <CardTitle className="text-xl">Acciones rápidas</CardTitle>
+                <CardDescription>Atajos para operar el catálogo sin salir de esta vista.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 pt-0 sm:grid-cols-2">
+              <QuickActionButton
+                title="Nuevo producto"
+                description="Alta rápida"
+                onClick={() => {
+                  openQuickCreate(categoryFilter || null);
+                  scrollToSection("catalog-create-section");
+                }}
+                disabled={readOnly}
+              />
+              <QuickActionButton title="Importar productos" description="Carga masiva" onClick={openBulkImport} disabled={readOnly} />
+              <QuickActionButton title="Exportar catálogo" description="Excel compatible" onClick={exportVisibleProducts} />
+              <QuickActionButton title="Gestión de categorías" description="Orden comercial" onClick={() => scrollToSection("catalog-categories")} />
+              <QuickActionButton
+                title="Ver detalle"
+                description={selectedProduct ? selectedProduct.name : "Selecciona un producto"}
+                href={selectedProduct ? `/app/catalog/${selectedProduct.id}` : undefined}
+                disabled={!selectedProduct}
+              />
+            </CardContent>
+          </Card>
+
+          <Card id="catalog-load-section" className="border-white/6 bg-card/90">
             <CardHeader action={<Badge variant="muted">Categorias</Badge>}>
               <div>
                 <CardTitle className="text-xl">Categorias del catalogo</CardTitle>
                 <CardDescription>Organiza productos por familia para que el catalogo y el bot puedan guiarlos mejor.</CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 pt-0">
+            <CardContent id="catalog-categories" className="space-y-4 pt-0">
               <div className="flex flex-wrap gap-2">
                 <Input
                   value={categoryName}
@@ -1917,18 +2042,27 @@ function MetricCard({
   icon: Icon,
   label,
   value,
-  helper
+  helper,
+  accent = "brand"
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
   helper: string;
+  accent?: "brand" | "emerald" | "blue" | "amber" | "violet";
 }) {
+  const accentClasses = {
+    brand: "border-white/10 bg-surface/80 text-brandBright",
+    emerald: "border-emerald-500/20 bg-emerald-500/12 text-emerald-300",
+    blue: "border-blue-500/20 bg-blue-500/12 text-blue-300",
+    amber: "border-amber-500/20 bg-amber-500/12 text-amber-300",
+    violet: "border-violet-500/20 bg-violet-500/12 text-violet-300"
+  } as const;
   return (
     <Card className="border-white/6 bg-card/90">
       <CardContent className="flex items-start gap-4 p-5">
-        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-surface/80">
-          <Icon className="h-5 w-5 text-brandBright" />
+        <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border ${accentClasses[accent]}`}>
+          <Icon className="h-5 w-5" />
         </span>
         <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
@@ -1947,6 +2081,47 @@ function DetailStat({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-sm font-medium">{value}</p>
     </div>
   );
+}
+
+function QuickActionButton({
+  title,
+  description,
+  onClick,
+  href,
+  disabled = false
+}: {
+  title: string;
+  description: string;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+}) {
+  const classes =
+    "flex min-h-[84px] flex-col items-start justify-between rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-left transition-colors hover:bg-surface/70";
+
+  if (href && !disabled) {
+    return (
+      <Link href={href} className={classes}>
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs text-muted">{description}</span>
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" className={classes} onClick={onClick} disabled={disabled}>
+      <span className="text-sm font-medium">{title}</span>
+      <span className="text-xs text-muted">{description}</span>
+    </button>
+  );
+}
+
+function escapeCsvValue(value: string) {
+  const normalized = String(value ?? "");
+  if (normalized.includes(";") || normalized.includes('"') || normalized.includes("\n")) {
+    return `"${normalized.replace(/"/g, '""')}"`;
+  }
+  return normalized;
 }
 
 function buildCatalogImagePayload(imageUrl: string, imageAlt: string, imageSource: "external_url" | "uploaded") {
