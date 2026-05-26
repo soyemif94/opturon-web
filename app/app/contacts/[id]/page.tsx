@@ -27,7 +27,7 @@ export default async function AppContactDetailPage({ params }: { params: Promise
   return (
     <ClientPageShell
       title={contact?.name || "Detalle de contacto"}
-      description="Lectura simple del registro CRM para validar identidad, datos fiscales basicos y contexto operativo."
+      description="Lectura comercial del contacto para validar identidad, contexto operativo y relacion financiera sin salir del CRM."
       badge="Contacto"
       backHref="/app/contacts"
       backLabel="Volver a contactos"
