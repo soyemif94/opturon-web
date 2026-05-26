@@ -1103,7 +1103,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <Input
-                  className="pl-10"
+                  className="h-12 rounded-2xl border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] pl-10 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                   placeholder="Buscar por nombre, SKU o codigo de barras..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
@@ -1211,87 +1211,70 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               visibleProducts.map((product) => (
                 <div
                   key={product.id}
-                  className={`rounded-[22px] border px-3 py-3 transition-colors ${
-                    selectedId === product.id ? "border-brand/35 bg-brand/8" : "border-[color:var(--border)] bg-surface/55"
+                  className={`overflow-hidden rounded-[26px] border transition-all ${
+                    selectedId === product.id
+                      ? "border-brand/35 bg-[linear-gradient(135deg,rgba(255,122,0,0.10),rgba(8,16,28,0.94))] shadow-[0_22px_48px_rgba(255,122,0,0.10)]"
+                      : "border-white/8 bg-[linear-gradient(135deg,rgba(15,24,38,0.96),rgba(7,13,22,0.94))] hover:border-white/14 hover:bg-[linear-gradient(135deg,rgba(18,28,44,0.98),rgba(9,16,28,0.96))]"
                   }`}
                 >
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(product.id)}
-                        onChange={() => toggleSelection(product.id)}
-                        className="mt-2 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
-                        aria-label={`Seleccionar ${product.name}`}
-                      />
-                      <CatalogProductImage product={product} />
+                  <div className="flex flex-col gap-4 p-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(product.id)}
+                          onChange={() => toggleSelection(product.id)}
+                          className="mt-2 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
+                          aria-label={`Seleccionar ${product.name}`}
+                        />
+                        <CatalogProductImage product={product} />
+                      </div>
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
                         <div className="flex flex-col gap-3">
                           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="min-w-0">
+                            <div className="min-w-0 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-[15px] font-semibold text-foreground">{product.name}</p>
+                                <p className="truncate text-lg font-semibold text-foreground">{product.name}</p>
                                 <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
                                   {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
                                 </Badge>
+                                {getProductPricing(product).hasDiscount ? <Badge variant="warning">Promocion</Badge> : null}
+                              </div>
+                              <p className="text-sm text-muted">{product.sku || "Sin SKU"}</p>
+                              <div className="flex flex-wrap gap-2">
                                 {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
                                 {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
-                                {getProductPricing(product).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
+                                <Badge variant={getStockState(resolveStock(product)).variant}>{resolveStock(product)} en stock</Badge>
+                                <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
+                                  {getExpirationBadgePresentation(product.expirationDate).label}
+                                </Badge>
                               </div>
                             </div>
-                            <div className="shrink-0 rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2 text-left lg:min-w-[170px] lg:text-right">
-                              <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Precio</p>
+                            <div className="shrink-0 lg:text-right">
                               {getProductPricing(product).hasDiscount ? (
                                 <>
-                                  <p className="mt-1 text-xs text-muted line-through">
+                                  <p className="text-xs text-muted line-through">
                                     {formatCurrency(getProductPricing(product).originalPrice, product.currency || "ARS")}
                                   </p>
-                                  <p className="text-base font-semibold text-foreground">
+                                  <p className="mt-1 text-2xl font-semibold text-foreground">
                                     {formatCurrency(getProductPricing(product).finalPrice, product.currency || "ARS")}
                                   </p>
                                 </>
                               ) : (
-                                <p className="mt-1 text-base font-semibold text-foreground">
+                                <p className="text-2xl font-semibold text-foreground">
                                   {formatCurrency(resolvePrice(product), product.currency || "ARS")}
                                 </p>
                               )}
+                              <p className="mt-1 text-xs text-muted">Precio de venta</p>
                             </div>
                           </div>
                         </div>
-                        <p className="sr-only">
-                          {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
-                        </p>
-                        <p className="sr-only">
-                          Vencimiento {formatExpirationDate(product.expirationDate)}
-                          {product.expirationDate ? ` · ${getExpirationBadgePresentation(product.expirationDate).helper}` : ""}
-                        </p>
-                        <div className="grid gap-2 text-xs sm:grid-cols-3">
-                          <div className="rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2">
-                            <p className="uppercase tracking-[0.16em] text-muted">SKU</p>
-                            <p className="mt-1 text-sm font-medium text-foreground">{product.sku || "Sin SKU"}</p>
-                            <p className="mt-1 text-[11px] text-muted">
-                              {product.attributes?.length ? formatAttributesText(product.attributes) : "Sin atributos cargados"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2">
-                            <p className="uppercase tracking-[0.16em] text-muted">Stock</p>
-                            <p className="mt-1 text-sm font-medium text-foreground">{resolveStock(product)} unidades</p>
-                            <p className="mt-1 text-[11px] text-muted">{getStockState(resolveStock(product)).label}</p>
-                          </div>
-                          <div className="rounded-2xl border border-[color:var(--border)] bg-black/10 px-3 py-2">
-                            <p className="uppercase tracking-[0.16em] text-muted">Estado comercial</p>
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
-                                {getExpirationBadgePresentation(product.expirationDate).label}
-                              </Badge>
-                              <Badge variant={getStockState(resolveStock(product)).variant}>{getStockState(resolveStock(product)).label}</Badge>
-                              {product.riskDiscountSuggestion ? <Badge variant="warning">{product.riskDiscountSuggestion.label}</Badge> : null}
-                            </div>
-                            <p className="mt-2 text-[11px] text-muted">
-                              Vence {formatExpirationDate(product.expirationDate)}
-                              {product.expirationDate ? ` · ${getExpirationBadgePresentation(product.expirationDate).helper}` : ""}
-                            </p>
-                          </div>
+                        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+                          <span>{product.sku || "Sin SKU"}</span>
+                          <span>Stock {resolveStock(product)} unidades</span>
+                          <span>Vence {formatExpirationDate(product.expirationDate)}</span>
+                          <span>{getExpirationBadgePresentation(product.expirationDate).helper}</span>
+                          {product.attributes?.length ? <span>{formatAttributesText(product.attributes)}</span> : null}
                         </div>
                         {product.riskDiscountSuggestion ? (
                           <p className="rounded-2xl border border-amber-400/15 bg-amber-500/8 px-3 py-2 text-xs text-amber-200">
@@ -2127,7 +2110,7 @@ function QuickActionButton({
   disabled?: boolean;
 }) {
   const classes =
-    "flex min-h-[84px] flex-col items-start justify-between rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-left transition-colors hover:bg-surface/70";
+      "flex min-h-[92px] flex-col items-start justify-between rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(14,23,37,0.96),rgba(8,14,24,0.94))] p-4 text-left shadow-[0_14px_30px_rgba(3,8,16,0.24)] transition-colors hover:border-white/14 hover:bg-[linear-gradient(135deg,rgba(18,28,44,0.98),rgba(9,16,28,0.96))]";
 
   if (href && !disabled) {
     return (
@@ -2189,13 +2172,13 @@ function CatalogProductImage({
       ? "aspect-[16/10] w-full object-cover"
       : size === "lg"
         ? "h-40 w-full rounded-2xl object-cover"
-        : "h-20 w-20 shrink-0 rounded-2xl object-cover";
+        : "h-24 w-24 shrink-0 rounded-[22px] object-cover";
   const fallbackClassName =
     size === "detail"
       ? "flex aspect-[16/10] w-full items-center justify-center bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted"
       : size === "lg"
         ? "flex h-40 w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted"
-        : "flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-xs font-medium uppercase tracking-[0.16em] text-muted";
+        : "flex h-24 w-24 shrink-0 items-center justify-center rounded-[22px] bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-xs font-medium uppercase tracking-[0.16em] text-muted";
 
   if (hasImage) {
     return <img src={image?.url || ""} alt={alt} className={className} loading="lazy" />;
