@@ -1018,7 +1018,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
-        <Card className="border-white/6 bg-card/90">
+        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_22px_48px_rgba(3,8,16,0.28)]">
           <CardHeader action={<Badge variant="muted">Inventario</Badge>}>
             <div>
               <CardTitle className="text-xl">Resumen operativo</CardTitle>
@@ -1088,8 +1088,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             <div className="flex flex-col gap-3 lg:flex-row">
-              <select
-                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text lg:min-w-[220px] lg:w-auto"
+                <select
+                  className="h-12 w-full rounded-2xl border border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] px-4 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-w-[220px] lg:w-auto"
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
               >
@@ -1111,7 +1111,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               </div>
             </div>
             {activeCategory ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">Categoria activa</Badge>
@@ -1131,7 +1131,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 ) : null}
               </div>
             ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="muted">Vista general</Badge>
@@ -1144,7 +1144,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               </div>
             )}
             {products.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
                   <CheckSquare className="h-4 w-4 text-brandBright" />
                   <span>{selectedIds.length} seleccionados</span>
@@ -1164,7 +1164,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 </div>
               </div>
             ) : null}
-            <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+            <div className="flex flex-col gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(13,21,33,0.92),rgba(9,15,24,0.96))] px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">Vencimiento</Badge>
                 <Button type="button" variant={expirationFilter === "all" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("all")}>
@@ -1410,7 +1410,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
 
         <div className="space-y-6">
-          <Card id="catalog-create-section" className="border-white/6 bg-card/90">
+          <Card id="catalog-create-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
             <CardHeader action={<Badge variant="warning">Atajos</Badge>}>
               <div>
                 <CardTitle className="text-xl">Acciones rápidas</CardTitle>
@@ -1439,7 +1439,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             </CardContent>
           </Card>
 
-          <Card id="catalog-load-section" className="border-white/6 bg-card/90">
+          <Card id="catalog-load-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
             <CardHeader action={<Badge variant="muted">Categorias</Badge>}>
               <div>
                 <CardTitle className="text-xl">Categorias del catalogo</CardTitle>
@@ -1465,7 +1465,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               ) : (
                 <div className="space-y-2">
                   {categories.map((category) => (
-                    <div key={category.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3">
+                    <div key={category.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] p-3">
                       <div className="min-w-0 flex-1">
                         {editingCategoryId === category.id ? (
                           <div className="flex flex-wrap items-center gap-2">
@@ -1546,7 +1546,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             </CardContent>
           </Card>
 
-          <Card className="border-white/6 bg-card/90">
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
             <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : "Alta rapida"}</Badge>}>
               <div>
                 <CardTitle className="text-xl">Carga de productos</CardTitle>
