@@ -954,6 +954,591 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
   }
 
+  const renderCatalogWorkspacePremium = () => (
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-5">
+        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_22px_48px_rgba(3,8,16,0.28)]">
+          <CardHeader
+            action={
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <Badge variant="muted">{visibleProducts.length} visibles</Badge>
+                {riskCount > 0 ? <Badge variant="warning">{riskCount} en riesgo</Badge> : null}
+                {categoryFilter ? <Badge variant="outline">Categoria filtrada</Badge> : null}
+              </div>
+            }
+          >
+            <div>
+              <CardTitle className="text-xl">Buscar y filtrar productos</CardTitle>
+              <CardDescription>Ordena el catalogo con foco comercial: producto, precio, stock y estado en una sola vista.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_240px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                <Input
+                  className="h-12 rounded-2xl border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] pl-10 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                  placeholder="Buscar por nombre, SKU o codigo de barras..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              <select
+                className="h-12 w-full rounded-2xl border border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] px-4 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="">Todas las categorias ({products.length})</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name} ({categoryProductCounts.get(category.id) || 0}){category.isActive ? "" : " · Inactiva"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant={expirationFilter === "all" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("all")}>
+                Todos
+              </Button>
+              <Button type="button" variant={expirationFilter === "expiring_soon" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("expiring_soon")}>
+                Proximos a vencer
+              </Button>
+              <Button type="button" variant={expirationFilter === "critical" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("critical")}>
+                Criticos
+              </Button>
+              <Button type="button" variant={expirationFilter === "expired" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("expired")}>
+                Vencidos
+              </Button>
+              <Button type="button" variant={sortByUrgency ? "secondary" : "ghost"} size="sm" onClick={() => setSortByUrgency((current) => !current)}>
+                {sortByUrgency ? "Urgencia primero" : "Orden original"}
+              </Button>
+            </div>
+
+            {activeCategory ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Categoria activa</Badge>
+                    <span className="text-sm font-medium">{activeCategory.name}</span>
+                    <Badge variant={activeCategory.isActive ? "success" : "muted"}>{activeCategory.isActive ? "Activa" : "Inactiva"}</Badge>
+                  </div>
+                  <p className="text-sm text-muted">
+                    {visibleProducts.length} visibles de {activeCategoryProductCount} producto{activeCategoryProductCount === 1 ? "" : "s"} en esta categoria.
+                  </p>
+                </div>
+                {!readOnly ? (
+                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => openQuickCreate(activeCategory.id)}>
+                    Agregar producto
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="muted">Vista general</Badge>
+                    <span className="text-sm font-medium">Todas las categorias</span>
+                  </div>
+                  <p className="text-sm text-muted">
+                    {visibleProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catalogo actual.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {products.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <CheckSquare className="h-4 w-4 text-brandBright" />
+                  <span>{selectedIds.length} seleccionados</span>
+                  {selectedVisibleCount > 0 ? <span>· {selectedVisibleCount} visibles</span> : null}
+                </div>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={toggleSelectAllVisible}>
+                    {allVisibleSelected ? "Limpiar visibles" : "Seleccionar todo"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
+                    Limpiar seleccion
+                  </Button>
+                  <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    {bulkDeleting ? "Eliminando..." : "Eliminar seleccionados"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_22px_48px_rgba(3,8,16,0.28)]">
+          <CardHeader
+            action={
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <Badge variant="muted">{visibleProducts.length} visibles</Badge>
+                <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setListExpanded((current) => !current)}>
+                  {listExpanded ? "Colapsar" : "Expandir"}
+                  {listExpanded ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
+                </Button>
+              </div>
+            }
+          >
+            <div>
+              <CardTitle className="text-xl">Todos los productos</CardTitle>
+              <CardDescription>Listado comercial del catalogo con foco en producto, precio, stock y acciones rapidas.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {!listExpanded && products.length > 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+                Listado colapsado para ahorrar espacio operativo. Expande cuando necesites revisar productos.
+              </div>
+            ) : products.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+                Todavia no hay productos. Crea el primero desde el rail derecho o usa la carga masiva.
+              </div>
+            ) : visibleProducts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+                {activeCategory && !hasActiveSearch && isFilteredCategoryEmpty
+                  ? `La categoria ${activeCategory.name} todavia no tiene productos. Agrega uno nuevo en esta categoria para empezar a organizar el catalogo.`
+                  : activeCategory && hasActiveSearch
+                    ? `No encontramos coincidencias para "${search.trim()}" dentro de ${activeCategory.name}. Ajusta la busqueda o revisa otra categoria.`
+                    : !activeCategory && hasActiveSearch
+                      ? `No encontramos productos para "${search.trim()}". Prueba con otro nombre o SKU.`
+                      : expirationFilter !== "all"
+                        ? "No hay productos para este filtro de vencimiento."
+                        : "No encontramos productos para el criterio actual."}
+              </div>
+            ) : (
+              <>
+                {visibleProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className={`overflow-hidden rounded-[26px] border transition-all ${
+                      selectedId === product.id
+                        ? "border-brand/35 bg-[linear-gradient(135deg,rgba(255,122,0,0.10),rgba(8,16,28,0.94))] shadow-[0_22px_48px_rgba(255,122,0,0.10)]"
+                        : "border-white/8 bg-[linear-gradient(135deg,rgba(15,24,38,0.96),rgba(7,13,22,0.94))] hover:border-white/14 hover:bg-[linear-gradient(135deg,rgba(18,28,44,0.98),rgba(9,16,28,0.96))]"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-4 p-4 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="flex min-w-0 flex-1 items-start gap-4">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(product.id)}
+                            onChange={() => toggleSelection(product.id)}
+                            className="mt-2 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
+                            aria-label={`Seleccionar ${product.name}`}
+                          />
+                          <CatalogProductImage product={product} />
+                        </div>
+                        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
+                          <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="min-w-0 space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="truncate text-lg font-semibold text-foreground">{product.name}</p>
+                                  <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
+                                    {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
+                                  </Badge>
+                                  {getProductPricing(product).hasDiscount ? <Badge variant="warning">Promocion</Badge> : null}
+                                </div>
+                                <p className="text-sm text-muted">{product.sku || "Sin SKU"}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
+                                  {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
+                                  <Badge variant={getStockState(resolveStock(product)).variant}>{resolveStock(product)} en stock</Badge>
+                                  <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
+                                    {getExpirationBadgePresentation(product.expirationDate).label}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="shrink-0 lg:text-right">
+                                {getProductPricing(product).hasDiscount ? (
+                                  <>
+                                    <p className="text-xs text-muted line-through">
+                                      {formatCurrency(getProductPricing(product).originalPrice, product.currency || "ARS")}
+                                    </p>
+                                    <p className="mt-1 text-2xl font-semibold text-foreground">
+                                      {formatCurrency(getProductPricing(product).finalPrice, product.currency || "ARS")}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="text-2xl font-semibold text-foreground">
+                                    {formatCurrency(resolvePrice(product), product.currency || "ARS")}
+                                  </p>
+                                )}
+                                <p className="mt-1 text-xs text-muted">Precio de venta</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+                              <span>{product.sku || "Sin SKU"}</span>
+                              <span>Stock {resolveStock(product)} unidades</span>
+                              <span>Vence {formatExpirationDate(product.expirationDate)}</span>
+                              <span>{getExpirationBadgePresentation(product.expirationDate).helper}</span>
+                              {product.attributes?.length ? <span>{formatAttributesText(product.attributes)}</span> : null}
+                            </div>
+                            {product.riskDiscountSuggestion ? (
+                              <p className="rounded-2xl border border-amber-400/15 bg-amber-500/8 px-3 py-2 text-xs text-amber-200">
+                                {product.riskDiscountSuggestion.helper}
+                                {product.riskDiscountSuggestion.currentDiscountPercentage != null
+                                  ? ` Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%.`
+                                  : ` Sugerido ${product.riskDiscountSuggestion.suggestedDiscountPercentage}%.`}
+                              </p>
+                            ) : null}
+                            <p className="line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
+                          </div>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 xl:max-w-[320px] xl:justify-end">
+                        <Button asChild variant="secondary" size="sm">
+                          <Link href={`/app/catalog/${product.id}`}>
+                            Ver detalle
+                            <ArrowRight className="ml-1 h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button asChild variant="secondary" size="sm">
+                          <Link href={`/app/catalog/${product.id}/edit`}>
+                            <PencilLine className="mr-1 h-4 w-4" />
+                            Editar
+                          </Link>
+                        </Button>
+                        {canApplyDirectDiscount(product) ? (
+                          <Button
+                            type="button"
+                            variant={getProductPricing(product).hasDiscount ? "secondary" : "primary"}
+                            size="sm"
+                            disabled={readOnly}
+                            onClick={() => openDiscountEditor(product)}
+                          >
+                            {product.riskDiscountSuggestion && !getProductPricing(product).hasDiscount ? "Aplicar sugerencia" : getProductPricing(product).hasDiscount ? "Editar descuento" : "Aplicar descuento"}
+                          </Button>
+                        ) : null}
+                        <Button type="button" variant="secondary" size="sm" disabled={readOnly || statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
+                          {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Archivar" : "Activar"}
+                        </Button>
+                        <Button type="button" variant="destructive" size="sm" disabled={readOnly || deletingId === product.id || bulkDeleting} onClick={() => void deleteProduct(product)}>
+                          <Trash2 className="mr-1 h-4 w-4" />
+                          {deletingId === product.id ? "Eliminando..." : "Eliminar"}
+                        </Button>
+                      </div>
+                    </div>
+                    {discountEditorId === product.id ? (
+                      <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/85 p-4">
+                        {product.riskDiscountSuggestion ? (
+                          <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3">
+                            <p className="text-sm font-medium text-amber-100">{product.riskDiscountSuggestion.label}</p>
+                            <p className="mt-1 text-xs text-amber-200/90">{product.riskDiscountSuggestion.helper}</p>
+                            <p className="mt-2 text-xs text-amber-200/80">
+                              Sugerido {product.riskDiscountSuggestion.suggestedDiscountPercentage}%
+                              {product.riskDiscountSuggestion.currentDiscountPercentage != null
+                                ? ` · Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%`
+                                : ""}
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                          <div className="space-y-2">
+                            <label htmlFor={`discount-${product.id}`} className="text-sm font-medium">
+                              Descuento %
+                            </label>
+                            <Input
+                              id={`discount-${product.id}`}
+                              value={discountDraft}
+                              onChange={(event) => setDiscountDraft(event.target.value)}
+                              inputMode="decimal"
+                              placeholder={product.riskDiscountSuggestion ? String(product.riskDiscountSuggestion.suggestedDiscountPercentage) : ""}
+                              className="w-full lg:w-40"
+                              disabled={discountSavingId === product.id}
+                            />
+                            <p className="text-xs text-muted">
+                              Precio final: {formatCurrency(getDiscountedPrice(resolvePrice(product), discountDraft).finalPrice, product.currency || "ARS")}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="ghost" size="sm" onClick={closeDiscountEditor} disabled={discountSavingId === product.id}>
+                              Cancelar
+                            </Button>
+                            {product.riskDiscountSuggestion && product.riskDiscountSuggestion.canApply ? (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                  const suggested = String(product.riskDiscountSuggestion?.suggestedDiscountPercentage || "");
+                                  setDiscountDraft(suggested);
+                                  void saveDiscount(product, suggested, {
+                                    automationAttribution: {
+                                      templateKey: "catalog_risk_discount",
+                                      action: "apply_suggestion",
+                                      suggestedDiscountPercentage: product.riskDiscountSuggestion?.suggestedDiscountPercentage || 0,
+                                      source: "catalog_manager"
+                                    }
+                                  });
+                                }}
+                                disabled={discountSavingId === product.id}
+                              >
+                                Aplicar sugerencia
+                              </Button>
+                            ) : null}
+                            {product.discountPercentage != null ? (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                  setDiscountDraft("");
+                                  void saveDiscount(product, "");
+                                }}
+                                disabled={discountSavingId === product.id}
+                              >
+                                Quitar descuento
+                              </Button>
+                            ) : null}
+                            <Button type="button" size="sm" onClick={() => void saveDiscount(product)} disabled={discountSavingId === product.id}>
+                              {discountSavingId === product.id ? "Guardando..." : "Guardar descuento"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-3 text-sm text-muted">
+                  <span>{visibleProducts.length} productos visibles</span>
+                  <span>{sortByUrgency ? "Ordenados por urgencia" : "Orden original"}</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-5">
+        <Card id="catalog-create-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
+          <CardHeader action={<Badge variant="warning">Atajos</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Acciones rapidas</CardTitle>
+              <CardDescription>Atajos para operar el catalogo sin salir de esta vista.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0 sm:grid-cols-2 xl:grid-cols-1">
+            <QuickActionButton
+              title="Nuevo producto"
+              description="Alta rapida"
+              onClick={() => {
+                openQuickCreate(categoryFilter || null);
+                scrollToSection("catalog-create-section");
+              }}
+              disabled={readOnly}
+            />
+            <QuickActionButton title="Importar productos" description="Carga masiva" onClick={openBulkImport} disabled={readOnly} />
+            <QuickActionButton title="Exportar catalogo" description="Excel compatible" onClick={exportVisibleProducts} />
+            <QuickActionButton title="Gestion de categorias" description="Orden comercial" onClick={() => scrollToSection("catalog-categories")} />
+            <QuickActionButton
+              title="Ver detalle"
+              description={selectedProduct ? selectedProduct.name : "Selecciona un producto"}
+              href={selectedProduct ? `/app/catalog/${selectedProduct.id}` : undefined}
+              disabled={!selectedProduct}
+            />
+          </CardContent>
+        </Card>
+
+        <Card id="catalog-load-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
+          <CardHeader action={<Badge variant="muted">Categorias</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Categorias</CardTitle>
+              <CardDescription>Gestiona y organiza tus productos para el catalogo y el bot.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent id="catalog-categories" className="space-y-4 pt-0">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+                placeholder="Ej. Fundas"
+                disabled={readOnly || categorySaving}
+              />
+              <Button type="button" onClick={() => void createCategory()} disabled={readOnly || categorySaving}>
+                {categorySaving ? "Guardando..." : "Crear categoria"}
+              </Button>
+            </div>
+            {categories.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                Todavia no hay categorias. Si no cargas ninguna, el bot mantiene el flujo general actual.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {categories.map((category) => (
+                  <div key={category.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] p-3">
+                    <div className="min-w-0 flex-1">
+                      {editingCategoryId === category.id ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            value={editingCategoryName}
+                            onChange={(event) => setEditingCategoryName(event.target.value)}
+                            disabled={readOnly || categoryUpdatingId === category.id}
+                            className="max-w-sm"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={readOnly || categoryUpdatingId === category.id}
+                            onClick={() => void saveCategoryRename(category)}
+                          >
+                            Guardar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={readOnly || categoryUpdatingId === category.id}
+                            onClick={cancelCategoryEdit}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{category.name}</span>
+                          <Badge variant={category.isActive ? "success" : "muted"}>{category.isActive ? "Activa" : "Inactiva"}</Badge>
+                          <Badge variant={(categoryProductCounts.get(category.id) || 0) > 0 ? "muted" : "outline"}>
+                            {categoryProductCounts.get(category.id) || 0} producto{(categoryProductCounts.get(category.id) || 0) === 1 ? "" : "s"}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {editingCategoryId === category.id ? null : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
+                          onClick={() => startCategoryEdit(category)}
+                        >
+                          Renombrar
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
+                        onClick={() => void toggleCategory(category)}
+                      >
+                        {categoryUpdatingId === category.id ? "Guardando..." : category.isActive ? "Desactivar" : "Activar"}
+                      </Button>
+                      {editingCategoryId === category.id ? null : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
+                          onClick={() => void deleteCategory(category)}
+                        >
+                          {categoryDeletingId === category.id ? "Eliminando..." : "Eliminar"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
+          <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : "Alta rapida"}</Badge>}>
+            <div>
+              <CardTitle className="text-xl">Sincronizacion y carga</CardTitle>
+              <CardDescription>Alta individual o carga masiva para mantener el catalogo listo para el canal y el bot.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={mode === "single" ? "primary" : "secondary"}
+                size="sm"
+                onClick={() => openQuickCreate(categoryFilter || null)}
+                disabled={readOnly}
+              >
+                Alta rapida
+              </Button>
+              <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={() => setMode("bulk")} disabled={readOnly}>
+                Carga masiva
+              </Button>
+            </div>
+            <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] p-4">
+              <p className="text-sm font-medium">Modo actual</p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                {mode === "single"
+                  ? "El formulario de alta rapida sigue disponible para crear productos sin salir del catalogo."
+                  : "La carga masiva sigue disponible con previsualizacion y validacion antes de importar."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" size="sm" onClick={mode === "single" ? () => scrollToSection("catalog-create-section") : openBulkImport} disabled={readOnly}>
+                  {mode === "single" ? "Ir al formulario" : "Abrir importacion"}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={exportVisibleProducts}>
+                  Exportar visibles
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
+          <CardHeader action={selectedProduct ? <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>{resolveStatus(selectedProduct) === "active" ? "Activo" : "Archivado"}</Badge> : null}>
+            <div>
+              <CardTitle className="text-xl">Vista rapida</CardTitle>
+              <CardDescription>Contexto inmediato del producto seleccionado.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            {!selectedProduct ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm text-muted">
+                Selecciona un producto del listado para ver su detalle.
+              </div>
+            ) : (
+              <>
+                <div className="overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-surface/55">
+                  <CatalogProductImage product={selectedProduct} size="detail" />
+                </div>
+                <DetailStat label="Producto" value={selectedProduct.name} />
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>
+                    {resolveStatus(selectedProduct) === "active" ? "Activo" : "Archivado"}
+                  </Badge>
+                  <Badge variant={getStockState(resolveStock(selectedProduct)).variant}>{getStockState(resolveStock(selectedProduct)).label}</Badge>
+                  <Badge variant={getExpirationBadgePresentation(selectedProduct.expirationDate).variant}>
+                    {getExpirationBadgePresentation(selectedProduct.expirationDate).label}
+                  </Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <DetailStat label="Precio final" value={formatCurrency(getProductPricing(selectedProduct).finalPrice, selectedProduct.currency || "ARS")} />
+                  <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
+                  <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
+                  <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
+                </div>
+                {!readOnly ? (
+                  <Button asChild variant="secondary" size="sm" className="rounded-2xl">
+                    <Link href={`/app/catalog/${selectedProduct.id}/edit`}>
+                      <PencilLine className="mr-2 h-4 w-4" />
+                      Editar producto
+                    </Link>
+                  </Button>
+                ) : null}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  );
+
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] px-5 py-5 shadow-[var(--card-shadow)] lg:px-7 lg:py-6">
@@ -1017,892 +1602,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </div>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
-        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_22px_48px_rgba(3,8,16,0.28)]">
-          <CardHeader action={<Badge variant="muted">Inventario</Badge>}>
-            <div>
-              <CardTitle className="text-xl">Resumen operativo</CardTitle>
-              <CardDescription>Prioriza reposicion y seguimiento usando solo productos activos del catalogo.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-3 pt-0 md:grid-cols-3">
-            <DetailStat label="Sin stock" value={String(inventoryAlerts.outOfStockCount)} />
-            <DetailStat label="Stock bajo" value={String(inventoryAlerts.lowStockCount)} />
-            <DetailStat label="Activos" value={String(inventoryAlerts.activeCount)} />
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant={inventoryAlerts.attentionProducts.length > 0 ? "warning" : "success"}>
-            {inventoryAlerts.attentionProducts.length > 0 ? "Requiere atencion" : "Saludable"}
-          </Badge>}>
-            <div>
-              <CardTitle className="text-xl">Requieren atencion</CardTitle>
-              <CardDescription>Productos activos con inventario agotado o en umbral bajo.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            {inventoryAlerts.attentionProducts.length === 0 ? (
-              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
-                No hay productos activos con alertas de inventario.
-              </div>
-            ) : (
-              inventoryAlerts.attentionProducts.slice(0, 5).map(({ product, stock, state }) => (
-                <div
-                  key={product.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{product.name}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {product.sku || "Sin SKU"} · Stock {stock}
-                    </p>
-                  </div>
-                  <Badge variant={state.variant}>{state.label}</Badge>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(340px,0.82fr)]">
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader
-            action={
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <Badge variant="muted">{visibleProducts.length} visibles</Badge>
-                {riskCount > 0 ? <Badge variant="warning">{riskCount} en riesgo</Badge> : null}
-                {categoryFilter ? <Badge variant="outline">Categoria filtrada</Badge> : null}
-                <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setListExpanded((current) => !current)}>
-                  {listExpanded ? "Colapsar" : "Expandir"}
-                  {listExpanded ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
-                </Button>
-              </div>
-            }
-          >
-            <div>
-              <CardTitle className="text-xl">Buscar y filtrar productos</CardTitle>
-              <CardDescription>Revisa el catálogo con foco comercial: nombre, SKU, stock, precio y estado en una sola vista.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <div className="flex flex-col gap-3 lg:flex-row">
-                <select
-                  className="h-12 w-full rounded-2xl border border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] px-4 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-w-[220px] lg:w-auto"
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-              >
-                <option value="">Todas las categorias ({products.length})</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name} ({categoryProductCounts.get(category.id) || 0}){category.isActive ? "" : " · Inactiva"}
-                  </option>
-                ))}
-              </select>
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                <Input
-                  className="h-12 rounded-2xl border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] pl-10 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-                  placeholder="Buscar por nombre, SKU o codigo de barras..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </div>
-            </div>
-            {activeCategory ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">Categoria activa</Badge>
-                    <span className="text-sm font-medium">{activeCategory.name}</span>
-                    <Badge variant={activeCategory.isActive ? "success" : "muted"}>
-                      {activeCategory.isActive ? "Activa" : "Inactiva"}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted">
-                    {visibleProducts.length} visibles de {activeCategoryProductCount} producto{activeCategoryProductCount === 1 ? "" : "s"} en esta categoria.
-                  </p>
-                </div>
-                {!readOnly ? (
-                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => openQuickCreate(activeCategory.id)}>
-                    Agregar producto en {activeCategory.name}
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="muted">Vista general</Badge>
-                    <span className="text-sm font-medium">Todas las categorías</span>
-                  </div>
-                  <p className="text-sm text-muted">
-                    {visibleProducts.length} visibles de {products.length} producto{products.length === 1 ? "" : "s"} en el catálogo actual.
-                  </p>
-                </div>
-              </div>
-            )}
-            {products.length > 0 ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
-                  <CheckSquare className="h-4 w-4 text-brandBright" />
-                  <span>{selectedIds.length} seleccionados</span>
-                  {selectedVisibleCount > 0 ? <span>· {selectedVisibleCount} visibles</span> : null}
-                </div>
-                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={toggleSelectAllVisible}>
-                    {allVisibleSelected ? "Limpiar visibles" : "Seleccionar todo"}
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
-                    Limpiar seleccion
-                  </Button>
-                  <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    {bulkDeleting ? "Eliminando..." : "Eliminar seleccionados"}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-            <div className="flex flex-col gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(13,21,33,0.92),rgba(9,15,24,0.96))] px-4 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Vencimiento</Badge>
-                <Button type="button" variant={expirationFilter === "all" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("all")}>
-                  Todos
-                </Button>
-                <Button type="button" variant={expirationFilter === "expiring_soon" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("expiring_soon")}>
-                  Próximos a vencer
-                </Button>
-                <Button type="button" variant={expirationFilter === "critical" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("critical")}>
-                  Críticos
-                </Button>
-                <Button type="button" variant={expirationFilter === "expired" ? "primary" : "ghost"} size="sm" onClick={() => setExpirationFilter("expired")}>
-                  Vencidos
-                </Button>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
-                <span>{riskCount > 0 ? `${riskCount} productos en riesgo` : "Sin productos en riesgo en esta vista"}</span>
-                <Button type="button" variant={sortByUrgency ? "secondary" : "ghost"} size="sm" onClick={() => setSortByUrgency((current) => !current)}>
-                  {sortByUrgency ? "Urgencia primero" : "Orden original"}
-                </Button>
-              </div>
-            </div>
-            {!listExpanded && products.length > 0 ? (
-              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                Listado colapsado para ahorrar espacio operativo. Mantienes buscador y acciones masivas listas para expandir cuando necesites revisar productos.
-              </div>
-            ) : products.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                Todavia no hay productos. Crea el primero desde el panel lateral o pega varias lineas en carga masiva para poblar rapido el catalogo.
-              </div>
-            ) : visibleProducts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                {activeCategory && !hasActiveSearch && isFilteredCategoryEmpty
-                  ? `La categoria ${activeCategory.name} todavia no tiene productos. Agrega uno nuevo en esta categoria para empezar a organizar el catalogo.`
-                  : activeCategory && hasActiveSearch
-                    ? `No encontramos coincidencias para "${search.trim()}" dentro de ${activeCategory.name}. Ajusta la busqueda o revisa otra categoria.`
-                    : !activeCategory && hasActiveSearch
-                      ? `No encontramos productos para "${search.trim()}". Prueba con otro nombre o SKU.`
-                      : expirationFilter !== "all"
-                        ? "No hay productos para este filtro de vencimiento."
-                        : "No encontramos productos para el criterio actual."}
-              </div>
-            ) : (
-              visibleProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className={`overflow-hidden rounded-[26px] border transition-all ${
-                    selectedId === product.id
-                      ? "border-brand/35 bg-[linear-gradient(135deg,rgba(255,122,0,0.10),rgba(8,16,28,0.94))] shadow-[0_22px_48px_rgba(255,122,0,0.10)]"
-                      : "border-white/8 bg-[linear-gradient(135deg,rgba(15,24,38,0.96),rgba(7,13,22,0.94))] hover:border-white/14 hover:bg-[linear-gradient(135deg,rgba(18,28,44,0.98),rgba(9,16,28,0.96))]"
-                  }`}
-                >
-                  <div className="flex flex-col gap-4 p-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex min-w-0 flex-1 items-start gap-4">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(product.id)}
-                          onChange={() => toggleSelection(product.id)}
-                          className="mt-2 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
-                          aria-label={`Seleccionar ${product.name}`}
-                        />
-                        <CatalogProductImage product={product} />
-                      </div>
-                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
-                        <div className="flex flex-col gap-3">
-                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="min-w-0 space-y-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-lg font-semibold text-foreground">{product.name}</p>
-                                <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
-                                  {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
-                                </Badge>
-                                {getProductPricing(product).hasDiscount ? <Badge variant="warning">Promocion</Badge> : null}
-                              </div>
-                              <p className="text-sm text-muted">{product.sku || "Sin SKU"}</p>
-                              <div className="flex flex-wrap gap-2">
-                                {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
-                                {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
-                                <Badge variant={getStockState(resolveStock(product)).variant}>{resolveStock(product)} en stock</Badge>
-                                <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
-                                  {getExpirationBadgePresentation(product.expirationDate).label}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="shrink-0 lg:text-right">
-                              {getProductPricing(product).hasDiscount ? (
-                                <>
-                                  <p className="text-xs text-muted line-through">
-                                    {formatCurrency(getProductPricing(product).originalPrice, product.currency || "ARS")}
-                                  </p>
-                                  <p className="mt-1 text-2xl font-semibold text-foreground">
-                                    {formatCurrency(getProductPricing(product).finalPrice, product.currency || "ARS")}
-                                  </p>
-                                </>
-                              ) : (
-                                <p className="text-2xl font-semibold text-foreground">
-                                  {formatCurrency(resolvePrice(product), product.currency || "ARS")}
-                                </p>
-                              )}
-                              <p className="mt-1 text-xs text-muted">Precio de venta</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
-                          <span>{product.sku || "Sin SKU"}</span>
-                          <span>Stock {resolveStock(product)} unidades</span>
-                          <span>Vence {formatExpirationDate(product.expirationDate)}</span>
-                          <span>{getExpirationBadgePresentation(product.expirationDate).helper}</span>
-                          {product.attributes?.length ? <span>{formatAttributesText(product.attributes)}</span> : null}
-                        </div>
-                        {product.riskDiscountSuggestion ? (
-                          <p className="rounded-2xl border border-amber-400/15 bg-amber-500/8 px-3 py-2 text-xs text-amber-200">
-                            {product.riskDiscountSuggestion.helper}
-                            {product.riskDiscountSuggestion.currentDiscountPercentage != null
-                              ? ` Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%.`
-                              : ` Sugerido ${product.riskDiscountSuggestion.suggestedDiscountPercentage}%.`}
-                          </p>
-                        ) : null}
-                        <p className="line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
-                        {product.attributes?.length ? (
-                          <p className="sr-only">Atributos: {formatAttributesText(product.attributes)}</p>
-                        ) : null}
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 xl:max-w-[300px] xl:justify-end">
-                      {canApplyDirectDiscount(product) ? (
-                        <Button
-                          type="button"
-                          variant={getProductPricing(product).hasDiscount ? "secondary" : "primary"}
-                          size="sm"
-                          disabled={readOnly}
-                          onClick={() => openDiscountEditor(product)}
-                        >
-                          {product.riskDiscountSuggestion && !getProductPricing(product).hasDiscount ? "Aplicar sugerencia" : getProductPricing(product).hasDiscount ? "Editar descuento" : "Aplicar descuento"}
-                        </Button>
-                      ) : null}
-                      <Button asChild variant="secondary" size="sm">
-                        <Link href={`/app/catalog/${product.id}/edit`}>
-                          <PencilLine className="mr-1 h-4 w-4" />
-                          Editar
-                        </Link>
-                      </Button>
-                      <Button type="button" variant="secondary" size="sm" disabled={readOnly || statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
-                        {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Archivar" : "Activar"}
-                      </Button>
-                      <Button type="button" variant="destructive" size="sm" disabled={readOnly || deletingId === product.id || bulkDeleting} onClick={() => void deleteProduct(product)}>
-                        <Trash2 className="mr-1 h-4 w-4" />
-                        {deletingId === product.id ? "Eliminando..." : "Eliminar"}
-                      </Button>
-                      <Button asChild variant="secondary" size="sm">
-                        <Link href={`/app/catalog/${product.id}`}>
-                          Ver detalle
-                          <ArrowRight className="ml-1 h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                  {discountEditorId === product.id ? (
-                    <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/85 p-4">
-                      {product.riskDiscountSuggestion ? (
-                        <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3">
-                          <p className="text-sm font-medium text-amber-100">{product.riskDiscountSuggestion.label}</p>
-                          <p className="mt-1 text-xs text-amber-200/90">{product.riskDiscountSuggestion.helper}</p>
-                          <p className="mt-2 text-xs text-amber-200/80">
-                            Sugerido {product.riskDiscountSuggestion.suggestedDiscountPercentage}%
-                            {product.riskDiscountSuggestion.currentDiscountPercentage != null
-                              ? ` · Actual ${product.riskDiscountSuggestion.currentDiscountPercentage}%`
-                              : ""}
-                          </p>
-                        </div>
-                      ) : null}
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="space-y-2">
-                          <label htmlFor={`discount-${product.id}`} className="text-sm font-medium">
-                            Descuento %
-                          </label>
-                          <Input
-                            id={`discount-${product.id}`}
-                            value={discountDraft}
-                            onChange={(event) => setDiscountDraft(event.target.value)}
-                            inputMode="decimal"
-                            placeholder={product.riskDiscountSuggestion ? String(product.riskDiscountSuggestion.suggestedDiscountPercentage) : ""}
-                            className="w-full lg:w-40"
-                            disabled={discountSavingId === product.id}
-                          />
-                          <p className="text-xs text-muted">
-                            Precio final: {formatCurrency(getDiscountedPrice(resolvePrice(product), discountDraft).finalPrice, product.currency || "ARS")}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="ghost" size="sm" onClick={closeDiscountEditor} disabled={discountSavingId === product.id}>
-                            Cancelar
-                          </Button>
-                          {product.riskDiscountSuggestion && product.riskDiscountSuggestion.canApply ? (
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                const suggested = String(product.riskDiscountSuggestion?.suggestedDiscountPercentage || "");
-                                setDiscountDraft(suggested);
-                                void saveDiscount(product, suggested, {
-                                  automationAttribution: {
-                                    templateKey: "catalog_risk_discount",
-                                    action: "apply_suggestion",
-                                    suggestedDiscountPercentage: product.riskDiscountSuggestion?.suggestedDiscountPercentage || 0,
-                                    source: "catalog_manager"
-                                  }
-                                });
-                              }}
-                              disabled={discountSavingId === product.id}
-                            >
-                              Aplicar sugerencia
-                            </Button>
-                          ) : null}
-                          {product.discountPercentage != null ? (
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                setDiscountDraft("");
-                                void saveDiscount(product, "");
-                              }}
-                              disabled={discountSavingId === product.id}
-                            >
-                              Quitar descuento
-                            </Button>
-                          ) : null}
-                          <Button type="button" size="sm" onClick={() => void saveDiscount(product)} disabled={discountSavingId === product.id}>
-                            {discountSavingId === product.id ? "Guardando..." : "Guardar descuento"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card id="catalog-create-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
-            <CardHeader action={<Badge variant="warning">Atajos</Badge>}>
-              <div>
-                <CardTitle className="text-xl">Acciones rápidas</CardTitle>
-                <CardDescription>Atajos para operar el catálogo sin salir de esta vista.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-3 pt-0 sm:grid-cols-2">
-              <QuickActionButton
-                title="Nuevo producto"
-                description="Alta rápida"
-                onClick={() => {
-                  openQuickCreate(categoryFilter || null);
-                  scrollToSection("catalog-create-section");
-                }}
-                disabled={readOnly}
-              />
-              <QuickActionButton title="Importar productos" description="Carga masiva" onClick={openBulkImport} disabled={readOnly} />
-              <QuickActionButton title="Exportar catálogo" description="Excel compatible" onClick={exportVisibleProducts} />
-              <QuickActionButton title="Gestión de categorías" description="Orden comercial" onClick={() => scrollToSection("catalog-categories")} />
-              <QuickActionButton
-                title="Ver detalle"
-                description={selectedProduct ? selectedProduct.name : "Selecciona un producto"}
-                href={selectedProduct ? `/app/catalog/${selectedProduct.id}` : undefined}
-                disabled={!selectedProduct}
-              />
-            </CardContent>
-          </Card>
-
-          <Card id="catalog-load-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
-            <CardHeader action={<Badge variant="muted">Categorias</Badge>}>
-              <div>
-                <CardTitle className="text-xl">Categorias del catalogo</CardTitle>
-                <CardDescription>Organiza productos por familia para que el catalogo y el bot puedan guiarlos mejor.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent id="catalog-categories" className="space-y-4 pt-0">
-              <div className="flex flex-wrap gap-2">
-                <Input
-                  value={categoryName}
-                  onChange={(event) => setCategoryName(event.target.value)}
-                  placeholder="Ej. Fundas"
-                  disabled={readOnly || categorySaving}
-                />
-                <Button type="button" onClick={() => void createCategory()} disabled={readOnly || categorySaving}>
-                  {categorySaving ? "Guardando..." : "Crear categoria"}
-                </Button>
-              </div>
-              {categories.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
-                  Todavia no hay categorias. Si no cargas ninguna, el bot mantiene el flujo general actual.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div key={category.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] p-3">
-                      <div className="min-w-0 flex-1">
-                        {editingCategoryId === category.id ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Input
-                              value={editingCategoryName}
-                              onChange={(event) => setEditingCategoryName(event.target.value)}
-                              disabled={readOnly || categoryUpdatingId === category.id}
-                              className="max-w-sm"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={readOnly || categoryUpdatingId === category.id}
-                              onClick={() => void saveCategoryRename(category)}
-                            >
-                              Guardar
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              disabled={readOnly || categoryUpdatingId === category.id}
-                              onClick={cancelCategoryEdit}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{category.name}</span>
-                            <Badge variant={category.isActive ? "success" : "muted"}>{category.isActive ? "Activa" : "Inactiva"}</Badge>
-                            <Badge variant={(categoryProductCounts.get(category.id) || 0) > 0 ? "muted" : "outline"}>
-                              {categoryProductCounts.get(category.id) || 0} producto{(categoryProductCounts.get(category.id) || 0) === 1 ? "" : "s"}
-                            </Badge>
-                            {(categoryProductCounts.get(category.id) || 0) === 0 ? (
-                              <span className="text-xs text-muted">Categoria vacia</span>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {editingCategoryId === category.id ? null : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
-                            onClick={() => startCategoryEdit(category)}
-                          >
-                            Renombrar
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
-                          onClick={() => void toggleCategory(category)}
-                        >
-                          {categoryUpdatingId === category.id ? "Guardando..." : category.isActive ? "Desactivar" : "Activar"}
-                        </Button>
-                        {editingCategoryId === category.id ? null : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={readOnly || categoryUpdatingId === category.id || categoryDeletingId === category.id}
-                            onClick={() => void deleteCategory(category)}
-                          >
-                            {categoryDeletingId === category.id ? "Eliminando..." : "Eliminar"}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
-            <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : "Alta rapida"}</Badge>}>
-              <div>
-                <CardTitle className="text-xl">Carga de productos</CardTitle>
-                <CardDescription>Elige entre alta individual o carga masiva para poblar el catalogo mas rapido sin salir del portal.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={mode === "single" ? "primary" : "secondary"}
-                  size="sm"
-                  onClick={() => openQuickCreate(categoryFilter || null)}
-                  disabled={readOnly}
-                >
-                  Alta rapida
-                </Button>
-                <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={() => setMode("bulk")} disabled={readOnly}>
-                  Carga masiva
-                </Button>
-              </div>
-
-              {mode === "single" ? (
-                <form className="space-y-4" onSubmit={saveProduct}>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Nombre</label>
-                    <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Combo mediodia" disabled={readOnly} />
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">SKU</label>
-                      <Input value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} placeholder="Ej. COMBO-MED-01" disabled={readOnly} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Moneda</label>
-                      <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="ARS" maxLength={3} disabled={readOnly} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Categoria</label>
-                    <select
-                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                      value={draft.categoryId}
-                      onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
-                      disabled={readOnly}
-                    >
-                      <option value="">Sin categoria</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}{category.isActive ? "" : " · Inactiva"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Subcategoria</label>
-                    <Input
-                      value={draft.subcategory}
-                      onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
-                      placeholder="Ej. Remeras, Celulares, Reparaciones"
-                      disabled={readOnly}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Texto alternativo</label>
-                    <Input
-                      value={draft.imageAlt}
-                      onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
-                      placeholder="Ej. Foto principal del producto"
-                      disabled={readOnly || uploadingImage}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Subir imagen</label>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void handleImageUpload(event)} />
-                      <Button type="button" variant="secondary" onClick={() => imageInputRef.current?.click()} disabled={readOnly || uploadingImage}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        {uploadingImage ? "Subiendo..." : "Subir imagen"}
-                      </Button>
-                      <p className="text-sm text-muted">
-                        {draft.imageSource === "uploaded" ? "La imagen queda guardada en Opturon." : "Subi una foto para usarla como imagen principal del producto."}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-                    <p className="text-sm font-medium">Preview</p>
-                    <div className="mt-3">
-                      <CatalogProductImage product={{ image: buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource) }} size="lg" />
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Precio</label>
-                      <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Stock basico</label>
-                      <Input value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="0" inputMode="numeric" disabled={readOnly} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Vencimiento opcional</label>
-                    <Input
-                      type="date"
-                      value={draft.expirationDate}
-                      onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
-                      disabled={readOnly}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Descripcion</label>
-                    <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Atributos configurables</label>
-                    <Textarea
-                      className="min-h-[120px]"
-                      value={draft.attributesText}
-                      onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
-                      placeholder={"Uno por linea\nTalle: M, L, XL\nColor: Negro, Blanco"}
-                      disabled={readOnly}
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Button type="button" variant="ghost" onClick={() => startCreate(categoryFilter || null)} disabled={readOnly || uploadingImage}>
-                      Limpiar
-                    </Button>
-                    <Button type="submit" disabled={readOnly || saving || uploadingImage}>
-                      {saving ? "Guardando..." : "Crear producto"}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Pega varias lineas</label>
-                    <Textarea
-                      className="min-h-[180px]"
-                      value={bulkText}
-                      onChange={(event) => setBulkText(event.target.value)}
-                      placeholder="nombre | sku | precio | stock | descripcion | categoria"
-                      disabled={readOnly}
-                    />
-                    <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <p className="text-sm font-semibold">Formato por linea</p>
-                      <p className="mt-2 font-mono text-xs leading-6 text-text">
-                        nombre | sku | precio | stock | descripcion | categoria
-                      </p>
-                      <div className="mt-4 grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
-                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Campos opcionales</p>
-                          <div className="mt-2 space-y-1 text-sm text-muted">
-                            <p>- sku</p>
-                            <p>- descripcion</p>
-                            <p>- categoria</p>
-                          </div>
-                        </div>
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
-                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Regla de categoria</p>
-                          <p className="mt-2 text-sm leading-6 text-muted">
-                            Si la categoria no existe, se crea automaticamente.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-4 rounded-2xl border border-dashed border-[color:var(--border)] bg-card/70 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Ejemplo</p>
-                        <p className="mt-2 font-mono text-xs leading-6 text-text">
-                          Funda silicona iPhone 11 | FUNDA-01 | 6000 | 10 | Silicona flexible | Fundas
-                        </p>
-                      </div>
-                      <p className="mt-3 text-xs leading-6 text-muted">
-                        Tambien sigue funcionando el formato viejo de 5 columnas sin categoria.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="secondary" onClick={() => buildBulkPreview(bulkText)} disabled={readOnly}>
-                      Previsualizar
-                    </Button>
-                    <Button type="button" variant="ghost" onClick={() => setBulkText(BULK_EXAMPLE)} disabled={readOnly}>
-                      Cargar ejemplo
-                    </Button>
-                    <Button type="button" disabled={readOnly || bulkImporting || validBulkRows.length === 0} onClick={() => void importBulkProducts()}>
-                      <Upload className="mr-2 h-4 w-4" />
-                      {bulkImporting ? "Importando..." : "Importar productos"}
-                    </Button>
-                  </div>
-
-                  {bulkPreview.length > 0 ? (
-                    <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold">Preview de importacion</p>
-                        <Badge variant={validBulkRows.length === bulkPreview.length ? "success" : "warning"}>
-                          {validBulkRows.length} / {bulkPreview.length} validas
-                        </Badge>
-                      </div>
-
-                      <div className="mt-4 hidden grid-cols-[auto_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-3 px-3 text-[11px] uppercase tracking-[0.14em] text-muted md:grid">
-                        <span>Fila</span>
-                        <span>Producto</span>
-                        <span>Precio / Stock</span>
-                        <span>Categoria</span>
-                        <span>Descripcion</span>
-                      </div>
-                      <div className="mt-4 space-y-3">
-                        {bulkPreview.map((row) => (
-                          <div key={`${row.sourceRow}-${row.raw}`} className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
-                            <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)] md:items-start">
-                              <div className="flex items-center gap-2">
-                                <Badge variant={row.valid ? "success" : "danger"}>Fila {row.sourceRow}</Badge>
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-medium">{row.name || "Sin nombre"}</p>
-                                {row.sku ? <p className="mt-1 text-xs text-muted">SKU: {row.sku}</p> : null}
-                              </div>
-                              <div className="text-sm text-muted">
-                                <p>{formatCurrency(row.price || 0)}</p>
-                                <p className="mt-1">Stock {row.stock}</p>
-                              </div>
-                              <div className="text-sm text-muted">
-                                {row.categoryName || "Sin categoria"}
-                              </div>
-                              <div className="text-sm text-muted">
-                                {row.description || "Sin descripcion"}
-                              </div>
-                            </div>
-                            {row.valid ? (
-                              <p className="mt-3 text-xs text-emerald-300 md:hidden">
-                                Categoria: {row.categoryName || "Sin categoria"}
-                              </p>
-                            ) : (
-                              <p className="mt-2 text-sm text-red-300">{row.error}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {bulkResult ? (
-                    <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="success">{bulkResult.created} creados</Badge>
-                        <Badge variant={bulkResult.failed > 0 ? "warning" : "muted"}>{bulkResult.failed} fallidos</Badge>
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        {bulkResult.results.map((row) => (
-                          <div key={`${row.sourceRow}-${row.status}-${row.productId || row.code || "result"}`} className="flex flex-wrap items-center gap-2 text-sm">
-                            <Badge variant={row.status === "created" ? "success" : "danger"}>Fila {row.sourceRow}</Badge>
-                            <span>{row.status === "created" ? `Creada (${row.productId})` : `Fallo: ${humanizeBulkCode(row.code)}`}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={selectedProduct ? <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>{resolveStatus(selectedProduct) === "active" ? "Activo" : "Archivado"}</Badge> : null}>
-              <div>
-                <CardTitle className="text-xl">Detalle rapido</CardTitle>
-                <CardDescription>Contexto rapido del producto seleccionado para validar precio, stock y disponibilidad.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              {!selectedProduct ? (
-                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm text-muted">
-                  Selecciona un producto del listado para ver su detalle.
-                </div>
-              ) : (
-                <>
-                  <div className="overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-surface/55">
-                    <CatalogProductImage product={selectedProduct} size="detail" />
-                  </div>
-                  <DetailStat label="Producto" value={selectedProduct.name} />
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant={resolveStatus(selectedProduct) === "active" ? "success" : "muted"}>
-                      {resolveStatus(selectedProduct) === "active" ? "Activo" : "Archivado"}
-                    </Badge>
-                    <Badge variant={getStockState(resolveStock(selectedProduct)).variant}>
-                      {getStockState(resolveStock(selectedProduct)).label}
-                    </Badge>
-                    <Badge variant={getExpirationBadgePresentation(selectedProduct.expirationDate).variant}>
-                      {getExpirationBadgePresentation(selectedProduct.expirationDate).label}
-                    </Badge>
-                    {getProductPricing(selectedProduct).hasDiscount ? <Badge variant="warning">En promocion</Badge> : null}
-                    {selectedProduct.riskDiscountSuggestion ? <Badge variant="warning">{selectedProduct.riskDiscountSuggestion.label}</Badge> : null}
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <DetailStat label="Precio base" value={formatCurrency(getProductPricing(selectedProduct).originalPrice, selectedProduct.currency || "ARS")} />
-                    <DetailStat label="Precio final" value={formatCurrency(getProductPricing(selectedProduct).finalPrice, selectedProduct.currency || "ARS")} />
-                    <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
-                    <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
-                    <DetailStat label="Subcategoria" value={selectedProduct.subcategory || "Sin subcategoria"} />
-                    <DetailStat label="Imagen principal" value={selectedProduct.image?.url || "Sin imagen"} />
-                    <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
-                    <DetailStat label="Vencimiento" value={formatExpirationDate(selectedProduct.expirationDate)} />
-                    <DetailStat label="Descuento" value={selectedProduct.discountPercentage != null ? `${selectedProduct.discountPercentage}%` : "Sin descuento"} />
-                    <DetailStat
-                      label="Sugerencia automatica"
-                      value={selectedProduct.riskDiscountSuggestion ? `${selectedProduct.riskDiscountSuggestion.suggestedDiscountPercentage}%` : "Sin sugerencia"}
-                    />
-                    <DetailStat label="Atributos" value={formatAttributesText(selectedProduct.attributes) || "Sin atributos"} />
-                    <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
-                  </div>
-                  {selectedProduct.riskDiscountSuggestion ? (
-                    <div className="rounded-[22px] border border-amber-400/20 bg-amber-500/10 p-4">
-                      <p className="text-sm font-semibold text-amber-100">Sugerencia automatica de descuento</p>
-                      <p className="mt-2 text-sm text-amber-200/90">{selectedProduct.riskDiscountSuggestion.helper}</p>
-                      <p className="mt-2 text-xs text-amber-200/80">
-                        Sugerido {selectedProduct.riskDiscountSuggestion.suggestedDiscountPercentage}%
-                        {selectedProduct.riskDiscountSuggestion.currentDiscountPercentage != null
-                          ? ` · Actual ${selectedProduct.riskDiscountSuggestion.currentDiscountPercentage}%`
-                          : ""}
-                      </p>
-                    </div>
-                  ) : null}
-                  {!readOnly ? (
-                    <Button asChild variant="secondary" size="sm" className="rounded-2xl">
-                      <Link href={`/app/catalog/${selectedProduct.id}/edit`}>
-                        <PencilLine className="mr-2 h-4 w-4" />
-                        Editar producto
-                      </Link>
-                    </Button>
-                  ) : null}
-                  {getStockState(resolveStock(selectedProduct)).isLowStock ? (
-                    <p className="text-sm text-amber-300">Quedan pocas unidades disponibles de este producto.</p>
-                  ) : null}
-                  {getStockState(resolveStock(selectedProduct)).isOutOfStock ? (
-                    <p className="text-sm text-red-300">Este producto no tiene stock disponible en este momento.</p>
-                  ) : null}
-                  <p className={`text-sm ${
-                    getExpirationBadgePresentation(selectedProduct.expirationDate).variant === "danger"
-                      ? "text-red-300"
-                      : getExpirationBadgePresentation(selectedProduct.expirationDate).variant === "warning"
-                        ? "text-amber-300"
-                        : "text-muted"
-                  }`}>
-                    {getExpirationBadgePresentation(selectedProduct.expirationDate).helper}
-                  </p>
-                  <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                    <p className="text-sm font-semibold">Descripcion</p>
-                    <p className="mt-2 text-sm leading-7 text-muted">{selectedProduct.description || "Sin descripcion cargada."}</p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+      {renderCatalogWorkspacePremium()}
     </div>
   );
 }
