@@ -2,7 +2,7 @@
 
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Upload } from "lucide-react";
+import { CalendarClock, FileText, ImageIcon, Layers3, Package2, Save, Upload, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +60,11 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
   const [categories, setCategories] = useState<PortalProductCategory[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource);
+  const finalPrice = new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: draft.currency || "ARS",
+    maximumFractionDigits: 2
+  }).format(getDiscountedPrice(Number(draft.price || 0), draft.discountPercentage).finalPrice);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,148 +199,292 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
 
   return (
     <form className="space-y-6" onSubmit={submitProduct}>
-      <Card className="border-white/6 bg-card/90">
-        <CardHeader action={<Badge variant="warning">Editable</Badge>}>
-          <div>
-            <CardTitle className="text-xl">Editar producto</CardTitle>
-            <CardDescription>Actualiza informacion comercial basica sin salir del portal.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 pt-0 md:grid-cols-2">
-          <Input placeholder="Nombre del producto" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={saving || uploadingImage} />
-          <Input placeholder="Codigo / SKU" value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} disabled={saving || uploadingImage} />
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Precio"
-            value={draft.price}
-            onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <Input
-            type="number"
-            step="1"
-            min="0"
-            placeholder="Stock disponible"
-            value={draft.stock}
-            onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <Input placeholder="Moneda" maxLength={3} value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving || uploadingImage} />
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="IVA %"
-            value={draft.vatRate}
-            onChange={(event) => setDraft((current) => ({ ...current, vatRate: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <select
-            className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-            value={draft.status}
-            onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}
-            disabled={saving || uploadingImage}
-          >
-            <option value="active">Activo</option>
-            <option value="archived">Archivado</option>
-          </select>
-          <select
-            className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-            value={draft.categoryId}
-            onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
-            disabled={saving || uploadingImage}
-          >
-            <option value="">Sin categoria</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}{category.isActive ? "" : " · Inactiva"}
-              </option>
-            ))}
-          </select>
-          <Input
-            placeholder="Subcategoria"
-            value={draft.subcategory}
-            onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <Input
-            className="md:col-span-2"
-            placeholder="Texto alternativo de la imagen"
-            value={draft.imageAlt}
-            onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted md:col-span-2">
-            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void handleImageUpload(event)} />
-            <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={saving || uploadingImage}>
-              <Upload className="mr-2 h-4 w-4" />
-              {uploadingImage ? "Subiendo imagen..." : "Subir imagen"}
-            </Button>
-            <span>{draft.imageSource === "uploaded" ? "La imagen ya quedo guardada en Opturon." : "Subi una foto para usarla como imagen principal del producto."}</span>
-          </div>
-          <Input
-            type="date"
-            value={draft.expirationDate}
-            onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            placeholder="Descuento %"
-            value={draft.discountPercentage}
-            onChange={(event) => setDraft((current) => ({ ...current, discountPercentage: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <Textarea
-            className="md:col-span-2"
-            rows={6}
-            placeholder="Descripcion comercial del producto"
-            value={draft.description}
-            onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <Textarea
-            className="md:col-span-2"
-            rows={4}
-            placeholder={"Atributos configurables (uno por linea)\nTalle: M, L, XL\nColor: Negro, Blanco"}
-            value={draft.attributesText}
-            onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
-            disabled={saving || uploadingImage}
-          />
-          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
-            <p className="font-medium text-text">Preview de imagen</p>
-            <div className="mt-3 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-bg/60">
-              <CatalogProductImagePreview image={image} name={draft.name} />
-            </div>
-          </div>
-          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted md:col-span-2">
-            Precio final visible: {new Intl.NumberFormat("es-AR", { style: "currency", currency: draft.currency || "ARS", maximumFractionDigits: 2 }).format(
-              getDiscountedPrice(Number(draft.price || 0), draft.discountPercentage).finalPrice
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.22fr)_380px]">
+        <div className="space-y-6">
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
+            <CardHeader action={<Badge variant="warning">Editable</Badge>}>
+              <div>
+                <CardTitle className="text-xl">Informacion general</CardTitle>
+                <CardDescription>Actualiza la identidad comercial, clasificacion y estado operativo del producto.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2 xl:col-span-2">
+                <label className="text-sm font-medium">Nombre del producto</label>
+                <Input placeholder="Ej. Plan Empresa" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">SKU</label>
+                <Input placeholder="Ej. PLAN-PRO" value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Categoria</label>
+                <select
+                  className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={draft.categoryId}
+                  onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
+                  disabled={saving || uploadingImage}
+                >
+                  <option value="">Sin categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}{category.isActive ? "" : " · Inactiva"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Subcategoria</label>
+                <Input
+                  placeholder="Ej. Premium"
+                  value={draft.subcategory}
+                  onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
+                  disabled={saving || uploadingImage}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Estado</label>
+                <select
+                  className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={draft.status}
+                  onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}
+                  disabled={saving || uploadingImage}
+                >
+                  <option value="active">Activo</option>
+                  <option value="archived">Archivado</option>
+                </select>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card className="border-white/6 bg-card/90">
-        <CardHeader>
-          <div>
-            <CardTitle className="text-xl">Guardar cambios</CardTitle>
-            <CardDescription>Cuando termines, vuelve al detalle del producto para seguir operando en catalogo.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <Button type="submit" className="w-full rounded-2xl" disabled={saving || uploadingImage}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? "Guardando..." : "Guardar producto"}
-          </Button>
-        </CardContent>
-      </Card>
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <FileText className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Descripcion</CardTitle>
+                  <CardDescription>Cuenta que es tu producto, que incluye y como se presenta para el equipo comercial.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-0">
+              <label className="text-sm font-medium">Descripcion comercial</label>
+              <Textarea
+                className="min-h-[180px]"
+                rows={7}
+                placeholder="Describe beneficios, contexto y detalles operativos del producto."
+                value={draft.description}
+                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                disabled={saving || uploadingImage}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <Wallet className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Precio e inventario</CardTitle>
+                  <CardDescription>Define precio base, descuento, stock y configuracion fiscal sin salir del catalogo.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Precio base</label>
+                <Input type="number" step="0.01" min="0" placeholder="0" value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Moneda</label>
+                <Input placeholder="ARS" maxLength={3} value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">IVA %</label>
+                <Input type="number" step="0.01" min="0" placeholder="0" value={draft.vatRate} onChange={(event) => setDraft((current) => ({ ...current, vatRate: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Stock disponible</label>
+                <Input type="number" step="1" min="0" placeholder="0" value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descuento %</label>
+                <Input type="number" step="0.01" min="0" max="100" placeholder="0" value={draft.discountPercentage} onChange={(event) => setDraft((current) => ({ ...current, discountPercentage: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">Precio final visible</p>
+                <p className="mt-3 text-lg font-semibold">{finalPrice}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <CalendarClock className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Vencimiento</CardTitle>
+                  <CardDescription>Usalo cuando el producto tenga control por fecha o descuentos estacionales.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 pt-0 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Fecha de vencimiento</label>
+                <Input type="date" value={draft.expirationDate} onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+                {draft.expirationDate
+                  ? "El producto muestra una fecha cargada y puede seguir el circuito de control vigente."
+                  : "Todavia no hay una fecha de vencimiento definida para este producto."}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[0_22px_52px_rgba(3,8,16,0.24)]">
+            <CardHeader action={<Badge variant={draft.status === "active" ? "success" : "muted"}>{draft.status === "active" ? "Activo" : "Archivado"}</Badge>}>
+              <div>
+                <CardTitle className="text-xl">Vista previa del producto</CardTitle>
+                <CardDescription>Asi se ve el producto con la informacion actual que estas editando.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="overflow-hidden rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_top_right,rgba(176,80,0,0.32),transparent_38%),linear-gradient(135deg,rgba(34,19,8,0.92),rgba(13,21,33,0.98))]">
+                <CatalogProductImagePreview image={image} name={draft.name} />
+              </div>
+              <div className="space-y-3 rounded-[24px] border border-white/8 bg-surface/55 p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  {draft.categoryId ? <Badge variant="warning">{categories.find((category) => category.id === draft.categoryId)?.name || "Categoria"}</Badge> : null}
+                  {draft.subcategory ? <Badge variant="muted">{draft.subcategory}</Badge> : null}
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold leading-tight">{draft.name || "Nombre del producto"}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted">{draft.description.trim() || "Sin descripcion comercial cargada todavia."}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <PreviewStat label="Precio final" value={finalPrice} />
+                  <PreviewStat label="Stock actual" value={`${Number(draft.stock || 0)} unidades`} />
+                  <PreviewStat label="SKU" value={draft.sku || "Sin codigo"} />
+                  <PreviewStat label="IVA" value={`${Number(draft.vatRate || 0)}%`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[0_22px_52px_rgba(3,8,16,0.24)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <ImageIcon className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Imagen del producto</CardTitle>
+                  <CardDescription>Subi o reemplaza la imagen principal sin salir del editor.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="overflow-hidden rounded-[24px] border border-white/8 bg-surface/45">
+                <CatalogProductImagePreview image={image} name={draft.name} />
+              </div>
+              <div className="rounded-[22px] border border-dashed border-white/12 bg-surface/45 p-4">
+                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void handleImageUpload(event)} />
+                <Button type="button" variant="secondary" className="w-full rounded-2xl" onClick={() => fileInputRef.current?.click()} disabled={saving || uploadingImage}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  {uploadingImage ? "Subiendo imagen..." : "Subir nueva imagen"}
+                </Button>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  {draft.imageSource === "uploaded" ? "La imagen actual ya esta guardada en Opturon." : "Acepta JPG, PNG o WebP y se usa como imagen principal del producto."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[0_22px_52px_rgba(3,8,16,0.24)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <Layers3 className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Atributos configurables</CardTitle>
+                  <CardDescription>Define variantes u opciones comerciales usando el mismo formato ya soportado por el producto.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-0">
+              <label className="text-sm font-medium">Atributos</label>
+              <Textarea
+                className="min-h-[160px]"
+                rows={6}
+                placeholder={"Atributos configurables (uno por linea)\nTalle: M, L, XL\nColor: Negro, Blanco"}
+                value={draft.attributesText}
+                onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
+                disabled={saving || uploadingImage}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[0_22px_52px_rgba(3,8,16,0.24)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <Package2 className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Informacion adicional</CardTitle>
+                  <CardDescription>Campos complementarios para mejorar la lectura interna y la presentacion del producto.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Texto alternativo de la imagen</label>
+                <Input placeholder="Ej. Banner Plan Empresa" value={draft.imageAlt} onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+                Este editor mantiene intactos precio, stock, imagen, categoria, descuento y atributos usando los mismos handlers del catalogo actual.
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-brand/20 bg-[linear-gradient(180deg,rgba(33,22,14,0.92),rgba(12,17,26,0.98))] shadow-[0_24px_60px_rgba(176,80,0,0.12)]">
+            <CardHeader>
+              <div>
+                <CardTitle className="text-xl">Guardar cambios</CardTitle>
+                <CardDescription>Cuando termines, el producto vuelve a su detalle con la informacion actualizada.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <Button type="submit" className="w-full rounded-2xl" disabled={saving || uploadingImage}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Guardando..." : "Guardar producto"}
+              </Button>
+              <Button type="button" variant="secondary" className="w-full rounded-2xl" onClick={() => router.push(`/app/catalog/${product.id}`)} disabled={saving || uploadingImage}>
+                Volver al detalle
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </form>
+  );
+}
+
+function PreviewStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-bg/45 p-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
+      <p className="mt-2 text-sm font-medium">{value}</p>
+    </div>
   );
 }
 
