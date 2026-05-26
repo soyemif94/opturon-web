@@ -2,12 +2,16 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Calculator,
   Clock3,
   Eye,
   History,
+  ListOrdered,
   Loader2,
   LockKeyhole,
+  Printer,
   Store,
   UnlockKeyhole,
   Wallet
@@ -29,7 +33,7 @@ type CashHubProps = {
   readOnly?: boolean;
 };
 
-type CashSectionKey = "boxes" | "sessions" | "history" | "calculator";
+type CashSectionKey = "boxes" | "sessions" | "history" | "calculator" | "movements";
 
 type OpenFormState = {
   paymentDestinationId: string;
@@ -164,10 +168,14 @@ export function CashHub({
   const [closeForms, setCloseForms] = useState<CloseFormState>({});
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<CashSectionKey | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    initialCashBoxes.find((box) => box.currentSession)?.currentSession?.id || null
+  );
   const boxesSectionRef = useRef<HTMLDivElement | null>(null);
   const sessionsSectionRef = useRef<HTMLDivElement | null>(null);
   const historySectionRef = useRef<HTMLDivElement | null>(null);
   const calculatorSectionRef = useRef<HTMLDivElement | null>(null);
+  const movementsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const activeCashBoxes = useMemo(() => cashBoxes.filter((box) => box.isActive), [cashBoxes]);
   const openSessions = useMemo(
@@ -183,7 +191,7 @@ export function CashHub({
     () => openSessions.reduce((sum, session) => sum + Number(session.metrics?.salesAmount || 0), 0),
     [openSessions]
   );
-  const primarySession = openSessions[0] || null;
+  const primarySession = openSessions.find((session) => session.id === selectedSessionId) || openSessions[0] || null;
   const todayClosedSessions = useMemo(
     () => recentClosedSessions.filter((session) => isToday(session.closedAt)),
     [recentClosedSessions]
@@ -218,6 +226,10 @@ export function CashHub({
           ? current.paymentDestinationId
           : nextCashBoxes.find((box) => box.isActive && !box.currentSession)?.id || ""
     }));
+    setSelectedSessionId((current) => {
+      if (current && nextCashBoxes.some((box) => box.currentSession?.id === current)) return current;
+      return nextCashBoxes.find((box) => box.currentSession)?.currentSession?.id || null;
+    });
   }
 
   async function openCashSession() {
@@ -316,7 +328,9 @@ export function CashHub({
           ? sessionsSectionRef.current
           : section === "history"
             ? historySectionRef.current
-            : calculatorSectionRef.current;
+            : section === "movements"
+              ? movementsSectionRef.current
+              : calculatorSectionRef.current;
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -402,11 +416,26 @@ export function CashHub({
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-5 pt-0">
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
                       <div className="space-y-4">
                         <div className="rounded-[24px] border border-white/8 bg-surface/55 p-5">
                           <p className="text-sm text-muted">Caja</p>
-                          <p className="mt-2 text-xl font-semibold">{primarySession.paymentDestination?.name || "Caja"}</p>
+                          {openSessions.length > 1 ? (
+                            <select
+                              className="mt-2 h-11 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                              value={primarySession.id}
+                              onChange={(event) => setSelectedSessionId(event.target.value)}
+                              disabled={busyAction !== null}
+                            >
+                              {openSessions.map((session) => (
+                                <option key={session.id} value={session.id}>
+                                  {session.paymentDestination?.name || "Caja"}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="mt-2 text-xl font-semibold">{primarySession.paymentDestination?.name || "Caja"}</p>
+                          )}
                           <div className="mt-4 grid gap-4 sm:grid-cols-2">
                             <DetailStat label="Responsable" value={primarySession.openedByNameSnapshot || "Equipo"} />
                             <DetailStat label="Apertura" value={formatDate(primarySession.openedAt)} />
@@ -416,29 +445,39 @@ export function CashHub({
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <HighlightStat label="Total contado" value={formatCurrency(primarySession.metrics?.expectedAmountCurrent)} tone="green" />
-                          <HighlightStat label="Ventas imputadas" value={formatCurrency(primarySession.metrics?.salesAmount)} tone="blue" />
-                          <HighlightStat label="Pedidos visibles" value={String(primarySession.metrics?.ordersCount || 0)} tone="violet" />
-                          <HighlightStat label="Cierre esperado" value={formatCurrency(primarySession.metrics?.expectedAmountCurrent)} tone="amber" />
+                          <HighlightStat label="Transferencias" value={formatCountedBreakdown(primarySession.transferCountedAmount)} tone="blue" />
+                          <HighlightStat label="Tarjetas" value="Sin dato" tone="violet" />
+                          <HighlightStat label="Otros medios" value="Sin dato" tone="amber" />
                         </div>
                         <div className="flex flex-wrap gap-3">
-                          <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => scrollToSection("calculator")}>
-                            <Calculator className="mr-2 h-4 w-4" />
-                            Ver calculadora
+                          <Button type="button" variant="secondary" className="rounded-2xl" disabled>
+                            <ArrowDown className="mr-2 h-4 w-4 text-emerald-300" />
+                            Ingresar dinero
                           </Button>
-                          <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => scrollToSection("history")}>
-                            <History className="mr-2 h-4 w-4" />
-                            Ver historial
+                          <Button type="button" variant="secondary" className="rounded-2xl" disabled>
+                            <ArrowUp className="mr-2 h-4 w-4 text-red-300" />
+                            Retirar dinero
+                          </Button>
+                          <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => scrollToSection("movements")}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver movimientos
                           </Button>
                           <Button type="button" className="rounded-2xl" onClick={() => void closeCashSession(primarySession.id)} disabled={readOnly || busyAction !== null}>
                             {busyAction === primarySession.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
                             Cerrar sesion
                           </Button>
                         </div>
+                        <p className="text-xs text-muted">
+                          Ingresar dinero y retirar dinero todavia no tienen un flujo manual real separado en esta fuente de caja. Se mantienen visibles, pero no se simulan.
+                        </p>
                       </div>
                       <div className="rounded-[26px] border border-brand/20 bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.24),transparent_38%),linear-gradient(180deg,rgba(25,20,16,0.94),rgba(10,16,27,0.98))] p-5">
                         <p className="text-sm font-medium text-brandSoft">Lectura operativa</p>
                         <p className="mt-4 text-3xl font-semibold">{formatCurrency(primarySession.metrics?.salesAmount)}</p>
                         <p className="mt-2 text-sm leading-6 text-muted">Ventas visibles en la sesion principal. El cierre real se calcula con el efectivo y las transferencias que cargues al final del turno.</p>
+                        <div className="mt-5">
+                          <CashRegisterIllustration />
+                        </div>
                       </div>
                     </div>
 
@@ -595,10 +634,11 @@ export function CashHub({
               </Card>
             </div>
 
+            <div ref={movementsSectionRef} className="scroll-mt-28">
             <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_20px_52px_rgba(3,8,16,0.22)]">
               <CardHeader action={<Badge variant="muted">{recentVisibleOrders.length} visibles</Badge>}>
                 <div>
-                  <CardTitle className="text-xl">Ultimos movimientos</CardTitle>
+                  <CardTitle className="text-xl">Movimientos del dia</CardTitle>
                   <CardDescription>Ventas visibles imputadas a las sesiones abiertas, ordenadas por hora de movimiento.</CardDescription>
                 </div>
               </CardHeader>
@@ -627,6 +667,7 @@ export function CashHub({
                 )}
               </CardContent>
             </Card>
+            </div>
 
             <div ref={historySectionRef} className="scroll-mt-28">
               <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_20px_52px_rgba(3,8,16,0.22)]">
@@ -726,11 +767,14 @@ export function CashHub({
                   <CardDescription>Atajos reales para operar caja sin salir de este modulo.</CardDescription>
                 </div>
               </CardHeader>
-              <CardContent className="grid gap-3 pt-0 sm:grid-cols-2 xl:grid-cols-1">
-                <QuickActionButton title="Abrir sesion" description="Nueva caja operativa" onClick={() => scrollToSection("boxes")} disabled={readOnly || !availableCashBoxes.length || !backendReady} />
-                <QuickActionButton title="Ver sesion activa" description="Cierre y arqueo actual" onClick={() => scrollToSection("sessions")} disabled={!openSessions.length} />
-                <QuickActionButton title="Historial de cierres" description="Resumen del dia" onClick={() => scrollToSection("history")} />
-                <QuickActionButton title="Calculadora" description="Soporte rapido" onClick={() => scrollToSection("calculator")} />
+              <CardContent className="grid gap-3 pt-0 sm:grid-cols-2">
+                <QuickActionButton title="Ingresar dinero" description="Sin flujo manual" icon={ArrowDown} tone="green" disabled />
+                <QuickActionButton title="Retirar dinero" description="Sin flujo manual" icon={ArrowUp} tone="red" disabled />
+                <QuickActionButton title="Cierre rapido" description="Sesion activa" icon={LockKeyhole} tone="amber" onClick={() => scrollToSection("sessions")} disabled={!openSessions.length} />
+                <QuickActionButton title="Imprimir reporte" description="Resumen visual" icon={Printer} tone="blue" onClick={() => window.print()} />
+                <QuickActionButton title="Ver arqueo" description="Caja actual" icon={Clock3} tone="violet" onClick={() => scrollToSection("sessions")} disabled={!openSessions.length} />
+                <QuickActionButton title="Historial de cierres" description="Ultimos cierres" icon={ListOrdered} tone="amber" onClick={() => scrollToSection("history")} />
+                <QuickActionButton title="Calculadora" description="Soporte rapido" icon={Calculator} tone="blue" onClick={() => scrollToSection("calculator")} fullWidth />
               </CardContent>
             </Card>
 
@@ -841,24 +885,70 @@ function HighlightStat({
 function QuickActionButton({
   title,
   description,
+  icon: Icon,
   onClick,
-  disabled = false
+  disabled = false,
+  tone = "blue",
+  fullWidth = false
 }: {
   title: string;
   description: string;
+  icon: React.ComponentType<{ className?: string }>;
   onClick?: () => void;
   disabled?: boolean;
+  tone?: "green" | "red" | "amber" | "blue" | "violet";
+  fullWidth?: boolean;
 }) {
+  const toneClass = {
+    green: "text-emerald-300",
+    red: "text-red-300",
+    amber: "text-amber-300",
+    blue: "text-blue-300",
+    violet: "text-violet-300"
+  } as const;
+
   return (
     <button
       type="button"
-      className="flex min-h-[88px] flex-col items-start justify-between rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(14,23,37,0.96),rgba(8,14,24,0.94))] p-4 text-left shadow-[0_14px_30px_rgba(3,8,16,0.24)] transition-colors hover:border-white/14 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`flex min-h-[88px] flex-col items-start justify-between rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(14,23,37,0.96),rgba(8,14,24,0.94))] p-4 text-left shadow-[0_14px_30px_rgba(3,8,16,0.24)] transition-colors hover:border-white/14 disabled:cursor-not-allowed disabled:opacity-50 ${fullWidth ? "sm:col-span-2" : ""}`}
       onClick={onClick}
       disabled={disabled}
     >
+      <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-card/80 ${toneClass[tone]}`}>
+        <Icon className="h-5 w-5" />
+      </span>
       <span className="text-sm font-medium">{title}</span>
       <span className="text-xs text-muted">{description}</span>
     </button>
+  );
+}
+
+function CashRegisterIllustration() {
+  return (
+    <svg viewBox="0 0 220 180" className="w-full max-w-[220px]" aria-hidden="true">
+      <defs>
+        <linearGradient id="cashStroke" x1="0%" x2="100%" y1="0%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,191,94,0.95)" />
+          <stop offset="100%" stopColor="rgba(255,121,26,0.7)" />
+        </linearGradient>
+        <linearGradient id="cashGlow" x1="0%" x2="100%" y1="0%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,143,32,0.95)" />
+          <stop offset="100%" stopColor="rgba(176,80,0,0.9)" />
+        </linearGradient>
+      </defs>
+      <rect x="48" y="92" width="120" height="58" rx="10" fill="rgba(9,13,22,0.96)" stroke="url(#cashStroke)" strokeWidth="2" />
+      <rect x="60" y="102" width="96" height="30" rx="8" fill="rgba(14,20,31,0.94)" stroke="rgba(255,143,32,0.22)" />
+      <rect x="80" y="28" width="60" height="54" rx="10" transform="rotate(12 110 55)" fill="rgba(13,18,29,0.96)" stroke="url(#cashStroke)" strokeWidth="2" />
+      <rect x="92" y="40" width="12" height="8" rx="2" fill="url(#cashGlow)" transform="rotate(12 98 44)" />
+      <rect x="108" y="44" width="12" height="8" rx="2" fill="url(#cashGlow)" transform="rotate(12 114 48)" />
+      <rect x="95" y="56" width="12" height="8" rx="2" fill="url(#cashGlow)" transform="rotate(12 101 60)" />
+      <rect x="111" y="60" width="12" height="8" rx="2" fill="url(#cashGlow)" transform="rotate(12 117 64)" />
+      <rect x="104" y="84" width="20" height="12" rx="4" fill="rgba(16,20,30,0.98)" stroke="rgba(255,143,32,0.24)" />
+      <rect x="96" y="120" width="24" height="6" rx="3" fill="rgba(255,143,32,0.28)" />
+      <circle cx="110" cy="134" r="3" fill="url(#cashGlow)" />
+      <ellipse cx="110" cy="158" rx="56" ry="12" fill="rgba(255,143,32,0.09)" />
+      <ellipse cx="110" cy="158" rx="74" ry="18" fill="none" stroke="rgba(255,143,32,0.14)" />
+    </svg>
   );
 }
 
