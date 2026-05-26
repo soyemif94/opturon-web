@@ -1329,7 +1329,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               description="Alta rapida"
               onClick={() => {
                 openQuickCreate(categoryFilter || null);
-                scrollToSection("catalog-create-section");
+                scrollToSection("catalog-load-section");
               }}
               disabled={readOnly}
             />
@@ -1467,7 +1467,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               >
                 Alta rapida
               </Button>
-              <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={() => setMode("bulk")} disabled={readOnly}>
+              <Button type="button" variant={mode === "bulk" ? "primary" : "secondary"} size="sm" onClick={openBulkImport} disabled={readOnly}>
                 Carga masiva
               </Button>
             </div>
@@ -1479,7 +1479,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   : "La carga masiva sigue disponible con previsualizacion y validacion antes de importar."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" size="sm" onClick={mode === "single" ? () => scrollToSection("catalog-create-section") : openBulkImport} disabled={readOnly}>
+                <Button type="button" variant="secondary" size="sm" onClick={mode === "single" ? () => scrollToSection("catalog-load-section") : openBulkImport} disabled={readOnly}>
                   {mode === "single" ? "Ir al formulario" : "Abrir importacion"}
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={exportVisibleProducts}>
@@ -1487,6 +1487,244 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 </Button>
               </div>
             </div>
+            {mode === "single" ? (
+              <form className="space-y-4" onSubmit={saveProduct}>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nombre</label>
+                  <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Combo mediodia" disabled={readOnly} />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">SKU</label>
+                    <Input value={draft.sku} onChange={(event) => setDraft((current) => ({ ...current, sku: event.target.value }))} placeholder="Ej. COMBO-MED-01" disabled={readOnly} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Moneda</label>
+                    <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="ARS" maxLength={3} disabled={readOnly} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Categoria</label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={draft.categoryId}
+                    onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
+                    disabled={readOnly}
+                  >
+                    <option value="">Sin categoria</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}{category.isActive ? "" : " · Inactiva"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Subcategoria</label>
+                  <Input
+                    value={draft.subcategory}
+                    onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
+                    placeholder="Ej. Remeras, Celulares, Reparaciones"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Texto alternativo</label>
+                  <Input
+                    value={draft.imageAlt}
+                    onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))}
+                    placeholder="Ej. Foto principal del producto"
+                    disabled={readOnly || uploadingImage}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium">Subir imagen</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void handleImageUpload(event)} />
+                    <Button type="button" variant="secondary" onClick={() => imageInputRef.current?.click()} disabled={readOnly || uploadingImage}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      {uploadingImage ? "Subiendo..." : "Subir imagen"}
+                    </Button>
+                    <p className="text-sm text-muted">
+                      {draft.imageSource === "uploaded" ? "La imagen queda guardada en Opturon." : "Subi una foto para usarla como imagen principal del producto."}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                  <p className="text-sm font-medium">Preview</p>
+                  <div className="mt-3">
+                    <CatalogProductImage product={{ image: buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource) }} size="lg" />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Precio</label>
+                    <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Stock basico</label>
+                    <Input value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="0" inputMode="numeric" disabled={readOnly} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Vencimiento opcional</label>
+                  <Input
+                    type="date"
+                    value={draft.expirationDate}
+                    onChange={(event) => setDraft((current) => ({ ...current, expirationDate: event.target.value }))}
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Descripcion</label>
+                  <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Atributos configurables</label>
+                  <Textarea
+                    className="min-h-[120px]"
+                    value={draft.attributesText}
+                    onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
+                    placeholder={"Uno por linea\nTalle: M, L, XL\nColor: Negro, Blanco"}
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Button type="button" variant="ghost" onClick={() => startCreate(categoryFilter || null)} disabled={readOnly || uploadingImage}>
+                    Limpiar
+                  </Button>
+                  <Button type="submit" disabled={readOnly || saving || uploadingImage}>
+                    {saving ? "Guardando..." : "Crear producto"}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Pega varias lineas</label>
+                  <Textarea
+                    className="min-h-[180px]"
+                    value={bulkText}
+                    onChange={(event) => setBulkText(event.target.value)}
+                    placeholder="nombre | sku | precio | stock | descripcion | categoria"
+                    disabled={readOnly}
+                  />
+                  <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <p className="text-sm font-semibold">Formato por linea</p>
+                    <p className="mt-2 font-mono text-xs leading-6 text-text">
+                      nombre | sku | precio | stock | descripcion | categoria
+                    </p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Campos opcionales</p>
+                        <div className="mt-2 space-y-1 text-sm text-muted">
+                          <p>- sku</p>
+                          <p>- descripcion</p>
+                          <p>- categoria</p>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Regla de categoria</p>
+                        <p className="mt-2 text-sm leading-6 text-muted">
+                          Si la categoria no existe, se crea automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 rounded-2xl border border-dashed border-[color:var(--border)] bg-card/70 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Ejemplo</p>
+                      <p className="mt-2 font-mono text-xs leading-6 text-text">
+                        Funda silicona iPhone 11 | FUNDA-01 | 6000 | 10 | Silicona flexible | Fundas
+                      </p>
+                    </div>
+                    <p className="mt-3 text-xs leading-6 text-muted">
+                      Tambien sigue funcionando el formato viejo de 5 columnas sin categoria.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" onClick={() => buildBulkPreview(bulkText)} disabled={readOnly}>
+                    Previsualizar
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setBulkText(BULK_EXAMPLE)} disabled={readOnly}>
+                    Cargar ejemplo
+                  </Button>
+                  <Button type="button" disabled={readOnly || bulkImporting || validBulkRows.length === 0} onClick={() => void importBulkProducts()}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {bulkImporting ? "Importando..." : "Importar productos"}
+                  </Button>
+                </div>
+
+                {bulkPreview.length > 0 ? (
+                  <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold">Preview de importacion</p>
+                      <Badge variant={validBulkRows.length === bulkPreview.length ? "success" : "warning"}>
+                        {validBulkRows.length} / {bulkPreview.length} validas
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 hidden grid-cols-[auto_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-3 px-3 text-[11px] uppercase tracking-[0.14em] text-muted md:grid">
+                      <span>Fila</span>
+                      <span>Producto</span>
+                      <span>Precio / Stock</span>
+                      <span>Categoria</span>
+                      <span>Descripcion</span>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {bulkPreview.map((row) => (
+                        <div key={`${row.sourceRow}-${row.raw}`} className="rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
+                          <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)] md:items-start">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={row.valid ? "success" : "danger"}>Fila {row.sourceRow}</Badge>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium">{row.name || "Sin nombre"}</p>
+                              {row.sku ? <p className="mt-1 text-xs text-muted">SKU: {row.sku}</p> : null}
+                            </div>
+                            <div className="text-sm text-muted">
+                              <p>{formatCurrency(row.price || 0)}</p>
+                              <p className="mt-1">Stock {row.stock}</p>
+                            </div>
+                            <div className="text-sm text-muted">
+                              {row.categoryName || "Sin categoria"}
+                            </div>
+                            <div className="text-sm text-muted">
+                              {row.description || "Sin descripcion"}
+                            </div>
+                          </div>
+                          {row.valid ? (
+                            <p className="mt-3 text-xs text-emerald-300 md:hidden">
+                              Categoria: {row.categoryName || "Sin categoria"}
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-sm text-red-300">{row.error}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {bulkResult ? (
+                  <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="success">{bulkResult.created} creados</Badge>
+                      <Badge variant={bulkResult.failed > 0 ? "warning" : "muted"}>{bulkResult.failed} fallidos</Badge>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {bulkResult.results.map((row) => (
+                        <div key={`${row.sourceRow}-${row.status}-${row.productId || row.code || "result"}`} className="flex flex-wrap items-center gap-2 text-sm">
+                          <Badge variant={row.status === "created" ? "success" : "danger"}>Fila {row.sourceRow}</Badge>
+                          <span>{row.status === "created" ? `Creada (${row.productId})` : `Fallo: ${humanizeBulkCode(row.code)}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1565,7 +1803,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               disabled={readOnly}
               onClick={() => {
                 openQuickCreate(categoryFilter || null);
-                scrollToSection("catalog-create-section");
+                scrollToSection("catalog-load-section");
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
