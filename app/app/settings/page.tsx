@@ -171,39 +171,39 @@ export default async function AppSettingsPage() {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_320px]">
-        <div className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_78%_22%,rgba(176,80,0,0.18),transparent_24%),linear-gradient(135deg,rgba(12,20,32,0.98),rgba(10,16,28,0.96))] p-6 shadow-[var(--card-shadow)] lg:p-7">
+    <div className="space-y-5">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_82%_18%,rgba(176,80,0,0.14),transparent_22%),linear-gradient(135deg,rgba(12,20,32,0.98),rgba(10,16,28,0.96))] p-5 shadow-[var(--card-shadow)]">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="muted">Portal del cliente</Badge>
             <Badge variant="success">Portal activo</Badge>
             <Badge variant="success">Espacio activo</Badge>
             {backendReady ? <Badge variant="warning">Operacion en vivo</Badge> : null}
           </div>
-          <p className="mt-5 text-[11px] uppercase tracking-[0.22em] text-muted">Configuracion</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">Centraliza y optimiza tu negocio</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-muted lg:text-base">
-            Administra los datos del negocio, el equipo y los cobros que usa Opturon desde un solo lugar, con una lectura simple y operativa.
+          <p className="mt-4 text-[11px] uppercase tracking-[0.22em] text-muted">Configuracion</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Configuracion</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+            Administra negocio, equipo y cobros desde un solo lugar.
           </p>
 
-          <div className="mt-6 rounded-[24px] border border-white/8 bg-black/18 p-4">
+          <div className="mt-4 rounded-[22px] border border-white/8 bg-black/18 p-3.5">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-brand/20 bg-brand/10 text-brandBright">
-                <ShieldCheck className="h-5 w-5" />
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-brand/20 bg-brand/10 text-brandBright">
+                <ShieldCheck className="h-4 w-4" />
               </span>
               <div>
-                <p className="font-medium text-white">Tu configuracion impacta en la experiencia del cliente y en la operacion diaria.</p>
-                <p className="mt-1 text-sm leading-6 text-muted">Mientras mas completo este este centro, mejor responden el bot, el equipo y los cobros por transferencia.</p>
+                <p className="font-medium text-white">El estado de este centro impacta en la operacion diaria.</p>
+                <p className="mt-1 text-sm leading-6 text-muted">Completar negocio, usuarios y cobros mejora la atencion y reduce friccion.</p>
               </div>
             </div>
           </div>
         </div>
 
         <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="space-y-4 p-5">
+          <CardContent className="space-y-3 p-4">
             <div>
-              <p className="text-xl font-semibold">Todo en orden, todo conectado</p>
-              <p className="mt-2 text-sm leading-6 text-muted">Una buena configuracion mejora la eficiencia del bot y le da mas claridad al equipo.</p>
+              <p className="text-lg font-semibold">Lectura rapida</p>
+              <p className="mt-1 text-sm leading-6 text-muted">Estado actual de {clinicName}.</p>
             </div>
 
             {[
@@ -228,14 +228,14 @@ export default async function AppSettingsPage() {
                 copy: configuredModules.length ? `${configuredModules.join(" · ")} ya estan presentes en este centro.` : "Todavia no hay modulos configurados por completo."
               }
             ].map((item) => (
-              <div key={item.title} className="rounded-[22px] border border-white/8 bg-surface/55 p-4">
+              <div key={item.title} className="rounded-[20px] border border-white/8 bg-surface/55 p-3.5">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                     {item.icon}
                   </span>
                   <div>
                     <p className="font-medium text-white">{item.title}</p>
-                    <p className="mt-1 text-sm leading-6 text-muted">{item.copy}</p>
+                    <p className="mt-1 text-sm leading-5 text-muted">{item.copy}</p>
                   </div>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export default async function AppSettingsPage() {
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <HubCard
           href="/app/business"
           icon={<Building2 className="h-6 w-6 text-brandBright" />}
@@ -336,18 +336,16 @@ export default async function AppSettingsPage() {
         </HubCard>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
         <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
-                <Cog className="h-5 w-5" />
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
+                <Cog className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-2xl font-semibold text-white">Una buena configuracion puede aumentar tus ventas</p>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Los espacios que completan negocio, equipo y cobros suelen operar con menos friccion y mejores conversaciones.
-                </p>
+                <p className="text-xl font-semibold text-white">Mejora continua del espacio</p>
+                <p className="mt-1 text-sm leading-6 text-muted">Negocio, equipo y cobros completos ayudan a operar con menos friccion.</p>
               </div>
             </div>
             <Button asChild variant="secondary" className="rounded-2xl">
@@ -360,7 +358,7 @@ export default async function AppSettingsPage() {
         </Card>
 
         <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="space-y-3 p-5">
+          <CardContent className="space-y-3 p-4">
             <p className="text-lg font-semibold text-white">Lectura rapida</p>
             <p className="text-sm leading-6 text-muted">Estado actual del centro de configuracion de {clinicName}.</p>
             {[
@@ -438,27 +436,27 @@ function HubCard({
 
   const content = (
     <Card className={`h-full border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)] ${disabled ? "opacity-80" : ""}`}>
-      <CardContent className="flex h-full flex-col p-5">
+      <CardContent className="flex h-full flex-col p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border ${accents[accent]}`}>
+            <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border ${accents[accent]}`}>
               {icon}
             </span>
             <div>
-              <p className="text-2xl font-semibold text-white">{title}</p>
+              <p className="text-xl font-semibold text-white">{title}</p>
               <p className="mt-1 text-sm text-muted">{subtitle}</p>
             </div>
           </div>
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80">
             <ArrowRight className="h-4 w-4" />
           </span>
         </div>
 
-        <p className="mt-5 text-sm leading-7 text-muted">{description}</p>
+        <p className="mt-4 text-sm leading-6 text-muted">{description}</p>
 
-        <div className="mt-5 flex-1">{children}</div>
+        <div className="mt-4 flex-1">{children}</div>
 
-        <div className={`mt-5 flex items-center justify-between rounded-[20px] border px-4 py-3 text-sm font-medium transition-colors ${buttonClasses[accent]}`}>
+        <div className={`mt-4 flex items-center justify-between rounded-[18px] border px-4 py-3 text-sm font-medium transition-colors ${buttonClasses[accent]}`}>
           <span>{cta}</span>
           <ArrowRight className="h-4 w-4" />
         </div>
