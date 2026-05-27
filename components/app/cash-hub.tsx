@@ -16,11 +16,12 @@ import {
   UnlockKeyhole,
   Wallet
 } from "lucide-react";
-import type { PortalCashBoxOverview, PortalCashSession } from "@/lib/api";
+import type { PortalCashBoxOverview, PortalCashSession, PortalCashSessionMovement } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { CashCalculator } from "@/components/app/cash-calculator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,14 +51,24 @@ type CloseFormState = Record<
   }
 >;
 
-type VisibleOrder = {
+type VisibleMovement = {
   id: string;
-  customerName: string;
-  totalAmount: number;
+  kind: "sale" | PortalCashSessionMovement["type"];
+  amount: number;
   currency: string;
   createdAt: string | null;
-  sellerName: string;
+  label: string;
+  detail: string;
   sessionName: string;
+};
+
+type ManualMovementState = {
+  open: boolean;
+  sessionId: string | null;
+  type: PortalCashSessionMovement["type"];
+  amount: string;
+  method: Extract<PortalCashSessionMovement["method"], "cash" | "transfer">;
+  reason: string;
 };
 
 const EMPTY_OPEN_FORM: OpenFormState = {
@@ -66,11 +77,22 @@ const EMPTY_OPEN_FORM: OpenFormState = {
   notes: ""
 };
 
-function getCashErrorMessage(code: string, action: "open" | "close" | "refresh") {
+const EMPTY_MOVEMENT_FORM: ManualMovementState = {
+  open: false,
+  sessionId: null,
+  type: "manual_in",
+  amount: "",
+  method: "cash",
+  reason: ""
+};
+
+function getCashErrorMessage(code: string, action: "open" | "close" | "refresh" | "movement") {
   const normalized = String(code || "").trim();
   if (!normalized) {
     return action === "refresh"
       ? "No se pudo actualizar la caja."
+      : action === "movement"
+        ? "No se pudo registrar el movimiento."
       : action === "open"
         ? "No se pudo abrir la caja."
         : "No se pudo cerrar la caja.";
@@ -93,6 +115,14 @@ function getCashErrorMessage(code: string, action: "open" | "close" | "refresh")
       return "La sesion de caja ya no esta disponible.";
     case "cash_close_session_already_closed":
       return "La caja ya estaba cerrada.";
+    case "cash_session_not_open":
+      return "La sesion ya no esta abierta para registrar movimientos.";
+    case "invalid_cash_movement_amount":
+      return "El monto debe ser mayor a cero.";
+    case "invalid_cash_movement_method":
+      return "El metodo elegido no esta disponible.";
+    case "invalid_cash_movement_type":
+      return "El tipo de movimiento no es valido.";
     default:
       return normalized;
   }
@@ -141,6 +171,19 @@ function formatCountedBreakdown(value: number | null | undefined) {
   return value === null || value === undefined ? "No registrado" : formatCurrency(value);
 }
 
+function formatMovementMethod(value: PortalCashSessionMovement["method"]) {
+  switch (value) {
+    case "cash":
+      return "Efectivo";
+    case "transfer":
+      return "Transferencia";
+    case "card":
+      return "Tarjeta";
+    default:
+      return "Otro medio";
+  }
+}
+
 function isToday(value: string | null | undefined) {
   if (!value) return false;
   const date = new Date(value);
@@ -166,6 +209,7 @@ export function CashHub({
     paymentDestinationId: initialCashBoxes.find((box) => box.isActive && !box.currentSession)?.id || ""
   }));
   const [closeForms, setCloseForms] = useState<CloseFormState>({});
+  const [movementForm, setMovementForm] = useState<ManualMovementState>(EMPTY_MOVEMENT_FORM);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<CashSectionKey | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
@@ -196,17 +240,51 @@ export function CashHub({
     () => recentClosedSessions.filter((session) => isToday(session.closedAt)),
     [recentClosedSessions]
   );
-  const recentVisibleOrders = useMemo<VisibleOrder[]>(
+  const visibleMovements = useMemo<VisibleMovement[]>(
     () =>
       openSessions
-        .flatMap((session) =>
-          (session.metrics?.recentOrders || []).map((order) => ({
-            ...order,
-            sessionName: session.paymentDestination?.name || "Caja"
-          }))
-        )
+        .flatMap((session) => {
+          const sessionName = session.paymentDestination?.name || "Caja";
+          const orders: VisibleMovement[] = (session.metrics?.recentOrders || []).map((order) => ({
+            id: `order-${order.id}`,
+            kind: "sale",
+            amount: Number(order.totalAmount || 0),
+            currency: order.currency || "ARS",
+            createdAt: order.createdAt,
+            label: order.customerName,
+            detail: `${order.sellerName} · venta imputada`,
+            sessionName
+          }));
+          const manuals: VisibleMovement[] = (session.metrics?.recentMovements || []).map((movement) => ({
+            id: `movement-${movement.id}`,
+            kind: movement.type,
+            amount: Number(movement.amount || 0),
+            currency: "ARS",
+            createdAt: movement.createdAt,
+            label: movement.type === "manual_in" ? "Ingreso manual" : "Retiro manual",
+            detail: `${formatMovementMethod(movement.method)}${movement.reason ? ` · ${movement.reason}` : ""}${movement.createdByNameSnapshot ? ` · ${movement.createdByNameSnapshot}` : ""}`,
+            sessionName
+          }));
+          return [...orders, ...manuals];
+        })
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()),
     [openSessions]
+  );
+  const visibleManualInToday = useMemo(
+    () =>
+      [...openSessions, ...todayClosedSessions].reduce(
+        (sum, session) => sum + Number(session.metrics?.manualInAmountToday || 0),
+        0
+      ),
+    [openSessions, todayClosedSessions]
+  );
+  const visibleManualOutToday = useMemo(
+    () =>
+      [...openSessions, ...todayClosedSessions].reduce(
+        (sum, session) => sum + Number(session.metrics?.manualOutAmountToday || 0),
+        0
+      ),
+    [openSessions, todayClosedSessions]
   );
 
   async function refreshCashOverview() {
@@ -319,6 +397,62 @@ export function CashHub({
     }
   }
 
+  function openMovementDialog(type: PortalCashSessionMovement["type"], sessionId?: string | null) {
+    const targetSessionId = sessionId || primarySession?.id || null;
+    if (!targetSessionId) {
+      toast.error("No hay una sesion abierta", "Abre o selecciona una sesion para registrar un movimiento.");
+      return;
+    }
+
+    setMovementForm({
+      open: true,
+      sessionId: targetSessionId,
+      type,
+      amount: "",
+      method: "cash",
+      reason: ""
+    });
+  }
+
+  async function submitManualMovement() {
+    const sessionId = movementForm.sessionId;
+    const amount = Number(movementForm.amount || 0);
+    if (!sessionId) {
+      toast.error("Sesion no disponible", "Selecciona una sesion abierta antes de registrar un movimiento.");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Monto invalido", "Indica un monto mayor a cero.");
+      return;
+    }
+
+    setBusyAction("movement");
+    try {
+      const response = await fetch(`/api/app/cash-sessions/${sessionId}/movements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: movementForm.type,
+          amount,
+          method: movementForm.method,
+          reason: movementForm.reason.trim() || null
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getCashErrorMessage(String(json?.error || ""), "movement"));
+      }
+
+      await refreshCashOverview();
+      setMovementForm(EMPTY_MOVEMENT_FORM);
+      toast.success(movementForm.type === "manual_in" ? "Ingreso registrado" : "Retiro registrado");
+    } catch (error) {
+      toast.error("No se pudo registrar el movimiento", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   function scrollToSection(section: CashSectionKey) {
     setActiveSection(section);
     const target =
@@ -378,10 +512,11 @@ export function CashHub({
         <MetricCard
           icon={LockKeyhole}
           label="Egresos del dia"
-          value="Sin dato"
-          helper="Esta vista todavia no separa egresos manuales por fuente real."
+          value={formatCurrency(visibleManualOutToday)}
+          helper={visibleManualOutToday > 0 ? "Retiros manuales visibles registrados hoy." : "Sin retiros manuales registrados hoy."}
           accent="red"
-          active={false}
+          active={activeSection === "movements"}
+          onClick={() => scrollToSection("movements")}
         />
         <MetricCard
           icon={History}
@@ -446,15 +581,15 @@ export function CashHub({
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <HighlightStat label="Total contado" value={formatCurrency(primarySession.metrics?.expectedAmountCurrent)} tone="green" />
                           <HighlightStat label="Transferencias" value={formatCountedBreakdown(primarySession.transferCountedAmount)} tone="blue" />
-                          <HighlightStat label="Tarjetas" value="Sin dato" tone="violet" />
-                          <HighlightStat label="Otros medios" value="Sin dato" tone="amber" />
+                          <HighlightStat label="Tarjetas" value="Sin dato suficiente" tone="violet" />
+                          <HighlightStat label="Otros medios" value="Sin dato suficiente" tone="amber" />
                         </div>
                         <div className="flex flex-wrap gap-3">
-                          <Button type="button" variant="secondary" className="rounded-2xl" disabled>
+                          <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => openMovementDialog("manual_in", primarySession.id)} disabled={readOnly || busyAction !== null}>
                             <ArrowDown className="mr-2 h-4 w-4 text-emerald-300" />
                             Ingresar dinero
                           </Button>
-                          <Button type="button" variant="secondary" className="rounded-2xl" disabled>
+                          <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => openMovementDialog("manual_out", primarySession.id)} disabled={readOnly || busyAction !== null}>
                             <ArrowUp className="mr-2 h-4 w-4 text-red-300" />
                             Retirar dinero
                           </Button>
@@ -467,9 +602,7 @@ export function CashHub({
                             Cerrar sesion
                           </Button>
                         </div>
-                        <p className="text-xs text-muted">
-                          Ingresar dinero y retirar dinero todavia no tienen un flujo manual real separado en esta fuente de caja. Se mantienen visibles, pero no se simulan.
-                        </p>
+                        <p className="text-xs text-muted">Los movimientos manuales impactan el saldo esperado, el resumen del dia y la diferencia del cierre de la sesion.</p>
                       </div>
                       <div className="rounded-[26px] border border-brand/20 bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.24),transparent_38%),linear-gradient(180deg,rgba(25,20,16,0.94),rgba(10,16,27,0.98))] p-5">
                         <p className="text-sm font-medium text-brandSoft">Lectura operativa</p>
@@ -636,31 +769,36 @@ export function CashHub({
 
             <div ref={movementsSectionRef} className="scroll-mt-28">
             <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_20px_52px_rgba(3,8,16,0.22)]">
-              <CardHeader action={<Badge variant="muted">{recentVisibleOrders.length} visibles</Badge>}>
+              <CardHeader action={<Badge variant="muted">{visibleMovements.length} visibles</Badge>}>
                 <div>
                   <CardTitle className="text-xl">Movimientos del dia</CardTitle>
-                  <CardDescription>Ventas visibles imputadas a las sesiones abiertas, ordenadas por hora de movimiento.</CardDescription>
+                  <CardDescription>Ventas visibles y movimientos manuales reales imputados a las sesiones abiertas.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
-                {!recentVisibleOrders.length ? (
-                  <EmptyState title="Todavia no hay movimientos visibles" description="Cuando haya ventas imputadas a sesiones abiertas, se van a listar aca automaticamente." />
+                {!visibleMovements.length ? (
+                  <EmptyState title="Todavia no hay movimientos visibles" description="Cuando haya ventas o movimientos manuales en las sesiones abiertas, se van a listar aca automaticamente." />
                 ) : (
-                  recentVisibleOrders.slice(0, 8).map((order) => (
-                    <div key={order.id} className="grid gap-3 rounded-[22px] border border-white/8 bg-surface/55 p-4 md:grid-cols-[110px_minmax(0,1fr)_170px]">
+                  visibleMovements.slice(0, 10).map((movement) => (
+                    <div key={movement.id} className="grid gap-3 rounded-[22px] border border-white/8 bg-surface/55 p-4 md:grid-cols-[110px_minmax(0,1fr)_170px]">
                       <div>
-                        <p className="text-sm font-medium">{order.createdAt ? formatDate(order.createdAt) : "Sin hora"}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-emerald-300">Ingreso visible</p>
+                        <p className="text-sm font-medium">{movement.createdAt ? formatDate(movement.createdAt) : "Sin hora"}</p>
+                        <p className={`mt-1 text-xs uppercase tracking-[0.16em] ${movement.kind === "manual_out" ? "text-red-300" : "text-emerald-300"}`}>
+                          {movement.kind === "sale" ? "Venta visible" : movement.kind === "manual_in" ? "Ingreso manual" : "Retiro manual"}
+                        </p>
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-medium">{order.customerName}</p>
+                        <p className="truncate font-medium">{movement.label}</p>
                         <p className="mt-1 truncate text-sm text-muted">
-                          {order.sellerName} · {order.sessionName}
+                          {movement.detail} · {movement.sessionName}
                         </p>
                       </div>
                       <div className="text-left md:text-right">
-                        <p className="text-lg font-semibold">{formatCurrency(order.totalAmount, order.currency)}</p>
-                        <p className="mt-1 text-xs text-muted">Pedido imputado a caja</p>
+                        <p className={`text-lg font-semibold ${movement.kind === "manual_out" ? "text-red-300" : "text-emerald-300"}`}>
+                          {movement.kind === "manual_out" ? "-" : "+"}
+                          {formatCurrency(movement.amount, movement.currency)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">{movement.kind === "sale" ? "Pedido imputado a caja" : "Movimiento manual registrado"}</p>
                       </div>
                     </div>
                   ))
@@ -768,8 +906,8 @@ export function CashHub({
                 </div>
               </CardHeader>
               <CardContent className="grid gap-3 pt-0 sm:grid-cols-2">
-                <QuickActionButton title="Ingresar dinero" description="Sin flujo manual" icon={ArrowDown} tone="green" disabled />
-                <QuickActionButton title="Retirar dinero" description="Sin flujo manual" icon={ArrowUp} tone="red" disabled />
+                <QuickActionButton title="Ingresar dinero" description="Movimiento manual" icon={ArrowDown} tone="green" onClick={() => openMovementDialog("manual_in")} disabled={!primarySession || readOnly} />
+                <QuickActionButton title="Retirar dinero" description="Movimiento manual" icon={ArrowUp} tone="red" onClick={() => openMovementDialog("manual_out")} disabled={!primarySession || readOnly} />
                 <QuickActionButton title="Cierre rapido" description="Sesion activa" icon={LockKeyhole} tone="amber" onClick={() => scrollToSection("sessions")} disabled={!openSessions.length} />
                 <QuickActionButton title="Imprimir reporte" description="Resumen visual" icon={Printer} tone="blue" onClick={() => window.print()} />
                 <QuickActionButton title="Ver arqueo" description="Caja actual" icon={Clock3} tone="violet" onClick={() => scrollToSection("sessions")} disabled={!openSessions.length} />
@@ -787,14 +925,77 @@ export function CashHub({
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
                 <SummaryRow label="Ingresos visibles" value={formatCurrency(totalSalesOpen)} tone="green" />
+                <SummaryRow label="Ingresos manuales" value={formatCurrency(visibleManualInToday)} tone="green" />
                 <SummaryRow label="Saldo actual abierto" value={formatCurrency(totalExpectedOpen)} tone="green" />
                 <SummaryRow label="Cierres de hoy" value={String(todayClosedSessions.length)} tone="neutral" />
-                <SummaryRow label="Egresos del dia" value="Sin dato suficiente" tone="red" />
+                <SummaryRow label="Egresos del dia" value={formatCurrency(visibleManualOutToday)} tone="red" />
               </CardContent>
             </Card>
           </div>
         </div>
       )}
+
+      <Dialog
+        open={movementForm.open}
+        onOpenChange={(open) => setMovementForm((current) => (open ? current : EMPTY_MOVEMENT_FORM))}
+      >
+        <DialogContent className="max-w-[520px] rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(10,18,30,0.98),rgba(8,14,23,0.98))]">
+          <DialogHeader>
+            <DialogTitle>{movementForm.type === "manual_in" ? "Ingresar dinero a caja" : "Retirar dinero de caja"}</DialogTitle>
+            <DialogDescription>
+              Registra un movimiento manual real sobre la sesion abierta seleccionada. Impacta el saldo esperado, los movimientos visibles y la diferencia del cierre.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Monto</label>
+              <Input
+                value={movementForm.amount}
+                onChange={(event) => setMovementForm((current) => ({ ...current, amount: event.target.value }))}
+                inputMode="decimal"
+                placeholder="0"
+                disabled={busyAction === "movement"}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Metodo</label>
+              <select
+                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                value={movementForm.method}
+                onChange={(event) =>
+                  setMovementForm((current) => ({
+                    ...current,
+                    method: event.target.value === "transfer" ? "transfer" : "cash"
+                  }))
+                }
+                disabled={busyAction === "movement"}
+              >
+                <option value="cash">Efectivo</option>
+                <option value="transfer">Transferencia</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo u observacion</label>
+              <Textarea
+                className="min-h-[108px]"
+                value={movementForm.reason}
+                onChange={(event) => setMovementForm((current) => ({ ...current, reason: event.target.value }))}
+                placeholder="Ej. retiro para cambio, ingreso por ajuste o reposicion."
+                disabled={busyAction === "movement"}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => setMovementForm(EMPTY_MOVEMENT_FORM)} disabled={busyAction === "movement"}>
+              Cancelar
+            </Button>
+            <Button type="button" className="rounded-2xl" onClick={() => void submitManualMovement()} disabled={busyAction === "movement"}>
+              {busyAction === "movement" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : movementForm.type === "manual_in" ? <ArrowDown className="mr-2 h-4 w-4" /> : <ArrowUp className="mr-2 h-4 w-4" />}
+              {movementForm.type === "manual_in" ? "Registrar ingreso" : "Registrar retiro"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div ref={calculatorSectionRef} className="scroll-mt-28">
         <CashCalculator />

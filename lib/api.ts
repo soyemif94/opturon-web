@@ -1242,6 +1242,16 @@ export type PortalCashSessionOrder = {
   sellerName: string;
 };
 
+export type PortalCashSessionMovement = {
+  id: string;
+  type: "manual_in" | "manual_out";
+  method: "cash" | "transfer" | "card" | "other";
+  amount: number;
+  reason: string | null;
+  createdByNameSnapshot: string | null;
+  createdAt: string | null;
+};
+
 export type PortalCashSession = {
   id: string;
   clinicId: string;
@@ -1272,8 +1282,15 @@ export type PortalCashSession = {
   metrics?: {
     ordersCount: number;
     salesAmount: number;
+    manualInAmount?: number;
+    manualOutAmount?: number;
+    manualNetAmount?: number;
+    manualInAmountToday?: number;
+    manualOutAmountToday?: number;
+    manualMovementsCount?: number;
     expectedAmountCurrent: number;
     recentOrders: PortalCashSessionOrder[];
+    recentMovements?: PortalCashSessionMovement[];
   };
   lifecycle?: {
     canClose: boolean;
@@ -2097,6 +2114,39 @@ export async function closePortalCashSession(
   const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
   return backendPortalFetch<{ success: boolean; data: PortalCashSession }>(
     `/portal/tenants/${tenantId}/cash-sessions/${sessionId}/close`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function createPortalCashSessionMovement(
+  tenantId: string,
+  sessionId: string,
+  payload: {
+    type: PortalCashSessionMovement["type"];
+    amount: number;
+    method: PortalCashSessionMovement["method"];
+    reason?: string | null;
+    createdByUserId: string;
+    actorName?: string | null;
+    actorEmail?: string | null;
+    actorGlobalRole?: string | null;
+    actorTenantRole?: string | null;
+  },
+  actorUserId?: string | null
+) {
+  const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      movement: PortalCashSessionMovement;
+      session: PortalCashSession;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/cash-sessions/${sessionId}/movements`,
     {
       method: "POST",
       headers,
