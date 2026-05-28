@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Bot, BriefcaseBusiness, CheckCircle2, Landmark, ShieldCheck, Users } from "lucide-react";
 import { BUSINESS_SETTINGS_FORM_ID, BusinessSettingsForm } from "@/components/app/BusinessSettingsForm";
+import { isStaffRole } from "@/lib/app-permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -154,6 +155,7 @@ function buildWorkspace({
 export default async function BusinessPage() {
   const ctx = await requireAppPage({ permission: "manage_workspace" });
   const isRealTenant = Boolean(ctx.tenantId);
+  const canUseLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
 
   try {
     if (isRealTenant) {
@@ -176,23 +178,25 @@ export default async function BusinessPage() {
       });
     }
 
-    const data = readSaasData();
-    const tenants = Array.isArray(data.tenants) ? data.tenants : [];
-    const businessSettings = Array.isArray(data.businessSettings) ? data.businessSettings : [];
-    const tenantId = tenants[0]?.id || "";
-    const tenant = tenants.find((item) => item.id === tenantId) || null;
-    const settings: BusinessProfilePageSettings = {
-      ...EMPTY_SETTINGS,
-      ...(businessSettings.find((item) => item?.tenantId === tenantId) || {}),
-      tenantId
-    };
+    if (canUseLocalDemoData) {
+      const data = readSaasData();
+      const tenants = Array.isArray(data.tenants) ? data.tenants : [];
+      const businessSettings = Array.isArray(data.businessSettings) ? data.businessSettings : [];
+      const tenantId = tenants[0]?.id || "";
+      const tenant = tenants.find((item) => item.id === tenantId) || null;
+      const settings: BusinessProfilePageSettings = {
+        ...EMPTY_SETTINGS,
+        ...(businessSettings.find((item) => item?.tenantId === tenantId) || {}),
+        tenantId
+      };
 
-    return buildWorkspace({
-      settings,
-      clinicName: tenant?.name || "Espacio del cliente",
-      tenantIndustry: tenant?.industry || "Operacion comercial",
-      backendReady: false
-    });
+      return buildWorkspace({
+        settings,
+        clinicName: tenant?.name || "Espacio del cliente",
+        tenantIndustry: tenant?.industry || "Operacion comercial",
+        backendReady: false
+      });
+    }
   } catch (error) {
     console.error("[app/business] Failed to render business page.", error);
     return buildWorkspace({

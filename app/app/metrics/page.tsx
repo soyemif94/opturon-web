@@ -5,6 +5,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { isStaffRole } from "@/lib/app-permissions";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 import {
   MetricsInteractivePanels,
@@ -31,9 +32,9 @@ const TIME_BUCKETS = [
 export default async function AppMetricsPage() {
   const ctx = await requireAppPage();
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
-  const useLocalDemoData = !ctx.tenantId;
+  const useLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   const localData = useLocalDemoData ? readSaasData() : null;
-  const tenantId = ctx.tenantId || localData?.tenants[0]?.id || "";
+  const tenantId = ctx.tenantId || (useLocalDemoData ? localData?.tenants[0]?.id || "" : "");
 
   let conversations: ConversationRowData[] = [];
   let activeConversations = 0;

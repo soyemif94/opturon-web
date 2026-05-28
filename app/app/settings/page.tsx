@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { canManageUsers } from "@/lib/app-permissions";
+import { canManageUsers, isStaffRole } from "@/lib/app-permissions";
 import {
   getPortalBotTransferConfig,
   getPortalBusinessSettings,
@@ -82,6 +82,7 @@ export default async function AppSettingsPage() {
   const ctx = await requireAppPage({ permission: "manage_workspace" });
   const tenantId = ctx.tenantId || "";
   const backendReady = tenantId && isBackendConfigured();
+  const canUseLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   const allowUsers = canManageUsers(ctx);
 
   let clinicName = "Espacio del cliente";
@@ -103,7 +104,7 @@ export default async function AppSettingsPage() {
     transferConfig = transferResult?.data?.settings?.transferConfig || EMPTY_TRANSFER_CONFIG;
     users = usersResult?.data?.users || [];
     usersMeta = usersResult?.data?.meta || DEFAULT_USERS_META;
-  } else {
+  } else if (canUseLocalDemoData) {
     const data = readSaasData();
     const fallbackTenantId = tenantId || data.tenants[0]?.id || "";
     const tenant = data.tenants.find((item) => item.id === fallbackTenantId) || null;

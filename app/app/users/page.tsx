@@ -1,5 +1,5 @@
 import { TenantUsersManager } from "@/components/app/TenantUsersManager";
-import { canManageUsers } from "@/lib/app-permissions";
+import { canManageUsers, isStaffRole } from "@/lib/app-permissions";
 import type { PortalUserAuditEvent, PortalUsersMeta } from "@/lib/api";
 import { getPortalUsers, isBackendConfigured, isPortalInternalAuthConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
@@ -13,14 +13,16 @@ const DEFAULT_SUBACCOUNT_LIMIT = (() => {
 export default async function AppUsersPage({ searchParams }: { searchParams: Promise<{ tenantId?: string }> }) {
   const ctx = await requireAppPage({ permission: "manage_users" });
   const { tenantId: requestedTenantId } = await searchParams;
-  const data = !ctx.tenantId ? readSaasData() : null;
+  const canUseLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
+  const data = canUseLocalDemoData ? readSaasData() : null;
   const canUseRequestedTenant = Boolean(requestedTenantId && ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(ctx.globalRole || "")));
-  const tenantId = (canUseRequestedTenant ? requestedTenantId : "") || ctx.tenantId || data?.tenants[0]?.id || "";
+  const tenantId =
+    (canUseRequestedTenant ? requestedTenantId : "") || ctx.tenantId || (canUseLocalDemoData ? data?.tenants[0]?.id || "" : "");
   const canManage = canManageUsers(ctx);
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 
   let users: Array<{ id: string; email: string; name: string; tenantRole: string; accountKind: "primary" | "subaccount" }> =
-    !ctx.tenantId && !backendUsersReady
+    canUseLocalDemoData && !backendUsersReady
       ? listTenantMembers(tenantId).map((user) => ({
           id: user.id,
           email: user.email,

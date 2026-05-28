@@ -1,6 +1,6 @@
 import { ContactsWorkspace } from "@/components/app/ContactsWorkspace";
 import { Badge } from "@/components/ui/badge";
-import { canEditWorkspace } from "@/lib/app-permissions";
+import { canEditWorkspace, isStaffRole } from "@/lib/app-permissions";
 import { getPortalContacts, isBackendConfigured, type PortalContactDetail } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { listInboxConversations, readSaasData } from "@/lib/saas/store";
@@ -9,7 +9,7 @@ export default async function AppContactsPage() {
   const ctx = await requireAppPage();
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   const readOnly = !canEditWorkspace(ctx);
-  const useLocalDemoData = !ctx.tenantId;
+  const useLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   let contacts: PortalContactDetail[] = [];
 
   if (ctx.tenantId && backendReady) {

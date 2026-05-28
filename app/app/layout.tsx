@@ -1,18 +1,22 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { CommandPaletteProvider } from "@/components/ui/command-palette";
+import { isStaffRole } from "@/lib/app-permissions";
 import { requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 export default async function ClientPortalLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireAppPage();
+  const canUseLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   const rawTenantLabel = ctx.tenantId
     ? "Espacio del cliente"
-    : (() => {
+    : canUseLocalDemoData
+      ? (() => {
         const data = readSaasData();
         const tenant = data.tenants.find((item) => item.id === ctx.tenantId) || data.tenants[0];
         return tenant ? tenant.name : `Tenant: ${ctx.tenantId || "espacio"}`;
-      })();
+      })()
+      : "Espacio sin asignar";
   const tenantLabel = /demo tenant/i.test(rawTenantLabel) ? "Espacio del cliente" : rawTenantLabel;
   const showDebugInfo = process.env.NEXT_PUBLIC_SHOW_DEBUG_INFO === "true";
   const buildMarker = showDebugInfo
@@ -28,7 +32,11 @@ export default async function ClientPortalLayout({ children }: { children: React
       undefined
     : undefined;
   const whatsappStatus = buildWhatsAppConnectionStatus({
-    fallbackReason: ctx.tenantId ? "portal_status_pending_client_refresh" : "workspace_without_backend"
+    fallbackReason: ctx.tenantId
+      ? "portal_status_pending_client_refresh"
+      : canUseLocalDemoData
+        ? "workspace_without_backend"
+        : "missing_tenant_id"
   });
 
   return (

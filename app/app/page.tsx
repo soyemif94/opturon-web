@@ -1,6 +1,6 @@
 import { ClientOnboardingChecklist } from "@/components/app/client-onboarding-checklist";
 import { AppDashboard } from "@/components/app/app-dashboard";
-import { canManageWorkspace } from "@/lib/app-permissions";
+import { canManageWorkspace, isStaffRole } from "@/lib/app-permissions";
 import {
   getPortalBusinessSettings,
   getPortalContacts,
@@ -19,10 +19,10 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   const canManage = canManageWorkspace(ctx);
   const sp = await searchParams;
   const isDemo = sp.demo === "1";
-  const useLocalDemoData = !ctx.tenantId;
+  const useLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
 
   const localData = useLocalDemoData ? readSaasData() : null;
-  const tenantId = ctx.tenantId || sp.tenantId || localData?.tenants[0]?.id || "";
+  const tenantId = ctx.tenantId || (useLocalDemoData ? sp.tenantId || localData?.tenants[0]?.id || "" : "");
   const tenant = useLocalDemoData ? localData?.tenants.find((item) => item.id === tenantId) || null : null;
   let businessSettings: PortalBusinessSettings | {
     tenantId?: string;
