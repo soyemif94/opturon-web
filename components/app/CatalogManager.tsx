@@ -123,6 +123,8 @@ type BulkResultSummary = {
   results: BulkDisplayResult[];
 };
 
+const PRODUCTS_PER_PAGE = 5;
+
 type DeleteAttemptResult = {
   productId: string;
   ok: boolean;
@@ -183,6 +185,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [categoryUpdatingId, setCategoryUpdatingId] = useState<string | null>(null);
   const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedProduct = useMemo(
@@ -259,12 +262,46 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       return updatedRight - updatedLeft;
     });
   }, [expirationFilter, filteredProducts, sortByUrgency]);
+  const totalPages = Math.max(1, Math.ceil(visibleProducts.length / PRODUCTS_PER_PAGE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPageSafe - 1) * PRODUCTS_PER_PAGE;
+    return visibleProducts.slice(startIndex, startIndex + PRODUCTS_PER_PAGE);
+  }, [currentPageSafe, visibleProducts]);
+  const pageStart = visibleProducts.length === 0 ? 0 : (currentPageSafe - 1) * PRODUCTS_PER_PAGE + 1;
+  const pageEnd = visibleProducts.length === 0 ? 0 : Math.min(currentPageSafe * PRODUCTS_PER_PAGE, visibleProducts.length);
+  const paginationItems = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+
+    const items: Array<number | "ellipsis"> = [1];
+    const windowStart = Math.max(2, currentPageSafe - 1);
+    const windowEnd = Math.min(totalPages - 1, currentPageSafe + 1);
+
+    if (windowStart > 2) items.push("ellipsis");
+    for (let page = windowStart; page <= windowEnd; page += 1) {
+      items.push(page);
+    }
+    if (windowEnd < totalPages - 1) items.push("ellipsis");
+
+    items.push(totalPages);
+    return items;
+  }, [currentPageSafe, totalPages]);
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
-  const allVisibleSelected = visibleProducts.length > 0 && visibleProducts.every((product) => selectedIds.includes(product.id));
-  const selectedVisibleCount = visibleProducts.filter((product) => selectedIds.includes(product.id)).length;
+  const allVisibleSelected = paginatedProducts.length > 0 && paginatedProducts.every((product) => selectedIds.includes(product.id));
+  const selectedVisibleCount = paginatedProducts.filter((product) => selectedIds.includes(product.id)).length;
   const hasActiveSearch = search.trim().length > 0;
   const isFilteredCategoryEmpty = Boolean(activeCategory && activeCategoryProductCount === 0);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter, expirationFilter, sortByUrgency]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   function hydrateDraft(product?: Product | null): Draft {
     return {
@@ -401,13 +438,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   function toggleSelectAllVisible() {
     if (allVisibleSelected) {
-      setSelectedIds((current) => current.filter((id) => !visibleProducts.some((product) => product.id === id)));
+      setSelectedIds((current) => current.filter((id) => !paginatedProducts.some((product) => product.id === id)));
       return;
     }
 
     setSelectedIds((current) => {
       const next = new Set(current);
-      visibleProducts.forEach((product) => next.add(product.id));
+      paginatedProducts.forEach((product) => next.add(product.id));
       return Array.from(next);
     });
   }
@@ -1111,7 +1148,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               </div>
             ) : (
               <>
-                {visibleProducts.map((product) => (
+                {paginatedProducts.map((product) => (
                   <div
                     key={product.id}
                     className={`overflow-hidden rounded-[26px] border transition-all ${
@@ -1305,9 +1342,55 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     ) : null}
                   </div>
                 ))}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-3 text-sm text-muted">
-                  <span>{visibleProducts.length} productos visibles</span>
-                  <span>{sortByUrgency ? "Ordenados por urgencia" : "Orden original"}</span>
+                <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
+                    <span>
+                      Mostrando {pageStart}-{pageEnd} de {visibleProducts.length} producto{visibleProducts.length === 1 ? "" : "s"}
+                    </span>
+                    <span>{sortByUrgency ? "Ordenados por urgencia" : "Orden original"}</span>
+                  </div>
+                  {totalPages > 1 ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full border border-white/8 px-4 disabled:opacity-40"
+                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                        disabled={currentPageSafe === 1}
+                      >
+                        ←
+                      </Button>
+                      {paginationItems.map((item, index) => (
+                        item === "ellipsis" ? (
+                          <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted">
+                            ...
+                          </span>
+                        ) : (
+                          <Button
+                            key={item}
+                            type="button"
+                            variant={item === currentPageSafe ? "primary" : "ghost"}
+                            size="sm"
+                            className="min-w-10 rounded-full border border-white/8 px-4"
+                            onClick={() => setCurrentPage(item)}
+                          >
+                            {item}
+                          </Button>
+                        )
+                      ))}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full border border-white/8 px-4 disabled:opacity-40"
+                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                        disabled={currentPageSafe === totalPages}
+                      >
+                        →
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </>
             )}
