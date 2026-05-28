@@ -106,6 +106,16 @@ export function TenantUsersManager({
   const usedPct = !unlimitedSubaccounts && Number(subaccountLimit) > 0 ? Math.min(100, Math.round((subaccountCount / Number(subaccountLimit)) * 100)) : 0;
   const inviteBlockedByLimit = !unlimitedSubaccounts && form.role !== "owner" && Number(remainingSubaccounts) <= 0;
   const usersEndpoint = targetTenantId ? `/api/app/users?tenantId=${encodeURIComponent(targetTenantId)}` : "/api/app/users";
+  const teamUsers = useMemo(
+    () =>
+      isOpturonAdminScope
+        ? users
+        : users.filter((user) => {
+            const normalizedRole = normalizePortalUserRole(user.tenantRole);
+            return user.accountKind !== "primary" && normalizedRole !== "owner";
+          }),
+    [isOpturonAdminScope, users]
+  );
 
   const lastActivityByUser = useMemo(() => {
     const map = new Map<string, PortalUserAuditEvent>();
@@ -123,18 +133,18 @@ export function TenantUsersManager({
 
   const roleDistribution = useMemo(() => {
     const counts = { manager: 0, seller: 0, other: 0 };
-    users.forEach((user) => {
+    teamUsers.forEach((user) => {
       const normalized = normalizePortalUserRole(user.tenantRole);
       if (normalized === "owner" || normalized === "manager") counts.manager += 1;
       else if (normalized === "seller") counts.seller += 1;
       else counts.other += 1;
     });
     return counts;
-  }, [users]);
+  }, [teamUsers]);
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return users.filter((user) => {
+    return teamUsers.filter((user) => {
       const normalized = normalizePortalUserRole(user.tenantRole);
       const roleGroup =
         normalized === "owner" || normalized === "manager" ? "manager" : normalized === "seller" ? "seller" : "other";
@@ -145,7 +155,7 @@ export function TenantUsersManager({
         .toLowerCase()
         .includes(query);
     });
-  }, [users, search, selectedRoleFilter]);
+  }, [teamUsers, search, selectedRoleFilter]);
 
   function canManageTarget(user: UserRow) {
     if (!isOpturonAdminScope && user.accountKind === "primary") return false;
@@ -406,7 +416,7 @@ export function TenantUsersManager({
       <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
         <CardContent className="grid gap-5 p-5 lg:grid-cols-[1.1fr_0.9fr_1fr_1.1fr_260px] lg:items-center">
           <MetricBlock label="Plan actual" value={unlimitedSubaccounts ? "Ilimitado" : "Cupo del espacio"} helper={unlimitedSubaccounts ? "Usuarios sin limite visible" : `${subaccountCount} de ${subaccountLimit || 0} usuarios activos`} accent="violet" />
-          <MetricBlock label="Usuarios activos" value={`${users.length} / ${subaccountLimit || users.length}`} helper={`${Math.max(0, Number(remainingSubaccounts || 0))} cupo${Number(remainingSubaccounts || 0) === 1 ? "" : "s"} disponible${Number(remainingSubaccounts || 0) === 1 ? "" : "s"}`} accent="blue" />
+          <MetricBlock label="Usuarios activos" value={`${subaccountCount} / ${subaccountLimit || subaccountCount}`} helper={`${Math.max(0, Number(remainingSubaccounts || 0))} cupo${Number(remainingSubaccounts || 0) === 1 ? "" : "s"} disponible${Number(remainingSubaccounts || 0) === 1 ? "" : "s"}`} accent="blue" />
           <div className="space-y-2">
             <p className="text-sm text-muted">Distribucion</p>
             <div className="grid grid-cols-3 gap-3">
@@ -666,7 +676,7 @@ export function TenantUsersManager({
 
             <div className="flex items-center justify-between text-sm text-muted">
               <span>
-                Mostrando 1 a {filteredUsers.length} de {users.length} usuarios
+                Mostrando 1 a {filteredUsers.length} de {teamUsers.length} usuarios
               </span>
               <div className="flex items-center gap-2">
                 <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-muted">
