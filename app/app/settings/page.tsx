@@ -8,7 +8,6 @@ import {
   Cog,
   Landmark,
   ShieldCheck,
-  Sparkles,
   Users
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -164,82 +163,64 @@ export default async function AppSettingsPage() {
     { label: "Mensaje personalizado", value: Boolean(String(transferConfig.instructions || "").trim()), detail: transferConfig.enabled ? "Activo" : "Sin activar" }
   ];
 
-  const configuredModules = [
-    businessChecks.filter((item) => item.value).length > 0 ? "Negocio" : null,
-    allowUsers ? "Equipo" : null,
-    transferConfig.enabled || transferChecks.some((item) => item.value) ? "Cobros" : null
-  ].filter(Boolean) as string[];
-
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_82%_18%,rgba(176,80,0,0.14),transparent_22%),linear-gradient(135deg,rgba(12,20,32,0.98),rgba(10,16,28,0.96))] p-5 shadow-[var(--card-shadow)]">
+    <div className="space-y-4">
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_236px]">
+        <div className="overflow-hidden rounded-[26px] border border-white/8 bg-[radial-gradient(circle_at_82%_18%,rgba(176,80,0,0.12),transparent_18%),linear-gradient(135deg,rgba(12,20,32,0.98),rgba(10,16,28,0.96))] p-4 shadow-[var(--card-shadow)]">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="muted">Portal del cliente</Badge>
             <Badge variant="success">Portal activo</Badge>
             <Badge variant="success">Espacio activo</Badge>
             {backendReady ? <Badge variant="warning">Operacion en vivo</Badge> : null}
           </div>
-          <p className="mt-4 text-[11px] uppercase tracking-[0.22em] text-muted">Configuracion</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Configuracion</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            Administra negocio, equipo y cobros desde un solo lugar.
-          </p>
+          <p className="mt-3 text-[10px] uppercase tracking-[0.22em] text-muted">Configuracion</p>
+          <h1 className="mt-1.5 text-[31px] font-semibold tracking-tight text-white">Configuracion</h1>
+          <p className="mt-1 text-sm leading-5 text-muted">Administra negocio, equipo y cobros desde un solo lugar.</p>
 
-          <div className="mt-4 rounded-[22px] border border-white/8 bg-black/18 p-3.5">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-brand/20 bg-brand/10 text-brandBright">
-                <ShieldCheck className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="font-medium text-white">El estado de este centro impacta en la operacion diaria.</p>
-                <p className="mt-1 text-sm leading-6 text-muted">Completar negocio, usuarios y cobros mejora la atencion y reduce friccion.</p>
-              </div>
-            </div>
+          <div className="mt-3 flex items-center gap-3 rounded-[18px] border border-white/8 bg-black/16 px-3.5 py-2.5">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-brand/20 bg-brand/10 text-brandBright">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <p className="text-sm leading-5 text-muted">Completar negocio, usuarios y cobros mejora la operacion diaria.</p>
           </div>
         </div>
 
         <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="space-y-3 p-4">
+          <CardContent className="space-y-2.5 p-3.5">
             <div>
-              <p className="text-lg font-semibold">Lectura rapida</p>
-              <p className="mt-1 text-sm leading-6 text-muted">Estado actual de {clinicName}.</p>
+              <p className="text-base font-semibold text-white">Lectura rapida</p>
+              <p className="mt-1 text-xs leading-5 text-muted">Estado actual de {clinicName}.</p>
             </div>
-
             {[
               {
-                icon: <Building2 className="h-5 w-5 text-brandBright" />,
-                title: "Datos actualizados",
-                copy: businessChecks.filter((item) => item.value).length >= 3 ? "La informacion del negocio ya acompana bien la operacion." : "Todavia hay datos clave del negocio para completar."
+                icon: <Building2 className="h-4 w-4 text-brandBright" />,
+                title: "Negocio",
+                copy: businessChecks.every((item) => item.value) ? "Listo" : `${businessChecks.filter((item) => item.value).length}/4 completos`
               },
               {
-                icon: <Users className="h-5 w-5 text-violet-300" />,
-                title: "Equipo organizado",
-                copy: `${activeUsers.length || 0} usuario${activeUsers.length === 1 ? "" : "s"} activo${activeUsers.length === 1 ? "" : "s"} en el espacio.`
+                icon: <Users className="h-4 w-4 text-violet-300" />,
+                title: "Equipo",
+                copy: `${activeUsers.length || 0} activo${activeUsers.length === 1 ? "" : "s"}`
               },
               {
-                icon: <Banknote className="h-5 w-5 text-emerald-300" />,
-                title: "Cobros automaticos",
-                copy: transferConfig.enabled ? "El bot ya puede compartir datos bancarios automaticamente." : "Activa transferencia para que el bot comparta alias, CBU e instrucciones."
-              },
-              {
-                icon: <Sparkles className="h-5 w-5 text-sky-300" />,
-                title: "Operacion optimizada",
-                copy: configuredModules.length ? `${configuredModules.join(" · ")} ya estan presentes en este centro.` : "Todavia no hay modulos configurados por completo."
+                icon: <Banknote className="h-4 w-4 text-emerald-300" />,
+                title: "Cobros",
+                copy: transferConfig.enabled ? "Activo" : "Pendiente"
               }
             ].map((item) => (
-              <div key={item.title} className="rounded-[20px] border border-white/8 bg-surface/55 p-3.5">
-                <div className="flex items-start gap-3">
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                    {item.icon}
-                  </span>
-                  <div>
-                    <p className="font-medium text-white">{item.title}</p>
-                    <p className="mt-1 text-sm leading-5 text-muted">{item.copy}</p>
-                  </div>
+              <div key={item.title} className="flex items-center gap-3 rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                  {item.icon}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white">{item.title}</p>
+                  <p className="truncate text-xs text-muted">{item.copy}</p>
                 </div>
               </div>
             ))}
+            <div className="rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5 text-xs leading-5 text-muted">
+              {backendReady ? "Conectado a datos reales del portal." : "Usando datos locales del espacio actual."}
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -336,16 +317,16 @@ export default async function AppSettingsPage() {
         </HubCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_236px]">
         <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <CardContent className="flex flex-col gap-3 p-3.5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
                 <Cog className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-xl font-semibold text-white">Mejora continua del espacio</p>
-                <p className="mt-1 text-sm leading-6 text-muted">Negocio, equipo y cobros completos ayudan a operar con menos friccion.</p>
+                <p className="text-lg font-semibold text-white">Mejora continua del espacio</p>
+                <p className="mt-1 text-sm leading-5 text-muted">Negocio, equipo y cobros completos ayudan a operar con menos friccion.</p>
               </div>
             </div>
             <Button asChild variant="secondary" className="rounded-2xl">
@@ -358,9 +339,8 @@ export default async function AppSettingsPage() {
         </Card>
 
         <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="space-y-3 p-4">
-            <p className="text-lg font-semibold text-white">Lectura rapida</p>
-            <p className="text-sm leading-6 text-muted">Estado actual del centro de configuracion de {clinicName}.</p>
+          <CardContent className="space-y-2.5 p-3.5">
+            <p className="text-base font-semibold text-white">Estado del centro</p>
             {[
               {
                 label: "Negocio",
@@ -375,19 +355,14 @@ export default async function AppSettingsPage() {
                 ready: transferChecks.some((item) => item.value)
               }
             ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-[18px] border border-white/8 bg-surface/55 px-4 py-3">
+              <div key={item.label} className="flex items-center justify-between rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5">
                 <span className="text-sm text-white">{item.label}</span>
-                <span className={`inline-flex items-center gap-2 text-sm ${item.ready ? "text-emerald-300" : "text-muted"}`}>
-                  <CheckCircle2 className="h-4 w-4" />
+                <span className={`inline-flex items-center gap-2 text-xs ${item.ready ? "text-emerald-300" : "text-muted"}`}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
                   {item.ready ? "Listo" : "Pendiente"}
                 </span>
               </div>
             ))}
-            <div className="rounded-[18px] border border-white/8 bg-surface/55 p-4 text-sm leading-6 text-muted">
-              {backendReady
-                ? "El espacio esta conectado al backend real del portal y el hub muestra datos activos del negocio."
-                : "El hub usa datos locales del espacio actual mientras el backend real no esta disponible para este tenant."}
-            </div>
             <Button asChild className="w-full rounded-2xl">
               <Link href="/app/settings/transfer">
                 Configurar cobros
