@@ -408,32 +408,20 @@ function OpturonMark({ compact = false }: { compact?: boolean }) {
 function DesktopRail({
   pathname,
   visibleNavItems,
-  onOpenMenu,
   onSignOut
 }: {
   pathname: string;
   visibleNavItems: typeof navItems;
-  onOpenMenu: () => void;
   onSignOut: () => void;
 }) {
   return (
-    <aside className="sticky top-3 hidden h-[calc(100vh-1.5rem)] w-[92px] shrink-0 xl:flex">
-      <div className="relative flex h-full w-full flex-col items-center rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+    <aside className="hidden w-[92px] shrink-0 self-start xl:block">
+      <div className="relative sticky top-3 flex max-h-[calc(100vh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
         <div className="absolute inset-0 rounded-[30px] bg-[image:var(--rail-overlay)]" />
         <div className="relative flex h-full flex-col items-center">
           <OpturonMark compact />
 
-          <button
-            type="button"
-            onClick={onOpenMenu}
-            className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface/80 text-muted transition-colors hover:text-text"
-            aria-label="Abrir menu de navegacion"
-            title="Abrir menu"
-          >
-            <Menu className="h-4.5 w-4.5" />
-          </button>
-
-          <nav className="mt-6 flex flex-1 flex-col items-center gap-2">
+          <nav className="mt-6 flex flex-1 flex-col items-center gap-2 overflow-y-auto pr-1">
             {visibleNavItems.map((item) => {
               const active = item.match(pathname);
               const Icon = item.icon;
@@ -650,7 +638,6 @@ export function AppShell({
         <DesktopRail
           pathname={pathname}
           visibleNavItems={visibleNavItems}
-          onOpenMenu={() => setSidebarOpen(true)}
           onSignOut={() => void signOut({ callbackUrl: "/login" })}
         />
 
@@ -668,7 +655,7 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(true)}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-card/70 text-muted transition-colors hover:text-text"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-card/70 text-muted transition-colors hover:text-text xl:hidden"
                   aria-label="Abrir menu de navegacion"
                 >
                   <Menu className="h-4.5 w-4.5" />

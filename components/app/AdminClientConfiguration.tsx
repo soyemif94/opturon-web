@@ -114,11 +114,19 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     () => tenants.find((tenant) => tenant.tenantId === selectedTenantId) || tenants[0] || null,
     [selectedTenantId, tenants]
   );
+  const [identityDraft, setIdentityDraft] = useState(() => ({
+    displayName: selectedTenant ? getTenantLabel(selectedTenant) : "",
+    primaryEmail: selectedTenant?.primaryEmail || ""
+  }));
   const [draft, setDraft] = useState<TenantPolicy | null>(selectedTenant ? clonePolicy(selectedTenant.policy) : null);
   const [saving, setSaving] = useState(false);
 
   function selectTenant(tenant: AdminTenantPolicyRow) {
     setSelectedTenantId(tenant.tenantId);
+    setIdentityDraft({
+      displayName: getTenantLabel(tenant),
+      primaryEmail: tenant.primaryEmail || ""
+    });
     setDraft(clonePolicy(normalizePolicy(tenant.policy)));
   }
 
@@ -133,15 +141,33 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       const response = await fetch(`/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/policy`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft)
+        body: JSON.stringify({
+          ...draft,
+          displayName: identityDraft.displayName.trim(),
+          primaryEmail: identityDraft.primaryEmail.trim()
+        })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error || "policy_save_failed");
       const savedPolicy = normalizePolicy(json.policy);
       setTenants((current) =>
-        current.map((tenant) => (tenant.tenantId === selectedTenant.tenantId ? { ...tenant, policy: savedPolicy } : tenant))
+        current.map((tenant) =>
+          tenant.tenantId === selectedTenant.tenantId
+            ? {
+                ...tenant,
+                name: json?.clinic?.name || tenant.name,
+                displayName: identityDraft.displayName.trim() || tenant.displayName || tenant.name,
+                primaryEmail: json?.clinic?.primaryEmail || json?.primaryEmail || identityDraft.primaryEmail.trim() || null,
+                policy: savedPolicy
+              }
+            : tenant
+        )
       );
       setDraft(clonePolicy(savedPolicy));
+      setIdentityDraft((current) => ({
+        displayName: current.displayName.trim(),
+        primaryEmail: current.primaryEmail.trim()
+      }));
       toast.success("Configuracion guardada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar");
@@ -213,6 +239,33 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
               <Save className="h-4 w-4" />
               {saving ? "Guardando" : "Guardar"}
             </Button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+          <h3 className="font-semibold">Datos base del cliente</h3>
+          <p className="mt-2 text-sm text-muted">
+            Corrige el nombre visible y el email principal sin recrear el tenant. El tenant ID tecnico no cambia.
+          </p>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <label className="block text-sm text-muted">
+              Nombre visible
+              <input
+                type="text"
+                value={identityDraft.displayName}
+                onChange={(event) => setIdentityDraft((current) => ({ ...current, displayName: event.target.value }))}
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+              />
+            </label>
+            <label className="block text-sm text-muted">
+              Email principal
+              <input
+                type="email"
+                value={identityDraft.primaryEmail}
+                onChange={(event) => setIdentityDraft((current) => ({ ...current, primaryEmail: event.target.value }))}
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+              />
+            </label>
           </div>
         </div>
 

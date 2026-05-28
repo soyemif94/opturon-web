@@ -28,6 +28,14 @@ export type AdminTenantPolicyRow = {
   timezone?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  lifecycle?: {
+    status?: string | null;
+    archivedAt?: string | null;
+    deletedAt?: string | null;
+    activePortalUsers?: number;
+    activeOwners?: number;
+    visible?: boolean;
+  };
   policy: TenantPolicy;
 };
 
@@ -135,13 +143,18 @@ export async function getAdminTenantPolicy(tenantId: string) {
         id: string;
         name: string | null;
         externalTenantId: string | null;
+        primaryEmail?: string | null;
       };
+      primaryEmail?: string | null;
       policy: TenantPolicy;
     };
   }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`);
 }
 
-export async function patchAdminTenantPolicy(tenantId: string, payload: Partial<TenantPolicy>) {
+export async function patchAdminTenantPolicy(
+  tenantId: string,
+  payload: Partial<TenantPolicy> & { displayName?: string; primaryEmail?: string }
+) {
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -151,7 +164,9 @@ export async function patchAdminTenantPolicy(tenantId: string, payload: Partial<
         id: string;
         name: string | null;
         externalTenantId: string | null;
+        primaryEmail?: string | null;
       };
+      primaryEmail?: string | null;
       policy: TenantPolicy;
     };
   }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`, {
