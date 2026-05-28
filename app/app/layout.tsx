@@ -46,6 +46,7 @@ export default async function ClientPortalLayout({ children }: { children: React
       isStaff={Boolean(ctx.globalRole && ctx.globalRole !== "client")}
       globalRole={ctx.globalRole}
       tenantRole={ctx.tenantRole}
+      accountScope={ctx.accountScope}
       userId={ctx.userId}
     >
       <div className="min-h-screen w-full">
@@ -57,6 +58,7 @@ export default async function ClientPortalLayout({ children }: { children: React
           deploymentId={deploymentId}
           globalRole={ctx.globalRole}
           tenantRole={ctx.tenantRole}
+          accountScope={ctx.accountScope}
           whatsappStatus={whatsappStatus}
         >
           {children}

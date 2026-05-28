@@ -55,7 +55,7 @@ type Props = {
 };
 
 const ADMIN_ROLE_OPTIONS = [
-  { value: "owner", label: "Cliente" },
+  { value: "owner", label: "Nuevo cliente (crea workspace)" },
   { value: "manager", label: "Manager" },
   { value: "seller", label: "Vendedor" },
   { value: "viewer", label: "Solo lectura" }
@@ -157,6 +157,10 @@ export function TenantUsersManager({
   }
 
   function roleLabel(role: string, accountKind?: string) {
+    if (isOpturonAdminScope) {
+      const normalized = normalizePortalUserRole(role);
+      if (normalized === "owner" || String(accountKind || "").trim().toLowerCase() === "primary") return "Cuenta principal";
+    }
     return portalUserRoleLabel(role, accountKind);
   }
 
@@ -514,11 +518,13 @@ export function TenantUsersManager({
                             disabled={pendingRoleUserId === user.id}
                             onChange={(event) => void updateRole(user.id, event.target.value)}
                           >
-                            {roleOptions.map((role) => (
+                            {roleOptions
+                              .filter((role) => role.value !== "owner" || visibleRoleValue(user) === "owner")
+                              .map((role) => (
                               <option key={role.value} value={role.value}>
                                 {role.label}
                               </option>
-                            ))}
+                              ))}
                           </select>
                         ) : (
                           <RoleBadge role={user.tenantRole} accountKind={user.accountKind} />
@@ -699,7 +705,10 @@ function accessDescriptor(user: UserRow) {
 
 function RoleBadge({ role, accountKind }: { role: string; accountKind?: "primary" | "subaccount" }) {
   const normalized = normalizePortalUserRole(role);
-  if (accountKind === "primary" || normalized === "owner" || normalized === "manager") {
+  if (accountKind === "primary" || normalized === "owner") {
+    return <ActionPill label="Principal" tone="violet" />;
+  }
+  if (normalized === "manager") {
     return <ActionPill label="Manager" tone="violet" />;
   }
   if (normalized === "seller") {

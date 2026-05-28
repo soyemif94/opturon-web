@@ -92,6 +92,7 @@ export const authOptions: NextAuthOptions = {
                 globalRole,
                 tenantId: tenantId || undefined,
                 tenantRole,
+                accountScope: backendUser.accountScope,
                 authSource: "backend"
               };
             } catch (error) {
@@ -165,6 +166,7 @@ export const authOptions: NextAuthOptions = {
           token.role = token.globalRole;
           token.tenantId = (user as any).tenantId;
           token.tenantRole = (user as any).tenantRole;
+          token.accountScope = (user as any).accountScope;
           token.authSource = (user as any).authSource || token.authSource || "local";
         }
 
@@ -179,6 +181,7 @@ export const authOptions: NextAuthOptions = {
               token.userId = undefined;
               token.tenantId = undefined;
               token.tenantRole = undefined;
+              token.accountScope = undefined;
               token.globalRole = "client";
               token.role = "client";
               token.authSource = "backend";
@@ -193,11 +196,13 @@ export const authOptions: NextAuthOptions = {
                 token.role = token.globalRole;
                 token.tenantId = hydratedUser.tenantId;
                 token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+                token.accountScope = hydratedUser.accountScope;
                 token.authSource = "backend";
               } else {
                 token.userId = undefined;
                 token.tenantId = undefined;
                 token.tenantRole = undefined;
+                token.accountScope = undefined;
                 token.globalRole = "client";
                 token.role = "client";
               }
@@ -241,6 +246,7 @@ export const authOptions: NextAuthOptions = {
           session.user.role = session.user.globalRole;
           session.user.tenantId = token.tenantId ? String(token.tenantId) : undefined;
           session.user.tenantRole = token.tenantRole as any;
+          session.user.accountScope = token.accountScope ? String(token.accountScope) : undefined;
         }
       } catch (error) {
         console.error("SESSION_CALLBACK_ERROR", { msg: String(error) });

@@ -35,6 +35,7 @@ type RuntimeContext = CommandPaletteContextValue & {
   userId?: string;
   globalRole?: GlobalRole;
   tenantRole?: TenantRole;
+  accountScope?: string;
 };
 
 type PreviewData = {
@@ -141,7 +142,8 @@ export function CommandPaletteProvider({
   isStaff,
   userId,
   globalRole,
-  tenantRole
+  tenantRole,
+  accountScope
 }: {
   children: ReactNode;
   scope: PaletteScope;
@@ -150,6 +152,7 @@ export function CommandPaletteProvider({
   userId?: string;
   globalRole?: GlobalRole;
   tenantRole?: TenantRole;
+  accountScope?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [context, setContextState] = useState<CommandPaletteContextValue>({ tenantId });
@@ -179,7 +182,7 @@ export function CommandPaletteProvider({
   return (
     <ProviderCtx.Provider value={{ open, setOpen, context, setContext }}>
       {children}
-      <CommandPalette scope={scope} isStaff={Boolean(isStaff)} userId={userId} globalRole={globalRole} tenantRole={tenantRole} />
+      <CommandPalette scope={scope} isStaff={Boolean(isStaff)} userId={userId} globalRole={globalRole} tenantRole={tenantRole} accountScope={accountScope} />
     </ProviderCtx.Provider>
   );
 }
@@ -208,13 +211,15 @@ export function CommandPalette({
   isStaff,
   userId,
   globalRole,
-  tenantRole
+  tenantRole,
+  accountScope
 }: {
   scope: PaletteScope;
   isStaff: boolean;
   userId?: string;
   globalRole?: GlobalRole;
   tenantRole?: TenantRole;
+  accountScope?: string;
 }) {
   const { open, setOpen, context } = useProviderCtx();
   const inbox = useInboxContextOptional();
@@ -240,9 +245,10 @@ export function CommandPalette({
       isStaff,
       userId,
       globalRole,
-      tenantRole
+      tenantRole,
+      accountScope
     }),
-    [context, globalRole, inbox?.state.contactId, inbox?.state.conversationId, inbox?.state.dealId, isStaff, scope, tenantRole, userId]
+    [accountScope, context, globalRole, inbox?.state.contactId, inbox?.state.conversationId, inbox?.state.dealId, isStaff, scope, tenantRole, userId]
   );
   const canEdit = canEditWorkspace(runtime);
   const canManage = canManageWorkspace(runtime);

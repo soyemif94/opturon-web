@@ -621,6 +621,7 @@ export async function loginPortalUser(email: string, password: string) {
       tenantId: string;
       tenantRole: TenantRole;
       globalRole: string;
+      accountScope?: string;
     };
   }>(
     "/portal/auth/login",
@@ -645,6 +646,7 @@ export async function getPortalAuthUserByEmail(email: string, tenantId?: string)
       tenantId: string;
       tenantRole: TenantRole;
       globalRole: GlobalRole;
+      accountScope?: string;
     } | null;
   }>(`/portal/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
 }

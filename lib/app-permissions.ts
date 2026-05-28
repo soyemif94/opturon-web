@@ -30,6 +30,7 @@ export type AppModule =
 type AccessContext = {
   globalRole?: GlobalRole;
   tenantRole?: TenantRole;
+  accountScope?: string;
 };
 
 const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
@@ -92,6 +93,9 @@ export function hasAppPermission(context: AccessContext, permission: AppPermissi
     }
     return true;
   }
+  if (String(context.accountScope || "").trim().toLowerCase() === "opturon_admin") {
+    return false;
+  }
   const tenantRole = normalizeTenantRole(context.tenantRole);
   if (!tenantRole) return false;
   return TENANT_ROLE_PERMISSIONS[tenantRole]?.[permission] === true;
@@ -99,6 +103,7 @@ export function hasAppPermission(context: AccessContext, permission: AppPermissi
 
 export function canAccessAppModule(context: AccessContext, module: AppModule) {
   if (isStaffRole(context.globalRole)) return true;
+  if (String(context.accountScope || "").trim().toLowerCase() === "opturon_admin") return false;
   const tenantRole = normalizeTenantRole(context.tenantRole);
   if (!tenantRole) return false;
   return TENANT_ROLE_MODULES[tenantRole].includes(module);

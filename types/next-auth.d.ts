@@ -10,6 +10,7 @@ declare module "next-auth" {
       role?: GlobalRole;
       tenantId?: string;
       tenantRole?: TenantRole;
+      accountScope?: string;
     };
   }
 
@@ -19,6 +20,7 @@ declare module "next-auth" {
     role?: GlobalRole;
     tenantId?: string;
     tenantRole?: TenantRole;
+    accountScope?: string;
   }
 }
 
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     role?: GlobalRole;
     tenantId?: string;
     tenantRole?: TenantRole;
+    accountScope?: string;
   }
 }
 

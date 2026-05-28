@@ -23,7 +23,8 @@ export async function getSessionContext() {
     userId: session?.user?.id,
     globalRole: session?.user?.globalRole,
     tenantId: session?.user?.tenantId,
-    tenantRole: session?.user?.tenantRole
+    tenantRole: session?.user?.tenantRole,
+    accountScope: session?.user?.accountScope
   };
 }
 

@@ -179,10 +179,10 @@ function normalizeRouteUserWithKind(user: { id: string; email: string; name: str
   };
 }
 
-function getUserManagementPolicy(ctx: { globalRole?: string; tenantRole?: string; tenantId?: string | null }) {
+function getUserManagementPolicy(ctx: { globalRole?: string; tenantRole?: string; tenantId?: string | null; accountScope?: string }) {
   const tenantRole = normalizeTenantRole(ctx.tenantRole);
   const staff = Boolean(isStaffRole(ctx.globalRole as any) && canManageUsers(ctx as any));
-  const tenantOwner = tenantRole === "owner";
+  const tenantOwner = tenantRole === "owner" && String(ctx.accountScope || "").trim().toLowerCase() !== "opturon_admin";
   const canManage = Boolean(staff || tenantOwner);
   const allowedRoles = staff ? ["owner", "manager", "seller", "viewer"] : [...CLIENT_SUBACCOUNT_ROLES];
 
