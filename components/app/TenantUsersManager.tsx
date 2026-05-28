@@ -1,8 +1,31 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  BriefcaseBusiness,
+  Clock3,
+  Crown,
+  Mail,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserCog,
+  UserPlus,
+  Users,
+  UserRoundCheck,
+  KeyRound,
+  Wand2
+} from "lucide-react";
 import type { PortalUserAuditEvent } from "@/lib/api";
 import { normalizePortalUserRole, portalUserRoleLabel } from "@/lib/portal-users";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { toast } from "@/components/ui/toast";
 
 type UserRow = { id: string; email: string; name: string; tenantRole: string; accountKind?: "primary" | "subaccount" };
@@ -46,7 +69,16 @@ function accountKindLabel(accountKind?: string) {
   return accountKind === "primary" ? "cuenta principal" : "subcuenta";
 }
 
-export function TenantUsersManager({ initialUsers, initialMeta, initialActivity, canManage, currentUserId, currentTenantRole, currentGlobalRole, targetTenantId }: Props) {
+export function TenantUsersManager({
+  initialUsers,
+  initialMeta,
+  initialActivity,
+  canManage,
+  currentUserId,
+  currentTenantRole,
+  currentGlobalRole,
+  targetTenantId
+}: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [meta, setMeta] = useState(initialMeta);
   const [activity, setActivity] = useState(initialActivity);
@@ -56,6 +88,10 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const [pendingPrimaryUserId, setPendingPrimaryUserId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<"all" | "manager" | "seller" | "other">("all");
+  const [search, setSearch] = useState("");
+  const [useTemporaryPassword, setUseTemporaryPassword] = useState(false);
+
   const isStaffManager = currentGlobalRole === "superadmin" || currentGlobalRole === "ops_admin";
   const isOpturonAdminScope = meta.accountScope === "opturon_admin";
   const roleOptions = isOpturonAdminScope ? ADMIN_ROLE_OPTIONS : CLIENT_ROLE_OPTIONS;
@@ -66,6 +102,46 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   const usedPct = !unlimitedSubaccounts && Number(subaccountLimit) > 0 ? Math.min(100, Math.round((subaccountCount / Number(subaccountLimit)) * 100)) : 0;
   const inviteBlockedByLimit = !unlimitedSubaccounts && form.role !== "owner" && Number(remainingSubaccounts) <= 0;
   const usersEndpoint = targetTenantId ? `/api/app/users?tenantId=${encodeURIComponent(targetTenantId)}` : "/api/app/users";
+
+  const lastActivityByUser = useMemo(() => {
+    const map = new Map<string, PortalUserAuditEvent>();
+    for (const entry of activity) {
+      const candidateIds = [entry.targetUserId, entry.actorUserId].filter(Boolean) as string[];
+      for (const id of candidateIds) {
+        const current = map.get(id);
+        if (!current || new Date(entry.createdAt).getTime() > new Date(current.createdAt).getTime()) {
+          map.set(id, entry);
+        }
+      }
+    }
+    return map;
+  }, [activity]);
+
+  const roleDistribution = useMemo(() => {
+    const counts = { manager: 0, seller: 0, other: 0 };
+    users.forEach((user) => {
+      const normalized = normalizePortalUserRole(user.tenantRole);
+      if (normalized === "owner" || normalized === "manager") counts.manager += 1;
+      else if (normalized === "seller") counts.seller += 1;
+      else counts.other += 1;
+    });
+    return counts;
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return users.filter((user) => {
+      const normalized = normalizePortalUserRole(user.tenantRole);
+      const roleGroup =
+        normalized === "owner" || normalized === "manager" ? "manager" : normalized === "seller" ? "seller" : "other";
+      if (selectedRoleFilter !== "all" && roleGroup !== selectedRoleFilter) return false;
+      if (!query) return true;
+      return [user.name, user.email, roleLabel(user.tenantRole, user.accountKind)]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [users, search, selectedRoleFilter]);
 
   function canManageTarget(user: UserRow) {
     if (!isOpturonAdminScope && user.accountKind === "primary") return false;
@@ -96,7 +172,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
     event?.preventDefault();
     const email = form.email.trim().toLowerCase();
     const name = form.name.trim();
-    const password = form.password.trim();
+    const password = useTemporaryPassword ? form.password.trim() : "";
 
     if (!name || name.length < 2) {
       setFeedback({ tone: "error", text: "Ingresa un nombre valido." });
@@ -121,7 +197,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
       const response = await fetch(usersEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, email, name, tenantId: targetTenantId })
+        body: JSON.stringify({ ...form, email, name, password, tenantId: targetTenantId })
       });
 
       if (!response.ok) {
@@ -135,6 +211,7 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
 
       await reloadUsers();
       setForm({ email: "", name: "", role: "seller", password: "" });
+      setUseTemporaryPassword(false);
       setFeedback({ tone: "success", text: "Usuario invitado correctamente." });
       toast.success("Invitacion enviada");
     } catch {
@@ -250,186 +327,325 @@ export function TenantUsersManager({ initialUsers, initialMeta, initialActivity,
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Usuarios cliente</h1>
-
-      <div className="rounded-2xl border border-[color:var(--border)] bg-card p-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_82%_18%,rgba(139,92,246,0.14),transparent_18%),linear-gradient(135deg,rgba(12,20,32,0.98),rgba(10,16,28,0.96))] p-5 shadow-[var(--card-shadow)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="font-semibold">Plan y cupo de usuarios</h3>
-            <p className="mt-1 text-sm text-muted">
-              {unlimitedSubaccounts ? `${subaccountCount} subcuentas activas` : `${subaccountCount} / ${subaccountLimit} subcuentas utilizadas`}
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              {unlimitedSubaccounts
-                ? "Cuenta administradora global de Opturon: no consume cupo de cliente."
-                : `Disponibles: ${remainingSubaccounts}. La cuenta principal no consume cupo.`}
-            </p>
-            {meta.primaryPortalUserId ? (
-              <p className="mt-1 text-xs text-muted">
-                Cuenta principal actual: {users.find((user) => user.id === meta.primaryPortalUserId)?.name || "Configurada"}.
-              </p>
-            ) : null}
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <Link href="/app/settings" className="transition-colors hover:text-white">
+                Configuracion
+              </Link>
+              <span>/</span>
+              <span className="text-white">Usuarios del espacio</span>
+            </div>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">Usuarios del espacio</h1>
+            <p className="mt-2 text-sm leading-6 text-muted">Gestiona tu equipo y los accesos al portal segun las necesidades de tu negocio.</p>
           </div>
-          <div className="w-full max-w-xs">
-            <div className="flex items-center justify-between text-xs text-muted">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="muted">Espacio del cliente</Badge>
+            <Badge variant="success">Portal activo</Badge>
+            <Badge variant="warning">Operacion en vivo</Badge>
+          </div>
+        </div>
+      </section>
+
+      <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+        <CardContent className="grid gap-5 p-5 lg:grid-cols-[1.1fr_0.9fr_1fr_1.1fr_260px] lg:items-center">
+          <MetricBlock label="Plan actual" value={unlimitedSubaccounts ? "Ilimitado" : "Cupo del espacio"} helper={unlimitedSubaccounts ? "Usuarios sin limite visible" : `${subaccountCount} de ${subaccountLimit || 0} usuarios activos`} accent="violet" />
+          <MetricBlock label="Usuarios activos" value={`${users.length} / ${subaccountLimit || users.length}`} helper={`${Math.max(0, Number(remainingSubaccounts || 0))} cupo${Number(remainingSubaccounts || 0) === 1 ? "" : "s"} disponible${Number(remainingSubaccounts || 0) === 1 ? "" : "s"}`} accent="blue" />
+          <div className="space-y-2">
+            <p className="text-sm text-muted">Distribucion</p>
+            <div className="grid grid-cols-3 gap-3">
+              <RoleCounter label="Manager" value={roleDistribution.manager} tone="violet" />
+              <RoleCounter label="Vendedores" value={roleDistribution.seller} tone="blue" />
+              <RoleCounter label="Otros" value={roleDistribution.other} tone="amber" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm text-muted">
               <span>Uso del plan</span>
               <span>{unlimitedSubaccounts ? "Ilimitado" : `${usedPct}%`}</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface">
+            <div className="h-2 overflow-hidden rounded-full bg-white/8">
               <div
-                className={`h-full rounded-full ${inviteBlockedByLimit ? "bg-amber-400" : "bg-brand"}`}
-                style={{ width: `${usedPct}%` }}
+                className="h-full rounded-full bg-[linear-gradient(90deg,#8b5cf6,#c084fc)]"
+                style={{ width: `${unlimitedSubaccounts ? 100 : usedPct}%` }}
               />
             </div>
+            <p className="text-sm leading-6 text-muted">{inviteBlockedByLimit ? "Alcanzaste el limite de usuarios de tu plan." : "Aprovecha al maximo tu equipo."}</p>
           </div>
-        </div>
+          <div className="flex justify-start lg:justify-end">
+            <Button type="button" className="w-full rounded-2xl bg-[linear-gradient(135deg,#7c3aed,#a855f7)] hover:bg-[linear-gradient(135deg,#8b5cf6,#c084fc)] lg:w-auto" onClick={() => document.getElementById("invite-user-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invitar usuario
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        {inviteBlockedByLimit ? (
-          <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3">
-            <p className="text-sm font-medium text-amber-100">Alcanzaste el limite de usuarios de tu plan.</p>
-            <p className="mt-1 text-xs text-amber-200">
-              No podes crear mas subcuentas hasta liberar cupo o ampliar tu plan.
-            </p>
+      <Card id="invite-user-section" className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+        <CardContent className="space-y-5 p-5">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Invitar nuevo usuario</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">Agrega un nuevo miembro a tu equipo y asignale un rol.</p>
+            {!canManage ? <p className="mt-2 text-sm text-muted">Solo propietario puede gestionar usuarios y permisos.</p> : null}
+            {inviteBlockedByLimit ? <p className="mt-2 text-sm text-amber-300">Alcanzaste el limite de usuarios de tu plan. Para crear otra subcuenta, primero hay que liberar cupo.</p> : null}
           </div>
-        ) : (
-          <div className="mt-4 rounded-xl border border-[color:var(--border)] bg-surface px-3 py-3">
-            <p className="text-sm text-muted">
-              Necesitas mas usuarios? Contactanos para ampliar tu plan.
-            </p>
-          </div>
-        )}
-      </div>
 
-      {canManage ? (
-        <form className="rounded-2xl border border-[color:var(--border)] bg-card p-4" onSubmit={invite}>
-          <h3 className="font-semibold">Invitar usuario</h3>
-          <p className="mt-1 text-sm text-muted">
-            {isStaffManager
-              ? "Crea accesos del portal con el rol que corresponda."
-              : currentTenantRole === "owner"
-                ? "La cuenta principal del negocio solo puede crear subcuentas operativas de vendedor o visualizador."
-                : "Solo la cuenta principal puede gestionar usuarios de este espacio."}
-          </p>
-          {inviteBlockedByLimit ? (
-            <p className="mt-2 text-xs text-amber-300">
-              Alcanzaste el limite de usuarios de tu plan. Para crear otra subcuenta, primero hay que liberar cupo.
-            </p>
+          {canManage ? (
+            <form className="grid gap-4 xl:grid-cols-[1fr_1fr_280px_300px] xl:items-start" onSubmit={invite}>
+              <FieldGroup label="Nombre completo">
+                <Input placeholder="Ej: Juan Perez" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+              </FieldGroup>
+              <FieldGroup label="Email">
+                <Input placeholder="ejemplo@email.com" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+              </FieldGroup>
+              <FieldGroup label="Rol">
+                <select className="h-10 w-full rounded-xl border border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-3 text-sm text-text" value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
+                  {roleOptions.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldGroup>
+              <div className="space-y-3">
+                <FieldGroup label="Generar contrasena temporal">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseTemporaryPassword((current) => !current);
+                      if (useTemporaryPassword) {
+                        setForm((p) => ({ ...p, password: "" }));
+                      }
+                    }}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full border transition-colors ${useTemporaryPassword ? "border-violet-400/40 bg-violet-500/30" : "border-white/10 bg-white/8"}`}
+                  >
+                    <span className={`inline-flex h-5 w-5 transform rounded-full bg-white transition-transform ${useTemporaryPassword ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </FieldGroup>
+                <p className="text-sm leading-6 text-muted">El usuario podra cambiarla al iniciar sesion.</p>
+              </div>
+              {useTemporaryPassword ? (
+                <div className="xl:col-span-3">
+                  <FieldGroup label="Contrasena temporal">
+                    <Input placeholder="Minimo 6 caracteres" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+                  </FieldGroup>
+                </div>
+              ) : null}
+              <div className="xl:col-span-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                {feedback.tone ? <p className={`text-sm ${feedback.tone === "success" ? "text-emerald-300" : "text-red-300"}`}>{feedback.text}</p> : null}
+                <Button type="submit" disabled={isSubmitting || inviteBlockedByLimit} className="rounded-2xl bg-[linear-gradient(135deg,#7c3aed,#a855f7)] hover:bg-[linear-gradient(135deg,#8b5cf6,#c084fc)]">
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  {isSubmitting ? "Enviando..." : "Enviar invitacion"}
+                </Button>
+              </div>
+            </form>
           ) : null}
-          <div className="mt-3 grid gap-2 md:grid-cols-4">
-            <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Nombre" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-            <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-            <select className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
-              {roleOptions.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-            <input className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm" placeholder="Password temporal" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <button type="submit" disabled={isSubmitting || inviteBlockedByLimit} className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              {isSubmitting ? "Invitando..." : "Invitar"}
-            </button>
-            {feedback.tone ? <p className={`text-xs ${feedback.tone === "success" ? "text-green-400" : "text-red-300"}`}>{feedback.text}</p> : null}
-          </div>
-        </form>
-      ) : (
-        <p className="text-sm text-muted">Solo propietario puede gestionar usuarios y permisos.</p>
-      )}
+        </CardContent>
+      </Card>
 
-      <div className="overflow-hidden rounded-2xl border border-[color:var(--border)]">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface text-xs uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Rol</th>
-              {canManage ? <th className="px-4 py-3 text-right">Acciones</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => {
-              const isCurrentUser = user.id === currentUserId;
-              return (
-                <tr key={user.id} className="border-t border-[color:var(--border)]">
-                  <td className="px-4 py-3">{user.name}</td>
-                  <td className="px-4 py-3">{user.email}</td>
-                  <td className="px-4 py-3">{accountKindLabel(user.accountKind)}</td>
-                  <td className="px-4 py-3 capitalize">
-                    {canManage && canManageTarget(user) ? (
-                      <select
-                        className="rounded-lg border border-[color:var(--border)] bg-bg p-2 text-sm"
-                        value={visibleRoleValue(user)}
-                        disabled={pendingRoleUserId === user.id}
-                        onChange={(event) => void updateRole(user.id, event.target.value)}
-                      >
-                        {roleOptions.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      roleLabel(user.tenantRole, user.accountKind)
-                    )}
-                  </td>
-                  {canManage ? (
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+          <CardContent className="space-y-4 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-white">Miembros del equipo</h2>
+                <p className="mt-2 text-sm leading-6 text-muted">Administra usuarios y permisos del espacio sin perder contexto comercial.</p>
+              </div>
+              <div className="flex flex-col gap-3 lg:items-end">
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { key: "all", label: "Todos" },
+                    { key: "manager", label: "Managers" },
+                    { key: "seller", label: "Vendedores" },
+                    { key: "other", label: "Otros" }
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setSelectedRoleFilter(item.key as typeof selectedRoleFilter)}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${selectedRoleFilter === item.key ? "border-violet-400/40 bg-violet-500/15 text-violet-200" : "border-white/10 bg-white/5 text-muted hover:text-white"}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative w-full lg:w-72">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                  <Input className="pl-9" placeholder="Buscar usuario..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-[24px] border border-white/8">
+              <div className="hidden grid-cols-[1.5fr_0.9fr_0.7fr_0.9fr_0.95fr_0.7fr] gap-4 border-b border-white/8 bg-black/12 px-5 py-4 text-xs uppercase tracking-[0.18em] text-muted lg:grid">
+                <span>Usuario</span>
+                <span>Rol</span>
+                <span>Estado</span>
+                <span>Ultimo acceso</span>
+                <span>Acceso</span>
+                <span className="text-right">Acciones</span>
+              </div>
+              <div className="divide-y divide-white/8">
+                {filteredUsers.map((user) => {
+                  const isCurrentUser = user.id === currentUserId;
+                  const latestActivity = lastActivityByUser.get(user.id);
+                  const accessMeta = accessDescriptor(user);
+                  return (
+                    <div key={user.id} className="grid gap-4 px-5 py-4 lg:grid-cols-[1.5fr_0.9fr_0.7fr_0.9fr_0.95fr_0.7fr] lg:items-center">
+                      <div className="flex items-center gap-3">
+                        <SimpleAvatar
+                          name={user.name}
+                          className="h-12 w-12 rounded-full border border-white/8 bg-[linear-gradient(135deg,rgba(124,58,237,0.26),rgba(59,130,246,0.22))]"
+                          fallbackClassName="bg-transparent text-sm font-semibold text-white"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-white">{user.name}</p>
+                          <p className="truncate text-sm text-muted">{user.email}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        {canManage && canManageTarget(user) ? (
+                          <select
+                            className="h-10 w-full rounded-xl border border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-3 text-sm text-text"
+                            value={visibleRoleValue(user)}
+                            disabled={pendingRoleUserId === user.id}
+                            onChange={(event) => void updateRole(user.id, event.target.value)}
+                          >
+                            {roleOptions.map((role) => (
+                              <option key={role.value} value={role.value}>
+                                {role.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <RoleBadge role={user.tenantRole} accountKind={user.accountKind} />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-sm text-emerald-300">
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                        Activo
+                      </div>
+
+                      <div className="text-sm">
+                        <p className="text-white">{latestActivity ? formatActivityTimestamp(latestActivity.createdAt) : "Sin registro"}</p>
+                        <p className="mt-1 text-xs text-muted">{latestActivity ? formatActivityMessage(latestActivity) : "Todavia sin actividad visible"}</p>
+                      </div>
+
+                      <div className="text-sm">
+                        <p className="font-medium text-white">{accessMeta.title}</p>
+                        <p className="mt-1 text-xs text-muted">{accessMeta.copy}</p>
+                      </div>
+
+                      <div className="flex items-center justify-start gap-2 lg:justify-end">
                         {canPromoteToPrimary(user) ? (
-                          <button
-                            type="button"
+                          <ActionButton
+                            label={pendingPrimaryUserId === user.id ? "Actualizando..." : "Marcar principal"}
+                            icon={<Crown className="h-4 w-4" />}
+                            tone="amber"
                             onClick={() => void makePrimary(user.id)}
                             disabled={pendingPrimaryUserId === user.id}
-                            className="text-xs text-amber-200 hover:underline disabled:opacity-50"
-                            title="Marcar como cuenta principal"
-                          >
-                            {pendingPrimaryUserId === user.id ? "Actualizando..." : "Marcar principal"}
-                          </button>
+                          />
                         ) : user.accountKind === "primary" ? (
-                          <span className="text-xs text-emerald-300">Principal actual</span>
+                          <ActionPill label="Principal" tone="emerald" />
                         ) : null}
-                        <button
-                          type="button"
+                        <ActionButton
+                          label="Editar rol"
+                          icon={<UserCog className="h-4 w-4" />}
+                          tone="neutral"
+                          disabled
+                        />
+                        <ActionButton
+                          label={removingUserId === user.id ? "Eliminando..." : "Eliminar"}
+                          icon={<Trash2 className="h-4 w-4" />}
+                          tone="danger"
                           onClick={() => void removeUser(user.id)}
                           disabled={removingUserId === user.id || isCurrentUser || !canManageTarget(user)}
-                          className="text-xs text-red-300 hover:underline disabled:opacity-50"
-                          title={
-                            isCurrentUser
-                              ? "No puedes eliminar tu propio usuario activo."
-                              : !canManageTarget(user)
-                                ? "Esta cuenta no puede gestionar otra cuenta principal ni roles elevados."
-                                : "Eliminar usuario"
-                          }
-                        >
-                          {removingUserId === user.id ? "Eliminando..." : "Eliminar usuario"}
-                        </button>
+                        />
                       </div>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="rounded-2xl border border-[color:var(--border)] bg-card p-4">
-        <h3 className="font-semibold">Actividad reciente</h3>
-        <div className="mt-3 space-y-2 text-sm">
-          {activity.length ? (
-            activity.slice(0, 8).map((entry) => (
-              <div key={entry.id} className="rounded-xl border border-[color:var(--border)] bg-surface px-3 py-2">
-                <p>{formatActivityMessage(entry)}</p>
-                <p className="mt-1 text-xs text-muted">{formatActivityTimestamp(entry.createdAt)}</p>
+                    </div>
+                  );
+                })}
+                {!filteredUsers.length ? (
+                  <div className="px-5 py-10 text-center text-sm text-muted">No hay usuarios que coincidan con esta busqueda.</div>
+                ) : null}
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-muted">Todavia no hay eventos operativos registrados para usuarios.</p>
-          )}
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-muted">
+              <span>
+                Mostrando 1 a {filteredUsers.length} de {users.length} usuarios
+              </span>
+              <div className="flex items-center gap-2">
+                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-muted">
+                  ‹
+                </button>
+                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-400/40 bg-violet-500/20 text-violet-200">
+                  1
+                </button>
+                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-muted">
+                  ›
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-5">
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+            <CardContent className="space-y-4 p-5">
+              <h3 className="text-2xl font-semibold text-white">Detalles importantes</h3>
+              <SidebarInfo
+                icon={<ShieldCheck className="h-4 w-4" />}
+                title="Roles y permisos"
+                copy="Asigna el rol adecuado para controlar el acceso a funcionalidades del portal."
+                tone="violet"
+              />
+              <SidebarInfo
+                icon={<KeyRound className="h-4 w-4" />}
+                title="Seguridad"
+                copy="Las contrasenas temporales se pueden compartir solo si el flujo real lo necesita."
+                tone="amber"
+              />
+              <SidebarInfo
+                icon={<Users className="h-4 w-4" />}
+                title="Usuarios limitados"
+                copy={unlimitedSubaccounts ? "Este espacio hoy no muestra limite visible de subcuentas." : `En este plan tenes ${subaccountCount} usuarios activos de ${subaccountLimit || 0} disponibles.`}
+                tone="blue"
+              />
+              <SidebarInfo
+                icon={<Clock3 className="h-4 w-4" />}
+                title="Historial de actividad"
+                copy="Desde cada usuario puedes ver cambios recientes de rol, acceso y altas dentro del espacio."
+                tone="brand"
+              />
+              <Button asChild variant="secondary" className="w-full rounded-2xl">
+                <Link href="/app/settings">
+                  Ver guia de usuarios
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+            <CardContent className="space-y-3 p-5">
+              <h3 className="text-lg font-semibold text-white">Actividad reciente</h3>
+              {activity.length ? (
+                activity.slice(0, 4).map((entry) => (
+                  <div key={entry.id} className="rounded-[18px] border border-white/8 bg-surface/55 p-3.5">
+                    <p className="text-sm leading-6 text-white">{formatActivityMessage(entry)}</p>
+                    <p className="mt-1 text-xs text-muted">{formatActivityTimestamp(entry.createdAt)}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted">Todavia no hay eventos operativos registrados para usuarios.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -468,6 +684,156 @@ function formatActivityTimestamp(value: string) {
     dateStyle: "short",
     timeStyle: "short"
   }).format(date);
+}
+
+function accessDescriptor(user: UserRow) {
+  const normalized = normalizePortalUserRole(user.tenantRole);
+  if (user.accountKind === "primary" || normalized === "owner" || normalized === "manager") {
+    return { title: "Acceso total", copy: "Todo el portal" };
+  }
+  if (normalized === "seller") {
+    return { title: "Acceso operativo", copy: "Inbox, clientes y ventas" };
+  }
+  return { title: "Acceso limitado", copy: "Vista restringida del espacio" };
+}
+
+function RoleBadge({ role, accountKind }: { role: string; accountKind?: "primary" | "subaccount" }) {
+  const normalized = normalizePortalUserRole(role);
+  if (accountKind === "primary" || normalized === "owner" || normalized === "manager") {
+    return <ActionPill label="Manager" tone="violet" />;
+  }
+  if (normalized === "seller") {
+    return <ActionPill label="Vendedor" tone="blue" />;
+  }
+  return <ActionPill label="Otros" tone="amber" />;
+}
+
+function MetricBlock({
+  label,
+  value,
+  helper,
+  accent
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  accent: "violet" | "blue" | "amber";
+}) {
+  const accents = {
+    violet: "text-violet-300",
+    blue: "text-sky-300",
+    amber: "text-amber-300"
+  } as const;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted">{label}</p>
+      <p className={`text-2xl font-semibold ${accents[accent]}`}>{value}</p>
+      <p className="text-sm leading-6 text-muted">{helper}</p>
+    </div>
+  );
+}
+
+function RoleCounter({
+  label,
+  value,
+  tone
+}: {
+  label: string;
+  value: number;
+  tone: "violet" | "blue" | "amber";
+}) {
+  const toneClasses = {
+    violet: "text-violet-300",
+    blue: "text-sky-300",
+    amber: "text-amber-300"
+  } as const;
+  return (
+    <div className="rounded-[18px] border border-white/8 bg-surface/55 p-3 text-center">
+      <p className={`text-3xl font-semibold ${toneClasses[tone]}`}>{value}</p>
+      <p className="mt-1 text-xs text-muted">{label}</p>
+    </div>
+  );
+}
+
+function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="grid gap-2 text-sm">
+      <span className="font-medium text-white">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function SidebarInfo({
+  icon,
+  title,
+  copy,
+  tone
+}: {
+  icon: React.ReactNode;
+  title: string;
+  copy: string;
+  tone: "violet" | "amber" | "blue" | "brand";
+}) {
+  const toneClass = {
+    violet: "text-violet-300 border-violet-500/20 bg-violet-500/10",
+    amber: "text-amber-300 border-amber-500/20 bg-amber-500/10",
+    blue: "text-sky-300 border-sky-500/20 bg-sky-500/10",
+    brand: "text-brandBright border-brand/20 bg-brand/10"
+  } as const;
+
+  return (
+    <div className="rounded-[18px] border border-white/8 bg-surface/55 p-4">
+      <div className="flex items-start gap-3">
+        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${toneClass[tone]}`}>{icon}</span>
+        <div>
+          <p className="font-medium text-white">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-muted">{copy}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionPill({ label, tone }: { label: string; tone: "violet" | "blue" | "amber" | "emerald" }) {
+  const styles = {
+    violet: "border-violet-500/20 bg-violet-500/10 text-violet-200",
+    blue: "border-sky-500/20 bg-sky-500/10 text-sky-200",
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-200",
+    emerald: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+  } as const;
+  return <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${styles[tone]}`}>{label}</span>;
+}
+
+function ActionButton({
+  label,
+  icon,
+  tone,
+  onClick,
+  disabled = false
+}: {
+  label: string;
+  icon: React.ReactNode;
+  tone: "neutral" | "danger" | "amber";
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const styles = {
+    neutral: "border-white/10 bg-white/5 text-white hover:bg-white/8",
+    danger: "border-red-500/20 bg-red-500/10 text-red-200 hover:bg-red-500/15",
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
+  } as const;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles[tone]}`}
+    >
+      {icon}
+    </button>
+  );
 }
 
 async function safeJson(response: Response) {
