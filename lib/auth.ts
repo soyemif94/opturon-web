@@ -73,14 +73,25 @@ export const authOptions: NextAuthOptions = {
               const response = await loginPortalUser(email, password);
               const backendUser = response.data;
               const globalRole = normalizeGlobalRole(backendUser.globalRole);
+              const tenantId = String(backendUser.tenantId || "").trim();
+              const tenantRole = normalizeTenantRole(backendUser.tenantRole);
+              if (!isStaffGlobalRole(globalRole) && (!tenantId || !tenantRole)) {
+                console.error("AUTH_BACKEND_LOGIN_MISSING_TENANT_CONTEXT", {
+                  email,
+                  globalRole,
+                  tenantId: backendUser.tenantId || null,
+                  tenantRole: backendUser.tenantRole || null
+                });
+                return null;
+              }
               return {
                 id: backendUser.id,
                 email: backendUser.email,
                 name: backendUser.name,
                 role: globalRole,
                 globalRole,
-                tenantId: backendUser.tenantId,
-                tenantRole: normalizeTenantRole(backendUser.tenantRole),
+                tenantId: tenantId || undefined,
+                tenantRole,
                 authSource: "backend"
               };
             } catch (error) {
@@ -163,11 +174,18 @@ export const authOptions: NextAuthOptions = {
             isPersistentPortalIdentityEnabled() && !isStaffGlobalRole(tokenGlobalRole);
 
           if (shouldHydratePersistentPortalIdentity) {
+            const tokenTenantId = String(token.tenantId || "").trim();
+            if (!tokenTenantId) {
+              token.userId = undefined;
+              token.tenantId = undefined;
+              token.tenantRole = undefined;
+              token.globalRole = "client";
+              token.role = "client";
+              token.authSource = "backend";
+              return token;
+            }
             try {
-              const response = await getPortalAuthUserByEmail(
-                String(token.email),
-                token.tenantId ? String(token.tenantId) : undefined
-              );
+              const response = await getPortalAuthUserByEmail(String(token.email), tokenTenantId);
               const hydratedUser = response.data;
               if (hydratedUser) {
                 token.userId = hydratedUser.id;
