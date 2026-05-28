@@ -9,6 +9,7 @@ import {
   Clock3,
   Crown,
   Mail,
+  PencilLine,
   Search,
   ShieldCheck,
   Trash2,
@@ -87,6 +88,9 @@ export function TenantUsersManager({
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
   const [pendingPrimaryUserId, setPendingPrimaryUserId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [savingNameUserId, setSavingNameUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<"all" | "manager" | "seller" | "other">("all");
   const [search, setSearch] = useState("");
@@ -266,6 +270,52 @@ export function TenantUsersManager({
       toast.error("Error de red", "No pudimos actualizar el rol.");
     } finally {
       setPendingRoleUserId(null);
+    }
+  }
+
+  function startNameEdit(user: UserRow) {
+    setEditingUserId(user.id);
+    setEditingName(user.name);
+  }
+
+  function cancelNameEdit() {
+    setEditingUserId(null);
+    setEditingName("");
+  }
+
+  async function saveName(userId: string) {
+    const nextName = editingName.trim();
+    if (nextName.length < 2) {
+      setFeedback({ tone: "error", text: "Ingresa un nombre valido." });
+      toast.error("Nombre invalido");
+      return;
+    }
+
+    setSavingNameUserId(userId);
+    setFeedback({ tone: null, text: "" });
+    try {
+      const response = await fetch(usersEndpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, name: nextName, tenantId: targetTenantId })
+      });
+      if (!response.ok) {
+        const json = await safeJson(response);
+        const message = json?.detail || json?.error || "No se pudo actualizar el nombre.";
+        setFeedback({ tone: "error", text: String(message) });
+        toast.error("Error al actualizar usuario", String(message));
+        return;
+      }
+      setUsers((current) => current.map((user) => (user.id === userId ? { ...user, name: nextName } : user)));
+      await reloadUsers();
+      cancelNameEdit();
+      setFeedback({ tone: "success", text: "Nombre actualizado correctamente." });
+      toast.success("Usuario actualizado");
+    } catch {
+      setFeedback({ tone: "error", text: "Ocurrio un error de red al actualizar el nombre." });
+      toast.error("Error de red", "No pudimos actualizar el usuario.");
+    } finally {
+      setSavingNameUserId(null);
     }
   }
 
@@ -505,7 +555,37 @@ export function TenantUsersManager({
                           fallbackClassName="bg-transparent text-sm font-semibold text-white"
                         />
                         <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-white">{user.name}</p>
+                          {editingUserId === user.id ? (
+                            <div className="space-y-2">
+                              <Input
+                                value={editingName}
+                                onChange={(event) => setEditingName(event.target.value)}
+                                className="h-9"
+                                disabled={savingNameUserId === user.id}
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => void saveName(user.id)}
+                                  disabled={savingNameUserId === user.id}
+                                >
+                                  {savingNameUserId === user.id ? "Guardando..." : "Guardar"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={cancelNameEdit}
+                                  disabled={savingNameUserId === user.id}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="truncate text-base font-semibold text-white">{user.name}</p>
+                          )}
                           <p className="truncate text-sm text-muted">{user.email}</p>
                         </div>
                       </div>
@@ -558,12 +638,15 @@ export function TenantUsersManager({
                         ) : user.accountKind === "primary" ? (
                           <ActionPill label="Principal" tone="emerald" />
                         ) : null}
-                        <ActionButton
-                          label="Editar rol"
-                          icon={<UserCog className="h-4 w-4" />}
-                          tone="neutral"
-                          disabled
-                        />
+                        {canManageTarget(user) ? (
+                          <ActionButton
+                            label={editingUserId === user.id ? "Editando..." : "Editar"}
+                            icon={<PencilLine className="h-4 w-4" />}
+                            tone="neutral"
+                            onClick={() => startNameEdit(user)}
+                            disabled={editingUserId === user.id}
+                          />
+                        ) : null}
                         <ActionButton
                           label={removingUserId === user.id ? "Eliminando..." : "Eliminar"}
                           icon={<Trash2 className="h-4 w-4" />}

@@ -6,12 +6,16 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   Bot,
+  CircleDollarSign,
+  ClipboardList,
   CalendarDays,
   ChartColumn,
   ChevronRight,
   Building2,
   ContactRound,
+  FileText,
   Gift,
+  HandCoins,
   Shield,
   Headset,
   House,
@@ -24,11 +28,9 @@ import {
   PhoneCall,
   PlugZap,
   ReceiptText,
-  Receipt,
-  Settings2,
+  Settings,
   Sparkles,
   TrendingUp,
-  WalletCards
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -114,7 +116,7 @@ const navItems: Array<{
     href: "/app/orders",
     label: "Pedidos",
     description: "Pedidos internos, estados y preparacion desde el panel",
-    icon: Receipt,
+    icon: ClipboardList,
     module: "orders",
     match: (pathname: string) => pathname.startsWith("/app/orders")
   },
@@ -122,7 +124,7 @@ const navItems: Array<{
     href: "/app/invoices",
     label: "Comprobantes",
     description: "Documentos internos, saldo y ciclo de pre-facturacion",
-    icon: ReceiptText,
+    icon: FileText,
     module: "invoices",
     match: (pathname: string) => pathname.startsWith("/app/invoices")
   },
@@ -130,7 +132,7 @@ const navItems: Array<{
     href: "/app/payments",
     label: "Cobros",
     description: "Cobros registrados, estado y asignacion sobre comprobantes",
-    icon: PhoneCall,
+    icon: CircleDollarSign,
     module: "payments",
     match: (pathname: string) => pathname.startsWith("/app/payments")
   },
@@ -138,7 +140,7 @@ const navItems: Array<{
     href: "/app/cash",
     label: "Caja",
     description: "Apertura, control operativo y cierre de cajas del comercio",
-    icon: WalletCards,
+    icon: HandCoins,
     module: "cash",
     match: (pathname: string) => pathname.startsWith("/app/cash")
   },
@@ -170,7 +172,7 @@ const navItems: Array<{
     href: "/app/settings",
     label: "Configuracion",
     description: "Cuenta, negocio y preferencias del portal",
-    icon: Settings2,
+    icon: Settings,
     module: "settings",
     match: (pathname: string) => pathname.startsWith("/app/settings")
   },
@@ -418,10 +420,10 @@ function DesktopRail({
     <aside className="hidden w-[92px] shrink-0 self-start xl:block">
       <div className="relative sticky top-3 flex max-h-[calc(100vh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
         <div className="absolute inset-0 rounded-[30px] bg-[image:var(--rail-overlay)]" />
-        <div className="relative flex h-full flex-col items-center">
+        <div className="relative flex h-full min-h-0 flex-col items-center">
           <OpturonMark compact />
 
-          <nav className="mt-6 flex flex-1 flex-col items-center gap-2 overflow-y-auto pr-1">
+          <nav className="mt-6 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto overscroll-contain pr-1">
             {visibleNavItems.map((item) => {
               const active = item.match(pathname);
               const Icon = item.icon;

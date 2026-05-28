@@ -9,8 +9,8 @@ import {
   getPortalUsers,
   isBackendConfigured,
   isPortalInternalAuthConfigured,
+  patchPortalUser,
   patchPortalPrimaryUser,
-  patchPortalUserRole
 } from "@/lib/api";
 import { canManageUsers, isStaffRole, normalizeTenantRole } from "@/lib/app-permissions";
 import { requireAppApi } from "@/lib/saas/access";
@@ -25,10 +25,14 @@ const createSchema = z.object({
   tenantId: z.string().min(1).optional()
 });
 
-const updateRoleSchema = z.object({
+const updateUserSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(["owner", "manager", "seller", "viewer"]),
+  role: z.enum(["owner", "manager", "seller", "viewer"]).optional(),
+  name: z.string().min(2).optional(),
   tenantId: z.string().min(1).optional()
+}).refine((value) => Boolean(value.role || value.name), {
+  message: "At least one user field must be updated.",
+  path: ["userId"]
 });
 
 const CLIENT_SUBACCOUNT_ROLES = ["seller", "viewer"] as const;
@@ -487,9 +491,9 @@ export async function PATCH(request: NextRequest) {
   const policy = getUserManagementPolicy(guard.ctx || {});
   if (!policy.canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const parsed = updateRoleSchema.safeParse(await request.json());
+  const parsed = updateUserSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  if (!policy.allowedRoles.includes(parsed.data.role)) {
+  if (parsed.data.role && !policy.allowedRoles.includes(parsed.data.role)) {
     return NextResponse.json(
       {
         error: "role_not_allowed_for_actor",
@@ -527,20 +531,32 @@ export async function PATCH(request: NextRequest) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
     if (backendRequirement) return backendRequirement;
     try {
-      const response = await patchPortalUserRole(tenantId, parsed.data.userId, parsed.data.role, resolveBackendActorUserId(guard.ctx?.userId));
+      const response = await patchPortalUser(
+        tenantId,
+        parsed.data.userId,
+        {
+          ...(parsed.data.role ? { role: parsed.data.role } : {}),
+          ...(parsed.data.name ? { name: parsed.data.name.trim() } : {})
+        },
+        resolveBackendActorUserId(guard.ctx?.userId)
+      );
       safeAppendUsersAuditLog({
         tenantId,
         userId: guard.ctx?.userId,
-        action: "tenant_user_role_updated",
+        action: parsed.data.role ? "tenant_user_role_updated" : "tenant_user_updated",
         entity: "membership",
         entityId: parsed.data.userId,
-        metadata: { role: parsed.data.role }
+        metadata: {
+          ...(parsed.data.role ? { role: parsed.data.role } : {}),
+          ...(parsed.data.name ? { name: parsed.data.name.trim() } : {})
+        }
       });
       return NextResponse.json({ ok: true, user: response.data.user });
     } catch (error) {
-      return proxyUsersBackendError("update_user_role", tenantId, error, {
+      return proxyUsersBackendError("update_user", tenantId, error, {
         targetUserId: parsed.data.userId,
-        requestedRole: parsed.data.role
+        requestedRole: parsed.data.role,
+        requestedName: parsed.data.name
       });
     }
   }
@@ -548,17 +564,37 @@ export async function PATCH(request: NextRequest) {
   const data = readSaasData();
   const membership = data.memberships.find((item) => item.userId === parsed.data.userId && item.tenantId === tenantId);
   if (!membership) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  membership.role = parsed.data.role;
+  if (parsed.data.role) {
+    membership.role = parsed.data.role;
+  }
+  if (parsed.data.name) {
+    const currentUser = data.users.find((item) => item.id === parsed.data.userId);
+    if (currentUser) currentUser.name = parsed.data.name.trim();
+  }
   writeSaasData(data);
   appendAuditLog({
     tenantId,
     userId: guard.ctx?.userId,
-    action: "tenant_user_role_updated",
+    action: parsed.data.role ? "tenant_user_role_updated" : "tenant_user_updated",
     entity: "membership",
     entityId: parsed.data.userId,
-    metadata: { role: parsed.data.role }
+    metadata: {
+      ...(parsed.data.role ? { role: parsed.data.role } : {}),
+      ...(parsed.data.name ? { name: parsed.data.name.trim() } : {})
+    }
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    user: data.users.find((item) => item.id === parsed.data.userId)
+      ? {
+          id: parsed.data.userId,
+          name: data.users.find((item) => item.id === parsed.data.userId)?.name || targetUser.name,
+          email: data.users.find((item) => item.id === parsed.data.userId)?.email || targetUser.email,
+          role: parsed.data.role || targetUser.tenantRole,
+          accountKind: targetUser.accountKind
+        }
+      : null
+  });
 }
 
 const updatePrimarySchema = z.object({
