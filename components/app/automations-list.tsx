@@ -1,8 +1,19 @@
 import Link from "next/link";
-import { AlarmClock, Bot, CalendarDays, Edit3, MessageSquareText, MoonStar, PhoneCall, Sparkles, UserRound, Zap } from "lucide-react";
+import {
+  BellRing,
+  Bot,
+  CalendarDays,
+  CreditCard,
+  Hand,
+  MessageSquareText,
+  Package2,
+  RefreshCcw,
+  ShieldQuestion,
+  UserRound
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/ui/cn";
 
 type AutomationState = "activa" | "inactiva" | "requiere configuracion" | "recomendada";
@@ -16,20 +27,23 @@ export type AutomationModule = {
   summary: string;
   trigger: string;
   action: string;
-  icon: "sparkles" | "moon" | "human" | "faq" | "phone" | "calendar" | "alarm" | "bot";
+  icon: "welcome" | "catalog" | "handoff" | "followup" | "payments" | "fallback" | "faq" | "calendar" | "bot";
+  chips?: string[];
   channel?: string;
-  readiness?: string;
-  headline?: string;
+  configHref?: string;
+  configureLabel?: string;
+  showToggle?: boolean;
 };
 
 const ICONS = {
-  sparkles: Sparkles,
-  moon: MoonStar,
-  human: UserRound,
+  welcome: Hand,
+  catalog: Package2,
+  handoff: UserRound,
+  followup: RefreshCcw,
+  payments: CreditCard,
+  fallback: ShieldQuestion,
   faq: MessageSquareText,
-  phone: PhoneCall,
   calendar: CalendarDays,
-  alarm: AlarmClock,
   bot: Bot
 } as const;
 
@@ -37,108 +51,85 @@ export function AutomationsList({
   modules,
   pendingAutomationId,
   pendingAction,
-  onToggleEnabled,
-  onDelete
+  onToggleEnabled
 }: {
   modules: AutomationModule[];
   pendingAutomationId?: string | null;
   pendingAction?: "toggle" | "delete" | null;
   onToggleEnabled?: (module: AutomationModule) => void;
-  onDelete?: (module: AutomationModule) => void;
 }) {
   return (
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
       {modules.map((module) => {
         const Icon = ICONS[module.icon];
         const isPendingToggle = pendingAutomationId === module.id && pendingAction === "toggle";
-        const isPendingDelete = pendingAutomationId === module.id && pendingAction === "delete";
-        const toggleLabel = module.state === "activa" ? "Activa" : "Inactiva";
-        const toggleActionLabel = module.state === "activa" ? "Desactivar" : "Activar";
-        const toneClass =
-          module.state === "activa"
-            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
-            : module.state === "requiere configuracion"
-              ? "border-amber-500/20 bg-amber-500/10 text-amber-100"
-              : "border-white/10 bg-white/5 text-muted";
+        const isActive = module.state === "activa";
+        const showToggle = module.showToggle !== false;
 
         return (
           <Card key={module.id} className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
-            <CardHeader action={<Badge variant={stateVariant(module.state)}>{stateLabel(module.state)}</Badge>}>
-              <div className="flex items-start gap-4">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-black/20">
-                  <Icon className="h-5 w-5 text-brandBright" />
+            <CardContent className="space-y-4 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <span className={cn("inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border", iconTone(module.icon))}>
+                  <Icon className="h-6 w-6" />
                 </span>
-                <div>
-                  <CardTitle className="text-xl text-white">{module.name}</CardTitle>
-                  <CardDescription>{module.headline || module.description}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-white/10 bg-black/15 px-3 py-1 text-text">{module.channel || "WhatsApp"}</span>
-                <span className={cn("rounded-full border px-3 py-1", toneClass)}>{module.readiness || defaultReadiness(module.state)}</span>
+                <Badge variant={stateVariant(module.state)}>{stateLabel(module.state)}</Badge>
               </div>
 
-              <div className="rounded-2xl border border-white/8 bg-black/15 p-4 text-sm leading-6 text-muted">
-                {module.summary}
+              <div>
+                <h3 className="text-xl font-semibold text-white">{module.name}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted">{module.description}</p>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-white/8 bg-black/15 p-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Cuando actua</p>
-                  <p className="mt-1 text-sm font-medium text-white">{module.trigger}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Que hace</p>
-                  <p className="mt-1 text-sm font-medium text-white">{module.action}</p>
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {(module.chips || []).slice(0, 2).map((chip) => (
+                  <span key={chip} className="rounded-xl border border-white/8 bg-black/12 px-3 py-1.5 text-xs text-text">
+                    {chip}
+                  </span>
+                ))}
               </div>
 
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-black/15 px-4 py-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Estado</p>
-                    <p className="mt-1 text-sm font-medium text-white">{toggleLabel}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant={module.state === "activa" ? "secondary" : "primary"}
-                    size="sm"
-                    className="rounded-2xl"
-                    disabled={!onToggleEnabled || isPendingToggle || isPendingDelete}
-                    onClick={() => onToggleEnabled?.(module)}
-                  >
-                    {isPendingToggle ? "Guardando..." : toggleActionLabel}
-                  </Button>
+              <div className="rounded-2xl border border-white/8 bg-black/12 p-3 text-xs leading-6 text-muted">
+                <p>{module.summary}</p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <div className="space-y-1">
+                  <p className={cn("text-sm font-semibold uppercase tracking-[0.16em]", isActive ? "text-emerald-300" : "text-muted")}>
+                    {isActive ? "Activa" : module.state === "recomendada" ? "Recomendada" : "Inactiva"}
+                  </p>
+                  {showToggle ? (
+                    <button
+                      type="button"
+                      aria-label={isActive ? "Desactivar automatizacion" : "Activar automatizacion"}
+                      disabled={!onToggleEnabled || isPendingToggle}
+                      onClick={() => onToggleEnabled?.(module)}
+                      className={cn(
+                        "relative inline-flex h-7 w-12 items-center rounded-full border transition-colors",
+                        isActive ? "border-emerald-400/40 bg-emerald-500/30" : "border-white/10 bg-white/8",
+                        (!onToggleEnabled || isPendingToggle) && "opacity-70"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex h-5 w-5 transform rounded-full bg-white transition-transform",
+                          isActive ? "translate-x-6" : "translate-x-1"
+                        )}
+                      />
+                    </button>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 text-xs text-muted">
+                      <BellRing className="h-3.5 w-3.5" />
+                      <span>Plantilla disponible</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex gap-2">
-                  <Button asChild variant="secondary" className="flex-1 rounded-2xl">
-                    <Link href={`/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
-                      <Edit3 className="mr-2 h-4 w-4" />
-                      Configurar
-                    </Link>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="rounded-2xl px-4"
-                    disabled={!onDelete || isPendingToggle || isPendingDelete}
-                    onClick={() => onDelete?.(module)}
-                  >
-                    {isPendingDelete ? "Eliminando..." : "Eliminar"}
-                  </Button>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button asChild variant="ghost" className="flex-1 rounded-2xl">
-                    <Link href={`/app/automations/new?template=${encodeURIComponent(module.id)}`} aria-label={`Crear automatizacion desde ${module.name}`}>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Duplicar base
-                    </Link>
-                  </Button>
-                </div>
+                <Button asChild variant="secondary" className="rounded-2xl px-4">
+                  <Link href={module.configHref || `/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
+                    {module.configureLabel || "Configurar"}
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -157,13 +148,15 @@ function stateVariant(state: AutomationState): "success" | "muted" | "warning" {
 function stateLabel(state: AutomationState) {
   if (state === "activa") return "Activa";
   if (state === "inactiva") return "Inactiva";
-  if (state === "requiere configuracion") return "Requiere configuracion";
+  if (state === "requiere configuracion") return "Pendiente";
   return "Recomendada";
 }
 
-function defaultReadiness(state: AutomationState) {
-  if (state === "activa") return "Lista para responder";
-  if (state === "inactiva") return "Disponible para activar";
-  if (state === "requiere configuracion") return "Necesita revision";
-  return "Conviene activarla";
+function iconTone(icon: AutomationModule["icon"]) {
+  if (icon === "welcome") return "border-emerald-500/25 bg-emerald-500/14 text-emerald-200";
+  if (icon === "catalog") return "border-sky-500/25 bg-sky-500/14 text-sky-200";
+  if (icon === "handoff") return "border-violet-500/25 bg-violet-500/14 text-violet-200";
+  if (icon === "followup") return "border-amber-500/25 bg-amber-500/14 text-amber-200";
+  if (icon === "payments") return "border-rose-500/25 bg-rose-500/14 text-rose-200";
+  return "border-white/10 bg-white/8 text-brandBright";
 }

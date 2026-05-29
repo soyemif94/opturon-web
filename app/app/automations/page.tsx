@@ -56,8 +56,8 @@ export default async function AppAutomationsPage() {
 
   return (
     <ClientPageShell
-      title="Asistente comercial automatico"
-      description="Configura como Opturon responde, acompana y deriva conversaciones por WhatsApp sin convertirlo en un panel tecnico."
+      title="Automatizaciones"
+      description="Automatiza respuestas, seguimientos y ventas por WhatsApp sin conocimientos tecnicos."
       badge="Automatizaciones"
     >
       <AutomationsHub automations={automations} catalog={catalog} businessProfile={businessProfile} />
