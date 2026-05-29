@@ -153,10 +153,13 @@ function stateLabel(state: AutomationState) {
 }
 
 function iconTone(icon: AutomationModule["icon"]) {
-  if (icon === "welcome") return "border-emerald-500/25 bg-emerald-500/14 text-emerald-200";
-  if (icon === "catalog") return "border-sky-500/25 bg-sky-500/14 text-sky-200";
-  if (icon === "handoff") return "border-violet-500/25 bg-violet-500/14 text-violet-200";
-  if (icon === "followup") return "border-amber-500/25 bg-amber-500/14 text-amber-200";
-  if (icon === "payments") return "border-rose-500/25 bg-rose-500/14 text-rose-200";
-  return "border-white/10 bg-white/8 text-brandBright";
+  if (icon === "welcome") return "border-emerald-400/35 bg-emerald-500/18 text-emerald-200 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_16px_30px_rgba(16,185,129,0.16)]";
+  if (icon === "catalog") return "border-sky-400/35 bg-sky-500/18 text-sky-200 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_16px_30px_rgba(59,130,246,0.16)]";
+  if (icon === "handoff") return "border-violet-400/35 bg-violet-500/18 text-violet-200 shadow-[0_0_0_1px_rgba(167,139,250,0.12),0_16px_30px_rgba(124,58,237,0.16)]";
+  if (icon === "followup") return "border-orange-400/35 bg-orange-500/18 text-orange-200 shadow-[0_0_0_1px_rgba(251,146,60,0.12),0_16px_30px_rgba(234,88,12,0.16)]";
+  if (icon === "payments") return "border-rose-400/35 bg-rose-500/18 text-rose-200 shadow-[0_0_0_1px_rgba(251,113,133,0.12),0_16px_30px_rgba(225,29,72,0.16)]";
+  if (icon === "fallback") return "border-amber-400/35 bg-amber-500/18 text-amber-200 shadow-[0_0_0_1px_rgba(251,191,36,0.12),0_16px_30px_rgba(217,119,6,0.16)]";
+  if (icon === "faq") return "border-amber-400/35 bg-amber-500/18 text-amber-200 shadow-[0_0_0_1px_rgba(251,191,36,0.12),0_16px_30px_rgba(217,119,6,0.16)]";
+  if (icon === "calendar") return "border-orange-400/35 bg-orange-500/18 text-orange-200 shadow-[0_0_0_1px_rgba(251,146,60,0.12),0_16px_30px_rgba(234,88,12,0.16)]";
+  return "border-brand/35 bg-brand/18 text-brandBright shadow-[0_0_0_1px_rgba(249,115,22,0.12),0_16px_30px_rgba(192,80,0,0.16)]";
 }

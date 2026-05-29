@@ -518,6 +518,12 @@ export function AutomationsHub({
                 <span>Interacciones</span>
                 <span>Resultado</span>
               </div>
+              <div className="flex flex-wrap gap-2 border-b border-white/8 px-4 py-3">
+                <ExecutionStateChip label="Completada" tone="success" />
+                <ExecutionStateChip label="Enviada" tone="info" />
+                <ExecutionStateChip label="Fallida" tone="danger" />
+                <ExecutionStateChip label="Pendiente" tone="warning" />
+              </div>
               <div className="px-4 py-10 text-sm text-muted">
                 Sin actividad reciente todavía.
               </div>
@@ -680,6 +686,28 @@ function ArrowChip() {
   return (
     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-muted">
       <ArrowRight className="h-4 w-4" />
+    </span>
+  );
+}
+
+function ExecutionStateChip({
+  label,
+  tone
+}: {
+  label: string;
+  tone: "success" | "info" | "danger" | "warning";
+}) {
+  const toneClass = {
+    success: "border-emerald-500/25 bg-emerald-500/12 text-emerald-300",
+    info: "border-sky-500/25 bg-sky-500/12 text-sky-300",
+    danger: "border-rose-500/25 bg-rose-500/12 text-rose-300",
+    warning: "border-amber-500/25 bg-amber-500/12 text-amber-300"
+  } as const;
+
+  return (
+    <span className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs", toneClass[tone])}>
+      <span className="inline-flex h-2 w-2 rounded-full bg-current" />
+      {label}
     </span>
   );
 }
