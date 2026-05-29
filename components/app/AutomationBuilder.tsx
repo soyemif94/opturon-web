@@ -14,7 +14,6 @@ import {
   Clock3,
   Hand,
   Pencil,
-  PhoneCall,
   Sparkles,
   UserRound
 } from "lucide-react";
@@ -220,13 +219,20 @@ const TRIGGER_COPY: Record<TriggerType, { title: string; description: string }> 
   }
 };
 
-const QUICK_SNIPPETS = [
+const QUICK_SNIPPET_OPTIONS = [
   "Hola 👋 Gracias por escribirnos.",
   "En que podemos ayudarte hoy?",
   "Si quieres, dejanos tu nombre.",
   "Tambien puedes dejarnos tu telefono.",
   "Enseguida te responde una persona."
 ] as const;
+
+function normalizeBuilderCopy(value: string) {
+  return value
+    .replaceAll("Ã±", "n")
+    .replaceAll(/\s{2,}/g, " ")
+    .trim();
+}
 
 function goalToneClasses(tone: GoalDefinition["tone"], selected = false) {
   if (tone === "emerald") return selected ? "border-emerald-400/60 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.18)]" : "border-white/8 bg-black/12";
@@ -257,8 +263,8 @@ export function AutomationBuilder() {
   const [goalId, setGoalId] = useState<GoalId>(initialGoal.id);
   const [triggerType, setTriggerType] = useState<TriggerType>(initialGoal.defaultTrigger);
   const [keyword, setKeyword] = useState(initialGoal.defaultKeyword || "");
-  const [name, setName] = useState(initialGoal.defaultName);
-  const [message, setMessage] = useState(initialGoal.defaultMessage);
+  const [name, setName] = useState(() => normalizeBuilderCopy(initialGoal.defaultName));
+  const [message, setMessage] = useState(() => normalizeBuilderCopy(initialGoal.defaultMessage));
   const [tag, setTag] = useState(initialGoal.defaultTag || "");
   const [includeAssignHuman, setIncludeAssignHuman] = useState(Boolean(initialGoal.includeAssignHuman));
   const [includeTag, setIncludeTag] = useState(Boolean(initialGoal.includeTag));
@@ -278,8 +284,8 @@ export function AutomationBuilder() {
     setGoalId(nextGoal.id);
     setTriggerType(nextGoal.defaultTrigger);
     setKeyword(nextGoal.defaultKeyword || "");
-    setName(nextGoal.defaultName);
-    setMessage(nextGoal.defaultMessage);
+    setName(normalizeBuilderCopy(nextGoal.defaultName));
+    setMessage(normalizeBuilderCopy(nextGoal.defaultMessage));
     setTag(nextGoal.defaultTag || "");
     setIncludeAssignHuman(Boolean(nextGoal.includeAssignHuman));
     setIncludeTag(Boolean(nextGoal.includeTag));
@@ -291,6 +297,15 @@ export function AutomationBuilder() {
 
   function goBack() {
     setStep((current) => Math.max(1, current - 1));
+  }
+
+  function appendSnippet(snippet: string) {
+    const nextSnippet = normalizeBuilderCopy(snippet);
+    if (!nextSnippet) return;
+    setMessage((current) => {
+      const base = current.trim();
+      return base ? `${base}\n${nextSnippet}` : nextSnippet;
+    });
   }
 
   async function handleSubmit() {
@@ -488,6 +503,7 @@ export function AutomationBuilder() {
                         <label className="grid gap-2 text-sm">
                           <span className="font-medium text-white">Nombre visible de la automatizacion</span>
                           <input
+                            type="text"
                             className="h-12 w-full rounded-2xl border border-white/10 bg-black/12 px-4 text-text"
                             value={name}
                             onChange={(event) => setName(event.target.value)}
@@ -504,11 +520,11 @@ export function AutomationBuilder() {
                         </label>
 
                         <div className="flex flex-wrap gap-2">
-                          {QUICK_SNIPPETS.map((snippet) => (
+                          {QUICK_SNIPPET_OPTIONS.map((snippet) => (
                             <button
                               key={snippet}
                               type="button"
-                              onClick={() => setMessage((current) => `${current.trim()}\n${snippet}`.trim())}
+                              onClick={() => appendSnippet(snippet)}
                               className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-text transition hover:border-brand/30 hover:text-white"
                             >
                               + {snippet}
@@ -640,7 +656,7 @@ export function AutomationBuilder() {
                   <div className="border-b border-black/10 bg-[#1f4f42] px-4 py-3 text-sm font-medium text-white">Vista previa para el cliente</div>
                   <div className="space-y-4 bg-[linear-gradient(180deg,rgba(23,58,48,0.92),rgba(13,36,30,0.96))] p-4">
                     <div className="max-w-[86%] rounded-[18px] bg-[#2d3240] px-4 py-3 text-sm leading-6 text-white shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
-                      {goal.previewReply}
+                        {normalizeBuilderCopy(goal.previewReply)}
                     </div>
                     <div className="ml-auto max-w-[74%] rounded-[18px] bg-[#d9fdd3] px-4 py-3 text-sm leading-6 text-slate-900 shadow-[0_12px_28px_rgba(0,0,0,0.12)]">
                       Quiero mas informacion
