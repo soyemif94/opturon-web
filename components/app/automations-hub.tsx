@@ -174,8 +174,6 @@ export function AutomationsHub({
     return current?.label || "tu negocio";
   }, [profile?.businessType]);
 
-  const whatsappEnabled = useMemo(() => (profile?.capabilities || []).includes("whatsapp"), [profile]);
-
   const modules = useMemo<AutomationModule[]>(
     () =>
       items.map((automation) => {
@@ -201,34 +199,36 @@ export function AutomationsHub({
   );
 
   const compatibleCatalog = useMemo(() => catalogItems.filter((item) => item.compatible), [catalogItems]);
-  const activeCatalogCount = useMemo(() => compatibleCatalog.filter((item) => item.effectiveEnabled).length, [compatibleCatalog]);
 
   const templateModules = useMemo<AutomationModule[]>(
     () =>
-      compatibleCatalog.map((template) => ({
-        id: template.key,
-        name: template.name,
-        description: template.description || "Plantilla lista para extender el asistente comercial por WhatsApp.",
-        state: template.effectiveEnabled ? "activa" : "recomendada",
-        summary: template.description || "Plantilla disponible para sumar mas respuestas automaticas.",
-        trigger: "Disponible para sumar al asistente",
-        action: "Amplia respuestas, ventas o derivaciones segun el caso",
-        icon: template.key.includes("payment") || template.key.includes("invoice")
-          ? "payments"
-          : template.key.includes("catalog") || template.key.includes("product")
-            ? "catalog"
-            : template.key.includes("handoff") || template.key.includes("human")
-              ? "handoff"
-              : template.key.includes("follow") || template.key.includes("reminder")
-                ? "followup"
-                : "bot",
-        chips: template.requiredCapabilities.length ? template.requiredCapabilities.slice(0, 2) : ["Plantilla Opturon", "Lista para usar"],
-        channel: "WhatsApp",
-        configHref: "/app/automations/templates",
-        configureLabel: template.tenantEnabled ? "Revisar" : "Ver plantilla",
-        showToggle: false
-      })),
-    [compatibleCatalog]
+      compatibleCatalog
+        .filter((template) => !template.effectiveEnabled)
+        .map((template) => ({
+          id: template.key,
+          name: template.name,
+          description: template.description || "Idea lista para usar y sumar al asistente comercial.",
+          state: "recomendada",
+          summary: template.description || "Disponible para activar cuando quieras.",
+          trigger: "Disponible para sumar al asistente",
+          action: "Amplia respuestas, ventas o derivaciones segun el caso",
+          icon:
+            template.key.includes("payment") || template.key.includes("invoice")
+              ? "payments"
+              : template.key.includes("catalog") || template.key.includes("product")
+                ? "catalog"
+                : template.key.includes("handoff") || template.key.includes("human")
+                  ? "handoff"
+                  : template.key.includes("follow") || template.key.includes("reminder")
+                    ? "followup"
+                    : "bot",
+          chips: ["Lista para usar", businessTypeLabel],
+          channel: "WhatsApp",
+          configHref: "/app/automations/templates",
+          configureLabel: "Ver idea",
+          showToggle: false
+        })),
+    [businessTypeLabel, compatibleCatalog]
   );
 
   const recommendedModules = useMemo<AutomationModule[]>(() => {
@@ -241,15 +241,16 @@ export function AutomationsHub({
       summary: item.copy,
       trigger: "Se suma cuando el cliente necesita ayuda en ese momento",
       action: item.copy,
-      icon: item.title.toLowerCase().includes("carrito")
-        ? "followup"
-        : item.title.toLowerCase().includes("talles")
-          ? "faq"
-          : item.title.toLowerCase().includes("promoc")
-            ? "payments"
-            : item.title.toLowerCase().includes("agenda")
-              ? "calendar"
-              : "bot",
+      icon:
+        item.title.toLowerCase().includes("carrito")
+          ? "followup"
+          : item.title.toLowerCase().includes("talles")
+            ? "faq"
+            : item.title.toLowerCase().includes("promoc")
+              ? "payments"
+              : item.title.toLowerCase().includes("agenda")
+                ? "calendar"
+                : "bot",
       chips: ["Recomendada", businessTypeLabel],
       channel: "WhatsApp",
       configHref: "/app/automations/templates",
@@ -271,6 +272,16 @@ export function AutomationsHub({
     if (selectedTab === "templates") return templateModules;
     return modules;
   }, [modules, recommendedModules, selectedTab, templateModules]);
+
+  const selectedTabCopy = useMemo(() => {
+    if (selectedTab === "mine") {
+      return "Estas son las automatizaciones reales de tu negocio. Aqui ves que hace cada una, cuando actua y si esta activa.";
+    }
+    if (selectedTab === "recommended") {
+      return "Estas automatizaciones todavia no estan activas y podrian ayudarte a vender o atender mejor.";
+    }
+    return "Estas son ideas listas para usar. No son lo mismo que tus automatizaciones activas hasta que decidas activarlas o configurarlas.";
+  }, [selectedTab]);
 
   async function handleToggleEnabled(module: AutomationModule) {
     const nextEnabled = module.state !== "activa";
@@ -383,18 +394,20 @@ export function AutomationsHub({
   return (
     <div className="space-y-5">
       <section className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div />
+        <div className="max-w-xl text-sm leading-6 text-muted">
+          Crea una automatizacion simple para responder, recordar, derivar o acompanar ventas sin tocar nada tecnico.
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="secondary" className="rounded-2xl px-5">
             <Link href="#automation-help">
               <CircleHelp className="mr-2 h-4 w-4" />
-              ¿Cómo funciona?
+              Como funciona
             </Link>
           </Button>
           <Button asChild className="rounded-2xl px-5">
             <Link href="/app/automations/new">
               <Plus className="mr-2 h-4 w-4" />
-              Nueva automatización
+              Nueva automatizacion
             </Link>
           </Button>
         </div>
@@ -403,27 +416,12 @@ export function AutomationsHub({
       <Card className="overflow-hidden border-white/8 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
         <CardContent className="grid gap-5 p-6 xl:grid-cols-[minmax(0,1fr)_220px_220px_220px] xl:items-center">
           <div>
-            <h2 className="text-[2rem] font-semibold leading-tight text-white">Tu negocio puede automatizar más de lo que imaginás</h2>
-            <p className="mt-3 text-sm leading-6 text-muted">Activá automatizaciones listas para usar y ahorrá tiempo todos los días.</p>
+            <h2 className="text-[2rem] font-semibold leading-tight text-white">Tu negocio puede automatizar mas de lo que imaginas</h2>
+            <p className="mt-3 text-sm leading-6 text-muted">Activa automatizaciones listas para usar y ahorra tiempo todos los dias.</p>
           </div>
-          <SummaryMetric
-            label="Automatizaciones activas"
-            value={String(stats.active)}
-            helper={`${stats.total} configuradas en este espacio`}
-            tone="orange"
-          />
-          <SummaryMetric
-            label="Interacciones automatizadas"
-            value={interaccionesAutomatizadas}
-            helper="Sin métrica expuesta todavía"
-            tone="green"
-          />
-          <SummaryMetric
-            label="Tiempo ahorrado"
-            value={tiempoAhorrado}
-            helper="Sin métrica expuesta todavía"
-            tone="orange"
-          />
+          <SummaryMetric label="Automatizaciones activas" value={String(stats.active)} helper={`${stats.total} configuradas en este espacio`} tone="orange" />
+          <SummaryMetric label="Interacciones automatizadas" value={interaccionesAutomatizadas} helper="Sin metrica expuesta todavia" tone="green" />
+          <SummaryMetric label="Tiempo ahorrado" value={tiempoAhorrado} helper="Sin metrica expuesta todavia" tone="orange" />
         </CardContent>
       </Card>
 
@@ -433,7 +431,7 @@ export function AutomationsHub({
             {[
               { key: "mine", label: "Mis automatizaciones" },
               { key: "recommended", label: "Recomendadas para tu negocio", badge: recommendedModules.length },
-              { key: "templates", label: "Plantillas predisenadas" }
+              { key: "templates", label: "Ideas listas para usar" }
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -457,6 +455,8 @@ export function AutomationsHub({
           </Button>
         </div>
 
+        <div className="rounded-2xl border border-white/8 bg-black/12 px-4 py-3 text-sm leading-6 text-muted">{selectedTabCopy}</div>
+
         {selectedTab === "mine" && modules.length === 0 ? (
           <AutomationsEmptyState />
         ) : (
@@ -477,7 +477,7 @@ export function AutomationsHub({
               <CircleHelp className="h-4 w-4 text-muted" />
             </div>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Estas automatizaciones pueden ayudarte a vender más y mejorar la experiencia de tus clientes.
+              Estas automatizaciones todavia no estan activas y podrian ayudarte a vender o atender mejor.
             </p>
           </div>
 
@@ -491,7 +491,7 @@ export function AutomationsHub({
           </div>
 
           <Button asChild className="rounded-2xl px-5">
-            <Link href="/app/automations/templates">Activar recomendadas</Link>
+            <Link href="/app/automations/templates">Ver sugerencias</Link>
           </Button>
         </CardContent>
       </Card>
@@ -502,7 +502,7 @@ export function AutomationsHub({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-2xl font-semibold text-white">Ejecuciones recientes</h3>
-                <p className="mt-2 text-sm text-muted">Últimas ejecuciones de tus automatizaciones.</p>
+                <p className="mt-2 text-sm text-muted">Ultimas ejecuciones de tus automatizaciones.</p>
               </div>
               <Button asChild variant="secondary" className="rounded-2xl">
                 <Link href="/app/automations">Ver todas las ejecuciones</Link>
@@ -511,7 +511,7 @@ export function AutomationsHub({
 
             <div className="overflow-hidden rounded-2xl border border-white/8">
               <div className="hidden grid-cols-[1.4fr_0.6fr_0.6fr_1.2fr_0.6fr_1fr] gap-4 border-b border-white/8 bg-black/12 px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted lg:grid">
-                <span>Automatización</span>
+                <span>Automatizacion</span>
                 <span>Estado</span>
                 <span>Ejecutada</span>
                 <span>Disparador</span>
@@ -525,7 +525,8 @@ export function AutomationsHub({
                 <ExecutionStateChip label="Pendiente" tone="warning" />
               </div>
               <div className="px-4 py-10 text-sm text-muted">
-                Sin actividad reciente todavía.
+                <p>Todavia no hay ejecuciones recientes.</p>
+                <p className="mt-2">Cuando el bot responda, derive o envie mensajes, vas a ver la actividad aca.</p>
               </div>
             </div>
           </CardContent>
@@ -534,14 +535,14 @@ export function AutomationsHub({
         <Card id="automation-help" className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
           <CardContent className="space-y-4 p-5">
             <div>
-              <h3 className="text-2xl font-semibold text-white">¿Necesitás ayuda?</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">Aprendé a crear y optimizar tus automatizaciones.</p>
+              <h3 className="text-2xl font-semibold text-white">Necesitas ayuda?</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">Aprende a crear y optimizar tus automatizaciones.</p>
             </div>
 
             {[
-              { title: "Guía rápida", copy: "Paso a paso para empezar", href: "/app/automations/templates" },
-              { title: "Mejores prácticas", copy: "Consejos para vender más", href: "/app/automations/templates" },
-              { title: "Centro de ayuda", copy: "Videos y artículos", href: "/app/automations/templates" }
+              { title: "Guia rapida", copy: "Paso a paso para empezar", href: "/app/automations/templates" },
+              { title: "Mejores practicas", copy: "Consejos para vender mas", href: "/app/automations/templates" },
+              { title: "Centro de ayuda", copy: "Videos y articulos", href: "/app/automations/templates" }
             ].map((item) => (
               <Link key={item.title} href={item.href} className="block rounded-2xl border border-white/8 bg-black/12 p-4 transition hover:border-brand/30 hover:bg-brand/8">
                 <div className="flex items-start justify-between gap-3">
@@ -555,104 +556,110 @@ export function AutomationsHub({
             ))}
 
             <div className="rounded-2xl border border-white/8 bg-black/12 p-4">
-              <p className="text-sm leading-6 text-muted">
-                Las automatizaciones trabajan sobre WhatsApp y respetan pausas humanas.
-              </p>
+              <p className="text-sm leading-6 text-muted">Las automatizaciones trabajan sobre WhatsApp y respetan pausas humanas.</p>
             </div>
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
-        <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
-          <CardContent className="space-y-4 p-5">
-            <div>
-              <h3 className="text-xl font-semibold text-white">Compatibilidad del negocio</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">Definí el rubro y las capacidades que usa el asistente para mostrar automatizaciones coherentes.</p>
-            </div>
+      <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+        <CardContent className="space-y-4 p-5">
+          <div>
+            <h3 className="text-xl font-semibold text-white">Configuracion avanzada del asistente</h3>
+            <p className="mt-2 text-sm leading-6 text-muted">Estos datos ayudan a Opturon a recomendar automatizaciones segun tu negocio.</p>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-white">Tipo de negocio</label>
-              <select
-                className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                value={profile?.businessType || "services_general"}
-                disabled={savingProfile}
-                onChange={(event) => void saveBusinessProfile({ businessType: event.target.value })}
-              >
-                {BUSINESS_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <details className="group rounded-2xl border border-white/8 bg-black/12 p-4">
+            <summary className="cursor-pointer list-none text-sm font-medium text-white">Ver ajustes avanzados</summary>
+            <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-white">Tipo de negocio</label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={profile?.businessType || "services_general"}
+                    disabled={savingProfile}
+                    onChange={(event) => void saveBusinessProfile({ businessType: event.target.value })}
+                  >
+                    {BUSINESS_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-white">Capacidades disponibles</p>
-              <div className="flex flex-wrap gap-2">
-                {CAPABILITY_OPTIONS.map((capability) => {
-                  const active = (profile?.capabilities || []).includes(capability.value);
-                  return (
-                    <Button
-                      key={capability.value}
-                      type="button"
-                      size="sm"
-                      variant={active ? "primary" : "secondary"}
-                      disabled={savingProfile}
-                      onClick={() => {
-                        const current = new Set(profile?.capabilities || []);
-                        if (active) current.delete(capability.value);
-                        else current.add(capability.value);
-                        void saveBusinessProfile({ capabilities: Array.from(current) });
-                      }}
-                    >
-                      {capability.label}
-                    </Button>
-                  );
-                })}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-white">Capacidades del asistente</p>
+                  <div className="flex flex-wrap gap-2">
+                    {CAPABILITY_OPTIONS.map((capability) => {
+                      const active = (profile?.capabilities || []).includes(capability.value);
+                      return (
+                        <Button
+                          key={capability.value}
+                          type="button"
+                          size="sm"
+                          variant={active ? "primary" : "secondary"}
+                          disabled={savingProfile}
+                          onClick={() => {
+                            const current = new Set(profile?.capabilities || []);
+                            if (active) current.delete(capability.value);
+                            else current.add(capability.value);
+                            void saveBusinessProfile({ capabilities: Array.from(current) });
+                          }}
+                        >
+                          {capability.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted">
+                    No hace falta tocar esto salvo que quieras afinar recomendaciones o modulos avanzados.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-lg font-semibold text-white">Automatizaciones disponibles para activar</h4>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Estas ideas listas para usar no son lo mismo que tus automatizaciones activas hasta que decidas activarlas.
+                  </p>
+                </div>
+
+                {compatibleCatalog.length ? (
+                  compatibleCatalog.map((template) => (
+                    <div key={template.key} className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-black/12 p-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-white">{template.name}</p>
+                          <Badge variant={template.effectiveEnabled ? "success" : "muted"}>
+                            {template.effectiveEnabled ? "Activa" : "Disponible"}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-muted">{template.description || "Idea disponible para sumar al asistente."}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={template.tenantEnabled ? "secondary" : "primary"}
+                        disabled={pendingTemplateKey === template.key}
+                        onClick={() => void handleToggleTemplate(template)}
+                      >
+                        {pendingTemplateKey === template.key ? "Guardando..." : template.tenantEnabled ? "Deshabilitar" : "Habilitar"}
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-muted">
+                    Todavia no hay automatizaciones disponibles para activar con el perfil actual.
+                  </div>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
-          <CardContent className="space-y-4 p-5">
-            <div>
-              <h3 className="text-xl font-semibold text-white">Plantillas compatibles</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">Activá o desactivá las plantillas que mejor acompañan tu operación por WhatsApp.</p>
-            </div>
-
-            <div className="space-y-3">
-              {compatibleCatalog.length ? (
-                compatibleCatalog.map((template) => (
-                  <div key={template.key} className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-black/12 p-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-white">{template.name}</p>
-                        <Badge variant={template.effectiveEnabled ? "success" : "muted"}>{template.effectiveEnabled ? "Activa" : "Disponible"}</Badge>
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-muted">{template.description || "Plantilla compatible con este negocio."}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={template.tenantEnabled ? "secondary" : "primary"}
-                      disabled={pendingTemplateKey === template.key}
-                      onClick={() => void handleToggleTemplate(template)}
-                    >
-                      {pendingTemplateKey === template.key ? "Guardando..." : template.tenantEnabled ? "Deshabilitar" : "Habilitar"}
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-muted">
-                  Todavía no hay plantillas compatibles con el perfil actual.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+          </details>
+        </CardContent>
+      </Card>
     </div>
   );
 }
