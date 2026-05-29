@@ -21,6 +21,7 @@ type AutomationState = "activa" | "inactiva" | "requiere configuracion" | "recom
 
 export type AutomationModule = {
   id: string;
+  rawName?: string;
   name: string;
   description: string;
   state: AutomationState;

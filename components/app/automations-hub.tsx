@@ -15,7 +15,7 @@ import type { PortalAutomation, PortalAutomationCatalogItem, PortalBusinessSetti
 const BUSINESS_TYPE_OPTIONS = [
   { value: "dental_clinic", label: "Clinica odontologica" },
   { value: "medical_clinic", label: "Clinica medica" },
-  { value: "retail_products", label: "Tiendas de ropa" },
+  { value: "retail_products", label: "Tienda de ropa" },
   { value: "services_general", label: "Servicios generales" },
   { value: "beauty_salon", label: "Peluqueria / estetica" }
 ] as const;
@@ -36,11 +36,84 @@ const PROTECTED_RUNTIME_AUTOMATION_NAMES = new Set([
   "Conversational Menu Fallback"
 ]);
 
+type EssentialBlueprint = {
+  id: string;
+  title: string;
+  description: string;
+  icon: AutomationModule["icon"];
+  chips: readonly string[];
+  templateKey?: string;
+  runtimeNames?: readonly string[];
+  presetKey?: string;
+};
+
+const ESSENTIAL_BLUEPRINTS: EssentialBlueprint[] = [
+  {
+    id: "welcome",
+    title: "Bienvenida automatica",
+    description: "Saluda al cliente y ordena el primer paso de la conversacion.",
+    icon: "welcome" as const,
+    chips: ["Esencial", "Primer mensaje"],
+    templateKey: "conversation_welcome",
+    runtimeNames: ["Conversational Welcome Menu"],
+    presetKey: "welcome"
+  },
+  {
+    id: "handoff",
+    title: "Derivacion a humano",
+    description: "Pasa la conversacion a una persona cuando hace falta ayuda real.",
+    icon: "handoff" as const,
+    chips: ["Esencial", "Atencion humana"],
+    templateKey: "conversation_human_handoff",
+    runtimeNames: ["Conversational Menu Human"],
+    presetKey: "handoff"
+  },
+  {
+    id: "off-hours",
+    title: "Fuera de horario",
+    description: "Avisa al cliente cuando estas fuera de horario o con respuesta temporal.",
+    icon: "followup" as const,
+    chips: ["Base guiada", "Horario"],
+    presetKey: "off-hours"
+  },
+  {
+    id: "fallback",
+    title: "Respuesta cuando no entiende",
+    description: "Recupera la conversacion cuando el mensaje sale del flujo esperado.",
+    icon: "fallback" as const,
+    chips: ["Esencial", "Rescate"],
+    templateKey: "conversation_fallback",
+    runtimeNames: ["Conversational Menu Fallback"],
+    presetKey: "faq"
+  },
+  {
+    id: "pricing",
+    title: "Consulta de precios",
+    description: "Responde consultas comerciales sobre precios o planes.",
+    icon: "bot" as const,
+    chips: ["Esencial", "Ventas"],
+    templateKey: "conversation_pricing_menu",
+    runtimeNames: ["Conversational Menu Pricing"],
+    presetKey: "faq"
+  },
+  {
+    id: "catalog",
+    title: "Catalogo inteligente",
+    description: "Muestra productos cuando el cliente pregunta por lo que vendes.",
+    icon: "catalog" as const,
+    chips: ["Esencial", "Productos"],
+    templateKey: "conversation_products_menu",
+    runtimeNames: ["Conversational Menu Products"],
+    presetKey: "size-guide"
+  }
+] as const;
+
 type RecommendationBlueprint = {
   id: string;
   title: string;
-  copy: string;
+  description: string;
   icon: AutomationModule["icon"];
+  badge: string;
   templateKey?: string;
   presetKey?: string;
   requiredCapabilities?: string[];
@@ -48,26 +121,154 @@ type RecommendationBlueprint = {
 
 const RECOMMENDED_BY_BUSINESS: Record<string, RecommendationBlueprint[]> = {
   retail_products: [
-    { id: "size-guide", title: "Consulta de talles", copy: "Responde dudas de talles automaticamente", icon: "faq", presetKey: "size-guide", requiredCapabilities: ["catalog"] },
-    { id: "outfit", title: "Recomendacion de outfit", copy: "Sugiere productos complementarios", icon: "catalog", presetKey: "outfit", requiredCapabilities: ["catalog"] },
-    { id: "cart-recovery", title: "Recuperacion de carrito", copy: "Recupera clientes que no completaron compra", icon: "followup", presetKey: "followup", requiredCapabilities: ["whatsapp"] },
-    { id: "promotions", title: "Promociones automaticas", copy: "Envia ofertas personalizadas a tus clientes", icon: "payments", presetKey: "promotions", requiredCapabilities: ["whatsapp"] }
+    {
+      id: "size-guide",
+      title: "Consulta de talles",
+      description: "Reduce dudas repetidas y ayuda a cerrar ventas mas rapido.",
+      icon: "faq",
+      badge: "Muy recomendada",
+      presetKey: "size-guide",
+      requiredCapabilities: ["catalog"]
+    },
+    {
+      id: "outfit",
+      title: "Recomendacion de productos",
+      description: "Sugiere productos complementarios y mejora el ticket promedio.",
+      icon: "catalog",
+      badge: "Para vender mas",
+      presetKey: "outfit",
+      requiredCapabilities: ["catalog"]
+    },
+    {
+      id: "cart-recovery",
+      title: "Recuperacion de carrito",
+      description: "Te ayuda a retomar conversaciones que quedaron sin cierre.",
+      icon: "followup",
+      badge: "Muy recomendada",
+      presetKey: "followup",
+      requiredCapabilities: ["whatsapp"]
+    },
+    {
+      id: "promotions",
+      title: "Promociones automaticas",
+      description: "Deja listas respuestas para promos, temporadas o acciones puntuales.",
+      icon: "payments",
+      badge: "Campanas",
+      presetKey: "promotions",
+      requiredCapabilities: ["whatsapp"]
+    }
+  ],
+  beauty_salon: [
+    {
+      id: "agenda",
+      title: "Agenda de turnos",
+      description: "Orienta reservas y consultas de disponibilidad sin friccion.",
+      icon: "calendar",
+      badge: "Muy recomendada",
+      templateKey: "agenda_booking",
+      requiredCapabilities: ["agenda", "whatsapp"]
+    },
+    {
+      id: "reminders",
+      title: "Recordatorios de asistencia",
+      description: "Ayuda a reducir ausencias con mensajes previos al turno.",
+      icon: "followup",
+      badge: "Para ordenar agenda",
+      templateKey: "appointment_reminders",
+      requiredCapabilities: ["agenda", "whatsapp"]
+    },
+    {
+      id: "lead-capture",
+      title: "Captar prospectos",
+      description: "Pide datos y deja encaminada la primera conversacion.",
+      icon: "faq",
+      badge: "Muy recomendada",
+      presetKey: "lead-capture",
+      requiredCapabilities: ["whatsapp"]
+    }
   ],
   default: [
-    { id: "faq", title: "Preguntas frecuentes", copy: "Reduce consultas repetidas automaticamente", icon: "faq", presetKey: "faq", requiredCapabilities: ["whatsapp"] },
-    { id: "handoff", title: "Derivacion humana", copy: "Escala conversaciones al equipo cuando hace falta", icon: "handoff", templateKey: "conversation_human_handoff", requiredCapabilities: ["whatsapp"] },
-    { id: "followup", title: "Seguimiento comercial", copy: "Recupera contactos sin respuesta", icon: "followup", presetKey: "followup", requiredCapabilities: ["whatsapp"] },
-    { id: "agenda", title: "Agenda / turnos", copy: "Orienta reservas, demos o reuniones", icon: "calendar", templateKey: "agenda_booking", requiredCapabilities: ["agenda"] }
+    {
+      id: "faq",
+      title: "Preguntas frecuentes",
+      description: "Deja preparadas respuestas para horarios, direccion o dudas repetidas.",
+      icon: "faq",
+      badge: "Muy recomendada",
+      presetKey: "faq",
+      requiredCapabilities: ["whatsapp"]
+    },
+    {
+      id: "lead-capture",
+      title: "Captar prospectos",
+      description: "Pide datos clave y ordena el primer contacto comercial.",
+      icon: "faq",
+      badge: "Para ordenar ventas",
+      presetKey: "lead-capture",
+      requiredCapabilities: ["whatsapp"]
+    },
+    {
+      id: "followup",
+      title: "Seguimiento comercial",
+      description: "Te deja una base lista para retomar conversaciones importantes.",
+      icon: "followup",
+      badge: "Muy recomendada",
+      presetKey: "followup",
+      requiredCapabilities: ["whatsapp"]
+    },
+    {
+      id: "agenda",
+      title: "Agenda / turnos",
+      description: "Ideal si trabajas con reuniones, reservas o visitas agendadas.",
+      icon: "calendar",
+      badge: "Si usas agenda",
+      templateKey: "agenda_booking",
+      requiredCapabilities: ["agenda", "whatsapp"]
+    }
   ]
 };
 
+const PERSONALIZED_PRESETS = [
+  {
+    id: "vacations",
+    title: "Vacaciones o cierre temporal",
+    description: "Para avisar una pausa puntual sin depender de soporte.",
+    icon: "followup" as const,
+    badge: "Lista para usar",
+    presetKey: "vacations"
+  },
+  {
+    id: "promotions",
+    title: "Promo temporal",
+    description: "Ideal para descuentos, fechas especiales o una accion de ventas.",
+    icon: "payments" as const,
+    badge: "Campana puntual",
+    presetKey: "promotions"
+  },
+  {
+    id: "event",
+    title: "Evento especial",
+    description: "Para lanzamientos, eventos, ferias o mensajes extraordinarios.",
+    icon: "bot" as const,
+    badge: "Personalizable",
+    presetKey: "outfit"
+  },
+  {
+    id: "custom",
+    title: "Crear automatizacion personalizada",
+    description: "Para casos especiales que no entran en una base comun.",
+    icon: "bot" as const,
+    badge: "Avanzada",
+    presetKey: "custom"
+  }
+] as const;
+
 function summarizeTrigger(automation: PortalAutomation) {
   if (automation.trigger.type === "keyword") {
-    return automation.trigger.keyword ? `Cliente pregunta por "${automation.trigger.keyword}"` : "Cliente escribe una palabra clave";
+    return automation.trigger.keyword ? `Se activa cuando detecta "${automation.trigger.keyword}"` : "Se activa con una palabra clave";
   }
-  if (automation.trigger.type === "off_hours") return "Cliente escribe fuera de horario";
-  if (automation.trigger.type === "new_contact") return "Cliente escribe por primera vez";
-  return "Cliente inicia una conversacion";
+  if (automation.trigger.type === "off_hours") return "Se activa fuera del horario operativo";
+  if (automation.trigger.type === "new_contact") return "Se activa cuando escriben por primera vez";
+  return "Se activa cuando entra un mensaje";
 }
 
 function summarizeActions(automation: PortalAutomation) {
@@ -75,170 +276,44 @@ function summarizeActions(automation: PortalAutomation) {
     .map((action) => {
       if (action.type === "send_message") {
         const preview = String(action.message || "").trim();
-        return preview ? preview : "Responder automaticamente";
+        return preview ? preview : "Envia un mensaje";
       }
       if (action.type === "assign_human") return "Deriva con una persona";
       if (action.type === "tag_contact") {
         const tag = String(action.tag || "").trim();
-        return tag ? `Etiqueta ${tag}` : "Ordena el contacto";
+        return tag ? `Etiqueta ${tag}` : "Etiqueta al contacto";
       }
       return action.type;
     })
     .join(" · ");
 }
 
-function commercialCopyForAutomation(automation: PortalAutomation) {
-  const raw = `${automation.name} ${automation.description || ""} ${automation.trigger.type} ${automation.actions.map((action) => action.type).join(" ")}`.toLowerCase();
-  const hasHuman = automation.actions.some((action) => action.type === "assign_human") || raw.includes("handoff") || raw.includes("hum");
-  const hasCatalog = raw.includes("catalog") || raw.includes("product");
-  const hasPayment = raw.includes("payment") || raw.includes("cobro") || raw.includes("comprobante") || raw.includes("transfer");
-  const hasFollowup = raw.includes("follow") || raw.includes("recordatorio") || raw.includes("off_hours");
-  const hasFallback = raw.includes("fallback") || raw.includes("no entiende") || raw.includes("default");
-
-  if (hasPayment) {
-    return {
-      name: "Cobros y comprobantes",
-      description: "Envia link de pago y registra comprobantes automaticamente.",
-      icon: "payments" as const,
-      chips: ["Genera link de pago", "Confirma el pago"]
-    };
-  }
-
-  if (hasHuman) {
-    return {
-      name: "Derivacion humana",
-      description: "Pasa la conversacion a una persona cuando es necesario.",
-      icon: "handoff" as const,
-      chips: ["Detecta necesidad", "Notifica al equipo"]
-    };
-  }
-
-  if (hasCatalog) {
-    return {
-      name: "Catalogo inteligente",
-      description: "Muestra tus productos automaticamente cuando preguntan por algo.",
-      icon: "catalog" as const,
-      chips: ["Envia productos", "Responde consultas"]
-    };
-  }
-
-  if (automation.trigger.type === "new_contact" || raw.includes("welcome") || raw.includes("bienvenida")) {
-    return {
-      name: "Bienvenida automatica",
-      description: "Saluda y guia a tus clientes cuando te escriben por primera vez.",
-      icon: "welcome" as const,
-      chips: ["Da la bienvenida", "Muestra opciones"]
-    };
-  }
-
-  if (hasFollowup) {
-    return {
-      name: "Seguimiento automatico",
-      description: "Recupera clientes que no respondieron o quedaron pendientes.",
-      icon: "followup" as const,
-      chips: ["Envia recordatorios", "Reactiva conversaciones"]
-    };
-  }
-
-  if (hasFallback) {
-    return {
-      name: "Respuesta cuando no entiende",
-      description: "Mantiene la conversacion viva cuando el cliente sale del flujo esperado.",
-      icon: "fallback" as const,
-      chips: ["Ordena la conversacion", "Sugiere siguiente paso"]
-    };
-  }
-
-  return {
-    name: "Asistente conversacional",
-    description: automation.description || "Responde consultas y ayuda a ordenar conversaciones automaticamente.",
-    icon: "bot" as const,
-    chips: ["Atiende por WhatsApp", "Acompana al cliente"]
-  };
-}
-
-function commercialCopyForTemplate(template: PortalAutomationCatalogItem) {
+function iconFromTemplate(template: PortalAutomationCatalogItem): AutomationModule["icon"] {
   const raw = `${template.key} ${template.name} ${template.description || ""}`.toLowerCase();
-
-  if (raw.includes("payment") || raw.includes("invoice") || raw.includes("cobro") || raw.includes("comprobante")) {
-    return {
-      name: "Cobros y comprobantes",
-      description: "Comparte datos de pago y ayuda a ordenar comprobantes o validaciones.",
-      icon: "payments" as const,
-      chips: ["Cobros", "Pagos"]
-    };
-  }
-
-  if (raw.includes("agenda") || raw.includes("turno") || raw.includes("reserva")) {
-    return {
-      name: "Agenda / turnos",
-      description: "Orienta reservas, demos o turnos sin depender de respuesta manual.",
-      icon: "calendar" as const,
-      chips: ["Agenda", "Reservas"]
-    };
-  }
-
-  if (raw.includes("catalog") || raw.includes("product")) {
-    return {
-      name: "Catalogo inteligente",
-      description: "Muestra productos o propuestas comerciales cuando el cliente pregunta.",
-      icon: "catalog" as const,
-      chips: ["Catalogo", "Productos"]
-    };
-  }
-
-  if (raw.includes("fallback") || raw.includes("no entiende")) {
-    return {
-      name: "Respuesta cuando no entiende",
-      description: "Recupera la conversacion cuando el mensaje no entra en un flujo claro.",
-      icon: "fallback" as const,
-      chips: ["Fallback", "Ordena la conversacion"]
-    };
-  }
-
-  if (raw.includes("human") || raw.includes("handoff") || raw.includes("deriv")) {
-    return {
-      name: "Derivacion humana",
-      description: "Pasa la conversacion a una persona cuando hace falta intervencion humana.",
-      icon: "handoff" as const,
-      chips: ["Escala al equipo", "Atencion humana"]
-    };
-  }
-
-  if (raw.includes("welcome") || raw.includes("bienvenida")) {
-    return {
-      name: "Bienvenida automatica",
-      description: "Recibe al cliente y ordena el primer paso de la conversacion.",
-      icon: "welcome" as const,
-      chips: ["Primer mensaje", "Guia al cliente"]
-    };
-  }
-
-  if (raw.includes("pricing") || raw.includes("precio") || raw.includes("plan")) {
-    return {
-      name: "Planes y precios",
-      description: "Ayuda a responder consultas comerciales sobre precios o planes.",
-      icon: "bot" as const,
-      chips: ["Ventas", "Precios"]
-    };
-  }
-
-  if (raw.includes("generated_sales_bot")) {
-    return {
-      name: "Asistente comercial",
-      description: "Acompana consultas comerciales por WhatsApp con respuestas guiadas.",
-      icon: "bot" as const,
-      chips: ["Bot comercial", "WhatsApp"]
-    };
-  }
-
-  return {
-    name: template.name,
-    description: template.description || "Base disponible para sumar al asistente del negocio.",
-    icon: "bot" as const,
-    chips: ["Opturon", "Base lista"]
-  };
+  if (raw.includes("catalog") || raw.includes("product")) return "catalog";
+  if (raw.includes("agenda") || raw.includes("turno") || raw.includes("reserva")) return "calendar";
+  if (raw.includes("payment") || raw.includes("invoice") || raw.includes("cobro")) return "payments";
+  if (raw.includes("human") || raw.includes("handoff") || raw.includes("deriv")) return "handoff";
+  if (raw.includes("welcome") || raw.includes("bienvenida")) return "welcome";
+  if (raw.includes("fallback")) return "fallback";
+  return "bot";
 }
+
+function commercialCopyForAutomation(automation: PortalAutomation) {
+  const raw = `${automation.name} ${automation.trigger.type} ${automation.actions.map((action) => action.type).join(" ")}`.toLowerCase();
+  if (raw.includes("welcome")) return { name: "Bienvenida automatica", icon: "welcome" as const };
+  if (raw.includes("human")) return { name: "Derivacion a humano", icon: "handoff" as const };
+  if (raw.includes("pricing")) return { name: "Consulta de precios", icon: "bot" as const };
+  if (raw.includes("product")) return { name: "Catalogo inteligente", icon: "catalog" as const };
+  if (raw.includes("fallback")) return { name: "Respuesta cuando no entiende", icon: "fallback" as const };
+  if (raw.includes("payment") || raw.includes("cobro")) return { name: "Cobros y comprobantes", icon: "payments" as const };
+  return { name: automation.name, icon: "bot" as const };
+}
+
+type EssentialModuleResult = {
+  module: AutomationModule;
+  primaryAutomationId: string | null;
+};
 
 export function AutomationsHub({
   automations,
@@ -256,7 +331,6 @@ export function AutomationsHub({
   const [pendingAction, setPendingAction] = useState<"toggle" | "delete" | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [pendingTemplateKey, setPendingTemplateKey] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<"mine" | "recommended" | "templates">("mine");
 
   useEffect(() => {
     setItems(automations);
@@ -279,6 +353,8 @@ export function AutomationsHub({
     return new Set((profile?.capabilities || []).map((item) => String(item || "").trim().toLowerCase()));
   }, [profile?.capabilities]);
 
+  const catalogByKey = useMemo(() => new Map(catalogItems.map((item) => [item.key, item])), [catalogItems]);
+
   const duplicateCountsByName = useMemo(() => {
     return items.reduce<Record<string, number>>((acc, automation) => {
       const key = String(automation.name || "").trim();
@@ -287,120 +363,198 @@ export function AutomationsHub({
     }, {});
   }, [items]);
 
-  const modules = useMemo<AutomationModule[]>(
-    () =>
-      items.map((automation) => {
-        const commercial = commercialCopyForAutomation(automation);
-        const safeName = String(automation.name || "").trim();
-        return {
-          id: automation.id,
-          name: commercial.name,
-          description: commercial.description,
-          state: automation.enabled ? "activa" : "inactiva",
-          enabled: automation.enabled,
-          summary: summarizeActions(automation) || "Sin accion principal configurada todavia.",
-          trigger: summarizeTrigger(automation),
-          action: summarizeActions(automation) || "Sin accion principal configurada todavia.",
-          icon: commercial.icon,
-          chips: commercial.chips,
-          channel: "WhatsApp",
-          actionHref: `/app/automations/templates?focus=${encodeURIComponent(automation.id)}`,
-          actionLabel: "Configurar",
-          actionVariant: "secondary",
-          canDelete: !PROTECTED_RUNTIME_AUTOMATION_NAMES.has(safeName) || (duplicateCountsByName[safeName] || 0) > 1,
-          showToggle: true
-        };
-      }),
-    [duplicateCountsByName, items]
-  );
+  const essentialModules = useMemo<EssentialModuleResult[]>(() => {
+    const consumedIds = new Set<string>();
+    const results: EssentialModuleResult[] = [];
 
-  const compatibleCatalog = useMemo(() => catalogItems, [catalogItems]);
-  const catalogByKey = useMemo(() => new Map(compatibleCatalog.map((item) => [item.key, item])), [compatibleCatalog]);
+    for (const blueprint of ESSENTIAL_BLUEPRINTS) {
+      const matches = items
+        .filter((automation) => blueprint.runtimeNames?.includes(automation.name as never))
+        .sort((a, b) => Number(b.enabled) - Number(a.enabled) || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-  const templateModules = useMemo<AutomationModule[]>(
-    () =>
-      compatibleCatalog
-        .filter((template) => !template.effectiveEnabled || !template.compatible)
-        .map((template) => ({
-          ...(() => {
-            const commercial = commercialCopyForTemplate(template);
-            const state = !template.compatible ? "requiere datos" : template.effectiveEnabled ? "activa" : "disponible";
-            return {
-              id: template.key,
-              name: commercial.name,
-              description: commercial.description,
+      const primary = matches[0] || null;
+      if (primary) {
+        consumedIds.add(primary.id);
+      }
+
+      if (primary) {
+        const isProtected = PROTECTED_RUNTIME_AUTOMATION_NAMES.has(primary.name);
+        results.push({
+          primaryAutomationId: primary.id,
+          module: {
+            id: primary.id,
+            rawName: primary.name,
+            name: blueprint.title,
+            description: blueprint.description,
+            state: primary.enabled ? "activa" : "inactiva",
+            enabled: primary.enabled,
+            summary: summarizeActions(primary) || "Sin mensaje principal todavia.",
+            trigger: summarizeTrigger(primary),
+            action: summarizeActions(primary) || "Sin mensaje principal todavia.",
+            icon: blueprint.icon,
+            chips: [...blueprint.chips],
+            actionHref: blueprint.presetKey ? `/app/automations/new?template=${encodeURIComponent(blueprint.presetKey)}` : "/app/automations/new",
+            actionLabel: "Ver base",
+            actionVariant: "secondary",
+            canDelete: !isProtected || (duplicateCountsByName[primary.name] || 0) > 1,
+            showToggle: true
+          }
+        });
+        continue;
+      }
+
+      if (blueprint.templateKey) {
+        const template = catalogByKey.get(blueprint.templateKey) || null;
+        if (template) {
+          const state = !template.compatible ? "requiere datos" : template.effectiveEnabled ? "ya configurada" : "disponible";
+          results.push({
+            primaryAutomationId: null,
+            module: {
+              id: blueprint.id,
+              name: blueprint.title,
+              description: blueprint.description,
               state,
               summary:
                 state === "requiere datos"
-                  ? `Necesita ${template.missingCapabilities.join(", ")} para funcionar sin friccion.`
-                  : template.description || "Disponible para activar cuando quieras.",
-              trigger: state === "requiere datos" ? "Requiere datos del negocio o canal" : "Disponible para sumar al asistente",
-              action: "Amplia respuestas, ventas o derivaciones segun el caso",
-              icon: commercial.icon,
-              chips: state === "requiere datos" ? ["Requiere datos", businessTypeLabel] : commercial.chips,
-              channel: "WhatsApp",
-              actionHref: state === "requiere datos" ? "#advanced-config" : "/app/automations/templates",
-              actionLabel: state === "requiere datos" ? "Ver requisitos" : state === "activa" ? "Revisar" : "Activar",
-              actionVariant: state === "activa" ? "secondary" : "primary",
+                  ? `Para activarla necesitas ${template.missingCapabilities.join(", ")}.`
+                  : state === "ya configurada"
+                    ? "La base esta lista, pero todavia no se materializo como una automatizacion visible."
+                    : "Viene lista para activarse sin empezar desde cero.",
+              trigger: state === "requiere datos" ? "Primero completa los datos faltantes" : "Lista para usar",
+              action: blueprint.description,
+              icon: blueprint.icon,
+              chips: state === "requiere datos" ? ["Requiere datos", "Esencial"] : [...blueprint.chips],
+              actionHref: state === "requiere datos" ? "#advanced-config" : "/app/automations",
+              actionLabel: state === "requiere datos" ? "Ver requisitos" : state === "ya configurada" ? "Entender base" : "Activar base",
+              actionVariant: state === "ya configurada" ? "secondary" : "primary",
               onAction: state === "disponible" ? () => void handleToggleTemplate(template) : null,
               showToggle: false
-            };
-          })(),
-          channel: "WhatsApp",
-        })),
-    [businessTypeLabel, compatibleCatalog]
+            }
+          });
+          continue;
+        }
+      }
+
+      results.push({
+        primaryAutomationId: null,
+        module: {
+          id: blueprint.id,
+          name: blueprint.title,
+          description: blueprint.description,
+          state: "disponible",
+          summary:
+            blueprint.id === "off-hours"
+              ? "Todavia se configura como una base guiada desde el builder."
+              : "Tienes la base lista para crearla guiado paso a paso.",
+          trigger: "Base guiada",
+          action: blueprint.description,
+          icon: blueprint.icon,
+          chips: [...blueprint.chips],
+          actionHref: blueprint.presetKey ? `/app/automations/new?template=${encodeURIComponent(blueprint.presetKey)}` : "/app/automations/new",
+          actionLabel: "Usar base",
+          actionVariant: "primary",
+          showToggle: false
+        }
+      });
+    }
+
+    return results;
+  }, [catalogByKey, duplicateCountsByName, items]);
+
+  const primaryEssentialIds = useMemo(
+    () => new Set(essentialModules.map((item) => item.primaryAutomationId).filter(Boolean) as string[]),
+    [essentialModules]
   );
 
-  const recommendedModules = useMemo<AutomationModule[]>(() => {
-    const base = profile?.businessType === "retail_products" ? RECOMMENDED_BY_BUSINESS.retail_products : RECOMMENDED_BY_BUSINESS.default;
-    return base.map((item) => {
-      const matchedTemplate = item.templateKey ? catalogByKey.get(item.templateKey) || null : null;
-      const matchedAutomation = modules.find((module) => module.name === item.title) || null;
-      const missingRequiredCapabilities = (item.requiredCapabilities || []).filter((capability) => !enabledCapabilities.has(capability));
+  const extraAutomationModules = useMemo<AutomationModule[]>(() => {
+    return items
+      .filter((automation) => !primaryEssentialIds.has(automation.id))
+      .map((automation) => {
+        const copy = commercialCopyForAutomation(automation);
+        const duplicateCount = duplicateCountsByName[automation.name] || 0;
+        const isProtected = PROTECTED_RUNTIME_AUTOMATION_NAMES.has(automation.name);
+        return {
+          id: automation.id,
+          rawName: automation.name,
+          name: duplicateCount > 1 ? `${copy.name} (copia extra)` : copy.name,
+          description:
+            duplicateCount > 1
+              ? "Es una copia adicional de una base del asistente. Puedes borrarla si no la necesitas."
+              : automation.description || "Automatizacion creada o ajustada para un caso particular del negocio.",
+          state: automation.enabled ? "activa" : "inactiva",
+          enabled: automation.enabled,
+          summary: summarizeActions(automation) || "Sin mensaje principal todavia.",
+          trigger: summarizeTrigger(automation),
+          action: summarizeActions(automation) || "Sin mensaje principal todavia.",
+          icon: copy.icon,
+          chips: duplicateCount > 1 ? ["Duplicada", isProtected ? "Base esencial" : "Editable"] : [isProtected ? "Base extra" : "Personalizada", "Editable"],
+          actionHref: `/app/automations/new?template=${encodeURIComponent(copy.name.toLowerCase().includes("bienvenida") ? "welcome" : "custom")}`,
+          actionLabel: "Ajustar con guia",
+          actionVariant: "secondary",
+          canDelete: !isProtected || duplicateCount > 1,
+          showToggle: true
+        };
+      });
+  }, [duplicateCountsByName, items, primaryEssentialIds]);
 
-      if (matchedTemplate) {
-        const commercial = commercialCopyForTemplate(matchedTemplate);
-        const state = !matchedTemplate.compatible
+  const recommendedModules = useMemo<AutomationModule[]>(() => {
+    const source =
+      profile?.businessType === "retail_products"
+        ? RECOMMENDED_BY_BUSINESS.retail_products
+        : profile?.businessType === "beauty_salon"
+          ? RECOMMENDED_BY_BUSINESS.beauty_salon
+          : RECOMMENDED_BY_BUSINESS.default;
+
+    return source.map((item) => {
+      const template = item.templateKey ? catalogByKey.get(item.templateKey) || null : null;
+      const missingRequiredCapabilities = (item.requiredCapabilities || []).filter((capability) => !enabledCapabilities.has(capability));
+      const alreadyVisible =
+        ESSENTIAL_BLUEPRINTS.some((essential) => essential.title === item.title) ||
+        extraAutomationModules.some((module) => module.name.startsWith(item.title));
+
+      if (template) {
+        const state = !template.compatible
           ? "requiere datos"
-          : matchedTemplate.effectiveEnabled
-            ? "activa"
+          : template.effectiveEnabled
+            ? "ya configurada"
             : "disponible";
 
         return {
           id: item.id,
           name: item.title,
-          description: item.copy,
+          description: item.description,
           state,
           summary:
             state === "requiere datos"
-              ? `Necesita ${matchedTemplate.missingCapabilities.join(", ")} para activarse.`
-              : state === "activa"
-                ? "Ya esta lista dentro del espacio y se puede revisar o desactivar."
-                : "Ya viene preparada para activarse con un click.",
-          trigger: state === "requiere datos" ? "Primero completa requisitos del negocio" : "Lista para sumar al asistente del negocio",
-          action: item.copy,
-          icon: commercial.icon,
-          chips: state === "requiere datos" ? ["Requiere datos", businessTypeLabel] : ["Recomendada", businessTypeLabel],
-          channel: "WhatsApp",
+              ? `Para activarla necesitas ${template.missingCapabilities.join(", ")}.`
+              : state === "ya configurada"
+                ? "Ya esta lista dentro de tu espacio."
+                : "La puedes activar con un click sin empezar desde cero.",
+          trigger: state === "requiere datos" ? "Completa primero los requisitos" : "Lista para sumar al asistente",
+          action: item.description,
+          icon: item.icon,
+          chips: [item.badge, businessTypeLabel],
           actionHref: state === "requiere datos" ? "#advanced-config" : "/app/automations",
-          actionLabel: state === "requiere datos" ? "Ver requisitos" : state === "activa" ? "Revisar" : "Activar",
-          actionVariant: state === "activa" ? "secondary" : "primary",
-          onAction: state === "disponible" ? () => void handleToggleTemplate(matchedTemplate) : null,
+          actionLabel: state === "requiere datos" ? "Ver requisitos" : state === "ya configurada" ? "Ya configurada" : "Activar automatizacion",
+          actionVariant: state === "ya configurada" ? "secondary" : "primary",
+          onAction: state === "disponible" ? () => void handleToggleTemplate(template) : null,
           showToggle: false
         };
       }
 
-      if (matchedAutomation) {
+      if (alreadyVisible) {
         return {
-          ...matchedAutomation,
           id: item.id,
           name: item.title,
-          description: item.copy,
+          description: item.description,
           state: "ya configurada",
-          summary: "Ya existe una automatizacion de este tipo en tu espacio.",
-          chips: ["Ya configurada", businessTypeLabel],
+          summary: "Ya tienes una base equivalente visible en tu espacio.",
+          trigger: "Ya disponible",
+          action: item.description,
+          icon: item.icon,
+          chips: [item.badge, "Ya configurada"],
           actionHref: "/app/automations",
-          actionLabel: "Revisar",
+          actionLabel: "Ya configurada",
           actionVariant: "secondary",
           showToggle: false
         };
@@ -410,47 +564,53 @@ export function AutomationsHub({
       return {
         id: item.id,
         name: item.title,
-        description: item.copy,
+        description: item.description,
         state: requiresData ? "requiere datos" : "disponible",
         summary: requiresData
-          ? `Necesita ${missingRequiredCapabilities.join(", ")} para usar esta base.`
-          : "Abre una base ya prellenada para que no empieces desde cero.",
-        trigger: requiresData ? "Completa primero los datos necesarios" : "Lista para crear una version inicial",
-        action: item.copy,
+          ? `Para usarla necesitas ${missingRequiredCapabilities.join(", ")}.`
+          : "Abre una base guiada y prellenada para activarla mas rapido.",
+        trigger: requiresData ? "Necesita datos del negocio" : "Base guiada lista para usar",
+        action: item.description,
         icon: item.icon,
-        chips: requiresData ? ["Requiere datos", businessTypeLabel] : ["Disponible", businessTypeLabel],
-        channel: "WhatsApp",
+        chips: [item.badge, businessTypeLabel],
         actionHref: requiresData ? "#advanced-config" : `/app/automations/new?template=${encodeURIComponent(item.presetKey || item.id)}`,
-        actionLabel: requiresData ? "Ver requisitos" : "Usar base",
+        actionLabel: requiresData ? "Ver requisitos" : "Activar automatizacion",
         actionVariant: requiresData ? "secondary" : "primary",
         showToggle: false
       };
     });
-  }, [businessTypeLabel, catalogByKey, enabledCapabilities, modules, profile?.businessType]);
+  }, [businessTypeLabel, catalogByKey, enabledCapabilities, extraAutomationModules, profile?.businessType]);
 
-  const stats = useMemo(() => {
-    const active = modules.filter((item) => item.state === "activa").length;
-    return { active, total: modules.length };
-  }, [modules]);
+  const personalizedPresetModules = useMemo<AutomationModule[]>(
+    () =>
+      PERSONALIZED_PRESETS.map((preset) => ({
+        id: preset.id,
+        name: preset.title,
+        description: preset.description,
+        state: "disponible",
+        summary: "Abre una guia simple para crear algo especial sin empezar desde una hoja en blanco.",
+        trigger: "Caso especial del negocio",
+        action: preset.description,
+        icon: preset.icon,
+        chips: [preset.badge, "Personalizada"],
+        actionHref: `/app/automations/new?template=${encodeURIComponent(preset.presetKey)}`,
+        actionLabel: "Crear con guia",
+        actionVariant: "primary",
+        showToggle: false
+      })),
+    []
+  );
 
-  const interaccionesAutomatizadas = useMemo(() => "--", []);
-  const tiempoAhorrado = useMemo(() => "--", []);
-
-  const activeTabModules = useMemo(() => {
-    if (selectedTab === "recommended") return recommendedModules;
-    if (selectedTab === "templates") return templateModules;
-    return modules;
-  }, [modules, recommendedModules, selectedTab, templateModules]);
-
-  const selectedTabCopy = useMemo(() => {
-    if (selectedTab === "mine") {
-      return "Estas son las automatizaciones reales de tu negocio. Aqui ves que hace cada una, cuando actua y si esta activa.";
-    }
-    if (selectedTab === "recommended") {
-      return "Estas automatizaciones todavia no estan activas y podrian ayudarte a vender o atender mejor.";
-    }
-    return "Estas son ideas listas para usar. No son lo mismo que tus automatizaciones activas hasta que decidas activarlas o configurarlas.";
-  }, [selectedTab]);
+  const heroStats = useMemo(() => {
+    const activeEssentials = essentialModules.filter((item) => item.module.state === "activa" || item.module.state === "ya configurada").length;
+    const activeExtras = extraAutomationModules.filter((item) => item.state === "activa").length;
+    return {
+      activeEssentials,
+      recommendedReady: recommendedModules.filter((item) => item.state === "disponible").length,
+      customCount: extraAutomationModules.length,
+      totalVisible: activeEssentials + activeExtras
+    };
+  }, [essentialModules, extraAutomationModules, recommendedModules]);
 
   async function handleToggleEnabled(module: AutomationModule) {
     const nextEnabled = module.state !== "activa";
@@ -550,10 +710,10 @@ export function AutomationsHub({
           ? json.settings.capabilities
           : patch.capabilities || current?.capabilities || []
       }));
-      toast.success("Perfil de automatizacion actualizado");
+      toast.success("Configuracion avanzada actualizada");
       window.location.reload();
     } catch (error) {
-      toast.error("No se pudo guardar el perfil", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo guardar la configuracion", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setSavingProfile(false);
     }
@@ -574,20 +734,26 @@ export function AutomationsHub({
       }
 
       setCatalogItems((current) => current.map((item) => (item.key === template.key ? json.data.template : item)));
-      toast.success(nextEnabled ? "Template habilitado" : "Template deshabilitado");
+      toast.success(nextEnabled ? "Base activada" : "Base desactivada");
       window.location.reload();
     } catch (error) {
-      toast.error("No se pudo actualizar el template", error instanceof Error ? error.message : "unknown_error");
+      toast.error("No se pudo actualizar la base", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setPendingTemplateKey(null);
     }
   }
 
   return (
-    <div className="space-y-5">
-      <section className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-xl text-sm leading-6 text-muted">
-          Usa las automatizaciones base para lo cotidiano y crea una personalizada solo para casos especiales, como vacaciones, avisos temporales o promociones puntuales.
+    <div className="space-y-6">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brandBright">
+            Centro de automatizaciones
+          </div>
+          <h2 className="mt-4 text-4xl font-semibold tracking-tight text-white">Entiende rapido que ya tienes, que te conviene activar y que puedes personalizar.</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-muted lg:text-base">
+            Primero ves las funciones esenciales del asistente. Despues las recomendaciones para vender o atender mejor. Al final, las automatizaciones especiales para tu negocio.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="secondary" className="rounded-2xl px-5">
@@ -597,108 +763,107 @@ export function AutomationsHub({
             </Link>
           </Button>
           <Button asChild className="rounded-2xl px-5">
-            <Link href="/app/automations/new">
+            <Link href="/app/automations/new?template=custom">
               <Plus className="mr-2 h-4 w-4" />
-              Nueva automatizacion
+              Crear automatizacion personalizada
             </Link>
           </Button>
         </div>
       </section>
 
-      <Card className="overflow-hidden border-white/8 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
+      <Card className="overflow-hidden border-white/8 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(14,18,28,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.18)]">
         <CardContent className="grid gap-5 p-6 xl:grid-cols-[minmax(0,1fr)_220px_220px_220px] xl:items-center">
           <div>
-            <h2 className="text-[2rem] font-semibold leading-tight text-white">Tu negocio puede automatizar mas de lo que imaginas</h2>
-            <p className="mt-3 text-sm leading-6 text-muted">Activa automatizaciones listas para usar y ahorra tiempo todos los dias.</p>
-          </div>
-          <SummaryMetric label="Automatizaciones activas" value={String(stats.active)} helper={`${stats.total} configuradas en este espacio`} tone="orange" />
-          <SummaryMetric label="Interacciones automatizadas" value={interaccionesAutomatizadas} helper="Sin metrica expuesta todavia" tone="green" />
-          <SummaryMetric label="Tiempo ahorrado" value={tiempoAhorrado} helper="Sin metrica expuesta todavia" tone="orange" />
-        </CardContent>
-      </Card>
-
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-6 border-b border-white/8 text-sm">
-            {[
-              { key: "mine", label: "Mis automatizaciones" },
-              { key: "recommended", label: "Recomendadas para tu negocio", badge: recommendedModules.length },
-              { key: "templates", label: "Ideas listas para usar" }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setSelectedTab(tab.key as typeof selectedTab)}
-                className={cn(
-                  "inline-flex items-center gap-2 border-b-2 px-1 pb-3 pt-1 transition",
-                  selectedTab === tab.key ? "border-brand text-brandBright" : "border-transparent text-muted hover:text-white"
-                )}
-              >
-                <span>{tab.label}</span>
-                {tab.badge ? <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">{tab.badge}</span> : null}
-              </button>
-            ))}
-          </div>
-          <Button asChild variant="ghost" className="rounded-2xl text-text">
-            <Link href="#recent-activity">
-              <History className="mr-2 h-4 w-4" />
-              Ver historial de ejecuciones
-            </Link>
-          </Button>
-        </div>
-
-        <div className="rounded-2xl border border-white/8 bg-black/12 px-4 py-3 text-sm leading-6 text-muted">{selectedTabCopy}</div>
-
-        {selectedTab === "mine" && modules.length === 0 ? (
-          <AutomationsEmptyState />
-        ) : (
-          <AutomationsList
-            modules={activeTabModules}
-            pendingAutomationId={pendingAutomationId}
-            pendingAction={pendingAction}
-            onToggleEnabled={selectedTab === "mine" ? handleToggleEnabled : undefined}
-            onDelete={selectedTab === "mine" ? handleDeleteAutomation : undefined}
-          />
-        )}
-      </section>
-
-      <Card id="recommended" className="overflow-hidden border-white/8 bg-[linear-gradient(135deg,rgba(192,80,0,0.16),rgba(12,20,32,0.98))]">
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-md">
-            <div className="flex items-center gap-2">
-              <h3 className="text-2xl font-semibold text-white">Recomendadas para {businessTypeLabel}</h3>
-              <CircleHelp className="h-4 w-4 text-muted" />
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Estas automatizaciones todavia no estan activas y podrian ayudarte a vender o atender mejor.
+            <h3 className="text-[2rem] font-semibold leading-tight text-white">Tu asistente comercial ya puede trabajar sobre una base mucho mas clara.</h3>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Las esenciales son el punto de partida. Las recomendadas te ayudan a vender mejor. Las personalizadas resuelven casos especiales.
             </p>
           </div>
+          <SummaryMetric label="Esenciales listas" value={String(heroStats.activeEssentials)} helper="Funciones base visibles y controlables" tone="orange" />
+          <SummaryMetric label="Recomendadas listas" value={String(heroStats.recommendedReady)} helper="Puedes activarlas rapido si te sirven" tone="green" />
+          <SummaryMetric label="Personalizadas" value={String(heroStats.customCount)} helper="Casos especiales creados en tu espacio" tone="orange" />
+        </CardContent>
+      </Card>
 
-          <div className="grid flex-1 gap-3 lg:grid-cols-4">
-            {recommendedModules.slice(0, 4).map((module) => (
-              <div key={module.id} className="rounded-2xl border border-white/8 bg-black/12 p-4">
-                <p className="font-medium text-white">{module.name}</p>
-                <p className="mt-2 text-sm leading-6 text-muted">{module.description}</p>
-              </div>
-            ))}
+      <SectionIntro
+        title="A. Automatizaciones esenciales"
+        description="Estas son las funciones basicas del asistente. Deben ser faciles de entender, encender o apagar, sin lenguaje tecnico."
+      />
+      <AutomationsList
+        modules={essentialModules.map((item) => item.module)}
+        pendingAutomationId={pendingAutomationId}
+        pendingAction={pendingAction}
+        onToggleEnabled={handleToggleEnabled}
+        onDelete={handleDeleteAutomation}
+      />
+
+      <SectionIntro
+        title={`B. Recomendadas para ${businessTypeLabel}`}
+        description="Estas automatizaciones todavia no son lo principal del asistente, pero pueden ayudarte a vender o atender mejor segun tu negocio."
+      />
+      <AutomationsList modules={recommendedModules} pendingAutomationId={pendingAutomationId} pendingAction={pendingAction} />
+
+      <SectionIntro
+        title="C. Personalizadas"
+        description="Estas son para el 10% de casos especiales: vacaciones, promos puntuales, eventos, mensajes temporales o algo muy propio de tu negocio."
+      />
+      <div className="grid gap-4 xl:grid-cols-4">
+        {personalizedPresetModules.map((module) => (
+          <PresetCard key={module.id} module={module} />
+        ))}
+      </div>
+
+      <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <h3 className="text-xl font-semibold text-white">Crear algo especial no deberia sentirse tecnico.</h3>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              El builder nuevo te guia paso a paso para responder, derivar, acompañar ventas o dejar un mensaje temporal sin depender de soporte.
+            </p>
           </div>
-
           <Button asChild className="rounded-2xl px-5">
-            <Link href="/app/automations#recommended">Ver sugerencias</Link>
+            <Link href="/app/automations/new?template=custom">Abrir builder guiado</Link>
           </Button>
         </CardContent>
       </Card>
+
+      {extraAutomationModules.length ? (
+        <>
+          <SectionIntro
+            title="Extras creadas y copias revisables"
+            description="Aqui aparecen automatizaciones personalizadas, ajustes especiales o copias extras que si puedes revisar o borrar cuando corresponde."
+          />
+          <AutomationsList
+            modules={extraAutomationModules}
+            pendingAutomationId={pendingAutomationId}
+            pendingAction={pendingAction}
+            onToggleEnabled={handleToggleEnabled}
+            onDelete={handleDeleteAutomation}
+          />
+        </>
+      ) : null}
+
+      {!extraAutomationModules.length ? (
+        <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+          <CardContent className="p-5">
+            <AutomationsEmptyState />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Card id="recent-activity" className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-2xl font-semibold text-white">Ejecuciones recientes</h3>
-                <p className="mt-2 text-sm text-muted">Ultimas ejecuciones de tus automatizaciones.</p>
+                <h3 className="text-2xl font-semibold text-white">Actividad reciente</h3>
+                <p className="mt-2 text-sm text-muted">Cuando el bot responda, derive o envie mensajes, lo veras aqui.</p>
               </div>
               <Button asChild variant="secondary" className="rounded-2xl">
-                <Link href="/app/automations">Ver todas las ejecuciones</Link>
+                <Link href="/app/automations">
+                  <History className="mr-2 h-4 w-4" />
+                  Ver historial
+                </Link>
               </Button>
             </div>
 
@@ -719,7 +884,7 @@ export function AutomationsHub({
               </div>
               <div className="px-4 py-10 text-sm text-muted">
                 <p>Todavia no hay ejecuciones recientes.</p>
-                <p className="mt-2">Cuando el bot responda, derive o envie mensajes, vas a ver la actividad aca.</p>
+                <p className="mt-2">Cuando el bot responda, derive o envie mensajes, vas a ver aqui la actividad real del asistente.</p>
               </div>
             </div>
           </CardContent>
@@ -729,13 +894,25 @@ export function AutomationsHub({
           <CardContent className="space-y-4 p-5">
             <div>
               <h3 className="text-2xl font-semibold text-white">Necesitas ayuda?</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">Aprende a crear y optimizar tus automatizaciones.</p>
+              <p className="mt-2 text-sm leading-6 text-muted">La idea es que entiendas que tocar y que dejar quieto sin miedo a romper nada.</p>
             </div>
 
             {[
-              { title: "Guia rapida", copy: "Paso a paso para empezar", href: "/app/automations/templates" },
-              { title: "Mejores practicas", copy: "Consejos para vender mas", href: "/app/automations/templates" },
-              { title: "Centro de ayuda", copy: "Videos y articulos", href: "/app/automations/templates" }
+              {
+                title: "Empieza por esenciales",
+                copy: "Si algo ya esta funcionando, lo veras en el primer bloque y puedes encenderlo o apagarlo.",
+                href: "/app/automations"
+              },
+              {
+                title: "Activa recomendadas rapido",
+                copy: "Si una recomendada sirve para tu negocio, activala con un click o entra con una base guiada.",
+                href: "/app/automations"
+              },
+              {
+                title: "Usa el builder solo para casos especiales",
+                copy: "Vacaciones, promos puntuales y mensajes unicos viven mejor como personalizadas.",
+                href: "/app/automations/new?template=custom"
+              }
             ].map((item) => (
               <Link key={item.title} href={item.href} className="block rounded-2xl border border-white/8 bg-black/12 p-4 transition hover:border-brand/30 hover:bg-brand/8">
                 <div className="flex items-start justify-between gap-3">
@@ -749,7 +926,9 @@ export function AutomationsHub({
             ))}
 
             <div className="rounded-2xl border border-white/8 bg-black/12 p-4">
-              <p className="text-sm leading-6 text-muted">Las automatizaciones trabajan sobre WhatsApp y respetan pausas humanas.</p>
+              <p className="text-sm leading-6 text-muted">
+                Si una automatizacion dice "Requiere datos", normalmente falta WhatsApp conectado o alguna capacidad del negocio todavia no activada.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -759,7 +938,7 @@ export function AutomationsHub({
         <CardContent className="space-y-4 p-5">
           <div>
             <h3 className="text-xl font-semibold text-white">Configuracion avanzada del asistente</h3>
-            <p className="mt-2 text-sm leading-6 text-muted">Estos datos ayudan a Opturon a recomendar automatizaciones segun tu negocio.</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Esto no deberia ser lo primero que tocas. Solo ayuda a que Opturon recomiende mejor segun tu negocio.</p>
           </div>
 
           <details className="group rounded-2xl border border-white/8 bg-black/12 p-4">
@@ -806,37 +985,39 @@ export function AutomationsHub({
                       );
                     })}
                   </div>
-                  <p className="text-xs text-muted">
-                    No hace falta tocar esto salvo que quieras afinar recomendaciones o modulos avanzados.
-                  </p>
+                  <p className="text-xs text-muted">Solo hace falta tocar esto si una recomendacion te marca que faltan datos o capacidades.</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <h4 className="text-lg font-semibold text-white">Automatizaciones disponibles para activar</h4>
+                  <h4 className="text-lg font-semibold text-white">Bases disponibles en tu espacio</h4>
                   <p className="mt-2 text-sm leading-6 text-muted">
-                    Estas ideas listas para usar no son lo mismo que tus automatizaciones activas hasta que decidas activarlas.
+                    Aqui ves todas las bases detectadas para tu tenant, incluso las que todavia requieren datos o canal conectado.
                   </p>
                 </div>
 
-                {compatibleCatalog.length ? (
-                  compatibleCatalog.map((template) => (
+                {catalogItems.length ? (
+                  catalogItems.map((template) => (
                     <div key={template.key} className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-black/12 p-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-white">{template.name}</p>
-                          <Badge variant={template.effectiveEnabled ? "success" : "muted"}>
-                            {template.effectiveEnabled ? "Activa" : "Disponible"}
+                          <Badge variant={template.compatible ? (template.effectiveEnabled ? "success" : "muted") : "warning"}>
+                            {template.compatible ? (template.effectiveEnabled ? "Lista" : "Disponible") : "Requiere datos"}
                           </Badge>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-muted">{template.description || "Idea disponible para sumar al asistente."}</p>
+                        <p className="mt-2 text-sm leading-6 text-muted">
+                          {template.compatible
+                            ? template.description || "Base disponible para este negocio."
+                            : `Necesita ${template.missingCapabilities.join(", ")} para estar lista.`}
+                        </p>
                       </div>
                       <Button
                         type="button"
                         size="sm"
                         variant={template.tenantEnabled ? "secondary" : "primary"}
-                        disabled={pendingTemplateKey === template.key}
+                        disabled={pendingTemplateKey === template.key || !template.compatible}
                         onClick={() => void handleToggleTemplate(template)}
                       >
                         {pendingTemplateKey === template.key ? "Guardando..." : template.tenantEnabled ? "Deshabilitar" : "Habilitar"}
@@ -845,7 +1026,7 @@ export function AutomationsHub({
                   ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-muted">
-                    Todavia no hay automatizaciones disponibles para activar con el perfil actual.
+                    Todavia no hay bases detectadas para este espacio.
                   </div>
                 )}
               </div>
@@ -854,6 +1035,47 @@ export function AutomationsHub({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SectionIntro({
+  title,
+  description
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-2xl font-semibold text-white">{title}</h3>
+      <p className="max-w-3xl text-sm leading-6 text-muted">{description}</p>
+    </div>
+  );
+}
+
+function PresetCard({ module }: { module: AutomationModule }) {
+  return (
+    <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+      <CardContent className="space-y-4 p-5">
+        <div className={cn("inline-flex h-14 w-14 items-center justify-center rounded-[22px] border", iconTone(module.icon))}>
+          <span className="text-lg font-semibold text-white">{module.name.slice(0, 1)}</span>
+        </div>
+        <div>
+          <h4 className="text-xl font-semibold text-white">{module.name}</h4>
+          <p className="mt-2 text-sm leading-6 text-muted">{module.description}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(module.chips || []).slice(0, 2).map((chip) => (
+            <span key={chip} className="rounded-xl border border-white/8 bg-black/12 px-3 py-1.5 text-xs text-text">
+              {chip}
+            </span>
+          ))}
+        </div>
+        <Button asChild className="w-full rounded-2xl">
+          <Link href={module.actionHref || "/app/automations/new?template=custom"}>{module.actionLabel || "Crear con guia"}</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -910,4 +1132,15 @@ function ExecutionStateChip({
       {label}
     </span>
   );
+}
+
+function iconTone(icon: AutomationModule["icon"]) {
+  if (icon === "welcome") return "border-emerald-400/35 bg-emerald-500/18 text-emerald-200 shadow-[0_0_0_1px_rgba(52,211,153,0.12),0_16px_30px_rgba(16,185,129,0.16)]";
+  if (icon === "catalog") return "border-sky-400/35 bg-sky-500/18 text-sky-200 shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_16px_30px_rgba(59,130,246,0.16)]";
+  if (icon === "handoff") return "border-violet-400/35 bg-violet-500/18 text-violet-200 shadow-[0_0_0_1px_rgba(167,139,250,0.12),0_16px_30px_rgba(124,58,237,0.16)]";
+  if (icon === "followup") return "border-orange-400/35 bg-orange-500/18 text-orange-200 shadow-[0_0_0_1px_rgba(251,146,60,0.12),0_16px_30px_rgba(234,88,12,0.16)]";
+  if (icon === "payments") return "border-rose-400/35 bg-rose-500/18 text-rose-200 shadow-[0_0_0_1px_rgba(251,113,133,0.12),0_16px_30px_rgba(225,29,72,0.16)]";
+  if (icon === "fallback" || icon === "faq") return "border-amber-400/35 bg-amber-500/18 text-amber-200 shadow-[0_0_0_1px_rgba(251,191,36,0.12),0_16px_30px_rgba(217,119,6,0.16)]";
+  if (icon === "calendar") return "border-orange-400/35 bg-orange-500/18 text-orange-200 shadow-[0_0_0_1px_rgba(251,146,60,0.12),0_16px_30px_rgba(234,88,12,0.16)]";
+  return "border-brand/35 bg-brand/18 text-brandBright shadow-[0_0_0_1px_rgba(249,115,22,0.12),0_16px_30px_rgba(192,80,0,0.16)]";
 }
