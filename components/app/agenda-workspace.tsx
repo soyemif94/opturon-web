@@ -7,15 +7,19 @@ import {
   Ban,
   CalendarCheck2,
   CalendarDays,
+  CheckCheck,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   Clock3,
   LoaderCircle,
-  NotebookPen,
   PencilLine,
   Plus,
+  Search,
+  Sparkles,
   Trash2,
-  UserRound
+  UserRound,
+  Rows3
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,6 +106,8 @@ const monthLabels = [
 
 const weekLabels = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 
+type AgendaViewMode = "month" | "week" | "day" | "agenda";
+
 function toDateKey(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -112,6 +118,21 @@ function toDateKey(date: Date) {
 function parseDateKey(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function startOfWeek(date: Date) {
+  const next = new Date(date);
+  const offset = (next.getDay() + 6) % 7;
+  next.setDate(next.getDate() - offset);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfWeek(date: Date) {
+  const next = startOfWeek(date);
+  next.setDate(next.getDate() + 6);
+  next.setHours(23, 59, 59, 999);
+  return next;
 }
 
 function monthRange(date: Date) {
@@ -260,6 +281,49 @@ function isTodayKey(dateKey: string) {
   return dateKey === toDateKey(new Date());
 }
 
+function formatLongDate(value: string) {
+  return parseDateKey(value).toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+}
+
+function formatShortDate(value: string) {
+  return parseDateKey(value).toLocaleDateString("es-AR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short"
+  });
+}
+
+function matchesAgendaSearch(item: AgendaItem, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return false;
+  return [
+    item.title,
+    item.description,
+    item.contact?.name,
+    item.contact?.phone,
+    item.assignedUserName,
+    commercialActionLabel(item.commercialActionType),
+    formatShortDate(item.date),
+    formatLongDate(item.date)
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(normalizedQuery);
+}
+
+function getAgendaItemChipClass(item: AgendaItem) {
+  if (item.type === "availability") return "border-emerald-500/30 bg-emerald-500/12 text-emerald-100";
+  if (item.type === "blocked") return "border-rose-500/30 bg-rose-500/12 text-rose-100";
+  if (item.status === "confirmed") return "border-emerald-400/30 bg-emerald-500/12 text-emerald-100";
+  if (isCommercialAgendaItem(item)) return "border-fuchsia-400/30 bg-fuchsia-500/12 text-fuchsia-100";
+  return "border-sky-500/25 bg-sky-500/10 text-sky-100";
+}
+
 function isCommercialAttentionItem(item: Pick<AgendaItem, "commercialActionType" | "status" | "nextActionAt" | "date">) {
   if (!("origin" in item) && !item.commercialActionType) return false;
   if (!isCommercialAgendaItem(item as Pick<AgendaItem, "commercialActionType" | "origin" | "type" | "title"> & Pick<AgendaItem, "status" | "nextActionAt" | "date">)) return false;
@@ -335,6 +399,7 @@ function buildCommercialNextAction(item: Pick<AgendaItem, "commercialActionType"
 
 export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialCommercialPrefill }: AgendaWorkspaceProps) {
   const today = useMemo(() => new Date(), []);
+  const todayKey = useMemo(() => toDateKey(today), [today]);
   const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(today));
   const [items, setItems] = useState<AgendaItem[]>([]);
@@ -353,6 +418,10 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
   const [editDraft, setEditDraft] = useState<EditState | null>(null);
   const [visitScope, setVisitScope] = useState<"all" | "mine">("all");
   const [commercialView, setCommercialView] = useState<"all" | "commercial">("all");
+  const [viewMode, setViewMode] = useState<AgendaViewMode>("month");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchPool, setSearchPool] = useState<AgendaItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
   const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
@@ -468,6 +537,49 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
     return () => controller.abort();
   }, [selectedDateKey, refreshSeed]);
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchPool([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const from = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 6, 1);
+    const to = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 7, 0);
+
+    async function loadSearchPool() {
+      setSearchLoading(true);
+      try {
+        const response = await fetch(
+          `/api/app/agenda?from=${encodeURIComponent(toDateKey(from))}&to=${encodeURIComponent(toDateKey(to))}`,
+          { cache: "no-store", signal: controller.signal }
+        );
+        const json = (await response.json().catch(() => null)) as
+          | { data?: { items?: AgendaItem[] }; detail?: string; error?: string }
+          | null;
+
+        if (!response.ok) {
+          throw new Error(json?.detail || json?.error || "No pudimos consultar la agenda.");
+        }
+
+        setSearchPool(Array.isArray(json?.data?.items) ? json.data.items : []);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setSearchPool([]);
+        toast.error("No pudimos buscar en agenda", error instanceof Error ? error.message : "unknown_error");
+      } finally {
+        if (!controller.signal.aborted) {
+          setSearchLoading(false);
+        }
+      }
+    }
+
+    void loadSearchPool();
+    return () => controller.abort();
+  }, [currentMonth, searchQuery]);
+
   const calendarDays = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(calendarStart);
     date.setDate(calendarStart.getDate() + index);
@@ -485,6 +597,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
   });
 
   const selectedDate = useMemo(() => parseDateKey(selectedDateKey), [selectedDateKey]);
+  const selectedDateLabel = useMemo(() => formatLongDate(selectedDateKey), [selectedDateKey]);
 
   const selectedItems = items
     .filter((item) => item.date === selectedDateKey)
@@ -497,6 +610,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
     });
 
   const monthItems = items.filter((item) => item.date >= toDateKey(monthStart) && item.date <= toDateKey(monthEnd));
+  const todayItems = items.filter((item) => item.date === todayKey && item.status !== "cancelled");
   const monthCommercialItems = monthItems.filter((item) => isCommercialAgendaItem(item) && item.status !== "cancelled");
   const myCommercialCount = monthItems.filter((item) => isCommercialAgendaItem(item) && item.status !== "cancelled" && item.assignedUserId === currentUserId).length;
   const appointmentCount = monthItems.filter((item) => item.type === "appointment" && item.status !== "cancelled").length;
@@ -515,6 +629,42 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
   const selectedAttentionItems = selectedCommercial.filter((item) => isCommercialAttentionItem(item));
   const selectedConfirmed = selectedCommercial.filter((item) => item.status === "confirmed");
   const selectedTodayCommercial = selectedCommercial.filter((item) => isTodayKey(item.date));
+  const todayAppointmentCount = todayItems.filter((item) => item.type === "appointment").length;
+  const todayPendingCount = todayItems.filter((item) => item.status === "pending").length;
+  const todayConfirmedCount = todayItems.filter((item) => item.status === "confirmed").length;
+  const todayCommercialCount = todayItems.filter((item) => isCommercialAgendaItem(item)).length;
+  const activePriorityCopy = selectedAttentionItems.length
+    ? "Alta: reprogramar, pendientes y confirmadas de hoy"
+    : selectedConfirmed.length
+      ? "Media: confirmar detalles y ejecutar agenda del dia"
+      : "Baja: sin urgencias operativas visibles en esta fecha";
+  const searchResults = useMemo(
+    () =>
+      [...(searchPool.length ? searchPool : items)]
+        .filter((item) => item.status !== "cancelled")
+        .filter((item) => matchesAgendaSearch(item, searchQuery))
+        .sort((a, b) => `${a.date}-${a.startTime || "99:99"}-${a.title}`.localeCompare(`${b.date}-${b.startTime || "99:99"}-${b.title}`))
+        .slice(0, 8),
+    [items, searchPool, searchQuery]
+  );
+  const weekDays = useMemo(() => {
+    const from = startOfWeek(selectedDate);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(from);
+      date.setDate(from.getDate() + index);
+      const dateKey = toDateKey(date);
+      const dayItems = items
+        .filter((item) => item.date === dateKey && item.status !== "cancelled")
+        .sort((a, b) => `${a.startTime || "99:99"}-${a.title}`.localeCompare(`${b.startTime || "99:99"}-${b.title}`));
+      return {
+        date,
+        dateKey,
+        isSelected: dateKey === selectedDateKey,
+        isToday: dateKey === todayKey,
+        items: dayItems
+      };
+    });
+  }, [items, selectedDate, selectedDateKey, todayKey]);
   const createDisabled = createBusy || !draft.title.trim() || (requiresTimeRange(draft.type) && (!draft.startTime || !draft.endTime));
   const editDisabled =
     editBusy ||
@@ -747,295 +897,420 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
   }
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="success">Persistente</Badge>}>
-            <div>
-              <CardTitle className="text-lg">Agenda operativa</CardTitle>
-              <CardDescription>Los items se guardan por tenant y ahora cubren disponibilidad, bloqueos y turnos simples.</CardDescription>
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.24),transparent_24%),linear-gradient(180deg,rgba(12,16,24,0.98),rgba(9,13,20,0.96))] p-4 shadow-[var(--card-shadow)] md:p-5">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <Badge variant="warning">Agenda nativa</Badge>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Agenda</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+                Organiza disponibilidad, seguimientos, notas internas y reserva de turnos desde conversaciones.
+              </p>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm leading-6 text-muted">
-            Esta fase ya soporta notas, seguimientos, tareas, turnos, franjas no disponibles y disponibilidad base con persistencia tenant-scoped.
-          </CardContent>
-        </Card>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="muted">{monthLabels[currentMonth.getMonth()]} {currentMonth.getFullYear()}</Badge>
+              <Badge variant="success">Portal activo</Badge>
+              <Badge variant="outline">Operacion en vivo</Badge>
+            </div>
+          </div>
 
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="warning">{appointmentCount} turnos</Badge>}>
-            <div>
-              <CardTitle className="text-lg">Franjas del mes</CardTitle>
-              <CardDescription>Lectura operativa de turnos y bloques guardados en este tenant.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm leading-6 text-muted">
-            {availabilityCount} bloques disponibles, {blockedCount} bloqueos, {pendingCount} items pendientes y {commercialCount} visitas/demo comerciales activas.
-            {currentUserId ? ` ${myCommercialCount} asignadas a ti.` : ""}
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="warning">{commercialCount} comerciales</Badge>}>
-            <div>
-              <CardTitle className="text-lg">Resultados Del Mes</CardTitle>
-              <CardDescription>Lectura minima de visitas y demos comerciales cargadas en el mes visible.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-2 pt-0 text-sm text-muted">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-fuchsia-100/80">Total</p>
-                <p className="mt-1 text-xl font-semibold text-fuchsia-100">{commercialCount}</p>
-              </div>
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-amber-100/80">Interesados</p>
-                <p className="mt-1 text-xl font-semibold text-amber-100">{interestedCount}</p>
-              </div>
-              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-sky-100/80">Propuesta</p>
-                <p className="mt-1 text-xl font-semibold text-sky-100">{proposalRequestedCount}</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-100/80">Cerrados</p>
-                <p className="mt-1 text-xl font-semibold text-emerald-100">{wonCount}</p>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-rose-100">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-rose-100/80">No interesados</p>
-              <p className="mt-1 text-lg font-semibold">{notInterestedCount}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="outline">Fase 3</Badge>}>
-            <div>
-              <CardTitle className="text-lg">Base de producto</CardTitle>
-              <CardDescription>Disponibilidad y turnos simples hoy, sin abrir todavia bot ni scheduling avanzado.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-2 pt-0 text-sm text-muted">
-            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-2">Items por tenant/clinic</div>
-            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-2">Turnos, disponibilidad y bloqueos en el mismo modelo</div>
-            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-3 py-2">Validacion basica de horarios y choques obvios</div>
-          </CardContent>
-        </Card>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <AgendaKpiCard
+              icon={<CalendarDays className="h-4 w-4" />}
+              label="Hoy"
+              value={today.getDate()}
+              helper={`${monthLabels[today.getMonth()].toLowerCase()}, ${today.toLocaleDateString("es-AR", { weekday: "long" })}`}
+              tone="violet"
+            />
+            <AgendaKpiCard icon={<Clock3 className="h-4 w-4" />} label="Turnos hoy" value={todayAppointmentCount} helper={todayAppointmentCount ? "Items reservados hoy" : "Sin turnos"} tone="orange" />
+            <AgendaKpiCard icon={<Rows3 className="h-4 w-4" />} label="Pendientes" value={todayPendingCount} helper={todayPendingCount ? "Pendientes del dia" : "Sin items pendientes"} tone="blue" />
+            <AgendaKpiCard icon={<CheckCheck className="h-4 w-4" />} label="Confirmadas" value={todayConfirmedCount} helper={todayConfirmedCount ? "Confirmadas hoy" : "Sin confirmadas hoy"} tone="green" />
+            <AgendaKpiCard icon={<Sparkles className="h-4 w-4" />} label="Comerciales" value={todayCommercialCount} helper={todayCommercialCount ? "Activos hoy" : "Sin agenda comercial hoy"} tone="amber" />
+          </div>
+        </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader
-            action={
-              <div className="flex items-center gap-2">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.18fr)_420px]">
+        <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+          <CardContent className="space-y-4 p-4 md:p-5">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => shiftMonth(-1)}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
+                <div className="min-w-[156px] rounded-2xl border border-white/8 bg-black/15 px-4 py-2 text-sm font-medium text-white">
+                  {monthLabels[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                </div>
                 <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => shiftMonth(1)}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => {
+                    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+                    setSelectedDateKey(todayKey);
+                  }}
+                >
+                  Hoy
+                </Button>
               </div>
-            }
-          >
-            <div>
-              <CardTitle className="text-xl">
-                {monthLabels[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-              </CardTitle>
-              <CardDescription>La agenda trae los items reales del mes visible y los organiza por dia.</CardDescription>
+
+              <div className="flex flex-col gap-3 xl:min-w-[520px] xl:flex-row xl:items-center xl:justify-end">
+                <div className="relative w-full xl:flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Buscar por cliente, responsable o nota..."
+                    className="h-11 rounded-2xl border-white/10 bg-black/15 pl-9"
+                  />
+                </div>
+                <div className="inline-flex rounded-2xl border border-white/8 bg-black/15 p-1 text-xs">
+                  {[
+                    { key: "month", label: "Mes" },
+                    { key: "week", label: "Semana" },
+                    { key: "day", label: "Dia" },
+                    { key: "agenda", label: "Agenda" }
+                  ].map((mode) => (
+                    <button
+                      key={mode.key}
+                      type="button"
+                      onClick={() => setViewMode(mode.key as AgendaViewMode)}
+                      className={cn(
+                        "rounded-xl px-3 py-2 transition",
+                        viewMode === mode.key ? "bg-brand text-white shadow-[0_10px_25px_rgba(192,80,0,0.22)]" : "text-muted hover:text-white"
+                      )}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
+
+            {searchQuery.trim().length >= 2 ? (
+              <div className="rounded-[24px] border border-white/8 bg-black/15 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">Buscador operativo</p>
+                    <p className="mt-1 text-xs text-muted">Encuentra rapido fechas, horas y contexto para cada cliente.</p>
+                  </div>
+                  <Badge variant="outline">{searchLoading ? "Buscando..." : `${searchResults.length} coincidencia(s)`}</Badge>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {searchResults.length ? (
+                    searchResults.map((item) => (
+                      <button
+                        key={`search-${item.id}`}
+                        type="button"
+                        onClick={() => {
+                          const nextDate = parseDateKey(item.date);
+                          setCurrentMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+                          setSelectedDateKey(item.date);
+                          setViewMode("agenda");
+                        }}
+                        className="flex flex-col items-start gap-1 rounded-2xl border border-white/8 bg-surface/55 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/10"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-white">{item.contact?.name || item.title}</span>
+                          <Badge variant={typeMeta(item.type).variant}>{typeMeta(item.type).label}</Badge>
+                        </div>
+                        <p className="text-xs text-brandBright">
+                          {formatShortDate(item.date)} {item.startTime ? `— ${item.startTime}` : "— sin hora"}
+                        </p>
+                        <p className="text-xs text-muted">{item.title}{item.description ? ` · ${item.description}` : ""}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-5 text-sm text-muted">
+                      {searchLoading ? "Buscando coincidencias reales..." : "No encontramos coincidencias en la agenda cargada para ese termino."}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             {loading ? (
-              <div className="flex min-h-[320px] items-center justify-center text-sm text-muted">
+              <div className="flex min-h-[360px] items-center justify-center text-sm text-muted">
                 <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                 Cargando agenda del mes...
               </div>
             ) : errorMessage ? (
               <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{errorMessage}</div>
             ) : (
-              <div className="grid grid-cols-7 gap-2">
-                {weekLabels.map((label) => (
-                  <div key={label} className="px-2 pb-1 text-center text-[11px] uppercase tracking-[0.16em] text-muted">
-                    {label}
-                  </div>
-                ))}
-
-                {calendarDays.map((day) => (
-                  <button
-                    key={day.dateKey}
-                    type="button"
-                    onClick={() => setSelectedDateKey(day.dateKey)}
-                    className={cn(
-                      "min-h-[108px] rounded-2xl border p-3 text-left transition",
-                      day.isSelected
-                        ? "border-brand/40 bg-brand/10 shadow-[0_0_0_1px_rgba(192,80,0,0.12)]"
-                        : "border-[color:var(--border)] bg-surface/65 hover:bg-surface",
-                      !day.inCurrentMonth && "opacity-45"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={cn("text-sm font-medium", day.isToday && "text-brandBright")}>{day.date.getDate()}</span>
-                      {day.isToday ? <Badge variant="warning">Hoy</Badge> : null}
+              <>
+                {viewMode === "month" ? (
+                  <div className="overflow-hidden rounded-[24px] border border-white/8 bg-black/12">
+                    <div className="grid grid-cols-7 gap-px border-b border-white/8 bg-white/6">
+                      {weekLabels.map((label) => (
+                        <div key={label} className="px-3 py-3 text-center text-[11px] uppercase tracking-[0.18em] text-muted">
+                          {label}
+                        </div>
+                      ))}
                     </div>
-                    <div className="mt-4 space-y-2">
-                      {day.commercialCount > 0 ? <div className="h-1.5 rounded-full bg-fuchsia-400/70" /> : null}
-                      {day.attentionCount > 0 ? <div className="h-1.5 rounded-full bg-amber-400/80" /> : null}
-                      {day.count > 0 ? (
-                        <>
-                          <div className="h-2 rounded-full bg-brand/40" />
-                          <p className="text-xs text-muted">{day.count} item(s)</p>
-                          {day.commercialCount > 0 ? <p className="text-[11px] text-fuchsia-200">{day.commercialCount} comercial(es)</p> : null}
-                          {day.attentionCount > 0 ? <p className="text-[11px] text-amber-200">{day.attentionCount} requiere accion</p> : null}
-                        </>
+                    <div className="grid grid-cols-7 gap-px bg-white/6">
+                      {calendarDays.map((day) => {
+                        const dayItems = items
+                          .filter((item) => item.date === day.dateKey && item.status !== "cancelled")
+                          .sort((a, b) => `${a.startTime || "99:99"}-${a.title}`.localeCompare(`${b.startTime || "99:99"}-${b.title}`))
+                          .slice(0, 2);
+                        return (
+                          <button
+                            key={day.dateKey}
+                            type="button"
+                            onClick={() => setSelectedDateKey(day.dateKey)}
+                            className={cn(
+                              "min-h-[132px] bg-[rgba(10,14,22,0.94)] p-3 text-left transition hover:bg-[rgba(16,22,34,0.98)]",
+                              day.isSelected && "bg-[rgba(192,80,0,0.10)] shadow-[inset_0_0_0_1px_rgba(192,80,0,0.32)]",
+                              !day.inCurrentMonth && "opacity-45"
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={cn("text-sm font-medium text-white", day.isToday && "text-brandBright")}>{day.date.getDate()}</span>
+                              {day.isToday ? <Badge variant="warning">Hoy</Badge> : null}
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              {dayItems.length ? (
+                                dayItems.map((item) => (
+                                  <div key={item.id} className={cn("rounded-xl border px-2.5 py-2 text-[11px]", getAgendaItemChipClass(item))}>
+                                    <p className="font-medium">{item.startTime || "Sin hora"}</p>
+                                    <p className="truncate opacity-90">{item.contact?.name || item.title}</p>
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-xs text-muted">Libre</p>
+                              )}
+                              {day.count > 2 ? <p className="text-[11px] text-muted">+{day.count - 2} item(s) mas</p> : null}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {viewMode === "week" ? (
+                  <div className="grid gap-3 lg:grid-cols-7">
+                    {weekDays.map((day) => (
+                      <button
+                        key={day.dateKey}
+                        type="button"
+                        onClick={() => setSelectedDateKey(day.dateKey)}
+                        className={cn(
+                          "rounded-[24px] border p-4 text-left transition",
+                          day.isSelected ? "border-brand/40 bg-brand/10" : "border-white/8 bg-black/12 hover:bg-black/20"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                              {weekLabels[(day.date.getDay() + 6) % 7]}
+                            </p>
+                            <p className={cn("mt-1 text-xl font-semibold text-white", day.isToday && "text-brandBright")}>{day.date.getDate()}</p>
+                          </div>
+                          {day.isToday ? <Badge variant="warning">Hoy</Badge> : null}
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          {day.items.length ? (
+                            day.items.slice(0, 4).map((item) => (
+                              <div key={item.id} className={cn("rounded-xl border px-2.5 py-2 text-[11px]", getAgendaItemChipClass(item))}>
+                                <p className="font-medium">{item.startTime || "Sin hora"}</p>
+                                <p className="truncate opacity-90">{item.contact?.name || item.title}</p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted">Sin items</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {viewMode === "day" ? (
+                  <div className="rounded-[24px] border border-white/8 bg-black/12 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">{selectedDateLabel}</p>
+                        <p className="mt-1 text-xs text-muted">Vista diaria enfocada en horario, responsable y estado comercial.</p>
+                      </div>
+                      <Badge variant="muted">{selectedItems.length} item(s)</Badge>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {selectedItems.length ? (
+                        selectedItems.map((item) => (
+                          <div key={`day-${item.id}`} className={cn("rounded-2xl border p-4", getItemSurface(item.type), commercialSurfaceClass(item, currentUserId))}>
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium text-white">{item.title}</p>
+                                <p className="mt-1 text-xs text-muted">
+                                  {formatTimeLabel(item)}{item.contact?.name ? ` · ${item.contact.name}` : ""}{item.assignedUserName ? ` · ${item.assignedUserName}` : ""}
+                                </p>
+                              </div>
+                              <Badge variant={statusMeta(item.status, isCommercialAgendaItem(item)).variant}>
+                                {statusMeta(item.status, isCommercialAgendaItem(item)).label}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))
                       ) : (
-                        <p className="text-xs text-muted">Libre</p>
+                        <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-8 text-sm text-muted">
+                          No hay items en esta fecha.
+                        </div>
                       )}
                     </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                ) : null}
+
+                {viewMode === "agenda" ? (
+                  <div className="rounded-[24px] border border-white/8 bg-black/12 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">Agenda operativa del periodo</p>
+                        <p className="mt-1 text-xs text-muted">Lista cronologica del mes visible para escanear rapido pendientes, demos y turnos.</p>
+                      </div>
+                      <Badge variant="muted">{monthItems.filter((item) => item.status !== "cancelled").length} item(s)</Badge>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {monthItems.filter((item) => item.status !== "cancelled").length ? (
+                        [...monthItems]
+                          .filter((item) => item.status !== "cancelled")
+                          .sort((a, b) => `${a.date}-${a.startTime || "99:99"}-${a.title}`.localeCompare(`${b.date}-${b.startTime || "99:99"}-${b.title}`))
+                          .map((item) => (
+                            <button
+                              key={`agenda-${item.id}`}
+                              type="button"
+                              onClick={() => setSelectedDateKey(item.date)}
+                              className="flex w-full flex-col items-start gap-2 rounded-2xl border border-white/8 bg-surface/55 px-4 py-3 text-left transition hover:border-brand/40 hover:bg-brand/10"
+                            >
+                              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-semibold text-white">{item.contact?.name || item.title}</span>
+                                  <Badge variant={typeMeta(item.type).variant}>{typeMeta(item.type).label}</Badge>
+                                  <Badge variant={statusMeta(item.status, isCommercialAgendaItem(item)).variant}>{statusMeta(item.status, isCommercialAgendaItem(item)).label}</Badge>
+                                </div>
+                                <span className="text-xs text-brandBright">{formatShortDate(item.date)} {item.startTime ? `· ${item.startTime}` : ""}</span>
+                              </div>
+                              <p className="text-xs text-muted">{item.title}{item.description ? ` · ${item.description}` : ""}</p>
+                            </button>
+                          ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-8 text-sm text-muted">
+                          Todavia no hay items cargados para el mes visible.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             )}
           </CardContent>
         </Card>
 
         <div className="space-y-5">
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader
-              action={
-                <div className="flex items-center gap-2">
-                  {currentUserId ? (
-                    <div className="inline-flex rounded-xl border border-[color:var(--border)] bg-bg/50 p-1 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setVisitScope("all")}
-                        className={cn("rounded-lg px-2.5 py-1 transition", visitScope === "all" ? "bg-brand text-white" : "text-muted")}
-                      >
-                        Todas
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVisitScope("mine")}
-                        className={cn("rounded-lg px-2.5 py-1 transition", visitScope === "mine" ? "bg-brand text-white" : "text-muted")}
-                      >
-                        Mis visitas
-                      </button>
-                    </div>
-                  ) : null}
-                  <Badge variant="muted">{selectedItems.length} item(s)</Badge>
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+            <CardContent className="space-y-4 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-white">Resumen del dia</h3>
+                  <p className="mt-1 text-sm text-muted">{selectedDateLabel}</p>
                 </div>
-              }
-            >
+                <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => setViewMode("agenda")}>
+                  Ver agenda completa
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <SummaryStrip icon={<CalendarCheck2 className="h-4 w-4" />} label="Disponible" tone="green" meta={`${selectedAvailability.length} item(s)`} copy={selectedAvailability.length ? selectedAvailability.map((item) => formatTimeLabel(item)).join(", ") : "Sin bloques base"} />
+                <SummaryStrip icon={<Ban className="h-4 w-4" />} label="No disponible" tone="rose" meta={`${selectedBlocked.length} item(s)`} copy={selectedBlocked.length ? selectedBlocked.map((item) => formatTimeLabel(item)).join(", ") : "Sin bloqueos cargados"} />
+                <SummaryStrip icon={<Clock3 className="h-4 w-4" />} label="Sin turnos" tone="orange" meta={selectedAppointments.length ? `${selectedAppointments.length} item(s)` : "Sin turnos para hoy"} copy={selectedAppointments.length ? selectedAppointments.map((item) => formatTimeLabel(item)).join(", ") : "Sin turnos para este dia"} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+            <CardContent className="space-y-4 p-4">
               <div>
-                <CardTitle className="text-xl">
-                  {selectedDate.toLocaleDateString("es-AR", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long"
-                  })}
-                </CardTitle>
-                <CardDescription>Panel diario conectado a los items reales del tenant.</CardDescription>
+                <h3 className="text-xl font-semibold text-white">Vista rapida</h3>
+                <p className="mt-1 text-sm text-muted">Lectura corta de operacion y estado comercial en la fecha seleccionada.</p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-                  <div className="flex items-center gap-2">
-                    <CalendarCheck2 className="h-4 w-4" />
-                    <span className="font-medium">Disponible</span>
-                  </div>
-                  <p className="mt-2 text-xs text-emerald-100/80">
-                    {selectedAvailability.length ? selectedAvailability.map((item) => formatTimeLabel(item)).join(", ") : "Sin bloques base para este dia"}
-                  </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <QuickStatCard label="Visitas / demos" value={selectedCommercial.length} tone="violet" />
+                <QuickStatCard label="Pendientes" value={selectedAttentionItems.length} tone="orange" />
+                <QuickStatCard label="Confirmadas" value={selectedConfirmed.length} tone="green" />
+                <QuickStatCard label="Agenda de hoy" value={selectedTodayCommercial.length} tone="blue" />
+              </div>
+
+              <div className="space-y-3 border-t border-white/8 pt-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-white">
+                  <CircleAlert className="h-4 w-4 text-brandBright" />
+                  Prioridad actual
                 </div>
-                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-100">
-                  <div className="flex items-center gap-2">
-                    <Ban className="h-4 w-4" />
-                    <span className="font-medium">No disponible</span>
-                  </div>
-                  <p className="mt-2 text-xs text-rose-100/80">
-                    {selectedBlocked.length ? selectedBlocked.map((item) => formatTimeLabel(item)).join(", ") : "Sin bloqueos cargados"}
-                  </p>
+                <div className="inline-flex rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs text-brandBright">
+                  {activePriorityCopy}
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-surface/65 p-3 text-sm text-muted">
-                  <div className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 text-brandBright" />
-                    <span className="font-medium text-text">Turnos</span>
-                  </div>
-                  <p className="mt-2 text-xs">
-                    {selectedAppointments.length ? `${selectedAppointments.length} reservado(s)` : "Todavia no hay turnos para este dia"}
-                  </p>
+                <div className="rounded-2xl border border-white/8 bg-black/10 p-4 text-sm leading-6 text-muted">
+                  {selectedItems.length
+                    ? "La agenda diaria ya consolida disponibilidad, bloqueos, pendientes y agenda comercial sobre la misma fuente real."
+                    : "Todavia no hay items para este dia. Puedes guardar una nota, un seguimiento, una tarea, una franja disponible o un bloqueo simple."}
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-3 text-sm text-fuchsia-100">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-fuchsia-200/80">Comerciales</p>
-                  <p className="mt-2 text-xl font-semibold">{selectedCommercial.length}</p>
-                  <p className="mt-1 text-xs text-fuchsia-100/75">Visitas y demos visibles en este dia.</p>
-                </div>
-                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-100">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-amber-200/80">Requieren accion</p>
-                  <p className="mt-2 text-xl font-semibold">{selectedAttentionItems.length}</p>
-                  <p className="mt-1 text-xs text-amber-100/75">Pendientes, reprogramar o con urgencia operativa.</p>
-                </div>
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-200/80">Confirmadas</p>
-                  <p className="mt-2 text-xl font-semibold">{selectedConfirmed.length}</p>
-                  <p className="mt-1 text-xs text-emerald-100/75">Listas para ejecucion comercial.</p>
-                </div>
-                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-sky-100">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-sky-200/80">De hoy</p>
-                  <p className="mt-2 text-xl font-semibold">{selectedTodayCommercial.length}</p>
-                  <p className="mt-1 text-xs text-sky-100/75">Agenda comercial a resolver hoy.</p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[color:var(--border)] bg-bg/35 p-4">
+              <div className="rounded-2xl border border-white/8 bg-black/10 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Consulta preparada para bot</p>
+                    <p className="text-sm font-medium text-white">Consulta preparada para bot</p>
                     <p className="mt-1 text-xs text-muted">
                       {availabilityDay
                         ? availabilityDay.policy === "explicit_availability"
                           ? "El dia usa disponibilidad explicita y devuelve ventanas reservables."
-                          : "El dia no define availability explicita; se exponen ocupados y bloqueos para decision futura."
+                          : "El dia no define disponibilidad explicita y expone ocupados y bloqueos."
                         : "Estamos consultando la capa de disponibilidad del dia."}
                     </p>
                   </div>
                   <Badge variant="outline">{availabilityLoading ? "Consultando" : "Backend listo"}</Badge>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {availabilityDay?.bookableWindows?.length ? (
                     availabilityDay.bookableWindows.map((window) => (
-                      <span key={`${window.date}-${window.startTime}-${window.endTime}`} className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-emerald-100">
+                      <span key={`${window.date}-${window.startTime}-${window.endTime}`} className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100">
                         {window.startTime} - {window.endTime}
                       </span>
                     ))
                   ) : (
-                    <span className="rounded-full border border-[color:var(--border)] bg-surface/65 px-3 py-1">
+                    <span className="rounded-full border border-white/8 bg-surface/65 px-3 py-1 text-xs text-muted">
                       {availabilityLoading ? "Consultando ventanas..." : "Sin ventanas reservables calculadas para este dia"}
                     </span>
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-[color:var(--border)] bg-bg/50 p-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setCommercialView("all")}
-                    className={cn("rounded-lg px-2.5 py-1 transition", commercialView === "all" ? "bg-brand text-white" : "text-muted")}
-                  >
-                    Todo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCommercialView("commercial")}
-                    className={cn("rounded-lg px-2.5 py-1 transition", commercialView === "commercial" ? "bg-brand text-white" : "text-muted")}
-                  >
-                    Solo comercial
-                  </button>
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+            <CardContent className="space-y-4 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-white">Agenda del dia</h3>
+                  <p className="mt-1 text-sm text-muted">Filtra las tarjetas del panel por alcance comercial sin perder el contexto operativo.</p>
                 </div>
-                <Badge variant="warning">Prioridad alta: reprogramar, pendientes y confirmadas de hoy</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  {currentUserId ? (
+                    <div className="inline-flex rounded-xl border border-white/8 bg-black/15 p-1 text-xs">
+                      <button type="button" onClick={() => setVisitScope("all")} className={cn("rounded-lg px-2.5 py-1 transition", visitScope === "all" ? "bg-brand text-white" : "text-muted")}>Todas</button>
+                      <button type="button" onClick={() => setVisitScope("mine")} className={cn("rounded-lg px-2.5 py-1 transition", visitScope === "mine" ? "bg-brand text-white" : "text-muted")}>Mis visitas</button>
+                    </div>
+                  ) : null}
+                  <div className="inline-flex rounded-xl border border-white/8 bg-black/15 p-1 text-xs">
+                    <button type="button" onClick={() => setCommercialView("all")} className={cn("rounded-lg px-2.5 py-1 transition", commercialView === "all" ? "bg-brand text-white" : "text-muted")}>Todo</button>
+                    <button type="button" onClick={() => setCommercialView("commercial")} className={cn("rounded-lg px-2.5 py-1 transition", commercialView === "commercial" ? "bg-brand text-white" : "text-muted")}>Solo comercial</button>
+                  </div>
+                  <Badge variant="muted">{selectedItems.length} item(s)</Badge>
+                </div>
               </div>
 
               {initialCommercialPrefill?.conversationId ? (
@@ -1045,9 +1320,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                     <Badge variant="outline">Lead derivado desde Inbox</Badge>
                   </div>
                   <p className="mt-2 leading-6">
-                    Esta agenda vino precompletada para{" "}
-                    <span className="font-medium text-white">{initialCommercialPrefill.contactName || "este lead"}</span>.
-                    Al guardar, la visita/demo queda vinculada a la conversacion original y visible en seguimiento.
+                    Esta agenda vino precompletada para <span className="font-medium text-white">{initialCommercialPrefill.contactName || "este lead"}</span>. Al guardar, la visita/demo queda vinculada a la conversacion original.
                   </p>
                 </div>
               ) : null}
@@ -1066,7 +1339,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                     <div key={item.id} className={cn("rounded-2xl border p-4", getItemSurface(item.type), commercialSurfaceClass(item, currentUserId))}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-medium">{item.title}</p>
+                          <p className="font-medium text-white">{item.title}</p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant={meta.variant}>{meta.label}</Badge>
                             <Badge variant={status.variant}>{status.label}</Badge>
@@ -1089,7 +1362,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                       </div>
                       {item.description ? <p className="mt-3 text-sm leading-6 text-muted">{item.description}</p> : null}
                       {item.contact ? (
-                        <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-bg/50 px-3 py-2 text-sm text-muted">
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-white/8 bg-black/12 px-3 py-2 text-sm text-muted">
                           <UserRound className="h-4 w-4 text-brandBright" />
                           <span>{item.contact.name}</span>
                           {item.contact.phone ? <span>- {item.contact.phone}</span> : null}
@@ -1097,77 +1370,40 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                       ) : null}
                       {commercialLabel || item.origin || item.location || item.conversationId ? (
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
-                          {item.contact?.name ? (
-                            <span className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1 text-text">Contacto: {item.contact.name}</span>
-                          ) : null}
-                          {item.origin ? (
-                            <span className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1">{item.origin}</span>
-                          ) : null}
-                          {item.location ? (
-                            <span className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1">Ubicacion: {item.location}</span>
-                          ) : null}
+                          {item.contact?.name ? <span className="rounded-full border border-white/8 bg-black/12 px-3 py-1 text-text">Contacto: {item.contact.name}</span> : null}
+                          {item.origin ? <span className="rounded-full border border-white/8 bg-black/12 px-3 py-1">{item.origin}</span> : null}
+                          {item.location ? <span className="rounded-full border border-white/8 bg-black/12 px-3 py-1">Ubicacion: {item.location}</span> : null}
                           {item.conversationId ? (
-                            <Link
-                              href={`/app/inbox/${item.conversationId}`}
-                              className="rounded-full border border-[color:var(--border)] bg-bg/50 px-3 py-1 text-text hover:bg-bg/70"
-                            >
+                            <Link href={`/app/inbox/${item.conversationId}`} className="rounded-full border border-white/8 bg-black/12 px-3 py-1 text-text hover:bg-black/20">
                               Ver conversacion {item.contact?.name ? `de ${item.contact.name}` : ""}
                             </Link>
                           ) : null}
                         </div>
                       ) : null}
                       {item.resultNote || item.nextStepNote || item.nextActionAt ? (
-                        <div className="mt-3 space-y-2 rounded-2xl border border-[color:var(--border)] bg-bg/40 p-3 text-sm text-muted">
-                          {outcomeLabel ? (
-                            <p>
-                              <span className="font-medium text-text">Resultado comercial:</span> {outcomeLabel}
-                            </p>
-                          ) : null}
-                          {item.resultNote ? (
-                            <p>
-                              <span className="font-medium text-text">Resultado:</span> {item.resultNote}
-                            </p>
-                          ) : null}
-                          {item.nextStepNote ? (
-                            <p>
-                              <span className="font-medium text-text">Proximo paso:</span> {item.nextStepNote}
-                            </p>
-                          ) : null}
+                        <div className="mt-3 space-y-2 rounded-2xl border border-white/8 bg-black/12 p-3 text-sm text-muted">
+                          {outcomeLabel ? <p><span className="font-medium text-text">Resultado comercial:</span> {outcomeLabel}</p> : null}
+                          {item.resultNote ? <p><span className="font-medium text-text">Resultado:</span> {item.resultNote}</p> : null}
+                          {item.nextStepNote ? <p><span className="font-medium text-text">Proximo paso:</span> {item.nextStepNote}</p> : null}
                           {item.nextActionAt ? (
                             <p>
                               <span className="font-medium text-text">Proxima accion:</span>{" "}
-                              {new Date(item.nextActionAt).toLocaleString("es-AR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit"
-                              })}
+                              {new Date(item.nextActionAt).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                             </p>
                           ) : null}
                         </div>
                       ) : null}
 
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "pending")} disabled={isBusy || item.status === "pending"}>
-                          Pendiente
-                        </Button>
+                        <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "pending")} disabled={isBusy || item.status === "pending"}>Pendiente</Button>
                         {isCommercial ? (
                           <>
-                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "confirmed")} disabled={isBusy || item.status === "confirmed"}>
-                              Confirmada
-                            </Button>
-                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>
-                              Realizada
-                            </Button>
-                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "reschedule")} disabled={isBusy || item.status === "reschedule"}>
-                              Reprogramar
-                            </Button>
+                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "confirmed")} disabled={isBusy || item.status === "confirmed"}>Confirmada</Button>
+                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>Realizada</Button>
+                            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "reschedule")} disabled={isBusy || item.status === "reschedule"}>Reprogramar</Button>
                           </>
                         ) : (
-                          <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>
-                            Hecho
-                          </Button>
+                          <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "done")} disabled={isBusy || item.status === "done"}>Hecho</Button>
                         )}
                         <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => void handleStatusChange(item, "cancelled")} disabled={isBusy || item.status === "cancelled"}>
                           {isCommercial ? "Cancelada" : "Cancelar"}
@@ -1177,7 +1413,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                   );
                 })
               ) : (
-                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/35 p-4 text-sm leading-6 text-muted">
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-4 text-sm leading-6 text-muted">
                   {commercialView === "commercial"
                     ? "Todavia no hay items comerciales para este dia. Si registras una visita, demo o seguimiento comercial, va a quedar visible aca."
                     : "Todavia no hay items para este dia. Puedes guardar una nota, un seguimiento, una tarea, una franja disponible o un bloqueo simple."}
@@ -1376,14 +1612,16 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
             </CardContent>
           </Card>
 
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant="warning">Creacion manual</Badge>}>
-              <div>
-                <CardTitle className="text-xl">Crear item del dia</CardTitle>
-                <CardDescription>La experiencia visual se mantiene y ahora tambien puedes registrar una visita o demo comercial vinculada al lead.</CardDescription>
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))]">
+            <CardContent className="space-y-4 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-white">Crear item del dia</h3>
+                  <p className="mt-1 text-sm text-muted">Formulario compacto premium reutilizando la creacion real de Agenda.</p>
+                </div>
+                <Badge variant="warning">Creacion manual</Badge>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
+
               <label className="space-y-2 text-sm">
                 <span className="font-medium">Titulo</span>
                 <Input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Ej. Llamar al cliente despues de la propuesta" />
@@ -1536,9 +1774,98 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
               </div>
             </CardContent>
           </Card>
-
         </div>
       </section>
+    </div>
+  );
+}
+
+function AgendaKpiCard({
+  icon,
+  label,
+  value,
+  helper,
+  tone
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  helper: string;
+  tone: "violet" | "orange" | "blue" | "green" | "amber";
+}) {
+  const tones = {
+    violet: "border-violet-500/20 bg-violet-500/10 text-violet-100",
+    orange: "border-brand/20 bg-brand/10 text-orange-100",
+    blue: "border-sky-500/20 bg-sky-500/10 text-sky-100",
+    green: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-100"
+  } as const;
+
+  return (
+    <div className={cn("rounded-[22px] border p-4", tones[tone])}>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-black/15">{icon}</span>
+        <span>{label}</span>
+      </div>
+      <p className="mt-3 text-3xl font-semibold">{value}</p>
+      <p className="mt-1 text-xs opacity-80">{helper}</p>
+    </div>
+  );
+}
+
+function SummaryStrip({
+  icon,
+  label,
+  copy,
+  meta,
+  tone
+}: {
+  icon: React.ReactNode;
+  label: string;
+  copy: string;
+  meta: string;
+  tone: "green" | "rose" | "orange";
+}) {
+  const tones = {
+    green: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+    rose: "border-rose-500/20 bg-rose-500/10 text-rose-100",
+    orange: "border-amber-500/20 bg-amber-500/10 text-amber-100"
+  } as const;
+
+  return (
+    <div className={cn("flex items-center justify-between gap-3 rounded-2xl border px-4 py-3", tones[tone])}>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          {icon}
+          <span>{label}</span>
+        </div>
+        <p className="mt-1 truncate text-xs opacity-80">{copy}</p>
+      </div>
+      <span className="shrink-0 text-xs opacity-90">{meta}</span>
+    </div>
+  );
+}
+
+function QuickStatCard({
+  label,
+  value,
+  tone
+}: {
+  label: string;
+  value: number;
+  tone: "violet" | "orange" | "green" | "blue";
+}) {
+  const tones = {
+    violet: "text-violet-300 border-violet-500/20 bg-violet-500/8",
+    orange: "text-orange-300 border-brand/20 bg-brand/8",
+    green: "text-emerald-300 border-emerald-500/20 bg-emerald-500/8",
+    blue: "text-sky-300 border-sky-500/20 bg-sky-500/8"
+  } as const;
+
+  return (
+    <div className={cn("rounded-2xl border p-4", tones[tone])}>
+      <p className="text-3xl font-semibold">{value}</p>
+      <p className="mt-1 text-xs">{label}</p>
     </div>
   );
 }
