@@ -56,9 +56,9 @@ export default async function AppAutomationsPage() {
 
   return (
     <ClientPageShell
-      title="Automatizaciones"
-      description="Automatiza respuestas y acciones cuando llegan mensajes de WhatsApp. Desde aqui puedes ver que esta activo, que conviene configurar y por donde empezar."
-      badge="Automatizacion"
+      title="Asistente comercial automatico"
+      description="Configura como Opturon responde, acompana y deriva conversaciones por WhatsApp sin convertirlo en un panel tecnico."
+      badge="Automatizaciones"
     >
       <AutomationsHub automations={automations} catalog={catalog} businessProfile={businessProfile} />
     </ClientPageShell>
