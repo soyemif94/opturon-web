@@ -9,6 +9,7 @@ import {
   Package2,
   RefreshCcw,
   ShieldQuestion,
+  Trash2,
   UserRound
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/ui/cn";
 
-type AutomationState = "activa" | "inactiva" | "requiere configuracion" | "recomendada";
+type AutomationState = "activa" | "inactiva" | "requiere configuracion" | "recomendada" | "disponible" | "ya configurada" | "requiere datos";
 
 export type AutomationModule = {
   id: string;
@@ -30,8 +31,11 @@ export type AutomationModule = {
   icon: "welcome" | "catalog" | "handoff" | "followup" | "payments" | "fallback" | "faq" | "calendar" | "bot";
   chips?: string[];
   channel?: string;
-  configHref?: string;
-  configureLabel?: string;
+  actionHref?: string;
+  actionLabel?: string;
+  actionVariant?: "primary" | "secondary";
+  onAction?: (() => void) | null;
+  canDelete?: boolean;
   showToggle?: boolean;
 };
 
@@ -51,18 +55,21 @@ export function AutomationsList({
   modules,
   pendingAutomationId,
   pendingAction,
-  onToggleEnabled
+  onToggleEnabled,
+  onDelete
 }: {
   modules: AutomationModule[];
   pendingAutomationId?: string | null;
   pendingAction?: "toggle" | "delete" | null;
   onToggleEnabled?: (module: AutomationModule) => void;
+  onDelete?: (module: AutomationModule) => void;
 }) {
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
       {modules.map((module) => {
         const Icon = ICONS[module.icon];
         const isPendingToggle = pendingAutomationId === module.id && pendingAction === "toggle";
+        const isPendingDelete = pendingAutomationId === module.id && pendingAction === "delete";
         const isActive = module.state === "activa";
         const showToggle = module.showToggle !== false;
 
@@ -96,7 +103,7 @@ export function AutomationsList({
               <div className="flex items-center justify-between gap-3 pt-1">
                 <div className="space-y-1">
                   <p className={cn("text-sm font-semibold uppercase tracking-[0.16em]", isActive ? "text-emerald-300" : "text-muted")}>
-                    {isActive ? "Activa" : module.state === "recomendada" ? "Recomendada" : "Inactiva"}
+                    {stateLabel(module.state)}
                   </p>
                   {showToggle ? (
                     <button
@@ -120,16 +127,37 @@ export function AutomationsList({
                   ) : (
                     <div className="inline-flex items-center gap-2 text-xs text-muted">
                       <BellRing className="h-3.5 w-3.5" />
-                      <span>Plantilla disponible</span>
+                      <span>{module.state === "requiere datos" ? "Requiere datos" : "Lista para usar"}</span>
                     </div>
                   )}
                 </div>
 
-                <Button asChild variant="secondary" className="rounded-2xl px-4">
-                  <Link href={module.configHref || `/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
-                    {module.configureLabel || "Configurar"}
-                  </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                  {module.canDelete ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="rounded-2xl px-3 text-rose-200 hover:bg-rose-500/10 hover:text-rose-100"
+                      disabled={!onDelete || isPendingDelete}
+                      onClick={() => onDelete?.(module)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {isPendingDelete ? "Eliminando..." : "Eliminar"}
+                    </Button>
+                  ) : null}
+
+                  {module.onAction ? (
+                    <Button type="button" variant={module.actionVariant || "secondary"} className="rounded-2xl px-4" onClick={module.onAction}>
+                      {module.actionLabel || "Abrir"}
+                    </Button>
+                  ) : (
+                    <Button asChild variant={module.actionVariant || "secondary"} className="rounded-2xl px-4">
+                      <Link href={module.actionHref || `/app/automations/templates?focus=${encodeURIComponent(module.id)}`}>
+                        {module.actionLabel || "Configurar"}
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -140,13 +168,16 @@ export function AutomationsList({
 }
 
 function stateVariant(state: AutomationState): "success" | "muted" | "warning" {
-  if (state === "activa") return "success";
+  if (state === "activa" || state === "ya configurada") return "success";
   if (state === "inactiva") return "muted";
   return "warning";
 }
 
 function stateLabel(state: AutomationState) {
   if (state === "activa") return "Activa";
+  if (state === "ya configurada") return "Ya configurada";
+  if (state === "disponible") return "Disponible";
+  if (state === "requiere datos") return "Requiere datos";
   if (state === "inactiva") return "Inactiva";
   if (state === "requiere configuracion") return "Pendiente";
   return "Recomendada";

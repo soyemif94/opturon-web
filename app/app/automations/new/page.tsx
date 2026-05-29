@@ -8,7 +8,7 @@ export default async function AppAutomationsNewPage() {
   return (
     <ClientPageShell
       title="Nueva automatizacion"
-      description="Crea la primera version de una regla automatica para responder, derivar o etiquetar conversaciones dentro de tu espacio."
+      description="Crea una automatizacion personalizada para casos especiales, como vacaciones, avisos temporales, promociones puntuales o seguimientos especificos."
       badge="Automatizacion"
     >
       <AutomationBuilder />

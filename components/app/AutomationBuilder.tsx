@@ -30,6 +30,48 @@ const TEMPLATE_PRESETS: Record<string, { name: string; trigger: TriggerType; act
     tag: "prospecto",
     message: "Hola, gracias por escribir. Para ayudarte mejor, cuéntanos qué necesitas."
   }
+  ,
+  faq: {
+    name: "Preguntas frecuentes",
+    trigger: "keyword",
+    keyword: "horarios",
+    actions: ["send_message"],
+    message: "Hola. Te paso una respuesta base para preguntas frecuentes. Puedes editarla con horarios, direccion, formas de pago o cualquier dato repetido de tu negocio."
+  },
+  followup: {
+    name: "Seguimiento comercial",
+    trigger: "new_contact",
+    actions: ["tag_contact", "send_message"],
+    tag: "seguimiento",
+    message: "Gracias por escribirnos. Si te quedaste con dudas o quieres retomar la conversacion, respondeme por aqui y seguimos contigo."
+  },
+  "size-guide": {
+    name: "Consulta de talles",
+    trigger: "keyword",
+    keyword: "talle",
+    actions: ["send_message"],
+    message: "Claro. Puedes editar esta respuesta con tu guia de talles, equivalencias o recomendaciones de calce para que el cliente elija mejor."
+  },
+  outfit: {
+    name: "Recomendacion de outfit",
+    trigger: "keyword",
+    keyword: "combinar",
+    actions: ["send_message"],
+    message: "Perfecto. Aqui puedes sugerir combinaciones, productos complementarios o ideas de outfit segun el estilo del cliente."
+  },
+  promotions: {
+    name: "Promocion puntual",
+    trigger: "keyword",
+    keyword: "promo",
+    actions: ["send_message"],
+    message: "Hola. Aqui puedes dejar preparada una promocion temporal, una bonificacion o una accion puntual para campanas especificas."
+  },
+  vacations: {
+    name: "Aviso temporal o vacaciones",
+    trigger: "message_received",
+    actions: ["send_message"],
+    message: "Estamos de vacaciones hasta el 15/06. Te respondemos al volver. Si quieres, deja tu mensaje y te contactamos apenas retomemos."
+  }
 };
 
 export function AutomationBuilder() {
