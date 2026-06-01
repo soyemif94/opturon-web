@@ -31,6 +31,7 @@ import {
   Settings,
   Sparkles,
   TrendingUp,
+  Warehouse,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +112,14 @@ const navItems: Array<{
     icon: Package,
     module: "catalog",
     match: (pathname: string) => pathname.startsWith("/app/catalog")
+  },
+  {
+    href: "/app/inventory",
+    label: "Inventario",
+    description: "Centro operativo de stock con alertas, reposicion y lectura bot-ready",
+    icon: Warehouse,
+    module: "inventory",
+    match: (pathname: string) => pathname.startsWith("/app/inventory")
   },
   {
     href: "/app/orders",

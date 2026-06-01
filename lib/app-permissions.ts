@@ -14,6 +14,7 @@ export type AppModule =
   | "sales"
   | "loyalty"
   | "catalog"
+  | "inventory"
   | "orders"
   | "invoices"
   | "payments"
@@ -68,10 +69,10 @@ const TENANT_ROLE_PERMISSIONS: Record<TenantRole, Record<AppPermission, boolean>
 };
 
 const TENANT_ROLE_MODULES: Record<TenantRole, AppModule[]> = {
-  owner: ["home", "inbox", "ops", "contacts", "sales", "loyalty", "catalog", "orders", "invoices", "payments", "cash", "agenda", "metrics", "integrations", "settings", "automations", "faqs", "business", "users"],
-  manager: ["home", "inbox", "ops", "contacts", "sales", "loyalty", "catalog", "orders", "invoices", "payments", "cash", "agenda", "metrics", "integrations", "settings", "automations", "faqs", "business"],
-  seller: ["home", "inbox", "ops", "contacts", "sales", "loyalty", "agenda", "orders", "invoices", "payments", "cash", "catalog"],
-  viewer: ["home", "inbox", "ops", "sales", "loyalty", "orders", "invoices", "payments", "cash", "catalog", "metrics"]
+  owner: ["home", "inbox", "ops", "contacts", "sales", "loyalty", "catalog", "inventory", "orders", "invoices", "payments", "cash", "agenda", "metrics", "integrations", "settings", "automations", "faqs", "business", "users"],
+  manager: ["home", "inbox", "ops", "contacts", "sales", "loyalty", "catalog", "inventory", "orders", "invoices", "payments", "cash", "agenda", "metrics", "integrations", "settings", "automations", "faqs", "business"],
+  seller: ["home", "inbox", "ops", "contacts", "sales", "loyalty", "agenda", "orders", "invoices", "payments", "cash", "catalog", "inventory"],
+  viewer: ["home", "inbox", "ops", "sales", "loyalty", "orders", "invoices", "payments", "cash", "catalog", "inventory", "metrics"]
 };
 
 export function normalizeTenantRole(role?: string): TenantRole | undefined {
