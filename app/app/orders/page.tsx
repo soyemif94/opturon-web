@@ -32,7 +32,6 @@ export default async function AppOrdersPage({
     <ClientPageShell
       title="Pedidos"
       description="Gestiona pedidos activos, pagos, entregas y seguimiento comercial desde un solo lugar."
-      badge="Operacion comercial"
       action={
         readOnly ? null : (
           <Button asChild className="rounded-2xl">
