@@ -1196,6 +1196,10 @@ function OpportunityRow({
   const priorityMeta = PRIORITY_META[item.priority];
   const canArchiveConversation = Boolean(item.conversationId);
   const canHideOrphan = listMode === "main" && !item.conversationId;
+  const customerAvatarClass =
+    "flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-orange-300/14 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.34),rgba(59,130,246,0.16)_62%,rgba(15,23,42,0.92))] text-base font-semibold text-white shadow-[0_14px_30px_rgba(15,23,42,0.34)]";
+  const actionButtonClass =
+    "h-10 shrink-0 rounded-2xl px-4 text-[13px] font-medium";
   const helperCopy = canArchiveConversation
     ? listMode === "archive"
       ? "Archivada desde su conversacion comercial."
@@ -1207,11 +1211,11 @@ function OpportunityRow({
   return (
     <div
       className={cn(
-        "rounded-[24px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-400/20 sm:px-5",
+        "overflow-hidden rounded-[24px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-400/20 sm:px-5",
         priorityMeta.ringClass
       )}
     >
-      <div className="hidden 2xl:grid 2xl:grid-cols-[minmax(280px,1.8fr)_minmax(170px,0.9fr)_minmax(160px,0.9fr)_minmax(190px,1fr)_minmax(120px,0.7fr)_minmax(180px,1fr)_auto] 2xl:items-center 2xl:gap-5">
+      <div className="hidden 2xl:grid 2xl:grid-cols-[minmax(320px,1.95fr)_minmax(170px,0.82fr)_minmax(165px,0.78fr)_minmax(190px,0.95fr)_minmax(120px,0.65fr)_minmax(185px,0.88fr)_minmax(230px,0.92fr)] 2xl:items-center 2xl:gap-5">
         <div className="min-w-0">
           <div className="flex items-start gap-4">
             {selectable ? (
@@ -1228,25 +1232,25 @@ function OpportunityRow({
             ) : (
               <div className="mt-2 h-4 w-4 shrink-0" />
             )}
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+            <div className={customerAvatarClass}>
               {initialsFromName(item.customer.name)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[15px] font-semibold leading-6 text-white">{item.customer.name}</p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <p className="text-[17px] font-semibold leading-6 tracking-[-0.01em] text-white">{item.customer.name}</p>
                 {item.contactId ? (
                   <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
                     Ver cliente
                   </Link>
                 ) : null}
               </div>
-              <p className="mt-0.5 text-sm text-white/78">{item.customer.phone || "Sin telefono"}</p>
-              <p className="mt-2 text-xs leading-5 text-white/45">{helperCopy}</p>
+              <p className="mt-1 text-[15px] text-white/72">{item.customer.phone || "Sin telefono"}</p>
+              <p className="mt-2 max-w-[26rem] text-[12px] leading-5 text-white/42">{helperCopy}</p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
             {item.commercialStageLabel}
           </span>
@@ -1259,14 +1263,14 @@ function OpportunityRow({
           <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
             {formatMoney(item.amount, item.currency)}
           </p>
-          <p className="mt-1 text-xs text-muted">Valor potencial</p>
+          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/36">Valor potencial</p>
         </div>
 
         <div className="min-w-0">
           <div className="flex items-start gap-2.5">
             <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-            <div>
-              <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
               <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
             </div>
           </div>
@@ -1279,7 +1283,7 @@ function OpportunityRow({
             ) : (
               <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
             )}
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
               <p className="mt-1 text-xs text-muted">Origen</p>
             </div>
@@ -1289,68 +1293,70 @@ function OpportunityRow({
         <div className="min-w-0">
           <div className="flex items-start gap-2.5">
             <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            <div>
-              <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-white">{item.responsible?.name || "Sin asignar"}</p>
               <p className="mt-1 text-xs text-muted">Responsable</p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex min-w-0 flex-col items-end gap-2 justify-self-end">
           <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
             {item.priorityLabel}
           </span>
-          {listMode === "archive" && orphanHidden ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="shrink-0 rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14"
-              onClick={onRestoreOrphan}
-            >
-              Restaurar
-            </Button>
-          ) : canArchiveConversation ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
-              onClick={onArchive}
-              disabled={readOnly || actionBusy}
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              {actionBusy ? "Archivando..." : "Archivar"}
-            </Button>
-          ) : canHideOrphan ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
-              onClick={onHideOrphan}
-              disabled={readOnly}
-            >
-              Ocultar
-            </Button>
-          ) : (
-            <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-              En archivo
-            </span>
-          )}
-          {item.contactId ? (
-            <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
-              <Link href={`/app/contacts/${item.contactId}`}>
-                Ver cliente
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          ) : null}
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+            {listMode === "archive" && orphanHidden ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className={cn(actionButtonClass, "border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14")}
+                onClick={onRestoreOrphan}
+              >
+                Restaurar
+              </Button>
+            ) : canArchiveConversation ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className={cn(actionButtonClass, "border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14")}
+                onClick={onArchive}
+                disabled={readOnly || actionBusy}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                {actionBusy ? "Archivando..." : "Archivar"}
+              </Button>
+            ) : canHideOrphan ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className={cn(actionButtonClass, "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]")}
+                onClick={onHideOrphan}
+                disabled={readOnly}
+              >
+                Ocultar
+              </Button>
+            ) : (
+              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+                En archivo
+              </span>
+            )}
+            {item.contactId ? (
+              <Button asChild size="sm" variant="ghost" className={cn(actionButtonClass, "border-white/10 bg-black/16 text-white hover:bg-white/8")}>
+                <Link href={`/app/contacts/${item.contactId}`}>
+                  Ver cliente
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
       <div className="hidden xl:flex 2xl:hidden xl:flex-col xl:gap-4">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(180px,0.9fr)_minmax(160px,0.9fr)_minmax(220px,1fr)] xl:items-start">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(165px,0.8fr)_minmax(150px,0.72fr)_minmax(200px,0.9fr)] xl:items-start">
           <div className="min-w-0">
             <div className="flex items-start gap-4">
               {selectable ? (
@@ -1367,24 +1373,24 @@ function OpportunityRow({
               ) : (
                 <div className="mt-2 h-4 w-4 shrink-0" />
               )}
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+              <div className={customerAvatarClass}>
                 {initialsFromName(item.customer.name)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[15px] font-semibold leading-6 text-white">{item.customer.name}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-[17px] font-semibold leading-6 tracking-[-0.01em] text-white">{item.customer.name}</p>
                   {item.contactId ? (
                     <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
                       Ver cliente
                     </Link>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-sm text-white/78">{item.customer.phone || "Sin telefono"}</p>
-                <p className="mt-2 text-xs leading-5 text-white/45">{helperCopy}</p>
+                <p className="mt-1 text-[15px] text-white/72">{item.customer.phone || "Sin telefono"}</p>
+                <p className="mt-2 max-w-[28rem] text-[12px] leading-5 text-white/42">{helperCopy}</p>
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
               {item.commercialStageLabel}
             </span>
@@ -1396,37 +1402,37 @@ function OpportunityRow({
             <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
               {formatMoney(item.amount, item.currency)}
             </p>
-            <p className="mt-1 text-xs text-muted">Valor potencial</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/36">Valor potencial</p>
           </div>
           <div className="flex items-start gap-2.5">
             <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-            <div>
-              <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
               <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
             </div>
           </div>
         </div>
-        <div className="grid gap-4 xl:grid-cols-[minmax(120px,0.7fr)_minmax(180px,1fr)_auto] xl:items-center">
+        <div className="grid gap-4 xl:grid-cols-[minmax(120px,0.65fr)_minmax(180px,0.95fr)_minmax(240px,1fr)] xl:items-center">
           <div className="flex items-start gap-2.5">
             {item.source && item.source.toLowerCase().includes("bot") ? (
               <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
             ) : (
               <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
             )}
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
               <p className="mt-1 text-xs text-muted">Origen</p>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
             <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            <div>
-              <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-white">{item.responsible?.name || "Sin asignar"}</p>
               <p className="mt-1 text-xs text-muted">Responsable</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 xl:pl-3">
+            <span className={cn("mr-auto rounded-full border px-2.5 py-1 text-[11px] font-medium xl:mr-0", priorityMeta.badgeClass)}>
               {item.priorityLabel}
             </span>
             {listMode === "archive" && orphanHidden ? (
@@ -1434,7 +1440,7 @@ function OpportunityRow({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="shrink-0 rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14"
+                className={cn(actionButtonClass, "border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14")}
                 onClick={onRestoreOrphan}
               >
                 Restaurar
@@ -1444,7 +1450,7 @@ function OpportunityRow({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+                className={cn(actionButtonClass, "border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14")}
                 onClick={onArchive}
                 disabled={readOnly || actionBusy}
               >
@@ -1456,7 +1462,7 @@ function OpportunityRow({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                className={cn(actionButtonClass, "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]")}
                 onClick={onHideOrphan}
                 disabled={readOnly}
               >
@@ -1468,7 +1474,7 @@ function OpportunityRow({
               </span>
             )}
             {item.contactId ? (
-              <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
+              <Button asChild size="sm" variant="ghost" className={cn(actionButtonClass, "border-white/10 bg-black/16 text-white hover:bg-white/8")}>
                 <Link href={`/app/contacts/${item.contactId}`}>
                   Ver cliente
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -1495,20 +1501,20 @@ function OpportunityRow({
           ) : (
             <div className="mt-2 h-4 w-4 shrink-0" />
           )}
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+          <div className={customerAvatarClass}>
             {initialsFromName(item.customer.name)}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[15px] font-semibold leading-6 text-white">{item.customer.name}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="text-[17px] font-semibold leading-6 tracking-[-0.01em] text-white">{item.customer.name}</p>
               {item.contactId ? (
                 <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
                   Ver cliente
                 </Link>
               ) : null}
             </div>
-            <p className="mt-0.5 text-sm text-white/78">{item.customer.phone || "Sin telefono"}</p>
-            <p className="mt-2 text-xs leading-5 text-white/45">{helperCopy}</p>
+            <p className="mt-1 text-[15px] text-white/72">{item.customer.phone || "Sin telefono"}</p>
+            <p className="mt-2 text-[12px] leading-5 text-white/42">{helperCopy}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1518,21 +1524,18 @@ function OpportunityRow({
           <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
             {item.collectionStatusLabel}
           </span>
-          <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
-            {item.priorityLabel}
-          </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
               {formatMoney(item.amount, item.currency)}
             </p>
-            <p className="mt-1 text-xs text-muted">Valor potencial</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/36">Valor potencial</p>
           </div>
           <div className="flex items-start gap-2.5">
             <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-            <div>
-              <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
               <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
             </div>
           </div>
@@ -1544,26 +1547,29 @@ function OpportunityRow({
             ) : (
               <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
             )}
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
               <p className="mt-1 text-xs text-muted">Origen</p>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
             <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            <div>
-              <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-6 text-white">{item.responsible?.name || "Sin asignar"}</p>
               <p className="mt-1 text-xs text-muted">Responsable</p>
             </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <span className={cn("mr-auto rounded-full border px-2.5 py-1 text-[11px] font-medium sm:mr-0", priorityMeta.badgeClass)}>
+            {item.priorityLabel}
+          </span>
           {listMode === "archive" && orphanHidden ? (
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="shrink-0 rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14"
+              className={cn(actionButtonClass, "border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14")}
               onClick={onRestoreOrphan}
             >
               Restaurar
@@ -1573,7 +1579,7 @@ function OpportunityRow({
               type="button"
               size="sm"
               variant="ghost"
-              className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+              className={cn(actionButtonClass, "border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14")}
               onClick={onArchive}
               disabled={readOnly || actionBusy}
             >
@@ -1585,22 +1591,22 @@ function OpportunityRow({
               type="button"
               size="sm"
               variant="ghost"
-              className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+              className={cn(actionButtonClass, "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]")}
               onClick={onHideOrphan}
               disabled={readOnly}
             >
               Ocultar
             </Button>
-          ) : (
-            <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-              En archivo
-            </span>
-          )}
-          {item.contactId ? (
-            <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
-              <Link href={`/app/contacts/${item.contactId}`}>
-                Ver cliente
-                <ArrowRight className="ml-2 h-4 w-4" />
+            ) : (
+              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+                En archivo
+              </span>
+            )}
+            {item.contactId ? (
+              <Button asChild size="sm" variant="ghost" className={cn(actionButtonClass, "border-white/10 bg-black/16 text-white hover:bg-white/8")}>
+                <Link href={`/app/contacts/${item.contactId}`}>
+                  Ver cliente
+                  <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           ) : null}
