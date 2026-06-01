@@ -53,8 +53,8 @@ export default async function AppSalesPage() {
   return (
     <ClientPageShell
       title="Ventas"
-      description="Vista comercial V1 para seguir oportunidades, cierres y ritmo de ventas con una lectura mas clara para el equipo."
-      badge="Comercial"
+      description="Centro comercial premium para seguir pipeline, cierres, responsables y oportunidades activas del espacio."
+      badge="Pipeline comercial"
     >
       <SalesHub summary={summary} metrics={metrics} opportunities={opportunities} />
     </ClientPageShell>
