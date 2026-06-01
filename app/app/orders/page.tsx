@@ -1,5 +1,6 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { OrdersHub } from "@/components/app/orders-hub";
+import { Button } from "@/components/ui/button";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalOrders, isBackendConfigured, type PortalOrder } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
@@ -30,8 +31,15 @@ export default async function AppOrdersPage({
   return (
     <ClientPageShell
       title="Pedidos"
-      description="Registra pedidos internos, revisa su estado y prepara la operacion diaria desde un modulo simple pero listo para crecer hacia pagos y facturacion."
+      description="Gestiona pedidos activos, pagos, entregas y seguimiento comercial desde un solo lugar."
       badge="Operacion comercial"
+      action={
+        readOnly ? null : (
+          <Button asChild className="rounded-2xl">
+            <a href="#new-order">Nuevo pedido</a>
+          </Button>
+        )
+      }
     >
       <OrdersHub
         initialOrders={initialOrders}

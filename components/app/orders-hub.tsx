@@ -1,32 +1,34 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, BadgeCheck, ClipboardList, Package, Receipt, ShoppingBag, Star } from "lucide-react";
+import { type ComponentType, type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  ClipboardList,
+  CreditCard,
+  Package,
+  Receipt,
+  ShoppingBag,
+  Sparkles,
+  UserRound
+} from "lucide-react";
 import type {
   PortalContact,
   PortalOrder,
   PortalOrderPaymentMetrics,
   PortalOrderPaymentMetricsRange,
-  PortalPaymentDestination,
-  PortalSellerMetrics
+  PortalPaymentDestination
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/cn";
 import { getStockState } from "@/lib/stock-state";
 
-const ORDER_STATUS_OPTIONS = [
-  "new",
-  "pending_payment",
-  "paid",
-  "preparing",
-  "ready",
-  "delivered",
-  "cancelled"
-] as const;
+const ORDER_STATUS_OPTIONS = ["new", "pending_payment", "paid", "preparing", "ready", "delivered", "cancelled"] as const;
 
 type OrdersHubProps = {
   initialOrders: PortalOrder[];
@@ -53,6 +55,38 @@ type AssignableSeller = {
   role: string | null;
 };
 
+type OrderFormState = {
+  customerType: "registered_contact" | "final_consumer";
+  contactId: string;
+  sellerUserId: string;
+  paymentDestinationId: string;
+  notes: string;
+  productId: string;
+  quantity: string;
+};
+
+type OrdersViewMode = "all" | "pending_validation";
+type OrdersSurfaceMode = "main" | "archive";
+
+const PRIMARY_ORDERS_LIMIT = 20;
+
+const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
+  range: "last_7_days",
+  pending: 0,
+  approved: 0,
+  rejected: 0
+};
+
+const initialForm: OrderFormState = {
+  customerType: "registered_contact",
+  contactId: "",
+  sellerUserId: "",
+  paymentDestinationId: "",
+  notes: "",
+  productId: "",
+  quantity: "1"
+};
+
 function hydrateOrderSeller(order: PortalOrder, sellers: AssignableSeller[]): PortalOrder {
   const seller = order.sellerUserId ? sellers.find((item) => item.id === order.sellerUserId) || null : null;
   if (!seller) return order;
@@ -68,54 +102,6 @@ function hydrateOrderSeller(order: PortalOrder, sellers: AssignableSeller[]): Po
         }
   };
 }
-
-type OrderFormState = {
-  customerType: "registered_contact" | "final_consumer";
-  contactId: string;
-  sellerUserId: string;
-  paymentDestinationId: string;
-  notes: string;
-  productId: string;
-  quantity: string;
-};
-
-const initialForm: OrderFormState = {
-  customerType: "registered_contact",
-  contactId: "",
-  sellerUserId: "",
-  paymentDestinationId: "",
-  notes: "",
-  productId: "",
-  quantity: "1"
-};
-
-type OrdersViewMode = "all" | "pending_validation";
-type OrdersSurfaceMode = "main" | "archive";
-
-const PRIMARY_ORDERS_LIMIT = 20;
-
-type SellerInsight = {
-  id: string;
-  tone: "alert" | "positive" | "highlight";
-  message: string;
-};
-
-const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
-  range: "last_7_days",
-  pending: 0,
-  approved: 0,
-  rejected: 0
-};
-
-const defaultSellerMetrics: PortalSellerMetrics = {
-  salesCriteria: {
-    countedOrderStatuses: "status != cancelled",
-    paidOrderCriteria: "paymentStatus = paid"
-  },
-  sellerMetrics: [],
-  ordersWithoutSeller: 0,
-  currency: "ARS"
-};
 
 export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, backendReady }: OrdersHubProps) {
   const [orders, setOrders] = useState(initialOrders);
@@ -152,7 +138,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     [products, form.productId]
   );
   const selectedProductIsActive = selectedProduct ? resolveProductStatus(selectedProduct) === "active" : false;
-
   const selectedContact = useMemo(
     () => contacts.find((contact) => contact.id === form.contactId) || null,
     [contacts, form.contactId]
@@ -163,6 +148,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     if (!selectedProduct || !Number.isInteger(quantity) || quantity <= 0) return 0;
     return Number((resolveProductPrice(selectedProduct) * quantity).toFixed(2));
   }, [form.quantity, selectedProduct]);
+
   const requestedQuantity = Number.parseInt(form.quantity, 10);
   const selectedProductStock = selectedProduct ? resolveProductStock(selectedProduct) : 0;
   const selectedProductPrice = selectedProduct ? resolveProductPrice(selectedProduct) : 0;
@@ -202,49 +188,83 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
           ? orders.filter((order) => isPendingTransferValidation(order))
           : orders.filter((order) => isOperationalOrder(order));
 
-    if (!normalizedSearch) {
-      return surfaceMode === "main" ? sourceOrders.slice(0, PRIMARY_ORDERS_LIMIT) : sourceOrders;
-    }
+    const candidateOrders = normalizedSearch
+      ? sourceOrders.filter((order) => {
+          const haystack = [
+            order.id,
+            order.customerName,
+            order.customerPhone,
+            order.contact?.name,
+            order.contact?.phone,
+            order.paymentStatus,
+            order.orderStatus,
+            order.paymentDestination?.name,
+            order.paymentDestinationNameSnapshot,
+            labelForOrderSeller(order),
+            order.items.map((item) => item.nameSnapshot).join(" ")
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
 
-    const searched = sourceOrders.filter((order) => {
-      const haystack = [
-        order.id,
-        order.customerName,
-        order.customerPhone,
-        order.contact?.name,
-        order.contact?.phone,
-        order.paymentStatus,
-        order.orderStatus,
-        order.paymentDestination?.name,
-        order.paymentDestinationNameSnapshot
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+          return haystack.includes(normalizedSearch);
+        })
+      : sourceOrders;
 
-      return haystack.includes(normalizedSearch);
-    });
-    return surfaceMode === "main" ? searched.slice(0, PRIMARY_ORDERS_LIMIT) : searched;
+    const sorted = candidateOrders.slice().sort((left, right) => compareOrdersForDisplay(left, right));
+    return surfaceMode === "main" ? sorted.slice(0, PRIMARY_ORDERS_LIMIT) : sorted;
   }, [normalizedSearch, orders, surfaceMode, viewMode]);
+
   const operationalOrdersCount = useMemo(() => orders.filter((order) => isOperationalOrder(order)).length, [orders]);
   const archivedOrdersCount = Math.max(orders.length - operationalOrdersCount, 0);
-  const sellerMetrics: any = defaultSellerMetrics;
-  const sellerMetricsLoading = false;
-  const selectedSellerMetricId = "";
-  const setSelectedSellerMetricId = (_value: string) => {};
-  const topSellerUserId = "";
-  const maxSellerRevenue = 0;
-  const maxSellerPaidOrders = 0;
-  const selectedSellerMetric: any = {
-    sellerUserId: "",
-    sellerName: "",
-    sellerRole: "",
-    totalOrders: 0,
-    totalPaidOrders: 0,
-    totalRevenue: 0,
-    averageTicket: 0
-  };
-  const sellerInsights: SellerInsight[] = [];
+  const paidOrdersCount = useMemo(() => orders.filter((order) => order.paymentStatus === "paid").length, [orders]);
+  const completedOrdersCount = useMemo(
+    () => orders.filter((order) => order.orderStatus === "ready" || order.orderStatus === "delivered").length,
+    [orders]
+  );
+  const todaySummary = useMemo(() => {
+    const todayKey = new Date().toDateString();
+    const todayOrders = orders.filter((order) => new Date(order.createdAt).toDateString() === todayKey);
+    return {
+      count: todayOrders.length,
+      revenue: todayOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+      pending: todayOrders.filter((order) => order.paymentStatus !== "paid").length
+    };
+  }, [orders]);
+  const attentionOrders = useMemo(
+    () =>
+      orders
+        .filter((order) => needsAttention(order))
+        .slice()
+        .sort((left, right) => compareOrdersForDisplay(left, right))
+        .slice(0, 4),
+    [orders]
+  );
+  const recentOrders = useMemo(
+    () =>
+      orders
+        .slice()
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        .slice(0, 4),
+    [orders]
+  );
+  const selectedOrderUnits = useMemo(
+    () => selectedOrder?.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
+    [selectedOrder]
+  );
+  const selectedOrderActionLabel = useMemo(() => {
+    if (!selectedOrder) return "Selecciona un pedido";
+    return labelForOrderAction(selectedOrder);
+  }, [selectedOrder]);
+  const nextStepNotes = useMemo(() => {
+    const notes: string[] = [];
+    if (stats.pending > 0) notes.push(`${stats.pending} pedidos siguen esperando confirmacion o pago.`);
+    if (stats.pendingValidation > 0) notes.push(`${stats.pendingValidation} comprobantes requieren validacion manual.`);
+    if (attentionOrders.some((order) => !order.sellerUserId)) notes.push("Hay pedidos operativos sin vendedor asignado.");
+    if (stats.preparing > 0) notes.push(`${stats.preparing} pedidos ya pueden pasar a preparacion o entrega.`);
+    if (notes.length === 0) notes.push("La operacion esta ordenada. Puedes usar el archivo para consulta historica.");
+    return notes.slice(0, 3);
+  }, [attentionOrders, stats.pending, stats.pendingValidation, stats.preparing]);
 
   async function loadPaymentMetrics(range: PortalOrderPaymentMetricsRange = metricsRange) {
     setMetricsLoading(true);
@@ -330,22 +350,26 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
         ? (json.paymentDestinations as PortalPaymentDestination[])
         : [];
       const currentUserId = typeof json?.currentUserId === "string" ? json.currentUserId : "";
+
       setSellers(nextSellers);
       setPaymentDestinations(nextPaymentDestinations);
       setForm((current) => {
         const defaultSellerId =
           (currentUserId && nextSellers.some((seller) => seller.id === currentUserId) ? currentUserId : "") || nextSellers[0]?.id || "";
+
         return {
           ...current,
-          sellerUserId: current.sellerUserId && nextSellers.some((seller) => seller.id === current.sellerUserId)
-            ? current.sellerUserId
-            : defaultSellerId,
+          sellerUserId:
+            current.sellerUserId && nextSellers.some((seller) => seller.id === current.sellerUserId)
+              ? current.sellerUserId
+              : defaultSellerId,
           paymentDestinationId:
             current.paymentDestinationId && nextPaymentDestinations.some((destination) => destination.id === current.paymentDestinationId)
               ? current.paymentDestinationId
               : ""
         };
       });
+
       return { nextSellers, nextPaymentDestinations };
     } finally {
       setMetaLoading(false);
@@ -382,7 +406,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     setDetailPaymentDestinationId(selectedOrder?.paymentDestinationId || "");
     setDetailSellerUserId(selectedOrder?.sellerUserId || "");
     setPaymentRejectionReason(selectedOrder?.transferPayment?.rejectionReason || "");
-  }, [selectedOrder?.id, selectedOrder?.paymentDestinationId, selectedOrder?.sellerUserId]);
+  }, [selectedOrder?.id, selectedOrder?.paymentDestinationId, selectedOrder?.sellerUserId, selectedOrder?.transferPayment?.rejectionReason]);
 
   async function reloadOrders(preferredOrderId?: string) {
     const response = await fetch("/api/app/orders", { cache: "no-store" });
@@ -427,7 +451,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     if (!selectedOrder || !isPendingTransferValidation(selectedOrder)) {
       setSelectedOrder(nextVisible[0]);
     }
-  }, [initialOrderId, orders, selectedOrder, surfaceMode, viewMode]);
+  }, [initialOrderId, orders, selectedOrder, viewMode]);
 
   useEffect(() => {
     if (!initialOrderId) return;
@@ -473,7 +497,17 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     }
   }
 
-  async function createOrder(event: React.FormEvent<HTMLFormElement>) {
+  function focusDetail(scroll = false) {
+    if (!scroll) return;
+    document.getElementById("order-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function selectOrder(orderId: string, scroll = false) {
+    await loadOrderDetail(orderId);
+    focusDetail(scroll);
+  }
+
+  async function createOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
 
@@ -529,12 +563,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
           paymentDestinationId: form.paymentDestinationId || null,
           source: "manual",
           notes: form.notes.trim(),
-          items: [
-            {
-              productId: form.productId,
-              quantity: itemQuantity
-            }
-          ]
+          items: [{ productId: form.productId, quantity: itemQuantity }]
         })
       });
 
@@ -560,6 +589,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
         productId: current.productId
       }));
       setFeedback({ tone: "success", text: "Pedido creado correctamente y detalle actualizado con datos reales." });
+      focusDetail(true);
     } catch (error) {
       setFeedback({
         tone: "danger",
@@ -573,6 +603,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   async function changeOrderStatus(orderId: string, orderStatus: string) {
     setStatusUpdatingId(orderId);
     setFeedback(null);
+
     try {
       const response = await fetch(`/api/app/orders/${orderId}/status`, {
         method: "PATCH",
@@ -591,9 +622,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       setOrders((current) => current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
       setSelectedOrder((current) => (current?.id === updatedOrder.id ? updatedOrder : current));
       setDetailPaymentDestinationId(updatedOrder.paymentDestinationId || "");
-      await Promise.all([
-        reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined)
-      ]);
+      await reloadProducts(form.productId || updatedOrder.items.find((item) => item.productId)?.productId || undefined);
       setFeedback({ tone: "success", text: "Estado del pedido actualizado." });
     } catch (error) {
       setFeedback({
@@ -722,220 +751,6 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
 
   return (
     <div className="space-y-6">
-      {false ? (
-      <Card>
-        <CardHeader>
-          <div>
-            <CardTitle>Metricas base por vendedor</CardTitle>
-            <CardDescription>
-              Fuente de verdad: seller del pedido en orders. Se cuentan pedidos no cancelados y el total vendido suma solo pagos confirmados.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {sellerInsights.length > 0 ? (
-            <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/45 p-4">
-              <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-amber-300" />
-                <p className="text-sm font-semibold text-foreground">Insights del negocio</p>
-              </div>
-              <div className="mt-4 space-y-3">
-                {sellerInsights.map((insight) => (
-                  <div key={insight.id} className="flex items-start gap-3 rounded-2xl border border-[color:var(--border)] bg-card/80 px-4 py-3">
-                    {insight.tone === "alert" ? (
-                      <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300" />
-                    ) : insight.tone === "positive" ? (
-                      <BadgeCheck className="mt-0.5 h-4 w-4 text-emerald-300" />
-                    ) : (
-                      <Star className="mt-0.5 h-4 w-4 text-sky-300" />
-                    )}
-                    <p className="text-sm text-foreground">{insight.message}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {sellerMetricsLoading ? (
-            <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-              Cargando metricas por vendedor...
-            </div>
-          ) : sellerMetrics.sellerMetrics.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-              Todavia no hay vendedores con pedidos asignados dentro del criterio actual.
-            </div>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {sellerMetrics.sellerMetrics.map((metric: any, index: number) => {
-                const revenue = Number(metric.totalRevenue || 0);
-                const paidOrders = Number(metric.totalPaidOrders || 0);
-                const revenueRatio = maxSellerRevenue > 0 ? Math.max((revenue / maxSellerRevenue) * 100, revenue > 0 ? 8 : 0) : 0;
-                const paidShare = metric.totalOrders > 0 ? Math.round((paidOrders / metric.totalOrders) * 100) : 0;
-                const isTopSeller = metric.sellerUserId === topSellerUserId;
-                const isSelected = metric.sellerUserId === selectedSellerMetric?.sellerUserId;
-
-                return (
-                  <button
-                    key={metric.sellerUserId}
-                    type="button"
-                    onClick={() => setSelectedSellerMetricId(metric.sellerUserId)}
-                    className={`rounded-[22px] border p-4 text-left transition-colors ${
-                      isSelected
-                        ? "border-brand/45 bg-brand/8"
-                        : isTopSeller
-                          ? "border-emerald-500/35 bg-emerald-500/8"
-                          : "border-[color:var(--border)] bg-surface/60 hover:bg-surface/80"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{metric.sellerName}</p>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted">{labelForSellerRole(metric.sellerRole)}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {isTopSeller ? <Badge variant="success">Top vendedor</Badge> : null}
-                        <Badge variant="muted">#{index + 1}</Badge>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-muted">
-                        <span>Impacto por total vendido</span>
-                        <span>{maxSellerRevenue > 0 ? `${Math.round((revenue / maxSellerRevenue) * 100)}% del lider` : "Sin ventas pagadas"}</span>
-                      </div>
-                      <div className="h-3 overflow-hidden rounded-full bg-surface/80">
-                        <div
-                          className={`h-full rounded-full ${isTopSeller ? "bg-emerald-400" : "bg-brand"}`}
-                          style={{ width: `${Math.min(revenueRatio, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <DetailStat label="Ventas" value={String(metric.totalOrders)} />
-                      <DetailStat label="Pagadas" value={String(metric.totalPaidOrders)} />
-                      <DetailStat label="Total vendido" value={formatCurrency(metric.totalRevenue, sellerMetrics.currency)} />
-                      <DetailStat label="Ticket promedio" value={formatCurrency(metric.averageTicket, sellerMetrics.currency)} />
-                    </div>
-
-                    <p className="mt-3 text-xs text-muted">Conversion a pago dentro del vendedor: {paidShare}%</p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {selectedSellerMetric ? (
-            <div className="rounded-[24px] border border-[color:var(--border)] bg-card/90 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted">Perfil de vendedor</p>
-                  <h3 className="mt-2 text-lg font-semibold text-foreground">{selectedSellerMetric.sellerName}</h3>
-                  <p className="mt-1 text-sm text-muted">
-                    {labelForSellerRole(selectedSellerMetric.sellerRole)} · ranking{" "}
-                    {sellerMetrics.sellerMetrics.findIndex((metric: any) => metric.sellerUserId === selectedSellerMetric.sellerUserId) + 1}
-                  </p>
-                </div>
-                {selectedSellerMetric.sellerUserId === topSellerUserId ? <Badge variant="success">Mejor facturacion actual</Badge> : null}
-              </div>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-4">
-                <DetailStat label="Ventas" value={String(selectedSellerMetric.totalOrders)} />
-                <DetailStat label="Pagadas" value={String(selectedSellerMetric.totalPaidOrders)} />
-                <DetailStat label="Total vendido" value={formatCurrency(selectedSellerMetric.totalRevenue, sellerMetrics.currency)} />
-                <DetailStat label="Ticket promedio" value={formatCurrency(selectedSellerMetric.averageTicket, sellerMetrics.currency)} />
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4">
-                  <p className="text-sm font-semibold text-foreground">Distribucion de ventas pagadas</p>
-                  <p className="mt-1 text-sm text-muted">Comparacion visual contra el vendedor con mayor facturacion actual.</p>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-muted">
-                      <span>Total vendido</span>
-                      <span>
-                        {maxSellerRevenue > 0
-                          ? `${Math.round((selectedSellerMetric.totalRevenue / maxSellerRevenue) * 100)}% del lider`
-                          : "Sin ventas pagadas"}
-                      </span>
-                    </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-surface/80">
-                      <div
-                        className="h-full rounded-full bg-brand"
-                        style={{
-                          width: `${Math.min(
-                            maxSellerRevenue > 0
-                              ? Math.max((selectedSellerMetric.totalRevenue / maxSellerRevenue) * 100, selectedSellerMetric.totalRevenue > 0 ? 8 : 0)
-                              : 0,
-                            100
-                          )}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4">
-                  <p className="text-sm font-semibold text-foreground">Pagadas vs no pagadas</p>
-                  <p className="mt-1 text-sm text-muted">Fallback visual simple usando la base actual del modelo.</p>
-                  <div className="mt-4 space-y-3">
-                    <div className="h-3 overflow-hidden rounded-full bg-surface/80">
-                      <div className="flex h-full w-full">
-                        <div
-                          className="h-full bg-emerald-400"
-                          style={{
-                            width: `${
-                              selectedSellerMetric.totalOrders > 0
-                                ? (selectedSellerMetric.totalPaidOrders / selectedSellerMetric.totalOrders) * 100
-                                : 0
-                            }%`
-                          }}
-                        />
-                        <div
-                          className="h-full bg-white/12"
-                          style={{
-                            width: `${
-                              selectedSellerMetric.totalOrders > 0
-                                ? ((selectedSellerMetric.totalOrders - selectedSellerMetric.totalPaidOrders) / selectedSellerMetric.totalOrders) * 100
-                                : 100
-                            }%`
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <DetailStat label="Pagadas" value={String(selectedSellerMetric.totalPaidOrders)} />
-                      <DetailStat
-                        label="No pagadas"
-                        value={String(Math.max(selectedSellerMetric.totalOrders - selectedSellerMetric.totalPaidOrders, 0))}
-                      />
-                    </div>
-                    <p className="text-xs text-muted">
-                      Ventas pagadas:{" "}
-                      {selectedSellerMetric.totalOrders > 0
-                        ? `${Math.round((selectedSellerMetric.totalPaidOrders / selectedSellerMetric.totalOrders) * 100)}%`
-                        : "0%"}
-                      {maxSellerPaidOrders > 0
-                        ? ` · pagadas vs lider: ${Math.round((selectedSellerMetric.totalPaidOrders / maxSellerPaidOrders) * 100)}%`
-                        : ""}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/35 p-4">
-            <p className="text-sm font-semibold text-foreground">Sin vendedor asignado</p>
-            <p className="mt-1 text-sm text-muted">Pedidos visibles con sellerUserId vacio. No se mezclan con ningun vendedor.</p>
-            <div className="mt-4 max-w-xs">
-              <DetailStat label="Pedidos" value={sellerMetricsLoading ? "..." : String(sellerMetrics.ordersWithoutSeller)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      ) : null}
-
       {feedback ? (
         <div className="rounded-2xl border border-[color:var(--border)] bg-surface/70 px-4 py-3">
           <Badge variant={feedback.tone}>{feedback.text}</Badge>
@@ -953,20 +768,62 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
         </Card>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-        <div className="order-2 space-y-6 xl:order-2">
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant={readOnly ? "warning" : "success"}>{readOnly ? "Solo lectura" : "Operativo"}</Badge>}>
-              <div>
-                <CardTitle className="text-xl">{surfaceMode === "main" ? "Pedidos operativos" : "Archivo de pedidos"}</CardTitle>
-                <CardDescription>
-                  {surfaceMode === "main"
-                    ? "La vista principal se enfoca en pendientes, rechazos, inconvenientes y pedidos recientes que todavia requieren accion."
-                    : "El archivo conserva pedidos resueltos o historicos para consulta sin ensuciar la operacion diaria."}
-                </CardDescription>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <MetricCard
+          icon={ClipboardList}
+          label="Pedidos activos"
+          value={String(operationalOrdersCount)}
+          helper="Pedidos que siguen moviendo la operacion del dia."
+          accent="from-brand/30 via-brandBright/12 to-transparent"
+        />
+        <MetricCard
+          icon={AlertTriangle}
+          label="Pendientes de pago"
+          value={String(stats.pending)}
+          helper="Nuevos, por cobrar o esperando validacion."
+          accent="from-amber-500/28 via-amber-400/10 to-transparent"
+        />
+        <MetricCard
+          icon={CreditCard}
+          label="Pagados"
+          value={String(paidOrdersCount)}
+          helper="Pedidos con cobro acreditado en el flujo actual."
+          accent="from-emerald-500/28 via-emerald-400/10 to-transparent"
+        />
+        <MetricCard
+          icon={Package}
+          label="Listos / entregados"
+          value={String(completedOrdersCount)}
+          helper="Pedidos preparados o ya cerrados con entrega."
+          accent="from-sky-500/28 via-sky-400/10 to-transparent"
+        />
+        <MetricCard
+          icon={Receipt}
+          label="Total vendido"
+          value={formatCurrency(stats.totalRevenue)}
+          helper="Suma comercial visible en pedidos reales del tenant."
+          accent="from-fuchsia-500/24 via-brand/10 to-transparent"
+        />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_340px]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant={readOnly ? "warning" : "success"}>{readOnly ? "Solo lectura" : "Mesa activa"}</Badge>}>
+            <div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="warning">Mesa principal</Badge>
+                <Badge variant="outline">Lectura comercial</Badge>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
+              <CardTitle className="mt-4 text-xl">{surfaceMode === "main" ? "Pedidos operativos" : "Archivo de pedidos"}</CardTitle>
+              <CardDescription>
+                {surfaceMode === "main"
+                  ? "Prioriza cobros, entregas y responsables para que la siguiente accion sea evidente."
+                  : "Conserva el historico fuera del flujo diario sin perder cliente, vendedor ni total."}
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-0">
+            <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/45 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" size="sm" variant={surfaceMode === "main" ? "primary" : "secondary"} onClick={() => setSurfaceMode("main")}>
                   Principal
@@ -974,351 +831,313 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                 <Button type="button" size="sm" variant={surfaceMode === "archive" ? "primary" : "secondary"} onClick={() => setSurfaceMode("archive")}>
                   Archivo
                 </Button>
+                {surfaceMode === "main" ? (
+                  <Button type="button" size="sm" variant={viewMode === "all" ? "secondary" : "ghost"} onClick={() => setViewMode("all")}>
+                    Todos
+                  </Button>
+                ) : null}
+                {surfaceMode === "main" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={viewMode === "pending_validation" ? "secondary" : "ghost"}
+                    onClick={() => setViewMode("pending_validation")}
+                  >
+                    Validacion manual
+                  </Button>
+                ) : null}
                 <Badge variant="muted">{filteredOrders.length} visibles</Badge>
                 <Badge variant="outline">{archivedOrdersCount} historicos</Badge>
               </div>
 
-              {surfaceMode === "main" ? (
-                <>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant={viewMode === "all" ? "primary" : "secondary"} onClick={() => setViewMode("all")}>
-                      Todos los operativos
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={viewMode === "pending_validation" ? "primary" : "secondary"}
-                      onClick={() => setViewMode("pending_validation")}
-                    >
-                      Pendientes de validacion
-                    </Button>
-                  </div>
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
-                    La principal muestra hasta {PRIMARY_ORDERS_LIMIT} pedidos operativos para mantener la operacion del dia rapida y limpia.
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm text-muted">
-                  El archivo mantiene el historico consultable. Puedes buscar por cliente, telefono o identificador del pedido.
-                </div>
-              )}
+              <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Buscar por pedido, cliente, telefono, destino o producto"
+                  aria-label="Buscar pedidos"
+                />
+                <p className="text-sm text-muted">
+                  {surfaceMode === "main"
+                    ? `La mesa activa muestra hasta ${PRIMARY_ORDERS_LIMIT} pedidos priorizados para operar sin ruido.`
+                    : "El archivo queda consultable sin contaminar la operacion del dia."}
+                </p>
+              </div>
+            </div>
 
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Buscar por pedido, cliente o telefono"
-                aria-label="Buscar pedidos"
-              />
-
-              {filteredOrders.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
-                  {normalizedSearch
-                    ? "No encontramos pedidos para esa busqueda."
-                    : surfaceMode === "archive"
-                      ? "No hay pedidos historicos para mostrar con este criterio."
-                      : viewMode === "pending_validation"
-                        ? "No hay comprobantes pendientes de validacion manual en este momento."
-                        : "No hay pedidos operativos pendientes ahora mismo. Usa Registrar pedido para cargar uno nuevo o revisa el Archivo para consultar historico."}
-                </div>
-              ) : (
-                filteredOrders.map((order) => (
-                  <button
+            {filteredOrders.length === 0 ? (
+              <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-surface/45 p-6 text-sm leading-7 text-muted">
+                {normalizedSearch
+                  ? "No encontramos pedidos para esa busqueda."
+                  : surfaceMode === "archive"
+                    ? "No hay pedidos historicos para mostrar con este criterio."
+                    : viewMode === "pending_validation"
+                      ? "No hay comprobantes pendientes de validacion manual en este momento."
+                      : "No hay pedidos activos pendientes ahora mismo. Puedes crear uno nuevo o revisar el archivo historico."}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredOrders.map((order) => (
+                  <div
                     key={order.id}
-                    type="button"
-                    onClick={() => void loadOrderDetail(order.id)}
-                    className={`w-full rounded-[22px] border p-4 text-left transition-colors ${
+                    className={cn(
+                      "rounded-[26px] border p-4 transition-colors lg:p-5",
                       selectedOrder?.id === order.id
-                        ? "border-brand/35 bg-brand/8"
-                        : "border-[color:var(--border)] bg-surface/55 hover:bg-surface/80"
-                    }`}
+                        ? "border-brand/35 bg-[linear-gradient(180deg,rgba(255,128,0,0.08),rgba(10,17,30,0.34))]"
+                        : "border-[color:var(--border)] bg-surface/50 hover:bg-surface/70"
+                    )}
                   >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold">{labelForOrderCustomer(order)}</p>
+                          <Badge variant="muted">{shortOrderId(order.id)}</Badge>
                           <Badge variant={badgeForOrderStatus(order.orderStatus)}>{labelForOrderStatus(order.orderStatus)}</Badge>
                           <Badge variant={badgeForPaymentStatus(order.paymentStatus)}>{labelForPaymentStatus(order.paymentStatus)}</Badge>
                           {isPendingTransferValidation(order) ? (
-                            <Badge variant={badgeForTransferValidation(order.transferPayment?.status)}>Pago por validar</Badge>
+                            <Badge variant={badgeForTransferValidation(order.transferPayment?.status)}>Requiere validacion</Badge>
                           ) : null}
-                          {order.customerType === "final_consumer" ? <Badge variant="muted">Consumidor final</Badge> : null}
+                          {order.customerType === "final_consumer" ? <Badge variant="outline">Consumidor final</Badge> : null}
                         </div>
-                        <p className="mt-2 text-sm text-muted">{labelForOrderPhone(order)}</p>
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
-                          <span>Vendedor: {labelForOrderSeller(order, sellers)}</span>
-                          <span>·</span>
-                          <span>{order.items.length} item(s)</span>
-                          <span>·</span>
-                          <span>{formatDate(order.createdAt)}</span>
+
+                        <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-xl font-semibold text-text">{labelForOrderCustomer(order)}</p>
+                            <p className="mt-1 text-sm text-muted">{labelForOrderPhone(order)}</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-right">
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Total</p>
+                            <p className="mt-2 text-lg font-semibold text-text">{formatCurrency(order.total, order.currency)}</p>
+                          </div>
                         </div>
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <DetailStat label="Responsable" value={labelForOrderSeller(order, sellers)} />
+                          <DetailStat label="Fecha" value={formatDateCompact(order.createdAt)} />
+                          <DetailStat label="Productos" value={summarizeOrderItems(order)} />
+                          <DetailStat label="Siguiente accion" value={labelForOrderAction(order)} />
+                        </div>
+
                         {order.transferPayment ? (
-                          <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-card/75 p-3 text-xs text-muted">
+                          <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/70 p-3 text-xs leading-6 text-muted">
                             <p>
-                              Comprobante: {labelForTransferValidation(order.transferPayment.status)}
-                              {order.transferPayment.proofSubmittedAt ? ` · ${formatDate(order.transferPayment.proofSubmittedAt)}` : ""}
+                              Comprobante {labelForTransferValidation(order.transferPayment.status)}
+                              {order.transferPayment.proofSubmittedAt ? ` · ${formatDateCompact(order.transferPayment.proofSubmittedAt)}` : ""}
                             </p>
                             <p className="mt-1">
                               {order.transferPayment.proofMetadata?.type || "Sin tipo"}
                               {order.transferPayment.proofMetadata?.caption ? ` · ${order.transferPayment.proofMetadata.caption}` : ""}
-                              {!order.transferPayment.proofMetadata?.caption && order.transferPayment.proofMetadata?.filename
-                                ? ` · ${order.transferPayment.proofMetadata.filename}`
-                                : ""}
                             </p>
                           </div>
                         ) : null}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <p className="text-sm font-medium">{formatCurrency(order.total, order.currency)}</p>
-                        <ArrowRight className="h-4 w-4 text-muted" />
+
+                      <div className="flex w-full flex-col gap-2 xl:w-[190px]">
+                        <Button type="button" className="rounded-2xl" onClick={() => void selectOrder(order.id, true)}>
+                          Ver pedido
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" className="rounded-2xl" onClick={() => void selectOrder(order.id, true)}>
+                          {labelForOrderAction(order)}
+                        </Button>
                       </div>
                     </div>
-                  </button>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="order-1 space-y-6 xl:order-1">
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant="muted">Alta desde catalogo</Badge>}>
-              <div>
-                <CardTitle className="text-xl">Registrar pedido</CardTitle>
-                <CardDescription>Selecciona un producto real del catalogo, define cliente y vendedor, y crea el pedido con detalle confiable.</CardDescription>
+                  </div>
+                ))}
               </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <form className="space-y-4" onSubmit={createOrder}>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Tipo de cliente</label>
-                    <select
-                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                      value={form.customerType}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          customerType: event.target.value as OrderFormState["customerType"],
-                          contactId: event.target.value === "registered_contact" ? current.contactId : ""
-                        }))
-                      }
-                    >
-                      <option value="registered_contact">Cliente existente</option>
-                      <option value="final_consumer">Consumidor final</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Vendedor responsable</label>
-                    <select
-                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                      value={form.sellerUserId}
-                      onChange={(event) => setForm((current) => ({ ...current, sellerUserId: event.target.value }))}
-                      disabled={metaLoading || sellers.length === 0}
-                    >
-                      <option value="">{metaLoading ? "Cargando vendedores..." : "Selecciona un vendedor"}</option>
-                      {sellers.map((seller) => (
-                        <option key={seller.id} value={seller.id}>
-                          {seller.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Destino de cobro</label>
-                    <select
-                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                      value={form.paymentDestinationId}
-                      onChange={(event) => setForm((current) => ({ ...current, paymentDestinationId: event.target.value }))}
-                      disabled={metaLoading}
-                    >
-                      <option value="">Sin definir por ahora</option>
-                      {paymentDestinations.map((destination) => (
-                        <option key={destination.id} value={destination.id}>
-                          {destination.name}{` · ${labelForPaymentDestinationType(destination.type)}`}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-sm text-muted">
-                      En esta fase puede quedar vacio si el pedido todavia no esta cobrado. Si ya sabes a donde entra la plata, dejalo imputado ahora.
-                    </p>
-                  </div>
-                </div>
+            )}
 
-                {form.customerType === "registered_contact" ? (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Cliente existente</label>
-                    <select
-                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                      value={form.contactId}
-                      onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
-                      disabled={contactsLoading || contacts.length === 0}
-                    >
-                      <option value="">{contactsLoading ? "Cargando clientes..." : "Selecciona un cliente"}</option>
-                      {contacts.map((contact) => (
-                        <option key={contact.id} value={contact.id}>
-                          {contact.name}{contact.phone ? ` · ${contact.phone}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-sm text-muted">
-                      {selectedContact
-                        ? "El pedido tomará el nombre y teléfono del contacto seleccionado."
-                        : "El pedido quedará vinculado a un contacto real del workspace."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm leading-7 text-muted">
-                    El pedido se registrará como <span className="font-medium text-text">Consumidor final</span> sin exigir nombre ni teléfono.
-                  </div>
-                )}
+            {loadingDetailId ? <p className="text-xs text-muted">Cargando detalle seleccionado...</p> : null}
+          </CardContent>
+        </Card>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Notas</label>
-                  <Textarea
-                    className="min-h-[112px]"
-                    value={form.notes}
-                    onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                    placeholder="Instrucciones de preparacion, retiro o entrega."
-                  />
-                </div>
+        <div className="space-y-5">
+          <SidebarCard badge="Resumen del dia" title="Pulso operativo" description="Lo que ingreso hoy y donde sigue el trabajo comercial.">
+            <div className="grid gap-3">
+              <DetailStat label="Pedidos de hoy" value={String(todaySummary.count)} />
+              <DetailStat label="Venta de hoy" value={formatCurrency(todaySummary.revenue)} />
+              <DetailStat label="Pendientes hoy" value={String(todaySummary.pending)} />
+            </div>
+          </SidebarCard>
 
-                <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
-                  <p className="text-sm font-semibold">Producto del pedido</p>
-                  <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_140px]">
-                    <div className="space-y-2">
-                      <label className="text-sm text-muted">Producto</label>
-                      <select
-                        className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                        value={form.productId}
-                        onChange={(event) => setForm((current) => ({ ...current, productId: event.target.value }))}
-                        disabled={productsLoading || products.length === 0}
-                      >
-                        <option value="">{productsLoading ? "Cargando catalogo..." : "Selecciona un producto"}</option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}{product.sku ? ` · ${product.sku}` : ""}{resolveProductStatus(product) === "active" ? "" : " · Inactivo"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm text-muted">Cantidad</label>
-                      <Input
-                        value={form.quantity}
-                        onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value }))}
-                        placeholder="1"
-                        inputMode="numeric"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <DetailStat label="Precio unitario" value={selectedProduct ? formatCurrency(resolveProductPrice(selectedProduct), selectedProduct.currency || "ARS") : "Pendiente"} />
-                    <DetailStat label="Stock catalogo" value={selectedProduct ? String(resolveProductStock(selectedProduct)) : "Pendiente"} />
-                    <DetailStat label="Total estimado" value={selectedProduct ? formatCurrency(visibleTotal, selectedProduct.currency || "ARS") : "Pendiente"} />
-                  </div>
-                  {selectedProduct ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Badge variant={selectedStockState.variant}>{selectedStockState.label}</Badge>
-                      {selectedStockState.isLowStock ? (
-                        <span className="text-sm text-amber-300">Quedan pocas unidades disponibles.</span>
-                      ) : null}
-                      {selectedStockState.isOutOfStock ? (
-                        <span className="text-sm text-red-300">Este producto no tiene stock disponible.</span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {selectedProduct && createBlockedByStock ? (
-                    <p className="mt-3 text-sm text-amber-300">
-                      {hasInactiveProduct
-                        ? "Este producto esta inactivo en catalogo y no se puede usar para registrar pedidos."
-                        : hasNoPrice
-                        ? "Este producto no tiene un precio valido cargado en este momento."
-                        : hasNoStock
-                        ? "Este producto no tiene stock disponible en este momento."
-                        : `La cantidad solicitada supera el stock disponible (${selectedProductStock}).`}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-muted">
-                    Fase 4: el pedido valida stock real, descuenta inventario al crearse y lo repone solo si el pedido se cancela.
-                  </p>
-                  <Button
-                    type="submit"
-                    disabled={
-                      readOnly ||
-                      saving ||
-                      !backendReady ||
-                      !selectedProduct ||
-                      hasInvalidQuantity ||
-                      createBlockedByStock ||
-                      !form.sellerUserId ||
-                      (form.customerType === "registered_contact" && !form.contactId)
-                    }
+          <SidebarCard
+            badge={attentionOrders.length > 0 ? "Requieren atencion" : "Operacion estable"}
+            title="Pedidos que requieren atencion"
+            description="Pendientes de pago, validacion o pedidos sin responsable claro."
+          >
+            {attentionOrders.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                No hay pedidos criticos detectados en este momento.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {attentionOrders.map((order) => (
+                  <button
+                    key={order.id}
+                    type="button"
+                    onClick={() => void selectOrder(order.id, true)}
+                    className="w-full rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-left transition-colors hover:bg-surface/70"
                   >
-                    {saving ? "Guardando..." : "Crear pedido"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={selectedOrder ? <Badge variant={badgeForOrderStatus(selectedOrder.orderStatus)}>{labelForOrderStatus(selectedOrder.orderStatus)}</Badge> : null}>
-              <div>
-                <CardTitle className="text-xl">Detalle del pedido</CardTitle>
-                <CardDescription>Consulta items, total y cambia el estado operativo sin salir del panel.</CardDescription>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-text">{labelForOrderCustomer(order)}</p>
+                        <p className="mt-1 text-xs text-muted">{labelForOrderAction(order)}</p>
+                      </div>
+                      <Badge variant={badgeForOrderStatus(order.orderStatus)}>{labelForOrderStatus(order.orderStatus)}</Badge>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              {!selectedOrder ? (
-                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm text-muted">
-                  Selecciona un pedido del listado para ver su detalle.
+            )}
+          </SidebarCard>
+
+          <SidebarCard badge="Proximos pasos" title="Secuencia sugerida" description="Solo usa datos reales del pedido para orientar la accion siguiente.">
+            <div className="space-y-3">
+              {nextStepNotes.map((note) => (
+                <div key={note} className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3 text-sm text-text">
+                  {note}
                 </div>
-              ) : (
-                <>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <DetailStat label="Estado" value={labelForOrderStatus(selectedOrder.orderStatus)} />
-                    <DetailStat label="Total" value={formatCurrency(selectedOrder.total, selectedOrder.currency)} />
-                    <DetailStat label="Vendedor" value={labelForOrderSeller(selectedOrder, sellers)} />
+              ))}
+            </div>
+          </SidebarCard>
+
+          <SidebarCard badge="Recientes" title="Pedidos recientes" description="Ultimos pedidos cargados para cambiar de foco rapido.">
+            <div className="space-y-3">
+              {recentOrders.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => void selectOrder(order.id, true)}
+                  className="flex w-full items-start justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-left transition-colors hover:bg-surface/70"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-text">{labelForOrderCustomer(order)}</p>
+                    <p className="mt-1 text-xs text-muted">{formatDateCompact(order.createdAt)}</p>
+                  </div>
+                  <p className="text-sm font-medium text-text">{formatCurrency(order.total, order.currency)}</p>
+                </button>
+              ))}
+            </div>
+          </SidebarCard>
+
+          <SidebarCard badge="Ayuda operativa" title="Validacion de pagos" description="Conteos simples del flujo de transferencias para no perder aprobaciones.">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant={metricsRange === "today" ? "primary" : "secondary"} onClick={() => setMetricsRange("today")}>
+                Hoy
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={metricsRange === "last_7_days" ? "primary" : "secondary"}
+                onClick={() => setMetricsRange("last_7_days")}
+              >
+                7 dias
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={metricsRange === "last_30_days" ? "primary" : "secondary"}
+                onClick={() => setMetricsRange("last_30_days")}
+              >
+                30 dias
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <DetailStat label="Pendientes" value={metricsLoading ? "..." : String(paymentMetrics.pending)} />
+              <DetailStat label="Aprobados" value={metricsLoading ? "..." : String(paymentMetrics.approved)} />
+              <DetailStat label="Rechazados" value={metricsLoading ? "..." : String(paymentMetrics.rejected)} />
+            </div>
+          </SidebarCard>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <Card id="order-detail" className="border-white/6 bg-card/90">
+          <CardHeader action={selectedOrder ? <Badge variant={badgeForOrderStatus(selectedOrder.orderStatus)}>{labelForOrderStatus(selectedOrder.orderStatus)}</Badge> : null}>
+            <div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="warning">Detalle vivo</Badge>
+                <Badge variant="outline">Sin metadata tecnica</Badge>
+              </div>
+              <CardTitle className="mt-4 text-xl">Detalle del pedido</CardTitle>
+              <CardDescription>Productos, responsables, cobro y estado operativo claros dentro de la misma vista.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-0">
+            {!selectedOrder ? (
+              <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-surface/45 p-6 text-sm text-muted">
+                Selecciona un pedido de la mesa principal para ver su detalle.
+              </div>
+            ) : (
+              <>
+                <div className="rounded-[26px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,128,0,0.05))] p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-muted">Pedido seleccionado</p>
+                      <h3 className="mt-3 text-2xl font-semibold text-text">{labelForOrderCustomer(selectedOrder)}</h3>
+                      <p className="mt-2 text-sm text-muted">{selectedOrder.id}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={badgeForOrderStatus(selectedOrder.orderStatus)}>{labelForOrderStatus(selectedOrder.orderStatus)}</Badge>
+                      <Badge variant={badgeForPaymentStatus(selectedOrder.paymentStatus)}>{labelForPaymentStatus(selectedOrder.paymentStatus)}</Badge>
+                      {selectedOrder.transferPayment ? (
+                        <Badge variant={badgeForTransferValidation(selectedOrder.transferPayment.status)}>
+                          {labelForTransferValidation(selectedOrder.transferPayment.status)}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                    <p className="text-sm font-semibold">Items del pedido</p>
-                    <div className="mt-3 space-y-3">
-                      {selectedOrder.items.map((item) => (
-                        <div key={item.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-card/85 p-3">
-                          <div>
-                            <p className="font-medium">{item.nameSnapshot}</p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted">
-                              <span>Cantidad: {item.quantity}</span>
-                              <span>Precio: {formatCurrency(item.priceSnapshot, selectedOrder.currency)}</span>
-                              {item.variant ? <span>{item.variant}</span> : null}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Subtotal</p>
-                            <p className="mt-2 text-sm font-medium">
-                              {formatCurrency(item.priceSnapshot * item.quantity, selectedOrder.currency)}
-                            </p>
+                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <DetailStat label="Total" value={formatCurrency(selectedOrder.total, selectedOrder.currency)} />
+                    <DetailStat label="Productos" value={`${selectedOrderUnits} unidad(es)`} />
+                    <DetailStat label="Responsable" value={labelForOrderSeller(selectedOrder, sellers)} />
+                    <DetailStat label="Siguiente accion" value={selectedOrderActionLabel} />
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-text">Productos del pedido</p>
+                      <p className="mt-1 text-sm text-muted">Cantidades, subtotales y composicion comercial del pedido.</p>
+                    </div>
+                    <Badge variant="muted">{selectedOrder.items.length} linea(s)</Badge>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {selectedOrder.items.map((item) => (
+                      <div key={item.id} className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-card/85 p-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <p className="font-medium text-text">{item.nameSnapshot}</p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted">
+                            <span>Cantidad: {item.quantity}</span>
+                            <span>Precio: {formatCurrency(item.priceSnapshot, selectedOrder.currency)}</span>
+                            {item.variant ? <span>{item.variant}</span> : null}
+                            {item.skuSnapshot ? <span>{item.skuSnapshot}</span> : null}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/50 px-4 py-3 text-right">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Subtotal</p>
+                          <p className="mt-2 text-sm font-semibold text-text">
+                            {formatCurrency(item.priceSnapshot * item.quantity, selectedOrder.currency)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </div>
 
-                  {selectedOrder.notes ? (
-                    <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <p className="text-sm font-semibold">Notas</p>
-                      <p className="mt-2 text-sm leading-7 text-muted">{selectedOrder.notes}</p>
-                    </div>
-                  ) : null}
+                {selectedOrder.notes ? (
+                  <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <p className="text-sm font-semibold text-text">Notas del pedido</p>
+                    <p className="mt-2 text-sm leading-7 text-muted">{selectedOrder.notes}</p>
+                  </div>
+                ) : null}
 
-                  <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="space-y-3 rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
                     <div>
-                      <p className="text-sm font-semibold">Vendedor asignado</p>
-                      <p className="mt-1 text-sm text-muted">Puedes corregir o reasignar el vendedor responsable sin alterar el resto del pedido.</p>
+                      <p className="text-sm font-semibold text-text">Vendedor asignado</p>
+                      <p className="mt-1 text-sm text-muted">Mantiene al responsable visible para operacion y seguimiento comercial.</p>
                     </div>
                     <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                       <div className="space-y-2">
@@ -1340,6 +1159,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       <Button
                         type="button"
                         variant="secondary"
+                        className="rounded-2xl"
                         disabled={readOnly || !backendReady || sellerUpdatingId === selectedOrder.id || !detailSellerUserId}
                         onClick={() => void saveOrderSeller()}
                       >
@@ -1348,10 +1168,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                  <div className="space-y-3 rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
                     <div>
-                      <p className="text-sm font-semibold">Destino del cobro</p>
-                      <p className="mt-1 text-sm text-muted">Puedes imputarlo manualmente desde este detalle antes o al momento de marcar el pedido como pagado.</p>
+                      <p className="text-sm font-semibold text-text">Destino del cobro</p>
+                      <p className="mt-1 text-sm text-muted">Permite dejar claro donde entra el dinero antes o al momento de pagar.</p>
                     </div>
                     <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                       <div className="space-y-2">
@@ -1373,6 +1193,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       <Button
                         type="button"
                         variant="secondary"
+                        className="rounded-2xl"
                         disabled={readOnly || !backendReady || destinationUpdatingId === selectedOrder.id}
                         onClick={() => void saveOrderPaymentDestination()}
                       >
@@ -1380,148 +1201,280 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       </Button>
                     </div>
                   </div>
+                </div>
 
-                  {selectedOrder.transferPayment ? (
-                    <div className="space-y-3 rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">Validacion manual de transferencia</p>
-                          <p className="mt-1 text-sm text-muted">
-                            Usa esta accion para aprobar o rechazar el comprobante y notificar el resultado por WhatsApp.
-                          </p>
-                        </div>
-                        <Badge variant={badgeForTransferValidation(selectedOrder.transferPayment.status)}>
-                          {labelForTransferValidation(selectedOrder.transferPayment.status)}
-                        </Badge>
+                {selectedOrder.transferPayment ? (
+                  <div className="space-y-3 rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text">Validacion manual de transferencia</p>
+                        <p className="mt-1 text-sm text-muted">Mantiene las acciones actuales de aprobacion y rechazo sin salir del detalle.</p>
                       </div>
-
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <DetailStat
-                          label="Comprobante recibido"
-                          value={selectedOrder.transferPayment.proofSubmittedAt ? formatDate(selectedOrder.transferPayment.proofSubmittedAt) : "Sin fecha"}
-                        />
-                        <DetailStat label="Estado del pago" value={labelForTransferValidation(selectedOrder.transferPayment.status)} />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Motivo de rechazo</label>
-                        <Textarea
-                          className="min-h-[88px]"
-                          value={paymentRejectionReason}
-                          onChange={(event) => setPaymentRejectionReason(event.target.value)}
-                          placeholder="Opcional. Ej: el comprobante no coincide con el importe o la cuenta."
-                          disabled={readOnly || paymentValidationBusy !== null}
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          disabled={readOnly || paymentValidationBusy !== null}
-                          onClick={() => void validateTransferPayment("approve")}
-                        >
-                          {paymentValidationBusy === "approve" ? "Aprobando..." : "Aprobar pago"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          disabled={readOnly || paymentValidationBusy !== null}
-                          onClick={() => void validateTransferPayment("reject")}
-                        >
-                          {paymentValidationBusy === "reject" ? "Rechazando..." : "Rechazar comprobante"}
-                        </Button>
-                      </div>
+                      <Badge variant={badgeForTransferValidation(selectedOrder.transferPayment.status)}>
+                        {labelForTransferValidation(selectedOrder.transferPayment.status)}
+                      </Badge>
                     </div>
-                  ) : null}
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Cambiar estado</label>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <DetailStat
+                        label="Comprobante recibido"
+                        value={selectedOrder.transferPayment.proofSubmittedAt ? formatDateCompact(selectedOrder.transferPayment.proofSubmittedAt) : "Sin fecha"}
+                      />
+                      <DetailStat label="Metodo" value={labelForTransferMethod(selectedOrder.transferPayment.paymentMethod)} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Motivo de rechazo</label>
+                      <Textarea
+                        className="min-h-[88px]"
+                        value={paymentRejectionReason}
+                        onChange={(event) => setPaymentRejectionReason(event.target.value)}
+                        placeholder="Opcional. Ej: el comprobante no coincide con el importe o la cuenta."
+                        disabled={readOnly || paymentValidationBusy !== null}
+                      />
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
-                      {ORDER_STATUS_OPTIONS.map((status) => (
-                        <Button
-                          key={status}
-                          type="button"
-                          variant={selectedOrder.orderStatus === status ? "primary" : "secondary"}
-                          size="sm"
-                          disabled={readOnly || statusUpdatingId === selectedOrder.id}
-                          onClick={() => void changeOrderStatus(selectedOrder.id, status)}
-                        >
-                          {statusUpdatingId === selectedOrder.id && selectedOrder.orderStatus !== status
-                            ? "Actualizando..."
-                            : labelForOrderStatus(status)}
-                        </Button>
-                      ))}
+                      <Button
+                        type="button"
+                        className="rounded-2xl"
+                        disabled={readOnly || paymentValidationBusy !== null}
+                        onClick={() => void validateTransferPayment("approve")}
+                      >
+                        {paymentValidationBusy === "approve" ? "Aprobando..." : "Aprobar pago"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="rounded-2xl"
+                        disabled={readOnly || paymentValidationBusy !== null}
+                        onClick={() => void validateTransferPayment("reject")}
+                      >
+                        {paymentValidationBusy === "reject" ? "Rechazando..." : "Rechazar comprobante"}
+                      </Button>
                     </div>
                   </div>
-                </>
+                ) : null}
+
+                <div className="space-y-3 rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-text">Cambiar estado</p>
+                    <p className="mt-1 text-sm text-muted">Se mantienen las transiciones actuales disponibles dentro del modulo.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {ORDER_STATUS_OPTIONS.map((status) => (
+                      <Button
+                        key={status}
+                        type="button"
+                        variant={selectedOrder.orderStatus === status ? "primary" : "secondary"}
+                        size="sm"
+                        className="rounded-2xl"
+                        disabled={readOnly || statusUpdatingId === selectedOrder.id}
+                        onClick={() => void changeOrderStatus(selectedOrder.id, status)}
+                      >
+                        {statusUpdatingId === selectedOrder.id && selectedOrder.orderStatus !== status
+                          ? "Actualizando..."
+                          : labelForOrderStatus(status)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card id="new-order" className="border-white/6 bg-card/90">
+          <CardHeader action={<Badge variant="muted">Alta desde catalogo</Badge>}>
+            <div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="warning">Nuevo pedido</Badge>
+                <Badge variant="outline">Sin cambiar endpoints</Badge>
+              </div>
+              <CardTitle className="mt-4 text-xl">Registrar pedido</CardTitle>
+              <CardDescription>Selecciona producto, cliente, vendedor y cobro usando exactamente los datos reales que el modulo ya consume.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <form className="space-y-4" onSubmit={createOrder}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Tipo de cliente</label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={form.customerType}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        customerType: event.target.value as OrderFormState["customerType"],
+                        contactId: event.target.value === "registered_contact" ? current.contactId : ""
+                      }))
+                    }
+                  >
+                    <option value="registered_contact">Cliente existente</option>
+                    <option value="final_consumer">Consumidor final</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Vendedor responsable</label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={form.sellerUserId}
+                    onChange={(event) => setForm((current) => ({ ...current, sellerUserId: event.target.value }))}
+                    disabled={metaLoading || sellers.length === 0}
+                  >
+                    <option value="">{metaLoading ? "Cargando vendedores..." : "Selecciona un vendedor"}</option>
+                    {sellers.map((seller) => (
+                      <option key={seller.id} value={seller.id}>
+                        {seller.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium">Destino de cobro</label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={form.paymentDestinationId}
+                    onChange={(event) => setForm((current) => ({ ...current, paymentDestinationId: event.target.value }))}
+                    disabled={metaLoading}
+                  >
+                    <option value="">Sin definir por ahora</option>
+                    {paymentDestinations.map((destination) => (
+                      <option key={destination.id} value={destination.id}>
+                        {destination.name}{` · ${labelForPaymentDestinationType(destination.type)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {form.customerType === "registered_contact" ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cliente existente</label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    value={form.contactId}
+                    onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
+                    disabled={contactsLoading || contacts.length === 0}
+                  >
+                    <option value="">{contactsLoading ? "Cargando clientes..." : "Selecciona un cliente"}</option>
+                    {contacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name}{contact.phone ? ` · ${contact.phone}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-sm text-muted">
+                    {selectedContact
+                      ? "El pedido tomara el nombre y telefono del contacto seleccionado."
+                      : "El pedido quedara vinculado a un contacto real del workspace."}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm leading-7 text-muted">
+                  El pedido se registrara como <span className="font-medium text-text">Consumidor final</span> sin exigir nombre ni telefono.
+                </div>
               )}
-              {loadingDetailId ? <p className="text-xs text-muted">Cargando detalle...</p> : null}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={ClipboardList} label="Pedidos registrados" value={String(stats.count)} helper="Pedidos internos visibles en el portal." />
-        <MetricCard icon={Receipt} label="Facturacion potencial" value={formatCurrency(stats.totalRevenue)} helper="Total bruto de los pedidos registrados." />
-        <MetricCard icon={ShoppingBag} label="Pendientes" value={String(stats.pending)} helper="Pedidos nuevos o esperando pago." />
-        <MetricCard
-          icon={Package}
-          label="Pagos por validar"
-          value={String(stats.pendingValidation)}
-          helper="Comprobantes de transferencia pendientes de revision manual."
-        />
-      </section>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notas</label>
+                <Textarea
+                  className="min-h-[112px]"
+                  value={form.notes}
+                  onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+                  placeholder="Instrucciones de preparacion, retiro o entrega."
+                />
+              </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Metricas operativas de pagos</CardTitle>
-            <CardDescription>Conteos simples del flujo de validacion manual por transferencia.</CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant={metricsRange === "today" ? "primary" : "secondary"} onClick={() => setMetricsRange("today")}>
-              Hoy
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={metricsRange === "last_7_days" ? "primary" : "secondary"}
-              onClick={() => setMetricsRange("last_7_days")}
-            >
-              7 dias
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={metricsRange === "last_30_days" ? "primary" : "secondary"}
-              onClick={() => setMetricsRange("last_30_days")}
-            >
-              30 dias
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <MetricCard
-            icon={Package}
-            label="Pendientes"
-            value={metricsLoading ? "..." : String(paymentMetrics.pending)}
-            helper="Basado en proofSubmittedAt."
-          />
-          <MetricCard
-            icon={Receipt}
-            label="Aprobados"
-            value={metricsLoading ? "..." : String(paymentMetrics.approved)}
-            helper="Basado en validatedAt."
-          />
-          <MetricCard
-            icon={ShoppingBag}
-            label="Rechazados"
-            value={metricsLoading ? "..." : String(paymentMetrics.rejected)}
-            helper="Basado en validatedAt."
-          />
-        </CardContent>
-      </Card>
+              <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
+                <p className="text-sm font-semibold text-text">Producto del pedido</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_140px]">
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted">Producto</label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                      value={form.productId}
+                      onChange={(event) => setForm((current) => ({ ...current, productId: event.target.value }))}
+                      disabled={productsLoading || products.length === 0}
+                    >
+                      <option value="">{productsLoading ? "Cargando catalogo..." : "Selecciona un producto"}</option>
+                      {products.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name}{product.sku ? ` · ${product.sku}` : ""}{resolveProductStatus(product) === "active" ? "" : " · Inactivo"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted">Cantidad</label>
+                    <Input
+                      value={form.quantity}
+                      onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value }))}
+                      placeholder="1"
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <DetailStat
+                    label="Precio unitario"
+                    value={selectedProduct ? formatCurrency(resolveProductPrice(selectedProduct), selectedProduct.currency || "ARS") : "Pendiente"}
+                  />
+                  <DetailStat label="Stock catalogo" value={selectedProduct ? String(resolveProductStock(selectedProduct)) : "Pendiente"} />
+                  <DetailStat label="Total estimado" value={selectedProduct ? formatCurrency(visibleTotal, selectedProduct.currency || "ARS") : "Pendiente"} />
+                </div>
+
+                {selectedProduct ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Badge variant={selectedStockState.variant}>{selectedStockState.label}</Badge>
+                    {selectedStockState.isLowStock ? <span className="text-sm text-amber-300">Quedan pocas unidades disponibles.</span> : null}
+                    {selectedStockState.isOutOfStock ? <span className="text-sm text-red-300">Este producto no tiene stock disponible.</span> : null}
+                  </div>
+                ) : null}
+
+                {selectedProduct && createBlockedByStock ? (
+                  <p className="mt-3 text-sm text-amber-300">
+                    {hasInactiveProduct
+                      ? "Este producto esta inactivo en catalogo y no se puede usar para registrar pedidos."
+                      : hasNoPrice
+                        ? "Este producto no tiene un precio valido cargado en este momento."
+                        : hasNoStock
+                          ? "Este producto no tiene stock disponible en este momento."
+                          : `La cantidad solicitada supera el stock disponible (${selectedProductStock}).`}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted">
+                  Se mantiene la logica actual: stock real, responsable, cliente y cobro usando el flujo ya existente.
+                </p>
+                <Button
+                  type="submit"
+                  className="rounded-2xl"
+                  disabled={
+                    readOnly ||
+                    saving ||
+                    !backendReady ||
+                    !selectedProduct ||
+                    hasInvalidQuantity ||
+                    createBlockedByStock ||
+                    !form.sellerUserId ||
+                    (form.customerType === "registered_contact" && !form.contactId)
+                  }
+                >
+                  {saving ? "Guardando..." : "Crear pedido"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
@@ -1543,24 +1496,52 @@ function MetricCard({
   icon: Icon,
   label,
   value,
-  helper
+  helper,
+  accent
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
   helper: string;
+  accent?: string;
+}) {
+  return (
+    <Card className="overflow-hidden border-white/6 bg-card/90">
+      <CardContent className="relative p-5">
+        <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-80", accent || "from-white/0 via-white/0 to-transparent")} />
+        <div className="relative flex items-start gap-4">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-surface/80">
+            <Icon className="h-5 w-5 text-brandBright" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
+            <p className="mt-2 text-2xl font-semibold text-text">{value}</p>
+            <p className="mt-2 text-sm leading-6 text-muted">{helper}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SidebarCard({
+  badge,
+  title,
+  description,
+  children
+}: {
+  badge: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
 }) {
   return (
     <Card className="border-white/6 bg-card/90">
-      <CardContent className="flex items-start gap-4 p-5">
-        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-surface/80">
-          <Icon className="h-5 w-5 text-brandBright" />
-        </span>
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
-          <p className="mt-2 text-2xl font-semibold">{value}</p>
-          <p className="mt-1 text-sm leading-6 text-muted">{helper}</p>
-        </div>
+      <CardContent className="p-5">
+        <Badge variant="warning">{badge}</Badge>
+        <h3 className="mt-4 text-xl font-semibold text-text">{title}</h3>
+        <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+        <div className="mt-4">{children}</div>
       </CardContent>
     </Card>
   );
@@ -1570,7 +1551,7 @@ function DetailStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-2 text-sm font-medium">{value}</p>
+      <p className="mt-2 text-sm font-medium leading-6 text-text">{value}</p>
     </div>
   );
 }
@@ -1597,7 +1578,7 @@ function badgeForTransferValidation(status: string | null | undefined) {
 function labelForOrderStatus(status: string) {
   switch (status) {
     case "new":
-      return "Nuevo";
+      return "Pendiente";
     case "pending_payment":
       return "Pendiente de pago";
     case "paid":
@@ -1661,25 +1642,12 @@ function isPendingTransferValidation(order: PortalOrder) {
   );
 }
 
-function labelForCustomerType(type: string | null | undefined) {
-  return type === "final_consumer" ? "Consumidor final" : "Cliente existente";
-}
-
 function labelForOrderCustomer(order: PortalOrder) {
   return order.customerType === "final_consumer" ? "Consumidor final" : order.customerName || order.contact?.name || "Cliente sin nombre";
 }
 
 function labelForOrderPhone(order: PortalOrder) {
   return order.customerPhone || order.contact?.phone || (order.customerType === "final_consumer" ? "No informado" : "Sin telefono");
-}
-
-function labelForSellerRole(role: string | null | undefined) {
-  switch (role) {
-    case "seller":
-      return "vendedor";
-    default:
-      return role || "equipo";
-  }
 }
 
 function labelForOrderSeller(order: PortalOrder, sellers: AssignableSeller[] = []) {
@@ -1689,7 +1657,6 @@ function labelForOrderSeller(order: PortalOrder, sellers: AssignableSeller[] = [
   }
   return order.seller?.name || order.sellerNameSnapshot || fallbackSeller?.name || "Sin asignar";
 }
-
 
 function isOperationalOrder(order: PortalOrder) {
   if (isPendingTransferValidation(order)) return true;
@@ -1711,14 +1678,6 @@ function labelForPaymentDestinationType(type: string | null | undefined) {
   }
 }
 
-function labelForPaymentDestination(order: PortalOrder) {
-  const name = order.paymentDestination?.name || order.paymentDestinationNameSnapshot;
-  const type = order.paymentDestination?.type || order.paymentDestinationTypeSnapshot;
-  if (!name) return "Sin definir";
-  return `${name}${type ? ` · ${labelForPaymentDestinationType(type)}` : ""}`;
-}
-
-
 function formatCurrency(value: number, currency = "ARS") {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -1727,13 +1686,58 @@ function formatCurrency(value: number, currency = "ARS") {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
-function formatDate(value: string) {
+function formatDateCompact(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Sin fecha";
   return new Intl.DateTimeFormat("es-AR", {
-    dateStyle: "medium",
+    dateStyle: "short",
     timeStyle: "short"
   }).format(date);
+}
+
+function shortOrderId(orderId: string) {
+  return orderId.slice(0, 8).toUpperCase();
+}
+
+function summarizeOrderItems(order: PortalOrder) {
+  const units = order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const names = order.items.slice(0, 2).map((item) => item.nameSnapshot);
+  return `${units} unidad(es) · ${names.join(", ")}${order.items.length > 2 ? "..." : ""}`;
+}
+
+function needsAttention(order: PortalOrder) {
+  if (isPendingTransferValidation(order)) return true;
+  if (order.orderStatus === "new" || order.orderStatus === "pending_payment") return true;
+  if (isOperationalOrder(order) && !order.sellerUserId) return true;
+  if ((order.orderStatus === "paid" || order.orderStatus === "ready") && order.paymentStatus !== "paid") return true;
+  return false;
+}
+
+function orderUrgencyScore(order: PortalOrder) {
+  if (isPendingTransferValidation(order)) return 0;
+  if (order.orderStatus === "pending_payment") return 1;
+  if (order.orderStatus === "new") return 2;
+  if (order.orderStatus === "ready") return 3;
+  if (order.orderStatus === "preparing") return 4;
+  if (order.orderStatus === "paid") return 5;
+  if (order.orderStatus === "delivered") return 6;
+  return 7;
+}
+
+function compareOrdersForDisplay(left: PortalOrder, right: PortalOrder) {
+  const urgencyDelta = orderUrgencyScore(left) - orderUrgencyScore(right);
+  if (urgencyDelta !== 0) return urgencyDelta;
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+}
+
+function labelForOrderAction(order: PortalOrder) {
+  if (isPendingTransferValidation(order)) return "Validar comprobante";
+  if (order.orderStatus === "new" || order.orderStatus === "pending_payment") return "Seguir cobro";
+  if (order.orderStatus === "paid" || order.orderStatus === "preparing") return "Preparar entrega";
+  if (order.orderStatus === "ready") return "Coordinar entrega";
+  if (order.orderStatus === "delivered") return "Cerrar seguimiento";
+  if (order.orderStatus === "cancelled") return "Revisar incidencia";
+  return "Ver detalle";
 }
 
 function humanizeOrderError(payload: any) {
