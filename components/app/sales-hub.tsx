@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  Archive,
   ArrowRight,
   BadgeDollarSign,
   Bot,
@@ -14,6 +15,7 @@ import {
   Flame,
   Handshake,
   LayoutPanelTop,
+  LoaderCircle,
   Search,
   Sparkles,
   Target,
@@ -27,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
 import { formatDateTimeLabel, formatMoney, relativeDateLabel, titleCaseLabel } from "@/lib/billing";
 import { cn } from "@/lib/ui/cn";
 
@@ -36,12 +39,19 @@ type SalesHubProps = {
   summary: PortalSalesSummary;
   metrics: PortalSalesMetrics;
   opportunities: PortalSalesOpportunity[];
+  readOnly: boolean;
 };
 
 type SalesListMode = "main" | "archive";
 type SalesOpportunityFilter = "all" | "closed" | "open" | "active_conversations";
 type PipelineLane = "new" | "contacted" | "negotiation" | "proposal" | "closed";
 type OpportunityPriority = "hot" | "attention" | "follow_up" | "cold" | "closed";
+type SalesVisibility = "active" | "archived";
+type SalesSnapshot = {
+  summary: PortalSalesSummary;
+  metrics: PortalSalesMetrics;
+  opportunities: PortalSalesOpportunity[];
+};
 
 type EnrichedOpportunity = PortalSalesOpportunity & {
   lane: PipelineLane;
@@ -133,19 +143,40 @@ const PRIORITY_META: Record<
   }
 };
 
-export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
+export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHubProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [listMode, setListMode] = useState<SalesListMode>("main");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeLane, setActiveLane] = useState<PipelineLane | "all">("all");
+  const [activeOpportunities, setActiveOpportunities] = useState<PortalSalesOpportunity[]>(opportunities);
+  const [archivedOpportunities, setArchivedOpportunities] = useState<PortalSalesOpportunity[] | null>(null);
+  const [summaryState, setSummaryState] = useState(summary);
+  const [metricsState, setMetricsState] = useState(metrics);
+  const [selectedOpportunityIds, setSelectedOpportunityIds] = useState<string[]>([]);
+  const [archivingOpportunityIds, setArchivingOpportunityIds] = useState<string[]>([]);
+  const [loadingArchiveView, setLoadingArchiveView] = useState(false);
+  const [refreshingSales, setRefreshingSales] = useState(false);
   const activeFilter = resolveOpportunityFilter(searchParams.get("view"));
 
+  const baseOpportunities = listMode === "archive" ? archivedOpportunities || [] : activeOpportunities;
   const enrichedOpportunities = useMemo<EnrichedOpportunity[]>(
-    () => opportunities.map((item) => enrichOpportunity(item)),
-    [opportunities]
+    () => baseOpportunities.map((item) => enrichOpportunity(item)),
+    [baseOpportunities]
   );
+
+  useEffect(() => {
+    setActiveOpportunities(opportunities);
+  }, [opportunities]);
+
+  useEffect(() => {
+    setSummaryState(summary);
+  }, [summary]);
+
+  useEffect(() => {
+    setMetricsState(metrics);
+  }, [metrics]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -186,8 +217,27 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
       ? laneFilteredOpportunities.slice(0, PRIMARY_OPPORTUNITY_LIMIT)
       : laneFilteredOpportunities;
 
-  const archivedCount =
-    activeFilter === "all" ? Math.max(laneFilteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0) : 0;
+  const overflowCount =
+    listMode === "main" && activeFilter === "all"
+      ? Math.max(laneFilteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0)
+      : 0;
+
+  const archivableVisibleOpportunities = useMemo(
+    () => visibleOpportunities.filter((item) => Boolean(item.conversationId)),
+    [visibleOpportunities]
+  );
+
+  const archivableSelectedIds = useMemo(
+    () =>
+      selectedOpportunityIds.filter((id) =>
+        activeOpportunities.some((item) => item.id === id && Boolean(item.conversationId))
+      ),
+    [activeOpportunities, selectedOpportunityIds]
+  );
+
+  const allVisibleArchivableSelected =
+    archivableVisibleOpportunities.length > 0 &&
+    archivableVisibleOpportunities.every((item) => archivableSelectedIds.includes(item.id));
 
   const laneSummaries = useMemo(() => {
     return PIPELINE_LANES.map((lane) => {
@@ -275,8 +325,8 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
     return `conic-gradient(${segments.join(", ")})`;
   }, [sourceBreakdown]);
 
-  const topPerformer = metrics.responsiblePerformance[0] || null;
-  const teamRows = metrics.responsiblePerformance.slice(0, 4);
+  const topPerformer = metricsState.responsiblePerformance[0] || null;
+  const teamRows = metricsState.responsiblePerformance.slice(0, 4);
 
   const topOpportunity = useMemo(() => {
     return [...searchedOpportunities].sort(compareOpportunities)[0] || null;
@@ -291,28 +341,28 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
   const executiveStats = [
     {
       label: "Ventas cerradas",
-      value: String(metrics.closedSalesCount),
+      value: String(metricsState.closedSalesCount),
       helper: "Operaciones cobradas sobre el pipeline visible.",
       icon: CircleCheckBig,
       tone: "emerald"
     },
     {
       label: "Oportunidades abiertas",
-      value: String(summary.activeOpportunities),
+      value: String(summaryState.activeOpportunities),
       helper: "Cuentas en seguimiento comercial real.",
       icon: UsersRound,
       tone: "blue"
     },
     {
       label: "Tasa de cierre",
-      value: `${summary.closeRate}%`,
+      value: `${summaryState.closeRate}%`,
       helper: "Cierres sobre el universo comercial visible.",
       icon: CircleGauge,
       tone: "violet"
     },
     {
       label: "Ticket promedio",
-      value: formatMoney(summary.averageTicket),
+      value: formatMoney(summaryState.averageTicket),
       helper: "Promedio efectivo de operaciones cobradas.",
       icon: BadgeDollarSign,
       tone: "amber"
@@ -330,8 +380,121 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
     router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
   }
 
+  async function loadSalesSnapshot(visibility: SalesVisibility): Promise<SalesSnapshot> {
+    const response = await fetch(`/api/app/sales?visibility=${visibility}`, { cache: "no-store" });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(String(json?.error || "sales_snapshot_failed"));
+    return {
+      summary: json?.summary || summaryState,
+      metrics: json?.metrics || metricsState,
+      opportunities: Array.isArray(json?.opportunities) ? (json.opportunities as PortalSalesOpportunity[]) : []
+    };
+  }
+
+  async function refreshSalesData(options?: { includeArchived?: boolean }) {
+    setRefreshingSales(true);
+    try {
+      const includeArchived = Boolean(options?.includeArchived) || archivedOpportunities !== null || listMode === "archive";
+      const [activeSnapshot, archivedSnapshot] = await Promise.all([
+        loadSalesSnapshot("active"),
+        includeArchived ? loadSalesSnapshot("archived") : Promise.resolve(null)
+      ]);
+
+      setSummaryState(activeSnapshot.summary);
+      setMetricsState(activeSnapshot.metrics);
+      setActiveOpportunities(activeSnapshot.opportunities);
+      if (archivedSnapshot) {
+        setArchivedOpportunities(archivedSnapshot.opportunities);
+      }
+      setSelectedOpportunityIds([]);
+    } finally {
+      setRefreshingSales(false);
+    }
+  }
+
+  async function ensureArchivedOpportunitiesLoaded() {
+    if (archivedOpportunities !== null) return;
+    setLoadingArchiveView(true);
+    try {
+      const snapshot = await loadSalesSnapshot("archived");
+      setArchivedOpportunities(snapshot.opportunities);
+    } catch (error) {
+      toast.error("No se pudo cargar el archivo", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setLoadingArchiveView(false);
+    }
+  }
+
+  async function archiveOpportunitySelection(opportunityIds: string[]) {
+    if (readOnly || archivingOpportunityIds.length > 0) return;
+
+    const selectedRows = activeOpportunities.filter(
+      (item) => opportunityIds.includes(item.id) && Boolean(item.conversationId)
+    );
+    const conversationIds = Array.from(
+      new Set(selectedRows.map((item) => String(item.conversationId || "").trim()).filter(Boolean))
+    );
+
+    if (!conversationIds.length) {
+      toast.error("No hay oportunidades archivables", "Solo se pueden archivar oportunidades con conversacion asociada.");
+      return;
+    }
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(
+            conversationIds.length === 1
+              ? "La oportunidad se ocultara del pipeline activo y seguira disponible en Archivo. Deseas continuar?"
+              : `Se archivaran ${conversationIds.length} oportunidades del pipeline activo. El historial seguira disponible en Archivo.`
+          );
+    if (!confirmed) return;
+
+    setArchivingOpportunityIds(opportunityIds);
+    try {
+      const response = await fetch("/api/app/inbox/archive", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "sales_archive_failed"));
+
+      await refreshSalesData({ includeArchived: archivedOpportunities !== null || listMode === "archive" });
+      toast.success(
+        conversationIds.length === 1 ? "Oportunidad archivada" : "Oportunidades archivadas",
+        "La limpieza del pipeline ya quedo aplicada sobre la base activa."
+      );
+    } catch (error) {
+      toast.error("No se pudo archivar", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setArchivingOpportunityIds([]);
+    }
+  }
+
+  useEffect(() => {
+    setSelectedOpportunityIds([]);
+  }, [activeFilter, activeLane, listMode, normalizedSearch]);
+
+  useEffect(() => {
+    setSelectedOpportunityIds((current) =>
+      current.filter((id) => activeOpportunities.some((item) => item.id === id && Boolean(item.conversationId)))
+    );
+  }, [activeOpportunities]);
+
+  useEffect(() => {
+    if (listMode === "archive" && archivedOpportunities === null) {
+      void ensureArchivedOpportunitiesLoaded();
+    }
+  }, [archivedOpportunities, listMode]);
+
   return (
     <div className="space-y-6">
+      {readOnly ? (
+        <div className="rounded-[22px] border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Este espacio esta en modo solo lectura. Puedes revisar el pipeline, pero las acciones de archivo no estan disponibles.
+        </div>
+      ) : null}
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-12">
@@ -340,10 +503,10 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.24em] text-white/55">Facturacion del mes</p>
-                    <p className="mt-4 text-4xl font-semibold tracking-tight text-white">{formatMoney(summary.salesMonth)}</p>
+                    <p className="mt-4 text-4xl font-semibold tracking-tight text-white">{formatMoney(summaryState.salesMonth)}</p>
                     <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/12 px-3 py-1 text-xs font-medium text-emerald-100">
                       <Sparkles className="h-3.5 w-3.5" />
-                      {summary.salesToday > 0 ? `${formatMoney(summary.salesToday)} cobrados hoy` : "Pipeline listo para empujar cierres"}
+                      {summaryState.salesToday > 0 ? `${formatMoney(summaryState.salesToday)} cobrados hoy` : "Pipeline listo para empujar cierres"}
                     </div>
                   </div>
                   <Button asChild size="sm" className="rounded-2xl bg-[linear-gradient(135deg,#f97316,#ea580c)] text-white shadow-[0_16px_30px_rgba(249,115,22,0.28)] hover:opacity-95">
@@ -460,17 +623,17 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
                       />
                       <FilterChip
                         active={activeFilter === "open"}
-                        label={`Activas ${summary.activeOpportunities}`}
+                        label={`Activas ${summaryState.activeOpportunities}`}
                         onClick={() => setOpportunityFilter("open")}
                       />
                       <FilterChip
                         active={activeFilter === "closed"}
-                        label={`Cierres ${metrics.closedSalesCount}`}
+                        label={`Cierres ${metricsState.closedSalesCount}`}
                         onClick={() => setOpportunityFilter("closed")}
                       />
                       <FilterChip
                         active={activeFilter === "active_conversations"}
-                        label={`Conversaciones ${summary.activeSalesConversations}`}
+                        label={`Conversaciones ${summaryState.activeSalesConversations}`}
                         onClick={() => setOpportunityFilter("active_conversations")}
                       />
                     </div>
@@ -487,9 +650,11 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
                       <div className="inline-flex rounded-2xl border border-white/10 bg-black/18 p-1">
                         <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
                           Principal
+                          <span className="ml-2 text-xs text-white/65">{activeOpportunities.length}</span>
                         </Button>
                         <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
                           Archivo
+                          <span className="ml-2 text-xs text-white/65">{archivedOpportunities?.length ?? 0}</span>
                         </Button>
                       </div>
                     </div>
@@ -542,31 +707,108 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
                   </div>
                 ) : listMode === "main" ? (
                   <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    Principal muestra las oportunidades mas relevantes del dia. El archivo conserva el historico sin ensuciar la lectura ejecutiva.
+                    Principal concentra el pipeline activo. Desde aca puedes seleccionar oportunidades y archivarlas sin tocar la base comercial.
                   </div>
                 ) : (
                   <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    Archivo comercial buscable para revisar historico, cierres y cuentas frias sin sobrecargar la mesa activa.
+                    Archivo comercial persistente para revisar historico, pruebas y conversaciones ocultadas del pipeline principal.
                   </div>
                 )}
 
-                {!visibleOpportunities.length ? (
+                {listMode === "main" ? (
+                  <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <p className="text-sm text-muted">
+                        {archivableSelectedIds.length > 0
+                          ? `${archivableSelectedIds.length} oportunidades seleccionadas listas para archivar.`
+                          : "Selecciona oportunidades con conversacion asociada para limpiar el pipeline sin perder historial."}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="rounded-2xl"
+                          onClick={() =>
+                            setSelectedOpportunityIds(
+                              allVisibleArchivableSelected ? [] : archivableVisibleOpportunities.map((item) => item.id)
+                            )
+                          }
+                          disabled={readOnly || archivableVisibleOpportunities.length === 0}
+                        >
+                          {allVisibleArchivableSelected ? "Cancelar visibles" : "Seleccionar visibles"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+                          onClick={() => void archiveOpportunitySelection(archivableSelectedIds)}
+                          disabled={readOnly || archivableSelectedIds.length === 0 || archivingOpportunityIds.length > 0 || refreshingSales}
+                        >
+                          {archivingOpportunityIds.length > 0 ? "Archivando..." : "Archivar seleccionadas"}
+                        </Button>
+                        {archivableSelectedIds.length > 0 ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="rounded-2xl"
+                            onClick={() => setSelectedOpportunityIds([])}
+                          >
+                            Cancelar
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
+                    {loadingArchiveView
+                      ? "Cargando archivo comercial..."
+                      : "Las oportunidades archivadas salen de la mesa activa y quedan disponibles aca para consulta."}
+                  </div>
+                )}
+
+                {listMode === "archive" && loadingArchiveView ? (
+                  <div className="flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.025] px-4 py-4 text-sm text-muted">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Cargando oportunidades archivadas...
+                  </div>
+                ) : !visibleOpportunities.length ? (
                   <div className="rounded-[24px] border border-dashed border-white/12 bg-white/[0.025] p-7 text-sm leading-7 text-muted">
                     {normalizedSearch
                       ? "No encontramos oportunidades para esa busqueda."
-                      : "Todavia no hay oportunidades visibles para este foco comercial."}
+                      : listMode === "archive"
+                        ? "Todavia no hay oportunidades archivadas para este foco comercial."
+                        : "Todavia no hay oportunidades visibles para este foco comercial."}
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {visibleOpportunities.map((item) => (
-                      <OpportunityRow key={item.id} item={item} />
+                      <OpportunityRow
+                        key={item.id}
+                        item={item}
+                        selectable={listMode === "main" && Boolean(item.conversationId)}
+                        selected={selectedOpportunityIds.includes(item.id)}
+                        selectionDisabled={readOnly || !item.conversationId}
+                        actionBusy={archivingOpportunityIds.includes(item.id) || refreshingSales}
+                        readOnly={readOnly}
+                        listMode={listMode}
+                        onToggleSelect={(checked) =>
+                          setSelectedOpportunityIds((current) =>
+                            checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id)
+                          )
+                        }
+                        onArchive={() => void archiveOpportunitySelection([item.id])}
+                      />
                     ))}
                   </div>
                 )}
 
-                {listMode === "main" && archivedCount > 0 ? (
+                {listMode === "main" && overflowCount > 0 ? (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    <span>{archivedCount} oportunidades adicionales quedaron en archivo para mantener lectura ejecutiva.</span>
+                    <span>{overflowCount} oportunidades adicionales quedaron fuera del foco principal para mantener lectura ejecutiva.</span>
                     <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => setListMode("archive")}>
                       Ver archivo
                     </Button>
@@ -590,7 +832,7 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
                 </div>
               </div>
               <div className="mt-5 space-y-3">
-                <SidebarMetricRow label="Ventas del dia" value={formatMoney(summary.salesToday)} tone="emerald" />
+                <SidebarMetricRow label="Ventas del dia" value={formatMoney(summaryState.salesToday)} tone="emerald" />
                 <SidebarMetricRow label="Cierres del dia" value={String(closedToday)} tone="violet" />
                 <SidebarMetricRow label="Nuevas oportunidades" value={String(newToday)} tone="blue" />
                 <SidebarMetricRow label="Sin responsable" value={String(unassignedCount)} tone="rose" />
@@ -602,7 +844,7 @@ export function SalesHub({ summary, metrics, opportunities }: SalesHubProps) {
             <CardContent className="p-5">
               <p className="text-xl font-semibold text-white">Conversaciones activas</p>
               <p className="mt-1 text-sm text-muted">Chats abiertos que hoy empujan oportunidades.</p>
-              <p className="mt-7 text-5xl font-semibold tracking-tight text-white">{summary.activeSalesConversations}</p>
+              <p className="mt-7 text-5xl font-semibold tracking-tight text-white">{summaryState.activeSalesConversations}</p>
               <p className="mt-2 text-sm text-muted">Conversaciones abiertas</p>
               <Button asChild className="mt-6 h-11 w-full rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14" variant="ghost">
                 <Link href="/app/inbox">
@@ -844,7 +1086,27 @@ function FilterChip({
   );
 }
 
-function OpportunityRow({ item }: { item: EnrichedOpportunity }) {
+function OpportunityRow({
+  item,
+  selectable,
+  selected,
+  selectionDisabled,
+  actionBusy,
+  readOnly,
+  listMode,
+  onToggleSelect,
+  onArchive
+}: {
+  item: EnrichedOpportunity;
+  selectable: boolean;
+  selected: boolean;
+  selectionDisabled: boolean;
+  actionBusy: boolean;
+  readOnly: boolean;
+  listMode: SalesListMode;
+  onToggleSelect: (checked: boolean) => void;
+  onArchive: () => void;
+}) {
   const priorityMeta = PRIORITY_META[item.priority];
 
   return (
@@ -854,9 +1116,19 @@ function OpportunityRow({ item }: { item: EnrichedOpportunity }) {
         priorityMeta.ringClass
       )}
     >
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_180px_160px_210px_130px_190px_126px] xl:items-center">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_180px_160px_210px_130px_190px_156px] xl:items-center">
         <div className="min-w-0">
           <div className="flex items-start gap-3">
+            <label className="mt-3 inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={(event) => onToggleSelect(event.target.checked)}
+                disabled={!selectable || selectionDisabled}
+                className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
+              />
+            </label>
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
               {initialsFromName(item.customer.name)}
             </div>
@@ -870,6 +1142,13 @@ function OpportunityRow({ item }: { item: EnrichedOpportunity }) {
                 ) : null}
               </div>
               <p className="mt-1 truncate text-sm text-muted">{item.customer.phone || "Sin telefono"}</p>
+              <p className="mt-2 text-xs text-white/45">
+                {item.conversationId
+                  ? listMode === "archive"
+                    ? "Oportunidad archivada desde su conversacion comercial."
+                    : "Puede archivarse sin perder historial."
+                  : "Sin conversacion asociada: no admite archivo directo por ahora."}
+              </p>
             </div>
           </div>
         </div>
@@ -920,14 +1199,37 @@ function OpportunityRow({ item }: { item: EnrichedOpportunity }) {
           <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
             {item.priorityLabel}
           </span>
-          {item.contactId ? (
-            <Button asChild size="sm" variant="ghost" className="rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
-              <Link href={`/app/contacts/${item.contactId}`}>
-                Ver cliente
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {listMode === "main" && item.conversationId ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+                onClick={onArchive}
+                disabled={readOnly || actionBusy}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                {actionBusy ? "Archivando..." : "Archivar"}
+              </Button>
+            ) : listMode === "main" ? (
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/55">
+                Archivo no disponible
+              </span>
+            ) : (
+              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+                En archivo
+              </span>
+            )}
+            {item.contactId ? (
+              <Button asChild size="sm" variant="ghost" className="rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
+                <Link href={`/app/contacts/${item.contactId}`}>
+                  Ver cliente
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

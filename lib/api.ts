@@ -2498,14 +2498,20 @@ export async function getPortalSalesMetrics(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/sales/metrics`, undefined, false);
 }
 
-export async function getPortalSalesOpportunities(tenantId: string) {
+export async function getPortalSalesOpportunities(
+  tenantId: string,
+  options?: {
+    visibility?: "active" | "archived";
+  }
+) {
+  const visibility = options?.visibility === "archived" ? "archived" : "active";
   return backendFetch<{
     success: boolean;
     data: {
       tenantId: string;
       opportunities: PortalSalesOpportunity[];
     };
-  }>(`/portal/tenants/${tenantId}/sales/opportunities`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/sales/opportunities?visibility=${visibility}`, undefined, false);
 }
 
 export async function getPortalLoyaltyProgram(tenantId: string) {

@@ -1,5 +1,6 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { SalesHub } from "@/components/app/sales-hub";
+import { canEditWorkspace } from "@/lib/app-permissions";
 import {
   getPortalSalesMetrics,
   getPortalSalesOpportunities,
@@ -13,6 +14,7 @@ import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppSalesPage() {
   const ctx = await requireAppPage();
+  const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let summary: PortalSalesSummary = {
     salesToday: 0,
@@ -38,7 +40,7 @@ export default async function AppSalesPage() {
       const [summaryResult, metricsResult, opportunitiesResult] = await Promise.all([
         getPortalSalesSummary(ctx.tenantId),
         getPortalSalesMetrics(ctx.tenantId),
-        getPortalSalesOpportunities(ctx.tenantId)
+        getPortalSalesOpportunities(ctx.tenantId, { visibility: "active" })
       ]);
       summary = summaryResult.data.summary;
       metrics = metricsResult.data.metrics;
@@ -56,7 +58,7 @@ export default async function AppSalesPage() {
       description="Centro comercial premium para seguir pipeline, cierres, responsables y oportunidades activas del espacio."
       badge="Pipeline comercial"
     >
-      <SalesHub summary={summary} metrics={metrics} opportunities={opportunities} />
+      <SalesHub summary={summary} metrics={metrics} opportunities={opportunities} readOnly={!ctx.tenantId || readOnly} />
     </ClientPageShell>
   );
 }
