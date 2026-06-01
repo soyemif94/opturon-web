@@ -43,6 +43,17 @@ type OrderFormState = {
   quantity: string;
 };
 
+type CartItem = {
+  productId: string;
+  name: string;
+  sku: string | null;
+  imageUrl: string | null;
+  unitPrice: number;
+  currency: string;
+  quantity: number;
+  stockAvailable: number;
+};
+
 const initialForm: OrderFormState = {
   customerType: "registered_contact",
   contactId: "",
@@ -57,6 +68,7 @@ export function OrderCreateEditor() {
   const router = useRouter();
   const [form, setForm] = useState<OrderFormState>(initialForm);
   const [productSearch, setProductSearch] = useState("");
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [contacts, setContacts] = useState<PortalContact[]>([]);
   const [sellers, setSellers] = useState<AssignableSeller[]>([]);
@@ -91,6 +103,10 @@ export function OrderCreateEditor() {
   const selectedProductPrice = selectedProduct ? resolveProductPrice(selectedProduct) : 0;
   const selectedStockState = getStockState(selectedProductStock);
   const visibleTotal = selectedProduct && Number.isInteger(requestedQuantity) && requestedQuantity > 0 ? Number((selectedProductPrice * requestedQuantity).toFixed(2)) : 0;
+  const cartUnits = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems]);
+  const subtotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0), [cartItems]);
+  const total = subtotal;
+  const selectedCurrency = cartItems[0]?.currency || selectedProduct?.currency || "ARS";
 
   const hasInvalidQuantity = !Number.isInteger(requestedQuantity) || requestedQuantity <= 0;
   const hasInactiveProduct = Boolean(selectedProduct) && !selectedProductIsActive;
@@ -172,28 +188,8 @@ export function OrderCreateEditor() {
       toast.error("Vendedor requerido", "Selecciona el vendedor responsable del pedido.");
       return;
     }
-    if (!form.productId || !selectedProduct) {
-      toast.error("Producto requerido", "Selecciona un producto del catalogo.");
-      return;
-    }
-    if (!selectedProductIsActive) {
-      toast.error("Producto inactivo", "Activa el producto en catalogo para usarlo en pedidos.");
-      return;
-    }
-    if (selectedProductPrice <= 0) {
-      toast.error("Precio invalido", `El producto ${selectedProduct.name} no tiene un precio valido cargado.`);
-      return;
-    }
-    if (hasInvalidQuantity) {
-      toast.error("Cantidad invalida", "La cantidad del producto debe ser mayor a cero.");
-      return;
-    }
-    if (selectedProductStock <= 0) {
-      toast.error("Sin stock", "El producto seleccionado no tiene stock disponible.");
-      return;
-    }
-    if (requestedQuantity > selectedProductStock) {
-      toast.error("Stock insuficiente", `No hay stock suficiente para ${selectedProduct.name}. Disponible: ${selectedProductStock}.`);
+    if (cartItems.length === 0) {
+      toast.error("Carrito vacio", "Agrega al menos un producto para crear el pedido.");
       return;
     }
 
@@ -209,7 +205,10 @@ export function OrderCreateEditor() {
           paymentDestinationId: form.paymentDestinationId || null,
           source: "manual",
           notes: form.notes.trim(),
-          items: [{ productId: form.productId, quantity: requestedQuantity }]
+          items: cartItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity
+          }))
         })
       });
 
@@ -237,7 +236,90 @@ export function OrderCreateEditor() {
       sellerUserId: current.sellerUserId,
       paymentDestinationId: current.paymentDestinationId
     }));
+    setCartItems([]);
     setProductSearch("");
+  }
+
+  function addSelectedProductToCart() {
+    if (!selectedProduct) {
+      toast.error("Producto requerido", "Selecciona un producto del catalogo.");
+      return;
+    }
+    if (!selectedProductIsActive) {
+      toast.error("Producto inactivo", "Activa el producto en catalogo para usarlo en pedidos.");
+      return;
+    }
+    if (selectedProductPrice <= 0) {
+      toast.error("Precio invalido", `El producto ${selectedProduct.name} no tiene un precio valido cargado.`);
+      return;
+    }
+    if (hasInvalidQuantity) {
+      toast.error("Cantidad invalida", "La cantidad del producto debe ser mayor a cero.");
+      return;
+    }
+    if (selectedProductStock <= 0) {
+      toast.error("Sin stock", "El producto seleccionado no tiene stock disponible.");
+      return;
+    }
+    if (requestedQuantity > selectedProductStock) {
+      toast.error("Stock insuficiente", `No hay stock suficiente para ${selectedProduct.name}. Disponible: ${selectedProductStock}.`);
+      return;
+    }
+
+    setCartItems((current) => {
+      const existing = current.find((item) => item.productId === selectedProduct.id);
+      if (!existing) {
+        return [
+          ...current,
+          {
+            productId: selectedProduct.id,
+            name: selectedProduct.name,
+            sku: selectedProduct.sku || null,
+            imageUrl: selectedProduct.image?.url || null,
+            unitPrice: selectedProductPrice,
+            currency: selectedProduct.currency || "ARS",
+            quantity: requestedQuantity,
+            stockAvailable: selectedProductStock
+          }
+        ];
+      }
+
+      const nextQuantity = existing.quantity + requestedQuantity;
+      if (nextQuantity > selectedProductStock) {
+        toast.error("Stock insuficiente", `No hay stock suficiente para ${selectedProduct.name}. Disponible: ${selectedProductStock}.`);
+        return current;
+      }
+
+      return current.map((item) =>
+        item.productId === selectedProduct.id
+          ? {
+              ...item,
+              quantity: nextQuantity,
+              stockAvailable: selectedProductStock,
+              unitPrice: selectedProductPrice,
+              currency: selectedProduct.currency || "ARS",
+              imageUrl: selectedProduct.image?.url || null
+            }
+          : item
+      );
+    });
+
+    toast.success("Producto agregado", `${selectedProduct.name} ya esta en el pedido.`);
+    setForm((current) => ({ ...current, quantity: "1" }));
+  }
+
+  function updateCartItemQuantity(productId: string, nextQuantity: number) {
+    setCartItems((current) =>
+      current.map((item) => {
+        if (item.productId !== productId) return item;
+        const cappedQuantity = Math.min(Math.max(nextQuantity, 1), Math.max(item.stockAvailable, 1));
+        return { ...item, quantity: cappedQuantity };
+      })
+    );
+  }
+
+  function removeCartItem(productId: string) {
+    setCartItems((current) => current.filter((item) => item.productId !== productId));
   }
 
   return (
@@ -261,7 +343,7 @@ export function OrderCreateEditor() {
         <SummaryChip icon={UserRound} accent="text-sky-300" label="Cliente seleccionado" value={form.customerType === "final_consumer" ? "Consumidor final" : selectedContact?.name || "Pendiente"} helper={selectedContact?.phone || "Sin telefono"} />
         <SummaryChip icon={UserRound} accent="text-orange-300" label="Vendedor responsable" value={selectedSeller?.name || "Pendiente"} helper={selectedSeller?.role || "Sin rol visible"} />
         <SummaryChip icon={Banknote} accent="text-emerald-300" label="Destino de cobro" value={selectedDestination?.name || "Sin definir"} helper={selectedDestination?.type ? labelForPaymentDestinationType(selectedDestination.type) : "Sin tipo"} />
-        <SummaryChip icon={Box} accent="text-fuchsia-300" label="Items agregados" value={selectedProduct ? "1 producto" : "0 productos"} helper={selectedProduct ? `${requestedQuantity > 0 ? requestedQuantity : 0} unidad(es)` : "Sin items"} />
+        <SummaryChip icon={Box} accent="text-fuchsia-300" label="Items agregados" value={`${cartItems.length} producto(s)`} helper={`${cartUnits} unidad(es)`} />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
@@ -387,10 +469,7 @@ export function OrderCreateEditor() {
                     variant="secondary"
                     className="rounded-2xl"
                     disabled={!selectedProduct}
-                    onClick={() => {
-                      if (!selectedProduct) return;
-                      setProductSearch(selectedProduct.name);
-                    }}
+                    onClick={addSelectedProductToCart}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar
@@ -441,65 +520,69 @@ export function OrderCreateEditor() {
             </div>
           </SectionCard>
 
-          <SectionCard title={`Productos agregados (${selectedProduct ? 1 : 0})`} description="Mesa comercial compacta con el item actualmente preparado para enviar." badge="Resumen comercial">
-            {!selectedProduct ? (
+          <SectionCard title={`Productos agregados (${cartItems.length})`} description="Mesa comercial compacta con los items actualmente preparados para enviar." badge="Resumen comercial">
+            {cartItems.length === 0 ? (
               <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/45 p-6 text-sm text-muted">
-                Selecciona un producto del catalogo para preparar el pedido.
+                Agrega al menos un producto para crear el pedido.
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-[minmax(0,1.3fr)_160px_140px_180px] gap-3 rounded-[18px] border border-[color:var(--border)] bg-white/[0.03] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted">
+                <div className="grid grid-cols-[minmax(0,1.3fr)_160px_160px_180px_56px] gap-3 rounded-[18px] border border-[color:var(--border)] bg-white/[0.03] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted">
                   <span>Producto</span>
                   <span>Precio unitario</span>
                   <span>Cantidad</span>
                   <span>Subtotal</span>
+                  <span />
                 </div>
-                <div className="grid grid-cols-[minmax(0,1.3fr)_160px_140px_180px] gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/50 px-4 py-4">
-                  <div className="flex min-w-0 items-center gap-4">
-                    <ProductThumb name={selectedProduct.name} imageUrl={selectedProduct.image?.url || null} />
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-semibold text-text">{selectedProduct.name}</p>
-                      <p className="mt-1 text-sm text-muted">{selectedProduct.sku || "Sin codigo"}</p>
+                {cartItems.map((item) => (
+                  <div key={item.productId} className="grid grid-cols-[minmax(0,1.3fr)_160px_160px_180px_56px] gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/50 px-4 py-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <ProductThumb name={item.name} imageUrl={item.imageUrl} />
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-text">{item.name}</p>
+                        <p className="mt-1 text-sm text-muted">{item.sku || "Sin codigo"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center text-sm font-medium text-text">{formatCurrency(item.unitPrice, item.currency)}</div>
+                    <div className="flex items-center">
+                      <div className="flex h-11 items-center rounded-2xl border border-[color:var(--border)] bg-bg/55 px-2">
+                        <button
+                          type="button"
+                          className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
+                          onClick={() => updateCartItemQuantity(item.productId, item.quantity - 1)}
+                        >
+                          -
+                        </button>
+                        <Input
+                          className="h-8 w-14 border-0 bg-transparent px-0 text-center"
+                          value={String(item.quantity)}
+                          onChange={(event) => {
+                            const nextQuantity = Number.parseInt(event.target.value || "0", 10);
+                            if (!Number.isFinite(nextQuantity)) return;
+                            updateCartItemQuantity(item.productId, nextQuantity);
+                          }}
+                          inputMode="numeric"
+                        />
+                        <button
+                          type="button"
+                          className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
+                          onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center text-base font-semibold text-text">{formatCurrency(item.unitPrice * item.quantity, item.currency)}</div>
+                    <div className="flex items-center justify-end">
+                      <Button type="button" variant="ghost" className="rounded-2xl text-red-300 hover:text-red-200" onClick={() => removeCartItem(item.productId)}>
+                        Quitar
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center text-sm font-medium text-text">{formatCurrency(selectedProductPrice, selectedProduct.currency || "ARS")}</div>
-                  <div className="flex items-center">
-                    <div className="flex h-11 items-center rounded-2xl border border-[color:var(--border)] bg-bg/55 px-2">
-                      <button
-                        type="button"
-                        className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
-                        onClick={() => setForm((current) => ({ ...current, quantity: String(Math.max(Number.parseInt(current.quantity || "1", 10) - 1, 1)) }))}
-                      >
-                        -
-                      </button>
-                      <Input
-                        className="h-8 w-14 border-0 bg-transparent px-0 text-center"
-                        value={form.quantity}
-                        onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value }))}
-                        inputMode="numeric"
-                      />
-                      <button
-                        type="button"
-                        className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
-                        onClick={() => setForm((current) => ({ ...current, quantity: String(Math.max(Number.parseInt(current.quantity || "0", 10) + 1, 1)) }))}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center text-base font-semibold text-text">{formatCurrency(visibleTotal, selectedProduct.currency || "ARS")}</div>
-                </div>
+                ))}
 
                 <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/35 p-5 text-sm text-muted">
-                  {selectedProduct && createBlockedByStock
-                    ? hasInactiveProduct
-                      ? "Este producto esta inactivo en catalogo."
-                      : hasNoPrice
-                        ? "Este producto no tiene un precio valido cargado."
-                        : hasNoStock
-                          ? "Este producto no tiene stock disponible."
-                          : `La cantidad solicitada supera el stock disponible (${selectedProductStock}).`
-                    : "Todos los datos utilizados son reales y provienen del sistema actual."}
+                  Todos los datos utilizados son reales y provienen del sistema actual.
                 </div>
               </div>
             )}
@@ -516,16 +599,17 @@ export function OrderCreateEditor() {
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
               <div className="space-y-3 rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4">
-                <SummaryRow label="Subtotal" value={selectedProduct ? formatCurrency(visibleTotal, selectedProduct.currency || "ARS") : "$ 0,00"} />
+                <SummaryRow label="Subtotal" value={formatCurrency(subtotal, selectedCurrency)} />
                 <SummaryRow label="Descuentos" value="$ 0,00" />
                 <SummaryRow label="Impuestos" value="$ 0,00" />
                 <div className="border-t border-[color:var(--border)] pt-3">
-                  <SummaryRow label="TOTAL" value={selectedProduct ? formatCurrency(visibleTotal, selectedProduct.currency || "ARS") : "$ 0,00"} emphasis />
+                  <SummaryRow label="TOTAL" value={formatCurrency(total, selectedCurrency)} emphasis />
                 </div>
               </div>
               <MiniStat label="Cliente" value={form.customerType === "final_consumer" ? "Consumidor final" : selectedContact?.name || "Pendiente"} />
               <MiniStat label="Responsable" value={selectedSeller?.name || "Pendiente"} />
               <MiniStat label="Cobro" value={selectedDestination?.name || "Sin definir"} />
+              <MiniStat label="Productos" value={`${cartItems.length} producto(s) · ${cartUnits} unidad(es)`} />
               <MiniStat label="Estado inicial" value="Pendiente" />
               <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
                 El alta sigue usando exactamente el endpoint actual de pedidos, con stock, cliente, vendedor y destino de cobro reales.
@@ -535,9 +619,7 @@ export function OrderCreateEditor() {
                 className="w-full rounded-2xl"
                 disabled={
                   saving ||
-                  !selectedProduct ||
-                  hasInvalidQuantity ||
-                  createBlockedByStock ||
+                  cartItems.length === 0 ||
                   !form.sellerUserId ||
                   (form.customerType === "registered_contact" && !form.contactId)
                 }
