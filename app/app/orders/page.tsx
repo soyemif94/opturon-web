@@ -35,7 +35,7 @@ export default async function AppOrdersPage({
       action={
         readOnly ? null : (
           <Button asChild className="rounded-2xl">
-            <a href="#new-order">Nuevo pedido</a>
+            <a href="/app/orders/new">Nuevo pedido</a>
           </Button>
         )
       }
