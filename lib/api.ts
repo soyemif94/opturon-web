@@ -1155,6 +1155,7 @@ export type PortalOrder = {
   paymentStatus: string;
   orderStatus: string;
   conversationId?: string | null;
+  portalHiddenAt?: string | null;
   createdAt: string;
   updatedAt: string;
   contact: {
@@ -2707,12 +2708,17 @@ export async function getPortalProductDetail(tenantId: string, productId: string
 export async function patchPortalOrder(
   tenantId: string,
   orderId: string,
-  payload: { paymentDestinationId?: string | null; sellerUserId?: string | null }
+  payload: { paymentDestinationId?: string | null; sellerUserId?: string | null; salesVisibility?: "active" | "archived" },
+  actor?: { id?: string | null; name?: string | null }
 ) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
   return backendFetch<{ success: boolean; data: PortalOrder }>(
     `/portal/tenants/${tenantId}/orders/${orderId}`,
     {
       method: "PATCH",
+      headers,
       body: JSON.stringify(payload)
     },
     false

@@ -63,7 +63,6 @@ export default async function AppSalesPage() {
         metrics={metrics}
         opportunities={opportunities}
         readOnly={!ctx.tenantId || readOnly}
-        tenantKey={ctx.tenantId || "workspace-demo"}
       />
     </ClientPageShell>
   );

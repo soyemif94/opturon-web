@@ -46,7 +46,18 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   try {
     const payload = await request.json().catch(() => null);
-    const result = await patchPortalOrder(tenantContext.tenantId, params.id, payload || {});
+    const result = await patchPortalOrder(
+      tenantContext.tenantId,
+      params.id,
+      payload || {},
+      {
+        id: tenantContext.ctx?.userId || null,
+        name:
+          typeof tenantContext.ctx?.session?.user?.name === "string"
+            ? tenantContext.ctx.session.user.name
+            : null
+      }
+    );
     return noStore(NextResponse.json({ ok: true, order: result.data }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

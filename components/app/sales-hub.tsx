@@ -40,7 +40,6 @@ type SalesHubProps = {
   metrics: PortalSalesMetrics;
   opportunities: PortalSalesOpportunity[];
   readOnly: boolean;
-  tenantKey: string;
 };
 
 type SalesListMode = "main" | "archive";
@@ -52,10 +51,6 @@ type SalesSnapshot = {
   summary: PortalSalesSummary;
   metrics: PortalSalesMetrics;
   opportunities: PortalSalesOpportunity[];
-};
-
-type OrphanVisibilityState = {
-  hiddenIds: string[];
 };
 
 type EnrichedOpportunity = PortalSalesOpportunity & {
@@ -148,7 +143,7 @@ const PRIORITY_META: Record<
   }
 };
 
-export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey }: SalesHubProps) {
+export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHubProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -161,33 +156,12 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
   const [metricsState, setMetricsState] = useState(metrics);
   const [selectedOpportunityIds, setSelectedOpportunityIds] = useState<string[]>([]);
   const [archivingOpportunityIds, setArchivingOpportunityIds] = useState<string[]>([]);
-  const [hiddenOrphanOpportunityIds, setHiddenOrphanOpportunityIds] = useState<string[]>([]);
   const [loadingArchiveView, setLoadingArchiveView] = useState(false);
   const [refreshingSales, setRefreshingSales] = useState(false);
   const activeFilter = resolveOpportunityFilter(searchParams.get("view"));
 
-  const visibleActiveOpportunities = useMemo(
-    () =>
-      activeOpportunities.filter(
-        (item) => !(hiddenOrphanOpportunityIds.includes(item.id) && !item.conversationId)
-      ),
-    [activeOpportunities, hiddenOrphanOpportunityIds]
-  );
-
-  const localArchivedOrphanOpportunities = useMemo(
-    () =>
-      activeOpportunities.filter(
-        (item) => hiddenOrphanOpportunityIds.includes(item.id) && !item.conversationId
-      ),
-    [activeOpportunities, hiddenOrphanOpportunityIds]
-  );
-
-  const baseOpportunities = useMemo(() => {
-    if (listMode === "archive") {
-      return [...(archivedOpportunities || []), ...localArchivedOrphanOpportunities];
-    }
-    return visibleActiveOpportunities;
-  }, [archivedOpportunities, listMode, localArchivedOrphanOpportunities, visibleActiveOpportunities]);
+  const visibleActiveOpportunities = activeOpportunities;
+  const baseOpportunities = listMode === "archive" ? archivedOpportunities || [] : visibleActiveOpportunities;
   const enrichedOpportunities = useMemo<EnrichedOpportunity[]>(
     () => baseOpportunities.map((item) => enrichOpportunity(item)),
     [baseOpportunities]
@@ -204,34 +178,6 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
   useEffect(() => {
     setMetricsState(metrics);
   }, [metrics]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storageKey = orphanOpportunityStorageKey(tenantKey);
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) {
-      setHiddenOrphanOpportunityIds([]);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as OrphanVisibilityState | null;
-      const nextIds = Array.isArray(parsed?.hiddenIds)
-        ? parsed.hiddenIds.map((value) => String(value || "").trim()).filter(Boolean)
-        : [];
-      setHiddenOrphanOpportunityIds(nextIds);
-    } catch {
-      setHiddenOrphanOpportunityIds([]);
-    }
-  }, [tenantKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      orphanOpportunityStorageKey(tenantKey),
-      JSON.stringify({ hiddenIds: hiddenOrphanOpportunityIds })
-    );
-  }, [hiddenOrphanOpportunityIds, tenantKey]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -277,22 +223,22 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
       ? Math.max(laneFilteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0)
       : 0;
 
-  const archivableVisibleOpportunities = useMemo(
-    () => visibleOpportunities.filter((item) => Boolean(item.conversationId)),
+  const actionableVisibleOpportunities = useMemo(
+    () => visibleOpportunities.filter((item) => isSalesOpportunityActionable(item)),
     [visibleOpportunities]
   );
 
-  const archivableSelectedIds = useMemo(
+  const actionableSelectedIds = useMemo(
     () =>
       selectedOpportunityIds.filter((id) =>
-        visibleActiveOpportunities.some((item) => item.id === id && Boolean(item.conversationId))
+        visibleActiveOpportunities.some((item) => item.id === id && isSalesOpportunityActionable(item))
       ),
     [selectedOpportunityIds, visibleActiveOpportunities]
   );
 
-  const allVisibleArchivableSelected =
-    archivableVisibleOpportunities.length > 0 &&
-    archivableVisibleOpportunities.every((item) => archivableSelectedIds.includes(item.id));
+  const allVisibleActionableSelected =
+    actionableVisibleOpportunities.length > 0 &&
+    actionableVisibleOpportunities.every((item) => actionableSelectedIds.includes(item.id));
 
   const laneSummaries = useMemo(() => {
     return PIPELINE_LANES.map((lane) => {
@@ -480,44 +426,71 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
     }
   }
 
+  async function patchOrderSalesVisibility(orderId: string, salesVisibility: "active" | "archived") {
+    const response = await fetch(`/api/app/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ salesVisibility })
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(String(json?.error || "sales_order_visibility_failed"));
+    return json;
+  }
+
   async function archiveOpportunitySelection(opportunityIds: string[]) {
     if (readOnly || archivingOpportunityIds.length > 0) return;
 
-      const selectedRows = visibleActiveOpportunities.filter(
-        (item) => opportunityIds.includes(item.id) && Boolean(item.conversationId)
-      );
+    const selectedRows = visibleActiveOpportunities.filter(
+      (item) => opportunityIds.includes(item.id) && isSalesOpportunityActionable(item)
+    );
     const conversationIds = Array.from(
       new Set(selectedRows.map((item) => String(item.conversationId || "").trim()).filter(Boolean))
     );
+    const orphanOrderIds = Array.from(
+      new Set(
+        selectedRows
+          .filter((item) => !item.conversationId && isOrderBackedOpportunity(item))
+          .map((item) => item.id)
+      )
+    );
 
-    if (!conversationIds.length) {
-      toast.error("No hay oportunidades archivables", "Solo se pueden archivar oportunidades con conversacion asociada.");
+    if (!conversationIds.length && !orphanOrderIds.length) {
+      toast.error("No hay oportunidades accionables", "No encontramos elementos validos para limpiar desde este pipeline.");
       return;
     }
 
+    const selectedCount = conversationIds.length + orphanOrderIds.length;
     const confirmed =
       typeof window === "undefined"
         ? false
         : window.confirm(
-            conversationIds.length === 1
-              ? "La oportunidad se ocultara del pipeline activo y seguira disponible en Archivo. Deseas continuar?"
-              : `Se archivaran ${conversationIds.length} oportunidades del pipeline activo. El historial seguira disponible en Archivo.`
+            selectedCount === 1
+              ? conversationIds.length === 1
+                ? "La oportunidad se ocultara del pipeline activo y seguira disponible en Archivo. Deseas continuar?"
+                : "Esta oportunidad no tiene conversacion asociada. Se ocultara del pipeline activo, pero no se eliminara la informacion comercial."
+              : `Se aplicara limpieza sobre ${selectedCount} oportunidades del pipeline activo. El historial seguira disponible en Archivo.`
           );
     if (!confirmed) return;
 
     setArchivingOpportunityIds(opportunityIds);
     try {
-      const response = await fetch("/api/app/inbox/archive", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationIds })
-      });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(String(json?.error || "sales_archive_failed"));
+      if (conversationIds.length) {
+        const response = await fetch("/api/app/inbox/archive", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationIds })
+        });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(String(json?.error || "sales_archive_failed"));
+      }
+
+      if (orphanOrderIds.length) {
+        await Promise.all(orphanOrderIds.map((orderId) => patchOrderSalesVisibility(orderId, "archived")));
+      }
 
       await refreshSalesData({ includeArchived: archivedOpportunities !== null || listMode === "archive" });
       toast.success(
-        conversationIds.length === 1 ? "Oportunidad archivada" : "Oportunidades archivadas",
+        selectedCount === 1 ? "Oportunidad archivada" : "Oportunidades archivadas",
         "La limpieza del pipeline ya quedo aplicada sobre la base activa."
       );
     } catch (error) {
@@ -540,13 +513,29 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
           );
     if (!confirmed) return;
 
-    setHiddenOrphanOpportunityIds((current) => (current.includes(opportunityId) ? current : [...current, opportunityId]));
-    toast.success("Oportunidad oculta", "La oportunidad huerfana salio del pipeline activo y ahora queda disponible en Archivo.");
+    setArchivingOpportunityIds([opportunityId]);
+    try {
+      await patchOrderSalesVisibility(opportunityId, "archived");
+      await refreshSalesData({ includeArchived: archivedOpportunities !== null || listMode === "archive" });
+      toast.success("Oportunidad oculta", "La oportunidad huerfana salio del pipeline activo y ahora queda disponible en Archivo.");
+    } catch (error) {
+      toast.error("No se pudo ocultar", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setArchivingOpportunityIds([]);
+    }
   }
 
-  function restoreHiddenOrphanOpportunity(opportunityId: string) {
-    setHiddenOrphanOpportunityIds((current) => current.filter((id) => id !== opportunityId));
-    toast.success("Oportunidad restaurada", "La oportunidad vuelve a aparecer en el pipeline principal.");
+  async function restoreHiddenOrphanOpportunity(opportunityId: string) {
+    setArchivingOpportunityIds([opportunityId]);
+    try {
+      await patchOrderSalesVisibility(opportunityId, "active");
+      await refreshSalesData({ includeArchived: true });
+      toast.success("Oportunidad restaurada", "La oportunidad vuelve a aparecer en el pipeline principal.");
+    } catch (error) {
+      toast.error("No se pudo restaurar", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setArchivingOpportunityIds([]);
+    }
   }
 
   useEffect(() => {
@@ -555,7 +544,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
 
   useEffect(() => {
     setSelectedOpportunityIds((current) =>
-      current.filter((id) => visibleActiveOpportunities.some((item) => item.id === id && Boolean(item.conversationId)))
+      current.filter((id) => visibleActiveOpportunities.some((item) => item.id === id && isSalesOpportunityActionable(item)))
     );
   }, [visibleActiveOpportunities]);
 
@@ -731,7 +720,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
                         </Button>
                         <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
                           Archivo
-                          <span className="ml-2 text-xs text-white/65">{(archivedOpportunities?.length ?? 0) + localArchivedOrphanOpportunities.length}</span>
+                          <span className="ml-2 text-xs text-white/65">{archivedOpportunities?.length ?? 0}</span>
                         </Button>
                       </div>
                     </div>
@@ -796,9 +785,9 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
                   <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <p className="text-sm text-muted">
-                        {archivableSelectedIds.length > 0
-                          ? `${archivableSelectedIds.length} oportunidades seleccionadas listas para archivar.`
-                          : "Selecciona oportunidades con conversacion asociada para limpiar el pipeline sin perder historial."}
+                        {actionableSelectedIds.length > 0
+                          ? `${actionableSelectedIds.length} oportunidades seleccionadas listas para limpiar el pipeline.`
+                          : "Selecciona oportunidades visibles para ocultarlas del pipeline sin borrar la base comercial."}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <Button
@@ -808,24 +797,24 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
                           className="rounded-2xl"
                           onClick={() =>
                             setSelectedOpportunityIds(
-                              allVisibleArchivableSelected ? [] : archivableVisibleOpportunities.map((item) => item.id)
+                              allVisibleActionableSelected ? [] : actionableVisibleOpportunities.map((item) => item.id)
                             )
                           }
-                          disabled={readOnly || archivableVisibleOpportunities.length === 0}
+                          disabled={readOnly || actionableVisibleOpportunities.length === 0}
                         >
-                          {allVisibleArchivableSelected ? "Cancelar visibles" : "Seleccionar visibles"}
+                          {allVisibleActionableSelected ? "Cancelar visibles" : "Seleccionar visibles"}
                         </Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="secondary"
                           className="rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
-                          onClick={() => void archiveOpportunitySelection(archivableSelectedIds)}
-                          disabled={readOnly || archivableSelectedIds.length === 0 || archivingOpportunityIds.length > 0 || refreshingSales}
+                          onClick={() => void archiveOpportunitySelection(actionableSelectedIds)}
+                          disabled={readOnly || actionableSelectedIds.length === 0 || archivingOpportunityIds.length > 0 || refreshingSales}
                         >
                           {archivingOpportunityIds.length > 0 ? "Archivando..." : "Archivar seleccionadas"}
                         </Button>
-                        {archivableSelectedIds.length > 0 ? (
+                        {actionableSelectedIds.length > 0 ? (
                           <Button
                             type="button"
                             size="sm"
@@ -866,13 +855,13 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
                       <OpportunityRow
                         key={item.id}
                         item={item}
-                        selectable={listMode === "main" && Boolean(item.conversationId)}
+                        selectable={listMode === "main" && isSalesOpportunityActionable(item)}
                         selected={selectedOpportunityIds.includes(item.id)}
-                        selectionDisabled={readOnly || !item.conversationId}
+                        selectionDisabled={readOnly || !isSalesOpportunityActionable(item)}
                         actionBusy={archivingOpportunityIds.includes(item.id) || refreshingSales}
                         readOnly={readOnly}
                         listMode={listMode}
-                        orphanHidden={hiddenOrphanOpportunityIds.includes(item.id) && !item.conversationId}
+                        orphanHidden={listMode === "archive" && !item.conversationId && isOrderBackedOpportunity(item)}
                         onToggleSelect={(checked) =>
                           setSelectedOpportunityIds((current) =>
                             checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id)
@@ -880,7 +869,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey 
                         }
                         onArchive={() => void archiveOpportunitySelection([item.id])}
                         onHideOrphan={() => void hideOrphanOpportunity(item.id)}
-                        onRestoreOrphan={() => restoreHiddenOrphanOpportunity(item.id)}
+                        onRestoreOrphan={() => void restoreHiddenOrphanOpportunity(item.id)}
                       />
                     ))}
                   </div>
@@ -1674,10 +1663,6 @@ function resolveOpportunityFilter(value: string | null): SalesOpportunityFilter 
   return "all";
 }
 
-function orphanOpportunityStorageKey(tenantKey: string) {
-  return `opturon:sales:hidden-orphans:${tenantKey}`;
-}
-
 function matchesOpportunityFilter(item: EnrichedOpportunity, filter: SalesOpportunityFilter) {
   if (filter === "closed") return item.commercialStage === "won" || item.lane === "closed";
   if (filter === "open") return item.commercialStage !== "won" && item.commercialStage !== "lost" && item.lane !== "closed";
@@ -1737,6 +1722,14 @@ function normalizeOpportunitySource(value: string | null) {
   if (text.includes("manual")) return "Manual";
   if (text.includes("web") || text.includes("form")) return "Web / Formulario";
   return titleCaseLabel(text);
+}
+
+function isOrderBackedOpportunity(item: Pick<PortalSalesOpportunity, "id">) {
+  return !String(item.id || "").startsWith("conversation:");
+}
+
+function isSalesOpportunityActionable(item: Pick<PortalSalesOpportunity, "id" | "conversationId">) {
+  return Boolean(item.conversationId) || (!item.conversationId && isOrderBackedOpportunity(item));
 }
 
 function resolvePipelineLane(item: PortalSalesOpportunity): PipelineLane {
