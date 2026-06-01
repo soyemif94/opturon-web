@@ -495,7 +495,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
           Este espacio esta en modo solo lectura. Puedes revisar el pipeline, pero las acciones de archivo no estan disponibles.
         </div>
       ) : null}
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-12">
             <Card className="relative overflow-hidden border-orange-400/30 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] shadow-[0_20px_80px_rgba(5,10,25,0.28)] lg:col-span-4 xl:col-span-5">
@@ -637,8 +637,8 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                         onClick={() => setOpportunityFilter("active_conversations")}
                       />
                     </div>
-                    <div className="flex w-full flex-col gap-3 md:flex-row xl:w-auto">
-                      <div className="relative min-w-[320px] flex-1 xl:flex-none">
+                    <div className="flex w-full flex-col gap-3 md:flex-row 2xl:w-auto">
+                      <div className="relative w-full flex-1 md:min-w-0 2xl:min-w-[320px] 2xl:flex-none">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                         <Input
                           className="h-11 rounded-2xl border-white/10 bg-black/18 pl-10 text-sm"
@@ -661,14 +661,14 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                   </div>
                 </div>
 
-                <div className="grid gap-3 overflow-x-auto pb-1 xl:grid-cols-5">
+                <div className="grid gap-3 overflow-x-auto pb-1 2xl:grid-cols-5">
                   {laneSummaries.map((lane) => (
                     <button
                       key={lane.key}
                       type="button"
                       onClick={() => setActiveLane((current) => (current === lane.key ? "all" : lane.key))}
                       className={cn(
-                        "min-w-[220px] rounded-[24px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-4 text-left transition-all duration-200 hover:-translate-y-0.5",
+                        "min-w-[220px] rounded-[24px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-4 text-left transition-all duration-200 hover:-translate-y-0.5 2xl:min-w-0",
                         activeLane === lane.key
                           ? "border-orange-400/35 shadow-[0_0_0_1px_rgba(249,115,22,0.14),0_18px_40px_rgba(0,0,0,0.20)]"
                           : "border-white/10"
@@ -1108,6 +1108,161 @@ function OpportunityRow({
   onArchive: () => void;
 }) {
   const priorityMeta = PRIORITY_META[item.priority];
+  const customerDetailCopy = item.customer.phone || "Sin telefono";
+  const archiveHelperCopy = item.conversationId
+    ? listMode === "archive"
+      ? "Oportunidad archivada desde su conversacion comercial."
+      : "Puede archivarse sin perder historial."
+    : "Sin conversacion asociada: no admite archivo directo por ahora.";
+
+  function renderCustomerBlock() {
+    return (
+      <div className="min-w-0">
+        <div className="flex items-start gap-3">
+          <label className="mt-3 inline-flex items-center">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(event) => onToggleSelect(event.target.checked)}
+              disabled={!selectable || selectionDisabled}
+              className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
+            />
+          </label>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+            {initialsFromName(item.customer.name)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{item.customer.name}</p>
+              {item.contactId ? (
+                <Link
+                  href={`/app/contacts/${item.contactId}`}
+                  className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200"
+                >
+                  Ver cliente
+                </Link>
+              ) : null}
+            </div>
+            <p className="mt-1 truncate text-sm text-muted">{customerDetailCopy}</p>
+            <p className="mt-2 text-xs leading-5 text-white/45">{archiveHelperCopy}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderStatusBadges() {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
+          {item.commercialStageLabel}
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
+          {item.collectionStatusLabel}
+        </span>
+      </div>
+    );
+  }
+
+  function renderAmountBlock() {
+    return (
+      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
+        <p className="truncate text-lg font-semibold text-white">{formatMoney(item.amount, item.currency)}</p>
+        <p className="mt-1 text-xs text-muted">Valor de la oportunidad</p>
+      </div>
+    );
+  }
+
+  function renderDateBlock() {
+    return (
+      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
+        <div className="flex items-start gap-2.5">
+          <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+          <div className="min-w-0">
+            <p className="truncate text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{item.lastActivityLabel}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderSourceBlock() {
+    return (
+      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
+        <div className="flex items-start gap-2.5">
+          {item.source && item.source.toLowerCase().includes("bot") ? (
+            <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
+          ) : (
+            <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
+            <p className="mt-1 text-xs text-muted">Origen</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderResponsibleBlock() {
+    return (
+      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
+        <div className="flex items-start gap-2.5">
+          <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+          <div className="min-w-0">
+            <p className="truncate text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+            <p className="mt-1 text-xs text-muted">Responsable</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderActionCluster() {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
+          {item.priorityLabel}
+        </span>
+        {listMode === "main" && item.conversationId ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+            onClick={onArchive}
+            disabled={readOnly || actionBusy}
+          >
+            <Archive className="mr-2 h-4 w-4" />
+            {actionBusy ? "Archivando..." : "Archivar"}
+          </Button>
+        ) : listMode === "main" ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/55">
+            Archivo no disponible
+          </span>
+        ) : (
+          <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+            En archivo
+          </span>
+        )}
+        {item.contactId ? (
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8"
+          >
+            <Link href={`/app/contacts/${item.contactId}`}>
+              Ver cliente
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -1116,121 +1271,42 @@ function OpportunityRow({
         priorityMeta.ringClass
       )}
     >
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_180px_160px_210px_130px_190px_156px] xl:items-center">
-        <div className="min-w-0">
-          <div className="flex items-start gap-3">
-            <label className="mt-3 inline-flex items-center">
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={(event) => onToggleSelect(event.target.checked)}
-                disabled={!selectable || selectionDisabled}
-                className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
-              />
-            </label>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
-              {initialsFromName(item.customer.name)}
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-medium text-white">{item.customer.name}</p>
-                {item.contactId ? (
-                  <Link href={`/app/contacts/${item.contactId}`} className="text-xs font-medium text-orange-100 transition hover:text-orange-200">
-                    Ver cliente
-                  </Link>
-                ) : null}
-              </div>
-              <p className="mt-1 truncate text-sm text-muted">{item.customer.phone || "Sin telefono"}</p>
-              <p className="mt-2 text-xs text-white/45">
-                {item.conversationId
-                  ? listMode === "archive"
-                    ? "Oportunidad archivada desde su conversacion comercial."
-                    : "Puede archivarse sin perder historial."
-                  : "Sin conversacion asociada: no admite archivo directo por ahora."}
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="hidden 2xl:grid 2xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,0.72fr)_minmax(0,0.9fr)_auto] 2xl:items-center 2xl:gap-4">
+        {renderCustomerBlock()}
+        {renderStatusBadges()}
+        {renderAmountBlock()}
+        {renderDateBlock()}
+        {renderSourceBlock()}
+        {renderResponsibleBlock()}
+        <div className="flex justify-end">{renderActionCluster()}</div>
+      </div>
 
-        <div className="flex flex-wrap gap-2">
-          <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
-            {item.commercialStageLabel}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
-            {item.collectionStatusLabel}
-          </span>
+      <div className="hidden xl:flex 2xl:hidden xl:flex-col xl:gap-4">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(220px,0.8fr)_minmax(230px,1fr)]">
+          {renderCustomerBlock()}
+          {renderStatusBadges()}
+          {renderAmountBlock()}
+          {renderDateBlock()}
         </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_auto] xl:items-start">
+          {renderSourceBlock()}
+          {renderResponsibleBlock()}
+          <div className="xl:flex xl:justify-end">{renderActionCluster()}</div>
+        </div>
+      </div>
 
-        <div>
-          <p className="text-lg font-semibold text-white">{formatMoney(item.amount, item.currency)}</p>
-          <p className="mt-1 text-xs text-muted">Valor de la oportunidad</p>
+      <div className="flex flex-col gap-3 xl:hidden">
+        {renderCustomerBlock()}
+        {renderStatusBadges()}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {renderAmountBlock()}
+          {renderDateBlock()}
         </div>
-
-        <div className="flex items-start gap-2.5">
-          <Clock3 className="mt-0.5 h-4 w-4 text-white/40" />
-          <div>
-            <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
-            <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {renderSourceBlock()}
+          {renderResponsibleBlock()}
         </div>
-
-        <div className="flex items-start gap-2.5">
-          {item.source && item.source.toLowerCase().includes("bot") ? (
-            <Bot className="mt-0.5 h-4 w-4 text-orange-100" />
-          ) : (
-            <CircleDot className="mt-0.5 h-4 w-4 text-white/45" />
-          )}
-          <div>
-            <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
-            <p className="mt-1 text-xs text-muted">Origen</p>
-          </div>
-        </div>
-
-        <div className="flex items-start gap-2.5">
-          <UserRound className="mt-0.5 h-4 w-4 text-white/45" />
-          <div>
-            <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
-            <p className="mt-1 text-xs text-muted">Responsable</p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 xl:justify-end">
-          <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
-            {item.priorityLabel}
-          </span>
-          <div className="flex items-center gap-2">
-            {listMode === "main" && item.conversationId ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
-                onClick={onArchive}
-                disabled={readOnly || actionBusy}
-              >
-                <Archive className="mr-2 h-4 w-4" />
-                {actionBusy ? "Archivando..." : "Archivar"}
-              </Button>
-            ) : listMode === "main" ? (
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/55">
-                Archivo no disponible
-              </span>
-            ) : (
-              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-                En archivo
-              </span>
-            )}
-            {item.contactId ? (
-              <Button asChild size="sm" variant="ghost" className="rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
-                <Link href={`/app/contacts/${item.contactId}`}>
-                  Ver cliente
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        {renderActionCluster()}
       </div>
     </div>
   );
