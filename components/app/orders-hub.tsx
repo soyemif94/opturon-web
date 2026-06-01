@@ -188,6 +188,10 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
         .slice(0, 4),
     [initialOrders]
   );
+  const selectedOrder = useMemo(
+    () => initialOrders.find((order) => order.id === selectedOrderId) || null,
+    [initialOrders, selectedOrderId]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -271,15 +275,17 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  useEffect(() => {
-    if (!selectedOrderId) return;
-    const selectedIndex = filteredOrders.findIndex((order) => order.id === selectedOrderId);
-    if (selectedIndex < 0) return;
-    const targetPage = Math.floor(selectedIndex / ORDERS_PER_PAGE) + 1;
-    if (targetPage !== currentPage) {
-      setCurrentPage(targetPage);
+  function applyQuickView(mode: "pending_validation" | "pending" | "delivered") {
+    setCurrentPage(1);
+    if (mode === "pending_validation") {
+      setViewMode("pending_validation");
+      setListTab("all");
+      return;
     }
-  }, [currentPage, filteredOrders, selectedOrderId]);
+
+    setViewMode("all");
+    setListTab(mode);
+  }
 
   return (
     <div className="space-y-6">
@@ -421,6 +427,25 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
               </div>
             </CardHeader>
             <CardContent className="pt-0">
+              {selectedOrder ? (
+                <div className="mb-4 rounded-[22px] border border-brand/20 bg-[linear-gradient(180deg,rgba(255,128,0,0.08),rgba(10,17,30,0.35))] p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-brandBright">Pedido seleccionado</p>
+                      <p className="mt-2 text-base font-semibold text-text">{labelForOrderCustomer(selectedOrder)}</p>
+                      <p className="mt-1 text-sm text-muted">
+                        {shortOrderId(selectedOrder.id)} · {formatDateCompact(selectedOrder.createdAt)} · {labelForOrderSeller(selectedOrder, sellers)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={badgeForOrderStatus(selectedOrder.orderStatus)}>{labelForOrderStatus(selectedOrder.orderStatus)}</Badge>
+                      <Badge variant={badgeForPaymentStatus(selectedOrder.paymentStatus)}>{labelForPaymentStatus(selectedOrder.paymentStatus)}</Badge>
+                      <Badge variant="outline">{formatCurrency(selectedOrder.total, selectedOrder.currency)}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {filteredOrders.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-surface/45 p-6 text-sm leading-7 text-muted">
                   {normalizedSearch || statusFilter !== "all" || sourceFilter !== "all" || sellerFilter !== "all" || dateFrom || dateTo
@@ -470,8 +495,8 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                             </td>
                             <td className="px-4 py-3 align-top">
                               <div className="flex justify-end gap-2">
-                                <Button type="button" size="sm" className="rounded-2xl" onClick={() => setSelectedOrderId(order.id)}>
-                                  Seleccionar
+                                <Button type="button" size="sm" className="rounded-2xl" variant={selectedOrderId === order.id ? "secondary" : "primary"} onClick={() => setSelectedOrderId(order.id)}>
+                                  {selectedOrderId === order.id ? "Seleccionado" : "Seleccionar"}
                                 </Button>
                               </div>
                             </td>
@@ -541,17 +566,14 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                 type="button"
                 variant="secondary"
                 className="justify-start rounded-2xl"
-                onClick={() => {
-                  setViewMode("pending_validation");
-                  setListTab("all");
-                }}
+                onClick={() => applyQuickView("pending_validation")}
               >
                 Validar pagos
               </Button>
-              <Button type="button" variant="secondary" className="justify-start rounded-2xl" onClick={() => setListTab("pending")}>
+              <Button type="button" variant="secondary" className="justify-start rounded-2xl" onClick={() => applyQuickView("pending")}>
                 Pedidos pendientes
               </Button>
-              <Button type="button" variant="secondary" className="justify-start rounded-2xl" onClick={() => setListTab("delivered")}>
+              <Button type="button" variant="secondary" className="justify-start rounded-2xl" onClick={() => applyQuickView("delivered")}>
                 Pedidos entregados
               </Button>
             </div>
