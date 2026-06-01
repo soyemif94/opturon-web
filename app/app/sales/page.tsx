@@ -58,7 +58,13 @@ export default async function AppSalesPage() {
       description="Centro comercial premium para seguir pipeline, cierres, responsables y oportunidades activas del espacio."
       badge="Pipeline comercial"
     >
-      <SalesHub summary={summary} metrics={metrics} opportunities={opportunities} readOnly={!ctx.tenantId || readOnly} />
+      <SalesHub
+        summary={summary}
+        metrics={metrics}
+        opportunities={opportunities}
+        readOnly={!ctx.tenantId || readOnly}
+        tenantKey={ctx.tenantId || "workspace-demo"}
+      />
     </ClientPageShell>
   );
 }

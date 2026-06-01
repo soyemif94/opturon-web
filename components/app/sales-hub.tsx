@@ -40,6 +40,7 @@ type SalesHubProps = {
   metrics: PortalSalesMetrics;
   opportunities: PortalSalesOpportunity[];
   readOnly: boolean;
+  tenantKey: string;
 };
 
 type SalesListMode = "main" | "archive";
@@ -51,6 +52,10 @@ type SalesSnapshot = {
   summary: PortalSalesSummary;
   metrics: PortalSalesMetrics;
   opportunities: PortalSalesOpportunity[];
+};
+
+type OrphanVisibilityState = {
+  hiddenIds: string[];
 };
 
 type EnrichedOpportunity = PortalSalesOpportunity & {
@@ -143,7 +148,7 @@ const PRIORITY_META: Record<
   }
 };
 
-export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHubProps) {
+export function SalesHub({ summary, metrics, opportunities, readOnly, tenantKey }: SalesHubProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -156,11 +161,33 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   const [metricsState, setMetricsState] = useState(metrics);
   const [selectedOpportunityIds, setSelectedOpportunityIds] = useState<string[]>([]);
   const [archivingOpportunityIds, setArchivingOpportunityIds] = useState<string[]>([]);
+  const [hiddenOrphanOpportunityIds, setHiddenOrphanOpportunityIds] = useState<string[]>([]);
   const [loadingArchiveView, setLoadingArchiveView] = useState(false);
   const [refreshingSales, setRefreshingSales] = useState(false);
   const activeFilter = resolveOpportunityFilter(searchParams.get("view"));
 
-  const baseOpportunities = listMode === "archive" ? archivedOpportunities || [] : activeOpportunities;
+  const visibleActiveOpportunities = useMemo(
+    () =>
+      activeOpportunities.filter(
+        (item) => !(hiddenOrphanOpportunityIds.includes(item.id) && !item.conversationId)
+      ),
+    [activeOpportunities, hiddenOrphanOpportunityIds]
+  );
+
+  const localArchivedOrphanOpportunities = useMemo(
+    () =>
+      activeOpportunities.filter(
+        (item) => hiddenOrphanOpportunityIds.includes(item.id) && !item.conversationId
+      ),
+    [activeOpportunities, hiddenOrphanOpportunityIds]
+  );
+
+  const baseOpportunities = useMemo(() => {
+    if (listMode === "archive") {
+      return [...(archivedOpportunities || []), ...localArchivedOrphanOpportunities];
+    }
+    return visibleActiveOpportunities;
+  }, [archivedOpportunities, listMode, localArchivedOrphanOpportunities, visibleActiveOpportunities]);
   const enrichedOpportunities = useMemo<EnrichedOpportunity[]>(
     () => baseOpportunities.map((item) => enrichOpportunity(item)),
     [baseOpportunities]
@@ -177,6 +204,34 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   useEffect(() => {
     setMetricsState(metrics);
   }, [metrics]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = orphanOpportunityStorageKey(tenantKey);
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      setHiddenOrphanOpportunityIds([]);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as OrphanVisibilityState | null;
+      const nextIds = Array.isArray(parsed?.hiddenIds)
+        ? parsed.hiddenIds.map((value) => String(value || "").trim()).filter(Boolean)
+        : [];
+      setHiddenOrphanOpportunityIds(nextIds);
+    } catch {
+      setHiddenOrphanOpportunityIds([]);
+    }
+  }, [tenantKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      orphanOpportunityStorageKey(tenantKey),
+      JSON.stringify({ hiddenIds: hiddenOrphanOpportunityIds })
+    );
+  }, [hiddenOrphanOpportunityIds, tenantKey]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -230,9 +285,9 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   const archivableSelectedIds = useMemo(
     () =>
       selectedOpportunityIds.filter((id) =>
-        activeOpportunities.some((item) => item.id === id && Boolean(item.conversationId))
+        visibleActiveOpportunities.some((item) => item.id === id && Boolean(item.conversationId))
       ),
-    [activeOpportunities, selectedOpportunityIds]
+    [selectedOpportunityIds, visibleActiveOpportunities]
   );
 
   const allVisibleArchivableSelected =
@@ -428,9 +483,9 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   async function archiveOpportunitySelection(opportunityIds: string[]) {
     if (readOnly || archivingOpportunityIds.length > 0) return;
 
-    const selectedRows = activeOpportunities.filter(
-      (item) => opportunityIds.includes(item.id) && Boolean(item.conversationId)
-    );
+      const selectedRows = visibleActiveOpportunities.filter(
+        (item) => opportunityIds.includes(item.id) && Boolean(item.conversationId)
+      );
     const conversationIds = Array.from(
       new Set(selectedRows.map((item) => String(item.conversationId || "").trim()).filter(Boolean))
     );
@@ -472,15 +527,37 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
     }
   }
 
+  async function hideOrphanOpportunity(opportunityId: string) {
+    if (readOnly) return;
+    const target = visibleActiveOpportunities.find((item) => item.id === opportunityId && !item.conversationId);
+    if (!target) return;
+
+    const confirmed =
+      typeof window === "undefined"
+        ? false
+        : window.confirm(
+            "Esta oportunidad no tiene conversacion asociada. Se ocultara del pipeline activo pero conservara la informacion comercial."
+          );
+    if (!confirmed) return;
+
+    setHiddenOrphanOpportunityIds((current) => (current.includes(opportunityId) ? current : [...current, opportunityId]));
+    toast.success("Oportunidad oculta", "La oportunidad huerfana salio del pipeline activo y ahora queda disponible en Archivo.");
+  }
+
+  function restoreHiddenOrphanOpportunity(opportunityId: string) {
+    setHiddenOrphanOpportunityIds((current) => current.filter((id) => id !== opportunityId));
+    toast.success("Oportunidad restaurada", "La oportunidad vuelve a aparecer en el pipeline principal.");
+  }
+
   useEffect(() => {
     setSelectedOpportunityIds([]);
   }, [activeFilter, activeLane, listMode, normalizedSearch]);
 
   useEffect(() => {
     setSelectedOpportunityIds((current) =>
-      current.filter((id) => activeOpportunities.some((item) => item.id === id && Boolean(item.conversationId)))
+      current.filter((id) => visibleActiveOpportunities.some((item) => item.id === id && Boolean(item.conversationId)))
     );
-  }, [activeOpportunities]);
+  }, [visibleActiveOpportunities]);
 
   useEffect(() => {
     if (listMode === "archive" && archivedOpportunities === null) {
@@ -498,7 +575,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
       <section className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-12">
-            <Card className="relative overflow-hidden border-orange-400/30 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] shadow-[0_20px_80px_rgba(5,10,25,0.28)] lg:col-span-4 xl:col-span-5">
+            <Card className="relative overflow-hidden border-orange-400/30 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] shadow-[0_20px_80px_rgba(5,10,25,0.28)] lg:col-span-4 xl:col-span-4">
               <CardContent className="relative p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -606,15 +683,15 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
 
           <Card className="overflow-hidden border-white/10 bg-white/[0.03] shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
             <CardContent className="p-5 lg:p-6">
-              <div className="flex flex-col gap-5">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                  <div>
-                    <p className="text-xl font-semibold text-white">Pipeline comercial activo</p>
-                    <p className="mt-1 text-sm text-muted">
-                      Seguimiento ejecutivo de oportunidades, conversaciones y proximidad de cierre.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-3 xl:items-end">
+                <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+                    <div>
+                      <p className="text-xl font-semibold text-white">Pipeline comercial activo</p>
+                      <p className="mt-1 text-sm text-muted">
+                        Seguimiento ejecutivo de oportunidades, conversaciones y proximidad de cierre.
+                      </p>
+                    </div>
+                  <div className="flex min-w-0 flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <FilterChip
                         active={activeFilter === "all"}
@@ -637,9 +714,9 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                         onClick={() => setOpportunityFilter("active_conversations")}
                       />
                     </div>
-                    <div className="flex w-full flex-col gap-3 md:flex-row 2xl:w-auto">
-                      <div className="relative w-full flex-1 md:min-w-0 2xl:min-w-[320px] 2xl:flex-none">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="relative min-w-0">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted" />
                         <Input
                           className="h-11 rounded-2xl border-white/10 bg-black/18 pl-10 text-sm"
                           value={searchQuery}
@@ -647,14 +724,14 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                           placeholder="Buscar por nombre, telefono, responsable o origen"
                         />
                       </div>
-                      <div className="inline-flex rounded-2xl border border-white/10 bg-black/18 p-1">
+                      <div className="inline-flex w-fit rounded-2xl border border-white/10 bg-black/18 p-1">
                         <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
                           Principal
-                          <span className="ml-2 text-xs text-white/65">{activeOpportunities.length}</span>
+                          <span className="ml-2 text-xs text-white/65">{visibleActiveOpportunities.length}</span>
                         </Button>
                         <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
                           Archivo
-                          <span className="ml-2 text-xs text-white/65">{archivedOpportunities?.length ?? 0}</span>
+                          <span className="ml-2 text-xs text-white/65">{(archivedOpportunities?.length ?? 0) + localArchivedOrphanOpportunities.length}</span>
                         </Button>
                       </div>
                     </div>
@@ -795,12 +872,15 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                         actionBusy={archivingOpportunityIds.includes(item.id) || refreshingSales}
                         readOnly={readOnly}
                         listMode={listMode}
+                        orphanHidden={hiddenOrphanOpportunityIds.includes(item.id) && !item.conversationId}
                         onToggleSelect={(checked) =>
                           setSelectedOpportunityIds((current) =>
                             checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id)
                           )
                         }
                         onArchive={() => void archiveOpportunitySelection([item.id])}
+                        onHideOrphan={() => void hideOrphanOpportunity(item.id)}
+                        onRestoreOrphan={() => restoreHiddenOrphanOpportunity(item.id)}
                       />
                     ))}
                   </div>
@@ -974,15 +1054,15 @@ function ExecutiveStatCard({
           : "border-amber-400/20 bg-amber-500/10 text-amber-100";
 
   return (
-    <Card className="border-white/10 bg-white/[0.03] shadow-[0_16px_40px_rgba(0,0,0,0.16)] backdrop-blur-xl lg:col-span-4 xl:col-span-2">
+    <Card className="overflow-hidden border-white/10 bg-white/[0.03] shadow-[0_16px_40px_rgba(0,0,0,0.16)] backdrop-blur-xl lg:col-span-4 xl:col-span-2">
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-white/92">{label}</p>
             <p className="mt-3 text-4xl font-semibold tracking-tight text-white">{value}</p>
             <p className="mt-3 text-sm leading-6 text-muted">{helper}</p>
           </div>
-          <span className={cn("inline-flex h-12 w-12 items-center justify-center rounded-2xl border", toneClass)}>
+          <span className={cn("inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border", toneClass)}>
             <Icon className="h-5 w-5" />
           </span>
         </div>
@@ -1094,8 +1174,11 @@ function OpportunityRow({
   actionBusy,
   readOnly,
   listMode,
+  orphanHidden,
   onToggleSelect,
-  onArchive
+  onArchive,
+  onHideOrphan,
+  onRestoreOrphan
 }: {
   item: EnrichedOpportunity;
   selectable: boolean;
@@ -1104,165 +1187,22 @@ function OpportunityRow({
   actionBusy: boolean;
   readOnly: boolean;
   listMode: SalesListMode;
+  orphanHidden: boolean;
   onToggleSelect: (checked: boolean) => void;
   onArchive: () => void;
+  onHideOrphan: () => void;
+  onRestoreOrphan: () => void;
 }) {
   const priorityMeta = PRIORITY_META[item.priority];
-  const customerDetailCopy = item.customer.phone || "Sin telefono";
-  const archiveHelperCopy = item.conversationId
+  const canArchiveConversation = Boolean(item.conversationId);
+  const canHideOrphan = listMode === "main" && !item.conversationId;
+  const helperCopy = canArchiveConversation
     ? listMode === "archive"
-      ? "Oportunidad archivada desde su conversacion comercial."
+      ? "Archivada desde su conversacion comercial."
       : "Puede archivarse sin perder historial."
-    : "Sin conversacion asociada: no admite archivo directo por ahora.";
-
-  function renderCustomerBlock() {
-    return (
-      <div className="min-w-0">
-        <div className="flex items-start gap-3">
-          <label className="mt-3 inline-flex items-center">
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(event) => onToggleSelect(event.target.checked)}
-              disabled={!selectable || selectionDisabled}
-              className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
-            />
-          </label>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
-            {initialsFromName(item.customer.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{item.customer.name}</p>
-              {item.contactId ? (
-                <Link
-                  href={`/app/contacts/${item.contactId}`}
-                  className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200"
-                >
-                  Ver cliente
-                </Link>
-              ) : null}
-            </div>
-            <p className="mt-1 truncate text-sm text-muted">{customerDetailCopy}</p>
-            <p className="mt-2 text-xs leading-5 text-white/45">{archiveHelperCopy}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderStatusBadges() {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
-          {item.commercialStageLabel}
-        </span>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
-          {item.collectionStatusLabel}
-        </span>
-      </div>
-    );
-  }
-
-  function renderAmountBlock() {
-    return (
-      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
-        <p className="truncate text-lg font-semibold text-white">{formatMoney(item.amount, item.currency)}</p>
-        <p className="mt-1 text-xs text-muted">Valor de la oportunidad</p>
-      </div>
-    );
-  }
-
-  function renderDateBlock() {
-    return (
-      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
-        <div className="flex items-start gap-2.5">
-          <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-          <div className="min-w-0">
-            <p className="truncate text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
-            <p className="mt-1 text-xs leading-5 text-muted">{item.lastActivityLabel}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderSourceBlock() {
-    return (
-      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
-        <div className="flex items-start gap-2.5">
-          {item.source && item.source.toLowerCase().includes("bot") ? (
-            <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
-          ) : (
-            <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
-            <p className="mt-1 text-xs text-muted">Origen</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderResponsibleBlock() {
-    return (
-      <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-3.5 py-3">
-        <div className="flex items-start gap-2.5">
-          <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-          <div className="min-w-0">
-            <p className="truncate text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
-            <p className="mt-1 text-xs text-muted">Responsable</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderActionCluster() {
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
-          {item.priorityLabel}
-        </span>
-        {listMode === "main" && item.conversationId ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
-            onClick={onArchive}
-            disabled={readOnly || actionBusy}
-          >
-            <Archive className="mr-2 h-4 w-4" />
-            {actionBusy ? "Archivando..." : "Archivar"}
-          </Button>
-        ) : listMode === "main" ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/55">
-            Archivo no disponible
-          </span>
-        ) : (
-          <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-            En archivo
-          </span>
-        )}
-        {item.contactId ? (
-          <Button
-            asChild
-            size="sm"
-            variant="ghost"
-            className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8"
-          >
-            <Link href={`/app/contacts/${item.contactId}`}>
-              Ver cliente
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        ) : null}
-      </div>
-    );
-  }
+    : listMode === "archive"
+      ? "Oculta del pipeline activo sin borrar la informacion comercial."
+      : "Sin conversacion asociada. Puedes ocultarla del pipeline activo.";
 
   return (
     <div
@@ -1271,42 +1211,400 @@ function OpportunityRow({
         priorityMeta.ringClass
       )}
     >
-      <div className="hidden 2xl:grid 2xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,0.72fr)_minmax(0,0.9fr)_auto] 2xl:items-center 2xl:gap-4">
-        {renderCustomerBlock()}
-        {renderStatusBadges()}
-        {renderAmountBlock()}
-        {renderDateBlock()}
-        {renderSourceBlock()}
-        {renderResponsibleBlock()}
-        <div className="flex justify-end">{renderActionCluster()}</div>
+      <div className="hidden 2xl:grid 2xl:grid-cols-[minmax(280px,1.8fr)_minmax(170px,0.9fr)_minmax(160px,0.9fr)_minmax(190px,1fr)_minmax(120px,0.7fr)_minmax(180px,1fr)_auto] 2xl:items-center 2xl:gap-5">
+        <div className="min-w-0">
+          <div className="flex items-start gap-4">
+            {selectable ? (
+              <label className="mt-2 inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={(event) => onToggleSelect(event.target.checked)}
+                  disabled={selectionDisabled}
+                  className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
+                />
+              </label>
+            ) : (
+              <div className="mt-2 h-4 w-4 shrink-0" />
+            )}
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+              {initialsFromName(item.customer.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[15px] font-semibold leading-6 text-white">{item.customer.name}</p>
+                {item.contactId ? (
+                  <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
+                    Ver cliente
+                  </Link>
+                ) : null}
+              </div>
+              <p className="mt-0.5 text-sm text-white/78">{item.customer.phone || "Sin telefono"}</p>
+              <p className="mt-2 text-xs leading-5 text-white/45">{helperCopy}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
+            {item.commercialStageLabel}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
+            {item.collectionStatusLabel}
+          </span>
+        </div>
+
+        <div className="min-w-0">
+          <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
+            {formatMoney(item.amount, item.currency)}
+          </p>
+          <p className="mt-1 text-xs text-muted">Valor potencial</p>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-start gap-2.5">
+            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+            <div>
+              <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+              <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-start gap-2.5">
+            {item.source && item.source.toLowerCase().includes("bot") ? (
+              <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
+            ) : (
+              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            )}
+            <div>
+              <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
+              <p className="mt-1 text-xs text-muted">Origen</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-start gap-2.5">
+            <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            <div>
+              <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+              <p className="mt-1 text-xs text-muted">Responsable</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
+            {item.priorityLabel}
+          </span>
+          {listMode === "archive" && orphanHidden ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="shrink-0 rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14"
+              onClick={onRestoreOrphan}
+            >
+              Restaurar
+            </Button>
+          ) : canArchiveConversation ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+              onClick={onArchive}
+              disabled={readOnly || actionBusy}
+            >
+              <Archive className="mr-2 h-4 w-4" />
+              {actionBusy ? "Archivando..." : "Archivar"}
+            </Button>
+          ) : canHideOrphan ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+              onClick={onHideOrphan}
+              disabled={readOnly}
+            >
+              Ocultar
+            </Button>
+          ) : (
+            <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+              En archivo
+            </span>
+          )}
+          {item.contactId ? (
+            <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
+              <Link href={`/app/contacts/${item.contactId}`}>
+                Ver cliente
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="hidden xl:flex 2xl:hidden xl:flex-col xl:gap-4">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(220px,0.8fr)_minmax(230px,1fr)]">
-          {renderCustomerBlock()}
-          {renderStatusBadges()}
-          {renderAmountBlock()}
-          {renderDateBlock()}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(180px,0.9fr)_minmax(160px,0.9fr)_minmax(220px,1fr)] xl:items-start">
+          <div className="min-w-0">
+            <div className="flex items-start gap-4">
+              {selectable ? (
+                <label className="mt-2 inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(event) => onToggleSelect(event.target.checked)}
+                    disabled={selectionDisabled}
+                    className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
+                  />
+                </label>
+              ) : (
+                <div className="mt-2 h-4 w-4 shrink-0" />
+              )}
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+                {initialsFromName(item.customer.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[15px] font-semibold leading-6 text-white">{item.customer.name}</p>
+                  {item.contactId ? (
+                    <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
+                      Ver cliente
+                    </Link>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-sm text-white/78">{item.customer.phone || "Sin telefono"}</p>
+                <p className="mt-2 text-xs leading-5 text-white/45">{helperCopy}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
+              {item.commercialStageLabel}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
+              {item.collectionStatusLabel}
+            </span>
+          </div>
+          <div>
+            <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
+              {formatMoney(item.amount, item.currency)}
+            </p>
+            <p className="mt-1 text-xs text-muted">Valor potencial</p>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+            <div>
+              <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+              <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
+            </div>
+          </div>
         </div>
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_auto] xl:items-start">
-          {renderSourceBlock()}
-          {renderResponsibleBlock()}
-          <div className="xl:flex xl:justify-end">{renderActionCluster()}</div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(120px,0.7fr)_minmax(180px,1fr)_auto] xl:items-center">
+          <div className="flex items-start gap-2.5">
+            {item.source && item.source.toLowerCase().includes("bot") ? (
+              <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
+            ) : (
+              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            )}
+            <div>
+              <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
+              <p className="mt-1 text-xs text-muted">Origen</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            <div>
+              <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+              <p className="mt-1 text-xs text-muted">Responsable</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
+              {item.priorityLabel}
+            </span>
+            {listMode === "archive" && orphanHidden ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="shrink-0 rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14"
+                onClick={onRestoreOrphan}
+              >
+                Restaurar
+              </Button>
+            ) : canArchiveConversation ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+                onClick={onArchive}
+                disabled={readOnly || actionBusy}
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                {actionBusy ? "Archivando..." : "Archivar"}
+              </Button>
+            ) : canHideOrphan ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                onClick={onHideOrphan}
+                disabled={readOnly}
+              >
+                Ocultar
+              </Button>
+            ) : (
+              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+                En archivo
+              </span>
+            )}
+            {item.contactId ? (
+              <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
+                <Link href={`/app/contacts/${item.contactId}`}>
+                  Ver cliente
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 xl:hidden">
-        {renderCustomerBlock()}
-        {renderStatusBadges()}
-        <div className="grid gap-3 sm:grid-cols-2">
-          {renderAmountBlock()}
-          {renderDateBlock()}
+        <div className="flex items-start gap-4">
+          {selectable ? (
+            <label className="mt-2 inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={(event) => onToggleSelect(event.target.checked)}
+                disabled={selectionDisabled}
+                className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
+              />
+            </label>
+          ) : (
+            <div className="mt-2 h-4 w-4 shrink-0" />
+          )}
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.24),rgba(37,99,235,0.12))] text-sm font-semibold text-white">
+            {initialsFromName(item.customer.name)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[15px] font-semibold leading-6 text-white">{item.customer.name}</p>
+              {item.contactId ? (
+                <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
+                  Ver cliente
+                </Link>
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-sm text-white/78">{item.customer.phone || "Sin telefono"}</p>
+            <p className="mt-2 text-xs leading-5 text-white/45">{helperCopy}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
+            {item.commercialStageLabel}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
+            {item.collectionStatusLabel}
+          </span>
+          <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
+            {item.priorityLabel}
+          </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {renderSourceBlock()}
-          {renderResponsibleBlock()}
+          <div>
+            <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
+              {formatMoney(item.amount, item.currency)}
+            </p>
+            <p className="mt-1 text-xs text-muted">Valor potencial</p>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+            <div>
+              <p className="text-sm text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
+              <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
+            </div>
+          </div>
         </div>
-        {renderActionCluster()}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start gap-2.5">
+            {item.source && item.source.toLowerCase().includes("bot") ? (
+              <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
+            ) : (
+              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            )}
+            <div>
+              <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
+              <p className="mt-1 text-xs text-muted">Origen</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            <div>
+              <p className="text-sm text-white">{item.responsible?.name || "Sin asignar"}</p>
+              <p className="mt-1 text-xs text-muted">Responsable</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {listMode === "archive" && orphanHidden ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="shrink-0 rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14"
+              onClick={onRestoreOrphan}
+            >
+              Restaurar
+            </Button>
+          ) : canArchiveConversation ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="shrink-0 rounded-2xl border border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+              onClick={onArchive}
+              disabled={readOnly || actionBusy}
+            >
+              <Archive className="mr-2 h-4 w-4" />
+              {actionBusy ? "Archivando..." : "Archivar"}
+            </Button>
+          ) : canHideOrphan ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+              onClick={onHideOrphan}
+              disabled={readOnly}
+            >
+              Ocultar
+            </Button>
+          ) : (
+            <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
+              En archivo
+            </span>
+          )}
+          {item.contactId ? (
+            <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-2xl border border-white/10 bg-black/16 text-white hover:bg-white/8">
+              <Link href={`/app/contacts/${item.contactId}`}>
+                Ver cliente
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -1368,6 +1666,10 @@ function QuickInsight({
 function resolveOpportunityFilter(value: string | null): SalesOpportunityFilter {
   if (value === "closed" || value === "open" || value === "active_conversations") return value;
   return "all";
+}
+
+function orphanOpportunityStorageKey(tenantKey: string) {
+  return `opturon:sales:hidden-orphans:${tenantKey}`;
 }
 
 function matchesOpportunityFilter(item: EnrichedOpportunity, filter: SalesOpportunityFilter) {
