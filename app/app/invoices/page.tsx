@@ -1,5 +1,5 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
-import { InvoicesWorkspace } from "@/components/app/InvoicesWorkspace";
+import { InvoicesHeaderActions, InvoicesWorkspace } from "@/components/app/InvoicesWorkspace";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalInvoices, isBackendConfigured, type PortalInvoice } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
@@ -21,8 +21,8 @@ export default async function AppInvoicesPage() {
   return (
     <ClientPageShell
       title="Comprobantes internos"
-      description="Pre-facturacion operativa para preparar documentos internos, revisar cobranza y dejar cada comprobante listo para contador."
-      badge="Pre-facturacion"
+      description="Visualiza, filtra y descarga todos los comprobantes emitidos desde el sistema y el bot."
+      action={<InvoicesHeaderActions readOnly={readOnly} />}
     >
       <InvoicesWorkspace initialInvoices={invoices} readOnly={readOnly} />
     </ClientPageShell>
