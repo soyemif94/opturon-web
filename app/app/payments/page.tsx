@@ -47,8 +47,7 @@ export default async function AppPaymentsPage() {
   return (
     <ClientPageShell
       title="Cobros"
-      description="Vista inicial de cobranzas para ver monto, metodo, estado y como se reparte cada cobro sobre facturas."
-      badge="Cobranza"
+      description="Controla tus cobranzas, metodos de pago y cajas desde un solo lugar."
     >
       <PaymentsWorkspace
         initialPayments={payments}
