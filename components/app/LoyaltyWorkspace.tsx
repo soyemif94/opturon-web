@@ -1,20 +1,8 @@
 "use client";
-
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  Gift,
-  ImagePlus,
-  MoreHorizontal,
-  RefreshCw,
-  Sparkles,
-  Star,
-  Trash2,
-  Trophy,
-  UserRound,
-  WalletCards
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Gift, ImagePlus, RefreshCw, Star, Trash2, WalletCards } from "lucide-react";
 import type { PortalContact, PortalLoyaltyContactDetail, PortalLoyaltyOverview, PortalLoyaltyProgram, PortalLoyaltyReward } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +54,7 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
   const [overview, setOverview] = useState(initialOverview);
   const [program, setProgram] = useState<PortalLoyaltyProgram>(initialOverview.program);
   const [rewardForm, setRewardForm] = useState<RewardFormState>(emptyRewardForm);
+  const [rewardEditorMode, setRewardEditorMode] = useState<"create" | "edit" | null>(null);
   const [savingProgram, setSavingProgram] = useState(false);
   const [savingReward, setSavingReward] = useState(false);
   const [uploadingRewardImage, setUploadingRewardImage] = useState(false);
@@ -76,7 +65,6 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
   const [redeeming, setRedeeming] = useState(false);
   const [contactLoyalty, setContactLoyalty] = useState<PortalLoyaltyContactDetail | null>(null);
   const [loadingContact, setLoadingContact] = useState(false);
-  const [showAllRewards, setShowAllRewards] = useState(false);
 
   async function reloadOverview(preferredRewardId?: string | null) {
     const response = await fetch("/api/app/loyalty", { cache: "no-store" });
@@ -105,13 +93,21 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
   }
 
   function startNewReward() {
+    setRewardEditorMode("create");
     setEditingRewardId(null);
     setRewardForm(emptyRewardForm);
   }
 
   function selectRewardForEdit(reward: PortalLoyaltyReward) {
+    setRewardEditorMode("edit");
     setEditingRewardId(reward.id);
     setRewardForm(hydrateRewardForm(reward));
+  }
+
+  function closeRewardEditor() {
+    setRewardEditorMode(null);
+    setEditingRewardId(null);
+    setRewardForm(emptyRewardForm);
   }
 
   async function loadContactLoyalty(contactId: string) {
@@ -246,6 +242,7 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
         throw new Error(json?.error || "No se pudo guardar la recompensa.");
       }
 
+      setRewardEditorMode("edit");
       const savedReward = json.reward as PortalLoyaltyReward;
       setEditingRewardId(savedReward.id);
       setRewardForm(hydrateRewardForm(savedReward));
@@ -296,280 +293,77 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
   }
 
   const activeRewards = overview.rewards.filter((item) => item.active);
-  const visibleRewards = showAllRewards ? overview.rewards : overview.rewards.slice(0, 3);
-  const lastProgramUpdate = program.updatedAt || program.createdAt || null;
-  const rankingAvailable = false;
-  const rankingCopy = rankingAvailable
-    ? "Clientes con mejor saldo y mayor movimiento reciente."
-    : "Aun no hay datos suficientes para mostrar un ranking consolidado.";
-  const programRuleLabel = `Cada $ ${Number(program.spendAmount || 0).toLocaleString("es-AR")} suma ${Number(program.pointsAmount || 0).toLocaleString("es-AR")} pts`;
-  const rewardHeadline = useMemo(() => {
-    if (!overview.rewards.length) return "Empieza a cargar recompensas para activar el programa.";
-    if (overview.summary.activeRewards === overview.rewards.length) return "Todas tus recompensas estan activas y listas para canjear.";
-    return `${overview.summary.activeRewards} de ${overview.rewards.length} recompensas estan activas hoy.`;
-  }, [overview.rewards.length, overview.summary.activeRewards]);
+  const rewardEditorOpen = rewardEditorMode !== null;
+  const editingReward = editingRewardId ? overview.rewards.find((item) => item.id === editingRewardId) || null : null;
+  const rewardTitle = rewardEditorMode === "create" ? "Nueva recompensa" : editingReward?.name || rewardForm.name || "Recompensa";
+  const rewardStatusLabel = rewardForm.active ? "Activa" : "Inactiva";
+  const rewardStatusVariant = rewardForm.active ? "success" : "muted";
 
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ImpactCard
-          icon={<WalletCards className="h-4 w-4" />}
-          label="Clientes con puntos"
-          value={String(overview.summary.activeCustomers)}
-          helper="Clientes con saldo disponible"
-          accent="green"
-        />
-        <ImpactCard
-          icon={<Star className="h-4 w-4" />}
-          label="Puntos emitidos"
-          value={String(overview.summary.pointsIssued)}
-          helper="Puntos acreditados en total"
-          accent="blue"
-        />
-        <ImpactCard
-          icon={<Gift className="h-4 w-4" />}
-          label="Puntos canjeados"
-          value={String(overview.summary.pointsRedeemed)}
-          helper="Puntos usados en recompensas"
-          accent="violet"
-        />
-        <ImpactCard
-          icon={<RefreshCw className="h-4 w-4" />}
-          label="Saldo pendiente"
-          value={String(overview.summary.outstandingPoints)}
-          helper="Puntos disponibles por canjear"
-          accent="amber"
-        />
+        <ImpactCard icon={<WalletCards className="h-4 w-4" />} label="Clientes con puntos" value={String(overview.summary.activeCustomers)} helper="Clientes con saldo disponible hoy." />
+        <ImpactCard icon={<Star className="h-4 w-4" />} label="Puntos emitidos" value={String(overview.summary.pointsIssued)} helper="Puntos acreditados por compras registradas." />
+        <ImpactCard icon={<Gift className="h-4 w-4" />} label="Puntos canjeados" value={String(overview.summary.pointsRedeemed)} helper="Consumo real de recompensas desde el panel." />
+        <ImpactCard icon={<RefreshCw className="h-4 w-4" />} label="Saldo pendiente" value={String(overview.summary.outstandingPoints)} helper="Puntos que siguen disponibles para futuras recompensas." />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_420px]">
-        <Card id="recompensas" className="overflow-hidden border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-          <CardHeader
-            action={
-              overview.rewards.length > 3 ? (
-                <Button variant="secondary" className="rounded-2xl" onClick={() => setShowAllRewards((current) => !current)}>
-                  {showAllRewards ? "Ver menos" : "Ver todas"}
+      {rewardEditorOpen ? (
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_340px]">
+          <Card className="border-white/6 bg-card/90">
+            <CardHeader className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button variant="ghost" className="gap-2 px-0 text-muted hover:text-text" onClick={closeRewardEditor}>
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver a fidelizacion
                 </Button>
-              ) : null
-            }
-          >
-            <div>
-              <CardTitle className="text-[1.9rem] leading-none tracking-tight">Recompensas</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6">{rewardHeadline}</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            {visibleRewards.length ? (
-              visibleRewards.map((reward, index) => (
-                <button
-                  key={reward.id}
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => selectRewardForEdit(reward)}
-                  className="group w-full rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,25,44,0.92),rgba(10,16,29,0.96))] p-4 text-left transition-all hover:border-brand/25 hover:bg-[linear-gradient(180deg,rgba(19,31,54,0.98),rgba(10,16,29,0.98))] disabled:cursor-default"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div className="flex items-center gap-4">
-                      <RewardImagePreview image={reward.image} title={reward.name} compact fallbackIndex={index} />
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-lg font-semibold text-white">{reward.name}</p>
-                          <Badge variant={reward.active ? "success" : "muted"}>{reward.active ? "Activa" : "Inactiva"}</Badge>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-muted">
-                          {reward.description || "Recompensa disponible para reforzar la recompra y el valor percibido del programa."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid min-w-[250px] flex-1 gap-3 sm:grid-cols-3 md:pl-4">
-                      <MetricPill label="Puntos requeridos" value={`${reward.pointsCost.toLocaleString("es-AR")} pts`} />
-                      <MetricPill label="Disponibilidad" value={reward.active ? "Activa" : "Pausada"} />
-                      <MetricPill label="Stock" value={`${reward.stockQty.toLocaleString("es-AR")} uds`} />
-                    </div>
-                    <div className="flex items-center justify-end gap-2 text-muted">
-                      <span className="hidden text-sm md:inline-flex">Editar</span>
-                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div className="rounded-[28px] border border-dashed border-white/10 bg-[linear-gradient(180deg,rgba(13,21,37,0.88),rgba(9,15,26,0.94))] p-8 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-brand/20 bg-brand/10 text-brandBright">
-                  <Gift className="h-7 w-7" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Edicion de recompensa</Badge>
+                  <Badge variant={rewardStatusVariant}>{rewardStatusLabel}</Badge>
                 </div>
-                <p className="mt-5 text-lg font-medium">Todavia no hay recompensas cargadas</p>
-                <p className="mt-2 text-sm leading-6 text-muted">Crea la primera recompensa para que el programa tenga una propuesta visible y canjeable.</p>
               </div>
-            )}
-
-            {!readOnly ? (
-              <Button
-                id="reward-editor-anchor"
-                variant="secondary"
-                className="w-full rounded-2xl border-white/10 bg-white/5 text-base"
-                onClick={startNewReward}
-              >
-                Crear recompensa
-              </Button>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card id="programa" className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-            <CardHeader>
               <div>
-                <CardTitle className="text-2xl">Resumen del programa</CardTitle>
-                <CardDescription className="mt-2 leading-6">Configuracion actual, regla de puntos y estado operativo de la fidelizacion.</CardDescription>
+                <CardTitle className="text-2xl">{rewardTitle}</CardTitle>
+                <CardDescription className="mt-2">
+                  Ajusta imagen, nombre, descripcion, costo y stock sin perder el contexto premium del modulo.
+                </CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              <SummaryRow label="Estado del programa" value={program.enabled ? "Activo" : "Pausado"} badge={program.enabled ? "Activo" : "Pausado"} badgeVariant={program.enabled ? "success" : "warning"} />
-              <SummaryRow label="Cada monto gastado" value={`$ ${Number(program.spendAmount || 0).toLocaleString("es-AR")}`} />
-              <SummaryRow label="Puntos acreditados" value={`${Number(program.pointsAmount || 0).toLocaleString("es-AR")} pts`} />
-              <SummaryRow label="Regla actual" value={programRuleLabel} />
-              <SummaryRow label="Ultima actualizacion" value={lastProgramUpdate ? formatDateTimeLabel(lastProgramUpdate) : "Sin cambios registrados"} />
-              <div className="rounded-2xl border border-brand/20 bg-brand/8 px-4 py-3 text-sm text-muted">
-                {program.programText || "Cada compra valida suma puntos para futuras recompensas."}
-              </div>
-              <Button asChild variant="secondary" className="w-full rounded-2xl">
-                <a href="#program-config">Ver configuracion completa</a>
-              </Button>
-            </CardContent>
-          </Card>
+            <CardContent className="space-y-5 pt-0">
+              <RewardImagePreview image={rewardForm.image} title={rewardForm.name || "Recompensa"} large />
 
-          <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-            <CardHeader
-              action={
-                <Button asChild variant="secondary" className="rounded-2xl">
-                  <a href="#movimientos">Ver todos los movimientos</a>
-                </Button>
-              }
-            >
-              <div>
-                <CardTitle className="text-2xl">Top clientes</CardTitle>
-                <CardDescription className="mt-2 leading-6">{rankingCopy}</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(13,21,37,0.88),rgba(9,15,26,0.94))] px-6 py-9 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-muted">
-                  <Trophy className="h-7 w-7" />
-                </div>
-                <p className="mt-5 text-xl font-medium">No hay datos disponibles</p>
-                <p className="mt-2 text-sm leading-6 text-muted">Aun no hay clientes con puntos acumulados suficientes para construir un ranking confiable.</p>
-                <Button asChild variant="secondary" className="mt-6 rounded-2xl">
-                  <a href="#movimientos">Ver ranking completo</a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_420px]">
-        <Card id="movimientos" className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-          <CardHeader>
-            <div>
-              <CardTitle className="text-2xl">Movimientos recientes</CardTitle>
-              <CardDescription className="mt-2 leading-6">Ultimos movimientos de puntos registrados en el sistema.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {overview.recentMovements.length ? (
-              <div className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(12,19,34,0.92),rgba(8,14,25,0.98))]">
-                <div className="hidden grid-cols-[1.2fr_0.8fr_1.4fr_0.8fr_0.9fr] gap-4 border-b border-white/8 px-5 py-4 text-[11px] uppercase tracking-[0.18em] text-muted md:grid">
-                  <span>Cliente</span>
-                  <span>Tipo</span>
-                  <span>Descripcion</span>
-                  <span>Puntos</span>
-                  <span>Fecha</span>
-                </div>
-                <div className="divide-y divide-white/6">
-                  {overview.recentMovements.map((movement) => (
-                    <div key={movement.id} className="grid gap-4 px-5 py-4 md:grid-cols-[1.2fr_0.8fr_1.4fr_0.8fr_0.9fr] md:items-center">
-                      <div>
-                        <p className="font-medium text-white">{movement.contact?.name || "Cliente"}</p>
-                        <p className="mt-1 text-sm text-muted">{movement.referenceId || "Sin referencia"}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant={movement.pointsDelta > 0 ? "success" : "warning"}>{movement.pointsDelta > 0 ? `+${movement.pointsDelta}` : movement.pointsDelta}</Badge>
-                        <Badge variant="muted">{titleCaseLabel(movement.direction)}</Badge>
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">{movement.reason || "Movimiento de loyalty"}</p>
-                        <p className="mt-1 text-sm text-muted">
-                          {movement.referenceType ? `${titleCaseLabel(movement.referenceType)} / ` : ""}
-                          {movement.contact?.phone || "Sin contacto"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">{movement.points} pts</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">{formatDateTimeLabel(movement.createdAt)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-[28px] border border-dashed border-white/10 bg-[linear-gradient(180deg,rgba(13,21,37,0.88),rgba(9,15,26,0.94))] px-6 py-12 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-muted">
-                  <Sparkles className="h-7 w-7" />
-                </div>
-                <p className="mt-5 text-xl font-medium">Aun no hay movimientos</p>
-                <p className="mt-2 text-sm leading-6 text-muted">Los movimientos de puntos apareceran aqui cuando se registren compras validas o canjes manuales.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card id="reward-editor" className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-            <CardHeader>
-              <div>
-                <CardTitle className="text-2xl">{rewardForm.id ? "Editar recompensa" : "Crear recompensa"}</CardTitle>
-                <CardDescription className="mt-2 leading-6">Alta minima para mantener el catalogo de beneficios alineado al programa actual.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <RewardImagePreview image={rewardForm.image} title={rewardForm.name || "Recompensa"} />
               {!readOnly ? (
-                <div className="flex flex-wrap gap-3">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white transition hover:border-brand/30 hover:bg-white/10">
-                    <ImagePlus className="h-4 w-4" />
-                    {uploadingRewardImage ? "Subiendo..." : rewardForm.image ? "Cambiar imagen" : "Subir imagen"}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      disabled={uploadingRewardImage}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.currentTarget.value = "";
-                        if (file) {
-                          void uploadRewardImage(file);
-                        }
-                      }}
-                    />
-                  </label>
-                  {rewardForm.image ? (
-                    <Button
-                      variant="secondary"
-                      className="rounded-2xl border-white/10 bg-white/5"
-                      onClick={() => setRewardForm((current) => ({ ...current, image: null }))}
-                      disabled={uploadingRewardImage}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar imagen
-                    </Button>
-                  ) : null}
+                <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                  <label className="block text-xs uppercase tracking-[0.16em] text-muted">Imagen</label>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[color:var(--border)] bg-bg px-4 py-2 text-sm">
+                      <ImagePlus className="h-4 w-4" />
+                      {uploadingRewardImage ? "Subiendo..." : rewardForm.image ? "Cambiar imagen" : "Cargar imagen"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        disabled={uploadingRewardImage}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) {
+                            void uploadRewardImage(file);
+                          }
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                    {rewardForm.image ? (
+                      <Button variant="ghost" onClick={() => setRewardForm((current) => ({ ...current, image: null }))} disabled={uploadingRewardImage}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar imagen
+                      </Button>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted">Formatos permitidos: JPG, PNG o WEBP. Maximo 4 MB.</p>
                 </div>
               ) : null}
+
               <div>
                 <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Nombre</p>
                 <Input value={rewardForm.name} disabled={readOnly} onChange={(event) => setRewardForm((current) => ({ ...current, name: event.target.value }))} />
@@ -615,226 +409,333 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
                 />
                 Mantener recompensa activa para nuevos canjes
               </label>
-              <div className="flex gap-3">
-                <Button className="flex-1 rounded-2xl" onClick={saveReward} disabled={readOnly || savingReward || uploadingRewardImage}>
+              <div className="flex flex-wrap gap-3">
+                <Button className="flex-1 sm:flex-none" onClick={saveReward} disabled={readOnly || savingReward || uploadingRewardImage}>
                   {savingReward ? "Guardando..." : rewardForm.id ? "Guardar cambios" : "Crear recompensa"}
                 </Button>
                 {!readOnly ? (
-                  <Button variant="secondary" className="rounded-2xl" onClick={startNewReward} disabled={savingReward}>
-                    {rewardForm.id ? "Volver al listado" : "Limpiar"}
+                  <Button variant="secondary" onClick={closeRewardEditor} disabled={savingReward}>
+                    {rewardForm.id ? "Volver al listado" : "Cancelar"}
                   </Button>
                 ) : null}
               </div>
             </CardContent>
           </Card>
 
-          <Card id="program-config" className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-            <CardHeader>
-              <div>
-                <CardTitle className="text-2xl">Configuracion del programa</CardTitle>
-                <CardDescription className="mt-2 leading-6">Define la regla de acumulacion y la politica de canje sin salir del panel.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm">
-                <input
-                  type="checkbox"
-                  checked={program.enabled}
-                  disabled={readOnly}
-                  onChange={(event) => setProgram((current) => ({ ...current, enabled: event.target.checked }))}
-                />
-                Activar programa de puntos para este negocio
-              </label>
-
-              <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-6">
+            <Card className="border-white/6 bg-card/90">
+              <CardHeader>
                 <div>
-                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Cada monto gastado</p>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={String(program.spendAmount)}
-                    disabled={readOnly}
-                    onChange={(event) => setProgram((current) => ({ ...current, spendAmount: Number(event.target.value || 0) }))}
-                  />
+                  <CardTitle className="text-lg">Vista previa</CardTitle>
+                  <CardDescription>Asi se ve la recompensa dentro del catalogo de fidelizacion.</CardDescription>
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                <div className="rounded-[24px] border border-[color:var(--border)] bg-surface/55 p-4">
+                  <div className="flex items-start gap-4">
+                    <RewardImagePreview image={rewardForm.image} title={rewardForm.name || "Recompensa"} compact />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{rewardForm.name || "Nombre de recompensa"}</p>
+                        <Badge variant={rewardStatusVariant}>{rewardStatusLabel}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-muted">{rewardForm.description || "Descripcion breve para anticipar el valor del canje."}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                  <SummaryPill label="Puntos requeridos" value={rewardForm.pointsCost ? `${rewardForm.pointsCost} pts` : "Pendiente"} />
+                  <SummaryPill label="Stock" value={`${rewardForm.stockQty || "0"} unidades`} />
+                  <SummaryPill label="Estado" value={rewardStatusLabel} />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/6 bg-card/90">
+              <CardHeader>
                 <div>
-                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Puntos acreditados</p>
-                  <Input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={String(program.pointsAmount)}
-                    disabled={readOnly}
-                    onChange={(event) => setProgram((current) => ({ ...current, pointsAmount: Number(event.target.value || 0) }))}
-                  />
+                  <CardTitle className="text-lg">Ayuda rapida</CardTitle>
+                  <CardDescription>Checklist breve para editar con menos scroll y mejor contexto.</CardDescription>
                 </div>
-              </div>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0 text-sm text-muted">
+                <p>Usa una imagen clara y reconocible para que el equipo identifique la recompensa al instante.</p>
+                <p>Deja el stock en `0` solo si quieres bloquear nuevos canjes manteniendo el registro visible.</p>
+                <p>Al guardar, el panel vuelve a usar la misma persistencia real que ya estaba activa para rewards.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      ) : (
+        <>
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_380px]">
+            <Card className="border-white/6 bg-card/90">
+              <CardHeader
+                action={
+                  <Badge variant={program.enabled ? "success" : "warning"}>{program.enabled ? "Programa activo" : "Programa pausado"}</Badge>
+                }
+              >
+                <div>
+                  <CardTitle className="text-xl">Configuracion del programa</CardTitle>
+                  <CardDescription>Define una regla simple por negocio para acumular puntos por compra acreditada.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={program.enabled}
+                    disabled={readOnly}
+                    onChange={(event) => setProgram((current) => ({ ...current, enabled: event.target.checked }))}
+                  />
+                  Activar programa de puntos para este negocio
+                </label>
 
-              <div>
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Texto visible</p>
-                <Textarea
-                  value={program.programText}
-                  disabled={readOnly}
-                  onChange={(event) => setProgram((current) => ({ ...current, programText: event.target.value }))}
-                />
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Politica de canje</p>
-                <Textarea
-                  value={program.redemptionPolicyText}
-                  disabled={readOnly}
-                  onChange={(event) => setProgram((current) => ({ ...current, redemptionPolicyText: event.target.value }))}
-                />
-              </div>
-
-              <div className="rounded-2xl border border-brand/20 bg-brand/8 px-4 py-3">
-                <p className="text-sm text-muted">
-                  Regla actual:
-                  <span className="ml-2 font-medium text-text">{programRuleLabel}</span>
-                </p>
-              </div>
-
-              <Button className="w-full rounded-2xl" onClick={saveProgram} disabled={readOnly || savingProgram}>
-                {savingProgram ? "Guardando..." : "Guardar configuracion"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-            <CardHeader>
-              <div>
-                <CardTitle className="text-2xl">Canje manual</CardTitle>
-                <CardDescription className="mt-2 leading-6">Permite operar un canje puntual con trazabilidad completa sobre el ledger actual.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div>
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Cliente</p>
-                <select
-                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm"
-                  value={selectedContactId}
-                  disabled={readOnly || !initialContacts.length}
-                  onChange={(event) => setSelectedContactId(event.target.value)}
-                >
-                  <option value="">Selecciona un cliente</option>
-                  {initialContacts.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Recompensa</p>
-                <select
-                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm"
-                  value={selectedRewardId}
-                  disabled={readOnly || !activeRewards.length}
-                  onChange={(event) => setSelectedRewardId(event.target.value)}
-                >
-                  <option value="">Selecciona una recompensa</option>
-                  {activeRewards.map((reward) => (
-                    <option key={reward.id} value={reward.id}>
-                      {reward.name} - {reward.pointsCost} pts
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Nota interna</p>
-                <Textarea value={redeemNotes} disabled={readOnly} onChange={(event) => setRedeemNotes(event.target.value)} />
-              </div>
-
-              <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,25,44,0.9),rgba(10,16,29,0.96))] p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/20 bg-brand/10 text-brandBright">
-                    <UserRound className="h-5 w-5" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Cada monto gastado</p>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={String(program.spendAmount)}
+                      disabled={readOnly}
+                      onChange={(event) => setProgram((current) => ({ ...current, spendAmount: Number(event.target.value || 0) }))}
+                    />
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted">Saldo del cliente</p>
-                    {loadingContact ? (
-                      <p className="mt-1 text-sm text-muted">Cargando puntos...</p>
-                    ) : contactLoyalty ? (
-                      <p className="mt-1 text-lg font-semibold text-white">{contactLoyalty.loyalty.summary.currentPoints} pts</p>
-                    ) : (
-                      <p className="mt-1 text-sm text-muted">Selecciona un cliente para ver su saldo actual.</p>
-                    )}
+                    <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Puntos acreditados</p>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={String(program.pointsAmount)}
+                      disabled={readOnly}
+                      onChange={(event) => setProgram((current) => ({ ...current, pointsAmount: Number(event.target.value || 0) }))}
+                    />
                   </div>
                 </div>
-                {contactLoyalty ? (
-                  <p className="mt-3 text-sm text-muted">
-                    Acumulados {contactLoyalty.loyalty.summary.totalEarned} / Canjeados {contactLoyalty.loyalty.summary.totalRedeemed}
-                  </p>
-                ) : null}
-              </div>
 
-              <Button className="w-full rounded-2xl" onClick={redeemReward} disabled={readOnly || redeeming || !selectedContactId || !selectedRewardId}>
-                {redeeming ? "Canjeando..." : "Canjear recompensa"}
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Texto visible</p>
+                  <Textarea
+                    value={program.programText}
+                    disabled={readOnly}
+                    onChange={(event) => setProgram((current) => ({ ...current, programText: event.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Politica de canje</p>
+                  <Textarea
+                    value={program.redemptionPolicyText}
+                    disabled={readOnly}
+                    onChange={(event) => setProgram((current) => ({ ...current, redemptionPolicyText: event.target.value }))}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/20 bg-brand/8 px-4 py-3">
+                  <p className="text-sm text-muted">
+                    Regla actual:
+                    <span className="ml-2 font-medium text-text">
+                      Cada {Number(program.spendAmount || 0).toLocaleString("es-AR")} de consumo acredita {Number(program.pointsAmount || 0)} puntos
+                    </span>
+                  </p>
+                  <Button onClick={saveProgram} disabled={readOnly || savingProgram}>
+                    {savingProgram ? "Guardando..." : "Guardar configuracion"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/6 bg-card/90">
+              <CardHeader>
+                <div>
+                  <CardTitle className="text-xl">Canje manual</CardTitle>
+                  <CardDescription>El equipo puede canjear puntos desde el panel con trazabilidad completa y saldo actualizado.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Cliente</p>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm"
+                    value={selectedContactId}
+                    disabled={readOnly || !initialContacts.length}
+                    onChange={(event) => setSelectedContactId(event.target.value)}
+                  >
+                    <option value="">Selecciona un cliente</option>
+                    {initialContacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Recompensa</p>
+                  <select
+                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm"
+                    value={selectedRewardId}
+                    disabled={readOnly || !activeRewards.length}
+                    onChange={(event) => setSelectedRewardId(event.target.value)}
+                  >
+                    <option value="">Selecciona una recompensa</option>
+                    {activeRewards.map((reward) => (
+                      <option key={reward.id} value={reward.id}>
+                        {reward.name} - {reward.pointsCost} pts
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Nota interna</p>
+                  <Textarea value={redeemNotes} disabled={readOnly} onChange={(event) => setRedeemNotes(event.target.value)} />
+                </div>
+
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Saldo del cliente</p>
+                  {loadingContact ? (
+                    <p className="mt-3 text-sm text-muted">Cargando puntos...</p>
+                  ) : contactLoyalty ? (
+                    <>
+                      <p className="mt-3 text-2xl font-semibold">{contactLoyalty.loyalty.summary.currentPoints} pts</p>
+                      <p className="mt-2 text-sm text-muted">
+                        Acumulados {contactLoyalty.loyalty.summary.totalEarned} / Canjeados {contactLoyalty.loyalty.summary.totalRedeemed}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted">Selecciona un cliente para ver su saldo actual.</p>
+                  )}
+                </div>
+
+                <Button className="w-full" onClick={redeemReward} disabled={readOnly || redeeming || !selectedContactId || !selectedRewardId}>
+                  {redeeming ? "Canjeando..." : "Canjear recompensa"}
+                </Button>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_420px]">
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader
+            action={
+              !readOnly ? (
+                <Button variant="secondary" onClick={startNewReward}>
+                  Nueva recompensa
+                </Button>
+              ) : null
+            }
+          >
+            <div>
+              <CardTitle className="text-xl">Recompensas</CardTitle>
+              <CardDescription>Catalogo premium por tenant para beneficios, descuentos o extras de servicio con stock e imagen.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {overview.rewards.length ? (
+              overview.rewards.map((reward) => {
+                const isEditing = editingRewardId === reward.id;
+                return (
+                  <div
+                    key={reward.id}
+                    className={`rounded-[24px] border p-4 transition-colors ${isEditing ? "border-brand/40 bg-brand/8" : "border-[color:var(--border)] bg-surface/55"}`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <RewardImagePreview image={reward.image} title={reward.name} compact />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{reward.name}</p>
+                          <Badge variant={reward.active ? "success" : "muted"}>{reward.active ? "Activa" : "Inactiva"}</Badge>
+                          <Badge variant={reward.stockQty > 0 ? "warning" : "danger"}>{reward.stockQty > 0 ? `${reward.stockQty} disponibles` : "Sin stock"}</Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-muted">{reward.description || "Sin descripcion comercial adicional."}</p>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                          <Badge variant="warning">{reward.pointsCost} pts</Badge>
+                          {!readOnly ? (
+                            <Button variant={isEditing ? "ghost" : "secondary"} onClick={() => selectRewardForEdit(reward)}>
+                              {isEditing ? "Seguir editando" : "Editar"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/40 p-6 text-sm leading-7 text-muted">
+                Todavia no hay recompensas cargadas. Crea la primera para empezar a canjear desde este mismo panel.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="border-white/6 bg-card/90">
+          <CardHeader>
+            <div>
+              <CardTitle className="text-xl">Alta rapida</CardTitle>
+              <CardDescription>Inicia una nueva recompensa y editala en una vista enfocada, sin perder el listado.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+              <p>Para crear o editar una recompensa, abrimos una vista dedicada dentro del modulo Loyalty.</p>
+              <p className="mt-3">Asi evitamos scroll innecesario y mantenemos el foco en imagen, stock, puntos y estado.</p>
+            </div>
+            {!readOnly ? (
+              <Button className="w-full" onClick={startNewReward}>
+                Nueva recompensa
               </Button>
+            ) : (
+              <Badge variant="muted">Modo solo lectura</Badge>
+            )}
+          </CardContent>
+        </Card>
+          </section>
+
+          <Card className="border-white/6 bg-card/90">
+            <CardHeader>
+              <div>
+                <CardTitle className="text-xl">Movimientos recientes</CardTitle>
+                <CardDescription>Ledger central para ver acreditaciones, canjes, ajustes y reversas con trazabilidad clara.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              {overview.recentMovements.length ? (
+                overview.recentMovements.map((movement) => (
+                  <div key={movement.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={movement.pointsDelta > 0 ? "success" : "warning"}>
+                            {movement.pointsDelta > 0 ? `+${movement.pointsDelta}` : movement.pointsDelta}
+                          </Badge>
+                          <Badge variant="muted">{titleCaseLabel(movement.direction)}</Badge>
+                          <p className="text-sm text-muted">{movement.contact?.name || "Cliente"}</p>
+                        </div>
+                        <p className="mt-3 font-medium">{movement.reason || "Movimiento de loyalty"}</p>
+                        <p className="mt-1 text-sm text-muted">
+                          {movement.referenceType ? `${titleCaseLabel(movement.referenceType)} / ` : ""}
+                          {movement.referenceId || "Sin referencia"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{formatDateTimeLabel(movement.createdAt)}</p>
+                        <p className="mt-1 text-sm text-muted">{movement.points} pts</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/40 p-6 text-sm leading-7 text-muted">
+                  Aun no hay movimientos de puntos. La tabla se va a poblar automaticamente cuando se registren pagos validos o canjes manuales.
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function ImpactCard({
-  icon,
-  label,
-  value,
-  helper,
-  accent
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  helper: string;
-  accent: "green" | "blue" | "violet" | "amber";
-}) {
-  const accentClasses = {
-    green: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-    blue: "border-blue-500/30 bg-blue-500/10 text-blue-300",
-    violet: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300",
-    amber: "border-amber-500/30 bg-amber-500/10 text-amber-300"
-  } satisfies Record<string, string>;
-
-  return (
-    <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-      <CardContent className="pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-muted">{label}</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{value}</p>
-            <p className="mt-2 text-sm text-muted">{helper}</p>
-          </div>
-          <span className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${accentClasses[accent]}`}>
-            {icon}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RewardThumb({ index, name }: { index: number; name: string }) {
-  const skins = [
-    "from-amber-100 via-orange-100 to-amber-50 text-amber-950",
-    "from-slate-200 via-zinc-100 to-slate-50 text-slate-950",
-    "from-emerald-100 via-teal-100 to-cyan-50 text-emerald-950"
-  ];
-
-  return (
-    <div
-      className={`flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-white/12 bg-gradient-to-br ${skins[index % skins.length]} shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]`}
-    >
-      <div className="flex flex-col items-center gap-1">
-        <Gift className="h-6 w-6" />
-        <span className="max-w-[56px] truncate text-[11px] font-semibold uppercase tracking-[0.16em]">{name.slice(0, 6)}</span>
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -843,29 +744,35 @@ function RewardImagePreview({
   image,
   title,
   compact = false,
-  fallbackIndex = 0
+  large = false
 }: {
   image: PortalLoyaltyReward["image"];
   title: string;
   compact?: boolean;
-  fallbackIndex?: number;
+  large?: boolean;
 }) {
-  if (image?.url) {
-    return (
+  if (compact) {
+    return image?.url ? (
       <img
         src={image.url}
         alt={image.alt || title}
-        className={compact ? "h-20 w-20 rounded-[22px] border border-white/12 object-cover" : "h-56 w-full rounded-[24px] border border-white/10 object-cover"}
+        className="h-20 w-20 rounded-2xl border border-[color:var(--border)] object-cover"
       />
+    ) : (
+      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface/60 text-brandBright">
+        <Gift className="h-6 w-6" />
+      </div>
     );
   }
 
-  if (compact) {
-    return <RewardThumb index={fallbackIndex} name={title} />;
-  }
-
-  return (
-    <div className="flex h-56 w-full items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-[linear-gradient(180deg,rgba(13,21,37,0.88),rgba(9,15,26,0.94))] text-muted">
+  return image?.url ? (
+    <img
+      src={image.url}
+      alt={image.alt || title}
+      className={large ? "h-[320px] w-full rounded-[28px] border border-[color:var(--border)] object-cover" : "h-48 w-full rounded-[24px] border border-[color:var(--border)] object-cover"}
+    />
+  ) : (
+    <div className={`flex w-full items-center justify-center border border-dashed border-[color:var(--border)] bg-surface/45 text-muted ${large ? "h-[320px] rounded-[28px]" : "h-48 rounded-[24px]"}`}>
       <div className="text-center">
         <Gift className="mx-auto h-8 w-8 text-brandBright" />
         <p className="mt-3 text-sm">Sin imagen cargada</p>
@@ -874,33 +781,30 @@ function RewardImagePreview({
   );
 }
 
-function MetricPill({ label, value }: { label: string; value: string }) {
+function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+    <div className="rounded-2xl border border-[color:var(--border)] bg-bg px-4 py-3">
       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-2 text-sm font-medium text-white">{value}</p>
+      <p className="mt-2 text-sm font-medium">{value}</p>
     </div>
   );
 }
 
-function SummaryRow({
-  label,
-  value,
-  badge,
-  badgeVariant
-}: {
-  label: string;
-  value: string;
-  badge?: string;
-  badgeVariant?: "default" | "success" | "warning" | "danger" | "muted" | "outline";
-}) {
+function ImpactCard({ icon, label, value, helper }: { icon: React.ReactNode; label: string; value: string; helper: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
-      <p className="text-sm text-muted">{label}</p>
-      <div className="flex items-center gap-2 text-right">
-        <p className="text-sm font-medium text-white">{value}</p>
-        {badge ? <Badge variant={badgeVariant || "muted"}>{badge}</Badge> : null}
-      </div>
-    </div>
+    <Card className="border-white/6 bg-card/90">
+      <CardContent className="pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.16em] text-muted">{label}</p>
+            <p className="mt-3 text-2xl font-semibold">{value}</p>
+            <p className="mt-2 text-sm text-muted">{helper}</p>
+          </div>
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10 text-brandBright">
+            {icon}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
