@@ -104,7 +104,10 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   }
 
   const headers = new Headers(init?.headers || {});
-  headers.set("Content-Type", "application/json");
+  const bodyIsFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  if (!bodyIsFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (withDebugKey) {
     const debugKey = String(process.env.API_DEBUG_KEY || "").trim();
@@ -978,6 +981,89 @@ export type PortalPayment = {
   allocations?: PortalPaymentAllocation[];
 };
 
+export type PortalLoyaltyProgram = {
+  id: string | null;
+  clinicId: string | null;
+  enabled: boolean;
+  spendAmount: number;
+  pointsAmount: number;
+  programText: string;
+  redemptionPolicyText: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type PortalLoyaltyReward = {
+  id: string;
+  clinicId: string;
+  name: string;
+  description: string | null;
+  pointsCost: number;
+  stockQty: number;
+  image: {
+    url: string;
+    alt?: string | null;
+    source?: string | null;
+  } | null;
+  active: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type PortalLoyaltyLedgerEntry = {
+  id: string;
+  clinicId: string;
+  contactId: string;
+  direction: string;
+  points: number;
+  pointsDelta: number;
+  reason: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string | null;
+  contact?: {
+    id: string;
+    name: string | null;
+    phone: string | null;
+  } | null;
+};
+
+export type PortalLoyaltyContactDetail = {
+  contact: {
+    id: string;
+    name: string;
+    phone: string | null;
+  };
+  loyalty: {
+    summary: {
+      contactId: string;
+      currentPoints: number;
+      totalEarned: number;
+      totalRedeemed: number;
+      totalAdjusted: number;
+      lastMovementAt: string | null;
+    };
+    ledger: PortalLoyaltyLedgerEntry[];
+  };
+};
+
+export type PortalLoyaltyOverview = {
+  program: PortalLoyaltyProgram;
+  rewards: PortalLoyaltyReward[];
+  summary: {
+    enrolledCustomers: number;
+    activeCustomers: number;
+    pointsIssued: number;
+    pointsRedeemed: number;
+    outstandingPoints: number;
+    totalMovements: number;
+    totalRedemptions: number;
+    activeRewards: number;
+  };
+  recentMovements: PortalLoyaltyLedgerEntry[];
+};
+
 export type PortalAutomation = {
   id: string;
   clinicId: string;
@@ -1248,6 +1334,142 @@ export async function getPortalAutomations(tenantId: string) {
       automations: PortalAutomation[];
     };
   }>(`/portal/tenants/${tenantId}/automations`);
+}
+
+export async function getPortalLoyaltyProgram(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      program: PortalLoyaltyProgram;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/program`);
+}
+
+export async function patchPortalLoyaltyProgram(
+  tenantId: string,
+  payload: {
+    enabled: boolean;
+    spendAmount: number;
+    pointsAmount: number;
+    programText?: string;
+    redemptionPolicyText?: string;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      program: PortalLoyaltyProgram;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/program`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalLoyaltyRewards(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      rewards: PortalLoyaltyReward[];
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/rewards`);
+}
+
+export async function createPortalLoyaltyReward(
+  tenantId: string,
+  payload: {
+    name: string;
+    description?: string | null;
+    pointsCost: number;
+    stockQty?: number;
+    image?: PortalLoyaltyReward["image"];
+    active?: boolean;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      reward: PortalLoyaltyReward;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/rewards`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function patchPortalLoyaltyReward(
+  tenantId: string,
+  rewardId: string,
+  payload: {
+    name?: string;
+    description?: string | null;
+    pointsCost?: number;
+    stockQty?: number;
+    image?: PortalLoyaltyReward["image"];
+    active?: boolean;
+  }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      reward: PortalLoyaltyReward;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/rewards/${rewardId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function uploadPortalLoyaltyRewardImage(tenantId: string, formData: FormData) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      image: NonNullable<PortalLoyaltyReward["image"]>;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/rewards/image-upload`, {
+    method: "POST",
+    body: formData
+  });
+}
+
+export async function getPortalLoyaltyOverview(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      overview: PortalLoyaltyOverview;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/overview`);
+}
+
+export async function getPortalLoyaltyContact(tenantId: string, contactId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalLoyaltyContactDetail;
+  }>(`/portal/tenants/${tenantId}/loyalty/contacts/${contactId}`);
+}
+
+export async function redeemPortalLoyaltyReward(
+  tenantId: string,
+  payload: { contactId: string; rewardId: string; notes?: string | null }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      redemption: PortalLoyaltyLedgerEntry;
+      contact: PortalLoyaltyContactDetail["contact"];
+      loyalty: PortalLoyaltyContactDetail["loyalty"];
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/redemptions`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function createPortalAutomation(
