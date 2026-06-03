@@ -1,5 +1,7 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { LoyaltyWorkspace } from "@/components/app/LoyaltyWorkspace";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalContacts, getPortalLoyaltyOverview, isBackendConfigured, type PortalContact, type PortalLoyaltyOverview } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
@@ -55,8 +57,20 @@ export default async function AppLoyaltyPage() {
   return (
     <ClientPageShell
       title="Fidelizacion"
-      description="Programa de puntos V1 para premiar recurrencia, operar canjes manuales y dejar trazabilidad por cliente dentro del mismo portal."
-      badge="Retencion"
+      description="Premia la lealtad de tus clientes con puntos, recompensas y seguimiento comercial desde un solo lugar."
+      badge={overview.program.enabled ? "Programa activo" : "Programa pausado"}
+      action={
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Button asChild variant="secondary" className="rounded-2xl">
+            <Link href="#programa">Configuracion del programa</Link>
+          </Button>
+          {!readOnly ? (
+            <Button asChild className="rounded-2xl">
+              <Link href="#reward-editor">Crear recompensa</Link>
+            </Button>
+          ) : null}
+        </div>
+      }
     >
       <LoyaltyWorkspace initialOverview={overview} initialContacts={contacts} readOnly={readOnly} />
     </ClientPageShell>
