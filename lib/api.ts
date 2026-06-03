@@ -108,7 +108,10 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   }
 
   const headers = new Headers(init?.headers || {});
-  headers.set("Content-Type", "application/json");
+  const bodyIsFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  if (!bodyIsFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (withDebugKey) {
     const debugKey = String(process.env.API_DEBUG_KEY || "").trim();
@@ -1711,6 +1714,12 @@ export type PortalLoyaltyReward = {
   name: string;
   description: string | null;
   pointsCost: number;
+  stockQty: number;
+  image: {
+    url: string;
+    alt?: string | null;
+    source?: string | null;
+  } | null;
   active: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -2571,7 +2580,14 @@ export async function getPortalLoyaltyRewards(tenantId: string) {
 
 export async function createPortalLoyaltyReward(
   tenantId: string,
-  payload: { name: string; description?: string | null; pointsCost: number; active?: boolean }
+  payload: {
+    name: string;
+    description?: string | null;
+    pointsCost: number;
+    stockQty?: number;
+    image?: PortalLoyaltyReward["image"];
+    active?: boolean;
+  }
 ) {
   return backendPortalFetch<{
     success: boolean;
@@ -2588,7 +2604,14 @@ export async function createPortalLoyaltyReward(
 export async function patchPortalLoyaltyReward(
   tenantId: string,
   rewardId: string,
-  payload: { name?: string; description?: string | null; pointsCost?: number; active?: boolean }
+  payload: {
+    name?: string;
+    description?: string | null;
+    pointsCost?: number;
+    stockQty?: number;
+    image?: PortalLoyaltyReward["image"];
+    active?: boolean;
+  }
 ) {
   return backendPortalFetch<{
     success: boolean;
@@ -2599,6 +2622,18 @@ export async function patchPortalLoyaltyReward(
   }>(`/portal/tenants/${tenantId}/loyalty/rewards/${rewardId}`, {
     method: "PATCH",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function uploadPortalLoyaltyRewardImage(tenantId: string, formData: FormData) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      image: NonNullable<PortalLoyaltyReward["image"]>;
+    };
+  }>(`/portal/tenants/${tenantId}/loyalty/rewards/image-upload`, {
+    method: "POST",
+    body: formData
   });
 }
 

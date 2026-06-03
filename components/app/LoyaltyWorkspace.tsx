@@ -1,12 +1,16 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Gift,
+  ImagePlus,
   MoreHorizontal,
   RefreshCw,
   Sparkles,
   Star,
+  Trash2,
   Trophy,
   UserRound,
   WalletCards
@@ -31,15 +35,32 @@ type RewardFormState = {
   name: string;
   description: string;
   pointsCost: string;
+  stockQty: string;
   active: boolean;
+  image: PortalLoyaltyReward["image"];
 };
 
 const emptyRewardForm: RewardFormState = {
   name: "",
   description: "",
   pointsCost: "",
-  active: true
+  stockQty: "0",
+  active: true,
+  image: null
 };
+
+function hydrateRewardForm(reward?: PortalLoyaltyReward | null): RewardFormState {
+  if (!reward) return emptyRewardForm;
+  return {
+    id: reward.id,
+    name: reward.name,
+    description: reward.description || "",
+    pointsCost: String(reward.pointsCost),
+    stockQty: String(reward.stockQty ?? 0),
+    active: reward.active,
+    image: reward.image || null
+  };
+}
 
 export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = false }: LoyaltyWorkspaceProps) {
   const [overview, setOverview] = useState(initialOverview);
@@ -47,27 +68,50 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
   const [rewardForm, setRewardForm] = useState<RewardFormState>(emptyRewardForm);
   const [savingProgram, setSavingProgram] = useState(false);
   const [savingReward, setSavingReward] = useState(false);
+  const [uploadingRewardImage, setUploadingRewardImage] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState(initialContacts[0]?.id || "");
   const [selectedRewardId, setSelectedRewardId] = useState(initialOverview.rewards.find((item) => item.active)?.id || "");
+  const [editingRewardId, setEditingRewardId] = useState<string | null>(null);
   const [redeemNotes, setRedeemNotes] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [contactLoyalty, setContactLoyalty] = useState<PortalLoyaltyContactDetail | null>(null);
   const [loadingContact, setLoadingContact] = useState(false);
   const [showAllRewards, setShowAllRewards] = useState(false);
 
-  async function reloadOverview() {
+  async function reloadOverview(preferredRewardId?: string | null) {
     const response = await fetch("/api/app/loyalty", { cache: "no-store" });
     const json = await response.json().catch(() => null);
     if (!response.ok) {
       throw new Error(json?.error || "No se pudo actualizar loyalty.");
     }
 
-    setOverview(json.overview);
-    setProgram(json.overview.program);
+    const nextOverview = json.overview as PortalLoyaltyOverview;
+    setOverview(nextOverview);
+    setProgram(nextOverview.program);
     setSelectedRewardId((current: string) => {
-      if (current && json.overview.rewards.some((item: PortalLoyaltyReward) => item.id === current && item.active)) return current;
-      return json.overview.rewards.find((item: PortalLoyaltyReward) => item.active)?.id || "";
+      if (current && nextOverview.rewards.some((item) => item.id === current && item.active)) return current;
+      return nextOverview.rewards.find((item) => item.active)?.id || "";
     });
+
+    if (preferredRewardId) {
+      const preferredReward = nextOverview.rewards.find((item) => item.id === preferredRewardId) || null;
+      if (preferredReward) {
+        setEditingRewardId(preferredReward.id);
+        setRewardForm(hydrateRewardForm(preferredReward));
+      }
+    }
+
+    return nextOverview;
+  }
+
+  function startNewReward() {
+    setEditingRewardId(null);
+    setRewardForm(emptyRewardForm);
+  }
+
+  function selectRewardForEdit(reward: PortalLoyaltyReward) {
+    setEditingRewardId(reward.id);
+    setRewardForm(hydrateRewardForm(reward));
   }
 
   async function loadContactLoyalty(contactId: string) {
@@ -130,12 +174,41 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
       }
 
       setProgram(json.program);
-      await reloadOverview();
+      await reloadOverview(editingRewardId);
       toast.success("Programa actualizado", "La regla de puntos ya quedo guardada para este negocio.");
     } catch (error) {
       toast.error("No se pudo guardar loyalty", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setSavingProgram(false);
+    }
+  }
+
+  async function uploadRewardImage(file: File) {
+    if (readOnly) return;
+
+    setUploadingRewardImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/app/loyalty/rewards/image-upload", {
+        method: "POST",
+        body: formData
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.error || "No se pudo subir la imagen.");
+      }
+
+      setRewardForm((current) => ({
+        ...current,
+        image: json.image || null
+      }));
+      toast.success("Imagen cargada", "La recompensa ya tiene preview lista para guardar.");
+    } catch (error) {
+      toast.error("No se pudo subir la imagen", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setUploadingRewardImage(false);
     }
   }
 
@@ -149,6 +222,10 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
       toast.error("Costo invalido", "Define una cantidad de puntos valida para el canje.");
       return;
     }
+    if (!Number.isInteger(Number(rewardForm.stockQty)) || Number(rewardForm.stockQty) < 0) {
+      toast.error("Stock invalido", "El stock debe ser cero o mayor.");
+      return;
+    }
 
     setSavingReward(true);
     try {
@@ -159,6 +236,8 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
           name: rewardForm.name.trim(),
           description: rewardForm.description.trim(),
           pointsCost: Number(rewardForm.pointsCost),
+          stockQty: Number(rewardForm.stockQty),
+          image: rewardForm.image,
           active: rewardForm.active
         })
       });
@@ -167,8 +246,10 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
         throw new Error(json?.error || "No se pudo guardar la recompensa.");
       }
 
-      await reloadOverview();
-      setRewardForm(emptyRewardForm);
+      const savedReward = json.reward as PortalLoyaltyReward;
+      setEditingRewardId(savedReward.id);
+      setRewardForm(hydrateRewardForm(savedReward));
+      await reloadOverview(savedReward.id);
       toast.success(rewardForm.id ? "Recompensa actualizada" : "Recompensa creada");
     } catch (error) {
       toast.error("No se pudo guardar la recompensa", error instanceof Error ? error.message : "unknown_error");
@@ -205,7 +286,7 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
       }
 
       setRedeemNotes("");
-      await Promise.all([reloadOverview(), loadContactLoyalty(selectedContactId)]);
+      await Promise.all([reloadOverview(editingRewardId), loadContactLoyalty(selectedContactId)]);
       toast.success("Canje registrado", "El descuento de puntos ya quedo trazado en el ledger.");
     } catch (error) {
       toast.error("No se pudo canjear", error instanceof Error ? error.message : "unknown_error");
@@ -284,20 +365,12 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
                   key={reward.id}
                   type="button"
                   disabled={readOnly}
-                  onClick={() =>
-                    setRewardForm({
-                      id: reward.id,
-                      name: reward.name,
-                      description: reward.description || "",
-                      pointsCost: String(reward.pointsCost),
-                      active: reward.active
-                    })
-                  }
+                  onClick={() => selectRewardForEdit(reward)}
                   className="group w-full rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,25,44,0.92),rgba(10,16,29,0.96))] p-4 text-left transition-all hover:border-brand/25 hover:bg-[linear-gradient(180deg,rgba(19,31,54,0.98),rgba(10,16,29,0.98))] disabled:cursor-default"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center">
                     <div className="flex items-center gap-4">
-                      <RewardThumb index={index} name={reward.name} />
+                      <RewardImagePreview image={reward.image} title={reward.name} compact fallbackIndex={index} />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="truncate text-lg font-semibold text-white">{reward.name}</p>
@@ -311,7 +384,7 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
                     <div className="grid min-w-[250px] flex-1 gap-3 sm:grid-cols-3 md:pl-4">
                       <MetricPill label="Puntos requeridos" value={`${reward.pointsCost.toLocaleString("es-AR")} pts`} />
                       <MetricPill label="Disponibilidad" value={reward.active ? "Activa" : "Pausada"} />
-                      <MetricPill label="Stock" value="No modelado" />
+                      <MetricPill label="Stock" value={`${reward.stockQty.toLocaleString("es-AR")} uds`} />
                     </div>
                     <div className="flex items-center justify-end gap-2 text-muted">
                       <span className="hidden text-sm md:inline-flex">Editar</span>
@@ -337,7 +410,7 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
                 id="reward-editor-anchor"
                 variant="secondary"
                 className="w-full rounded-2xl border-white/10 bg-white/5 text-base"
-                onClick={() => setRewardForm(emptyRewardForm)}
+                onClick={startNewReward}
               >
                 Crear recompensa
               </Button>
@@ -464,6 +537,39 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
+              <RewardImagePreview image={rewardForm.image} title={rewardForm.name || "Recompensa"} />
+              {!readOnly ? (
+                <div className="flex flex-wrap gap-3">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white transition hover:border-brand/30 hover:bg-white/10">
+                    <ImagePlus className="h-4 w-4" />
+                    {uploadingRewardImage ? "Subiendo..." : rewardForm.image ? "Cambiar imagen" : "Subir imagen"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={uploadingRewardImage}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.currentTarget.value = "";
+                        if (file) {
+                          void uploadRewardImage(file);
+                        }
+                      }}
+                    />
+                  </label>
+                  {rewardForm.image ? (
+                    <Button
+                      variant="secondary"
+                      className="rounded-2xl border-white/10 bg-white/5"
+                      onClick={() => setRewardForm((current) => ({ ...current, image: null }))}
+                      disabled={uploadingRewardImage}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar imagen
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               <div>
                 <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Nombre</p>
                 <Input value={rewardForm.name} disabled={readOnly} onChange={(event) => setRewardForm((current) => ({ ...current, name: event.target.value }))} />
@@ -476,16 +582,29 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
                   onChange={(event) => setRewardForm((current) => ({ ...current, description: event.target.value }))}
                 />
               </div>
-              <div>
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Costo en puntos</p>
-                <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={rewardForm.pointsCost}
-                  disabled={readOnly}
-                  onChange={(event) => setRewardForm((current) => ({ ...current, pointsCost: event.target.value }))}
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Costo en puntos</p>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={rewardForm.pointsCost}
+                    disabled={readOnly}
+                    onChange={(event) => setRewardForm((current) => ({ ...current, pointsCost: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.16em] text-muted">Stock disponible</p>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={rewardForm.stockQty}
+                    disabled={readOnly}
+                    onChange={(event) => setRewardForm((current) => ({ ...current, stockQty: event.target.value }))}
+                  />
+                </div>
               </div>
               <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm">
                 <input
@@ -497,12 +616,12 @@ export function LoyaltyWorkspace({ initialOverview, initialContacts, readOnly = 
                 Mantener recompensa activa para nuevos canjes
               </label>
               <div className="flex gap-3">
-                <Button className="flex-1 rounded-2xl" onClick={saveReward} disabled={readOnly || savingReward}>
-                  {savingReward ? "Guardando..." : rewardForm.id ? "Actualizar recompensa" : "Crear recompensa"}
+                <Button className="flex-1 rounded-2xl" onClick={saveReward} disabled={readOnly || savingReward || uploadingRewardImage}>
+                  {savingReward ? "Guardando..." : rewardForm.id ? "Guardar cambios" : "Crear recompensa"}
                 </Button>
-                {rewardForm.id ? (
-                  <Button variant="secondary" className="rounded-2xl" onClick={() => setRewardForm(emptyRewardForm)} disabled={savingReward}>
-                    Limpiar
+                {!readOnly ? (
+                  <Button variant="secondary" className="rounded-2xl" onClick={startNewReward} disabled={savingReward}>
+                    {rewardForm.id ? "Volver al listado" : "Limpiar"}
                   </Button>
                 ) : null}
               </div>
@@ -715,6 +834,41 @@ function RewardThumb({ index, name }: { index: number; name: string }) {
       <div className="flex flex-col items-center gap-1">
         <Gift className="h-6 w-6" />
         <span className="max-w-[56px] truncate text-[11px] font-semibold uppercase tracking-[0.16em]">{name.slice(0, 6)}</span>
+      </div>
+    </div>
+  );
+}
+
+function RewardImagePreview({
+  image,
+  title,
+  compact = false,
+  fallbackIndex = 0
+}: {
+  image: PortalLoyaltyReward["image"];
+  title: string;
+  compact?: boolean;
+  fallbackIndex?: number;
+}) {
+  if (image?.url) {
+    return (
+      <img
+        src={image.url}
+        alt={image.alt || title}
+        className={compact ? "h-20 w-20 rounded-[22px] border border-white/12 object-cover" : "h-56 w-full rounded-[24px] border border-white/10 object-cover"}
+      />
+    );
+  }
+
+  if (compact) {
+    return <RewardThumb index={fallbackIndex} name={title} />;
+  }
+
+  return (
+    <div className="flex h-56 w-full items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-[linear-gradient(180deg,rgba(13,21,37,0.88),rgba(9,15,26,0.94))] text-muted">
+      <div className="text-center">
+        <Gift className="mx-auto h-8 w-8 text-brandBright" />
+        <p className="mt-3 text-sm">Sin imagen cargada</p>
       </div>
     </div>
   );

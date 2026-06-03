@@ -55,6 +55,17 @@ export async function POST(request: NextRequest) {
       name: String(body?.name || "").trim(),
       description: typeof body?.description === "string" ? body.description : null,
       pointsCost: Number(body?.pointsCost || 0),
+      stockQty: Number(body?.stockQty ?? 0),
+      image:
+        body?.image === null
+          ? null
+          : body?.image && typeof body.image === "object" && typeof body.image.url === "string"
+            ? {
+                url: body.image.url,
+                alt: typeof body.image.alt === "string" ? body.image.alt : null,
+                source: typeof body.image.source === "string" ? body.image.source : null
+              }
+            : undefined,
       active: body?.active !== false
     });
 
