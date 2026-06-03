@@ -924,6 +924,7 @@ function labelForOrderSource(source: string | null | undefined) {
 }
 
 function labelForOrderPaymentMethod(order: PortalOrder) {
+  if (order.paymentRecord?.methodLabel) return order.paymentRecord.methodLabel;
   const transferMethod = order.transferPayment?.paymentMethod;
   if (transferMethod === "bank_transfer") return "Transferencia bancaria";
   if (transferMethod === "cash") return "Efectivo";

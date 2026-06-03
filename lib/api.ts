@@ -1174,6 +1174,15 @@ export type PortalOrder = {
     type: "bank" | "wallet" | "cash_box" | "other" | null;
     isActive: boolean | null;
   } | null;
+  paymentRecord?: {
+    id: string | null;
+    status: string | null;
+    method: string | null;
+    methodLabel: string | null;
+    paidAt: string | null;
+    destinationId: string | null;
+    destinationName: string | null;
+  } | null;
   transferPayment?: PortalOrderTransferPayment | null;
   conversationPreview?: PortalOrderConversationPreview | null;
   items: PortalOrderItem[];
@@ -1854,7 +1863,10 @@ export async function createPortalOrder(
     currency?: string;
     source?: string;
     sellerUserId?: string | null;
+    paymentStatus?: string;
+    paymentMethod?: string | null;
     paymentDestinationId?: string | null;
+    paidAt?: string | null;
     orderStatus?: string;
     items: Array<{
       productId?: string | null;

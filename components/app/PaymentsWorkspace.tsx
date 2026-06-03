@@ -176,6 +176,14 @@ function paymentDestinationLabel(payment: PortalPayment) {
   return "Sin clasificar";
 }
 
+function paymentMethodLabel(payment: PortalPayment) {
+  const metadata = payment.metadata && typeof payment.metadata === "object" ? payment.metadata : null;
+  if (typeof metadata?.paymentMethodLabel === "string" && metadata.paymentMethodLabel.trim()) {
+    return metadata.paymentMethodLabel.trim();
+  }
+  return titleCaseLabel(payment.method);
+}
+
 function paymentEffectiveDate(payment: PortalPayment) {
   return payment.paidAt || payment.createdAt;
 }
@@ -636,7 +644,7 @@ export function PaymentsWorkspace({
       cliente: payment.contact?.name || "Sin contacto",
       contacto: payment.contact?.phone || "",
       referencia: payment.externalReference || payment.invoiceId || "",
-      metodo: titleCaseLabel(payment.method),
+      metodo: paymentMethodLabel(payment),
       destino: paymentDestinationLabel(payment),
       monto: Number(payment.amount || 0),
       estado: titleCaseLabel(payment.status)
@@ -766,7 +774,7 @@ export function PaymentsWorkspace({
                           <p className="mt-1 truncate text-xs text-slate-500">{paymentDestinationLabel(payment)}</p>
                         </div>
                         <div className="flex items-start">
-                          <Badge variant={methodBadgeVariant(payment.method)}>{titleCaseLabel(payment.method)}</Badge>
+                          <Badge variant={methodBadgeVariant(payment.method)}>{paymentMethodLabel(payment)}</Badge>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-white">{formatMoney(payment.amount, payment.currency)}</p>
@@ -1173,7 +1181,7 @@ function MobilePaymentCard({
           <p className="truncate text-sm font-semibold text-white">{payment.contact?.name || "Sin contacto"}</p>
           <p className="mt-1 text-xs text-slate-500">{payment.allocations?.[0]?.invoice?.invoiceNumber || payment.externalReference || payment.invoiceId || "Pago a cuenta"}</p>
         </div>
-        <Badge variant={methodBadgeVariant(payment.method)}>{titleCaseLabel(payment.method)}</Badge>
+        <Badge variant={methodBadgeVariant(payment.method)}>{paymentMethodLabel(payment)}</Badge>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <Badge variant={badgeToneByStatus(payment.status)}>{titleCaseLabel(payment.status)}</Badge>

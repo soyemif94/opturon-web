@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, Box, Plus, Search, UserRound } from "lucide-react";
+import { Banknote, Box, CreditCard, Plus, Search, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,8 @@ type OrderFormState = {
   customerType: "registered_contact" | "final_consumer";
   contactId: string;
   sellerUserId: string;
+  paymentStatus: "paid" | "pending";
+  paymentMethod: "cash" | "bank_transfer" | "card" | "mercado_pago" | "other";
   paymentDestinationId: string;
   notes: string;
   productId: string;
@@ -58,6 +60,8 @@ const initialForm: OrderFormState = {
   customerType: "registered_contact",
   contactId: "",
   sellerUserId: "",
+  paymentStatus: "paid",
+  paymentMethod: "cash",
   paymentDestinationId: "",
   notes: "",
   productId: "",
@@ -107,6 +111,8 @@ export function OrderCreateEditor() {
   const subtotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0), [cartItems]);
   const total = subtotal;
   const selectedCurrency = cartItems[0]?.currency || selectedProduct?.currency || "ARS";
+  const paymentStatusLabel = form.paymentStatus === "paid" ? "Pagado ahora" : "Pendiente de pago";
+  const paymentMethodLabel = labelForPaymentMethod(form.paymentMethod);
 
   const hasInvalidQuantity = !Number.isInteger(requestedQuantity) || requestedQuantity <= 0;
   const hasInactiveProduct = Boolean(selectedProduct) && !selectedProductIsActive;
@@ -149,6 +155,11 @@ export function OrderCreateEditor() {
         const defaultProduct = nextProducts.find((product) => resolveProductStatus(product) === "active") || nextProducts[0] || null;
         const defaultSeller =
           (currentUserId && nextSellers.find((seller) => seller.id === currentUserId)) || nextSellers[0] || null;
+        const defaultPaymentDestination =
+          nextPaymentDestinations.find((destination) => destination.isActive && destination.type === "cash_box") ||
+          nextPaymentDestinations.find((destination) => destination.isActive) ||
+          nextPaymentDestinations[0] ||
+          null;
 
         setProducts(nextProducts);
         setContacts(nextContacts);
@@ -158,7 +169,8 @@ export function OrderCreateEditor() {
           ...current,
           productId: current.productId || defaultProduct?.id || "",
           contactId: current.contactId || nextContacts[0]?.id || "",
-          sellerUserId: current.sellerUserId || defaultSeller?.id || ""
+          sellerUserId: current.sellerUserId || defaultSeller?.id || "",
+          paymentDestinationId: current.paymentDestinationId || defaultPaymentDestination?.id || ""
         }));
       } catch (error) {
         toast.error("No se pudo preparar el alta", error instanceof Error ? error.message : "unknown_error");
@@ -188,6 +200,10 @@ export function OrderCreateEditor() {
       toast.error("Vendedor requerido", "Selecciona el vendedor responsable del pedido.");
       return;
     }
+    if (form.paymentStatus === "paid" && !form.paymentDestinationId.trim()) {
+      toast.error("Destino requerido", "Selecciona un destino de cobro para registrar el pedido como pagado.");
+      return;
+    }
     if (cartItems.length === 0) {
       toast.error("Carrito vacio", "Agrega al menos un producto para crear el pedido.");
       return;
@@ -202,7 +218,10 @@ export function OrderCreateEditor() {
           customerType: form.customerType,
           contactId: form.customerType === "registered_contact" ? form.contactId : null,
           sellerUserId: form.sellerUserId,
+          paymentStatus: form.paymentStatus,
+          paymentMethod: form.paymentStatus === "paid" ? form.paymentMethod : null,
           paymentDestinationId: form.paymentDestinationId || null,
+          paidAt: form.paymentStatus === "paid" ? new Date().toISOString() : null,
           source: "manual",
           notes: form.notes.trim(),
           items: cartItems.map((item) => ({
@@ -234,6 +253,8 @@ export function OrderCreateEditor() {
       customerType: current.customerType,
       contactId: current.customerType === "registered_contact" ? current.contactId : "",
       sellerUserId: current.sellerUserId,
+      paymentStatus: "paid",
+      paymentMethod: "cash",
       paymentDestinationId: current.paymentDestinationId
     }));
     setCartItems([]);
@@ -342,7 +363,7 @@ export function OrderCreateEditor() {
       <section className="grid gap-4 xl:grid-cols-4">
         <SummaryChip icon={UserRound} accent="text-sky-300" label="Cliente seleccionado" value={form.customerType === "final_consumer" ? "Consumidor final" : selectedContact?.name || "Pendiente"} helper={selectedContact?.phone || "Sin telefono"} />
         <SummaryChip icon={UserRound} accent="text-orange-300" label="Vendedor responsable" value={selectedSeller?.name || "Pendiente"} helper={selectedSeller?.role || "Sin rol visible"} />
-        <SummaryChip icon={Banknote} accent="text-emerald-300" label="Destino de cobro" value={selectedDestination?.name || "Sin definir"} helper={selectedDestination?.type ? labelForPaymentDestinationType(selectedDestination.type) : "Sin tipo"} />
+        <SummaryChip icon={CreditCard} accent="text-emerald-300" label="Pago del pedido" value={paymentStatusLabel} helper={form.paymentStatus === "paid" ? `${paymentMethodLabel}${selectedDestination?.name ? ` · ${selectedDestination.name}` : ""}` : "Se registrara sin cobrar"} />
         <SummaryChip icon={Box} accent="text-fuchsia-300" label="Items agregados" value={`${cartItems.length} producto(s)`} helper={`${cartUnits} unidad(es)`} />
       </section>
 
@@ -390,39 +411,21 @@ export function OrderCreateEditor() {
                 </div>
               )}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <FieldBlock label="Vendedor responsable">
-                  <select
-                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                    value={form.sellerUserId}
-                    onChange={(event) => setForm((current) => ({ ...current, sellerUserId: event.target.value }))}
-                    disabled={metaLoading || saving}
-                  >
-                    <option value="">{metaLoading ? "Cargando vendedores..." : "Selecciona un vendedor"}</option>
-                    {sellers.map((seller) => (
-                      <option key={seller.id} value={seller.id}>
-                        {seller.name}
-                      </option>
-                    ))}
-                  </select>
-                </FieldBlock>
-
-                <FieldBlock label="Destino de cobro">
-                  <select
-                    className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
-                    value={form.paymentDestinationId}
-                    onChange={(event) => setForm((current) => ({ ...current, paymentDestinationId: event.target.value }))}
-                    disabled={metaLoading || saving}
-                  >
-                    <option value="">Sin definir por ahora</option>
-                    {paymentDestinations.map((destination) => (
-                      <option key={destination.id} value={destination.id}>
-                        {destination.name}
-                      </option>
-                    ))}
-                  </select>
-                </FieldBlock>
-              </div>
+              <FieldBlock label="Vendedor responsable">
+                <select
+                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={form.sellerUserId}
+                  onChange={(event) => setForm((current) => ({ ...current, sellerUserId: event.target.value }))}
+                  disabled={metaLoading || saving}
+                >
+                  <option value="">{metaLoading ? "Cargando vendedores..." : "Selecciona un vendedor"}</option>
+                  {sellers.map((seller) => (
+                    <option key={seller.id} value={seller.id}>
+                      {seller.name}
+                    </option>
+                  ))}
+                </select>
+              </FieldBlock>
 
               <FieldBlock label="Notas">
                 <Textarea
@@ -433,6 +436,82 @@ export function OrderCreateEditor() {
                   disabled={saving}
                 />
               </FieldBlock>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Pago del pedido" description="Define si el pedido queda cobrado ahora o pendiente, usando los metodos y destinos reales del sistema." badge="Cobro inicial">
+            <div className="grid gap-4">
+              <FieldBlock label="Estado de pago">
+                <select
+                  className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                  value={form.paymentStatus}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      paymentStatus: event.target.value as OrderFormState["paymentStatus"]
+                    }))
+                  }
+                  disabled={saving}
+                >
+                  <option value="paid">Pagado ahora</option>
+                  <option value="pending">Pendiente de pago</option>
+                </select>
+              </FieldBlock>
+
+              {form.paymentStatus === "paid" ? (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FieldBlock label="Metodo de pago">
+                      <select
+                        className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                        value={form.paymentMethod}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            paymentMethod: event.target.value as OrderFormState["paymentMethod"]
+                          }))
+                        }
+                        disabled={saving}
+                      >
+                        <option value="cash">Efectivo</option>
+                        <option value="bank_transfer">Transferencia</option>
+                        <option value="card">Tarjeta</option>
+                        <option value="mercado_pago">Mercado Pago</option>
+                        <option value="other">Otro / mixto</option>
+                      </select>
+                    </FieldBlock>
+
+                    <FieldBlock label="Destino de cobro">
+                      <select
+                        className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                        value={form.paymentDestinationId}
+                        onChange={(event) => setForm((current) => ({ ...current, paymentDestinationId: event.target.value }))}
+                        disabled={metaLoading || saving}
+                      >
+                        <option value="">{metaLoading ? "Cargando destinos..." : "Selecciona un destino"}</option>
+                        {paymentDestinations.map((destination) => (
+                          <option key={destination.id} value={destination.id}>
+                            {destination.name}{destination.type ? ` · ${labelForPaymentDestinationType(destination.type)}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </FieldBlock>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FieldBlock label="Monto cobrado">
+                      <Input value={formatCurrency(total, selectedCurrency)} disabled />
+                    </FieldBlock>
+                    <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                      Se registrara el cobro completo del pedido usando el flujo real actual, sin pago parcial en esta fase.
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-[20px] border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                  El pedido se va a crear como <span className="font-medium text-text">pendiente de pago</span> y no registrara una cobranza inicial.
+                </div>
+              )}
             </div>
           </SectionCard>
         </div>
@@ -608,11 +687,11 @@ export function OrderCreateEditor() {
               </div>
               <MiniStat label="Cliente" value={form.customerType === "final_consumer" ? "Consumidor final" : selectedContact?.name || "Pendiente"} />
               <MiniStat label="Responsable" value={selectedSeller?.name || "Pendiente"} />
-              <MiniStat label="Cobro" value={selectedDestination?.name || "Sin definir"} />
+              <MiniStat label="Cobro" value={form.paymentStatus === "paid" ? `${paymentMethodLabel}${selectedDestination?.name ? ` · ${selectedDestination.name}` : ""}` : "Pendiente de pago"} />
               <MiniStat label="Productos" value={`${cartItems.length} producto(s) · ${cartUnits} unidad(es)`} />
-              <MiniStat label="Estado inicial" value="Pendiente" />
+              <MiniStat label="Estado inicial" value={paymentStatusLabel} />
               <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
-                El alta sigue usando exactamente el endpoint actual de pedidos, con stock, cliente, vendedor y destino de cobro reales.
+                El alta sigue usando exactamente el endpoint actual de pedidos y, cuando se marca como pagado, sincroniza la cobranza real con los modulos ya existentes.
               </div>
               <Button
                 type="submit"
@@ -621,7 +700,8 @@ export function OrderCreateEditor() {
                   saving ||
                   cartItems.length === 0 ||
                   !form.sellerUserId ||
-                  (form.customerType === "registered_contact" && !form.contactId)
+                  (form.customerType === "registered_contact" && !form.contactId) ||
+                  (form.paymentStatus === "paid" && !form.paymentDestinationId)
                 }
               >
                 {saving ? "Creando..." : "Crear pedido"}
@@ -670,6 +750,8 @@ function humanizeOrderError(payload: any) {
       return "El destino de cobro seleccionado ya no existe.";
     case "payment_destination_inactive":
       return "El destino de cobro seleccionado esta inactivo.";
+    case "missing_payment_destination_for_paid_order":
+      return "Selecciona un destino de cobro para registrar el pedido como pagado.";
     case "order_item_insufficient_stock":
       return "No hay stock suficiente para el producto seleccionado.";
     case "order_item_product_inactive":
@@ -792,5 +874,20 @@ function labelForPaymentDestinationType(type: string | null | undefined) {
       return "Otro";
     default:
       return "Sin tipo";
+  }
+}
+
+function labelForPaymentMethod(value: string | null | undefined) {
+  switch (value) {
+    case "cash":
+      return "Efectivo";
+    case "bank_transfer":
+      return "Transferencia";
+    case "card":
+      return "Tarjeta";
+    case "mercado_pago":
+      return "Mercado Pago";
+    default:
+      return "Otro / mixto";
   }
 }
