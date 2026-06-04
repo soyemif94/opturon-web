@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { type ComponentType, type FormEvent, useMemo, useState } from "react";
-import { ArrowRight, Boxes, Package, PencilLine, ScanLine, Search, Upload, Warehouse } from "lucide-react";
+import { type ComponentType, type FormEvent, useEffect, useMemo, useState } from "react";
+import { ArrowRight, Boxes, CheckSquare, ChevronDown, ChevronUp, Package, PencilLine, ScanLine, Search, Trash2, Upload, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,8 +22,18 @@ type Product = {
   stockQty?: number | null;
   status?: string | null;
   active?: boolean;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  subcategory?: string | null;
+  attributes?: Array<{ name: string; options: string[] }>;
   createdAt?: string | null;
   updatedAt?: string | null;
+};
+
+type ProductCategory = {
+  id: string;
+  name: string;
+  isActive: boolean;
 };
 
 type Draft = {
@@ -33,6 +43,9 @@ type Draft = {
   price: string;
   stock: string;
   currency: string;
+  categoryId: string;
+  subcategory: string;
+  attributesText: string;
 };
 
 type BulkPreviewRow = {
@@ -73,7 +86,10 @@ const EMPTY_DRAFT: Draft = {
   sku: "",
   price: "",
   stock: "0",
-  currency: "ARS"
+  currency: "ARS",
+  categoryId: "",
+  subcategory: "",
+  attributesText: ""
 };
 
 const BULK_EXAMPLE = [
@@ -84,7 +100,16 @@ const BULK_EXAMPLE = [
 
 export function CatalogManager({ initialProducts, readOnly = false }: { initialProducts: Product[]; readOnly?: boolean }) {
   const [products, setProducts] = useState(Array.isArray(initialProducts) ? initialProducts : []);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categoryName, setCategoryName] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryActionId, setCategoryActionId] = useState<string | null>(null);
+  const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null);
+  const [categoryEditingName, setCategoryEditingName] = useState("");
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(initialProducts[0]?.id || null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [bulkText, setBulkText] = useState("");
@@ -93,8 +118,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
+  const [listExpanded, setListExpanded] = useState(true);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedId) || null,
@@ -125,6 +153,27 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   }, [products, search]);
 
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
+  const allVisibleSelected = filteredProducts.length > 0 && filteredProducts.every((product) => selectedIds.includes(product.id));
+  const selectedVisibleCount = filteredProducts.filter((product) => selectedIds.includes(product.id)).length;
+  const categoryProductCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    products.forEach((product) => {
+      if (!product.categoryId) return;
+      counts.set(product.categoryId, (counts.get(product.categoryId) || 0) + 1);
+    });
+    return counts;
+  }, [products]);
+  const sortedCategories = useMemo(
+    () => [...categories].sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""))),
+    [categories]
+  );
+  const filteredCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return sortedCategories;
+    return sortedCategories.filter((category) => category.name.toLowerCase().includes(query));
+  }, [categorySearch, sortedCategories]);
+  const visibleCategories = categoriesExpanded ? filteredCategories : filteredCategories.slice(0, 5);
+  const hiddenCategoriesCount = Math.max(filteredCategories.length - visibleCategories.length, 0);
 
   function hydrateDraft(product?: Product | null): Draft {
     return {
@@ -133,8 +182,172 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       sku: product?.sku || "",
       price: product ? String(resolvePrice(product)) : "",
       stock: product ? String(resolveStock(product)) : "0",
-      currency: product?.currency || "ARS"
+      currency: product?.currency || "ARS",
+      categoryId: product?.categoryId || "",
+      subcategory: product?.subcategory || "",
+      attributesText: formatAttributesText(product?.attributes)
     };
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategories() {
+      try {
+        const response = await fetch("/api/app/catalog/categories?includeInactive=true", { cache: "no-store" });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(String(json?.error || "No se pudieron cargar las categorias."));
+        if (!cancelled) {
+          setCategories(
+            Array.isArray(json?.categories)
+              ? [...json.categories].sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")))
+              : []
+          );
+        }
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    }
+
+    void loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function createCategory() {
+    if (readOnly) return;
+    const name = categoryName.trim();
+    if (!name) {
+      setFeedback({ tone: "warning", text: "La categoria necesita un nombre." });
+      return;
+    }
+
+    setCategorySaving(true);
+    try {
+      const response = await fetch("/api/app/catalog/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, isActive: true })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo crear la categoria."));
+      const createdCategory = json?.category;
+      setCategories((current) =>
+        [...current, createdCategory]
+          .filter(Boolean)
+          .sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")))
+      );
+      setDraft((current) => ({ ...current, categoryId: createdCategory?.id || current.categoryId }));
+      setCategoryName("");
+      toast.success("Categoria creada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo crear la categoria.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al crear categoria", message);
+    } finally {
+      setCategorySaving(false);
+    }
+  }
+
+  function startCategoryRename(category: ProductCategory) {
+    setCategoryEditingId(category.id);
+    setCategoryEditingName(category.name);
+  }
+
+  function cancelCategoryRename() {
+    setCategoryEditingId(null);
+    setCategoryEditingName("");
+  }
+
+  async function renameCategory(category: ProductCategory) {
+    if (readOnly) return;
+    const name = categoryEditingName.trim();
+    if (!name) {
+      setFeedback({ tone: "warning", text: "La categoria necesita un nombre." });
+      return;
+    }
+
+    setCategoryActionId(category.id);
+    try {
+      const response = await fetch(`/api/app/catalog/categories/${category.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo renombrar la categoria."));
+      const updatedCategory = json?.category;
+      setCategories((current) =>
+        current
+          .map((item) => (item.id === category.id ? updatedCategory : item))
+          .sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")))
+      );
+      cancelCategoryRename();
+      toast.success("Categoria actualizada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo renombrar la categoria.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al renombrar categoria", message);
+    } finally {
+      setCategoryActionId(null);
+    }
+  }
+
+  async function toggleCategoryStatus(category: ProductCategory) {
+    if (readOnly) return;
+    setCategoryActionId(category.id);
+    try {
+      const response = await fetch(`/api/app/catalog/categories/${category.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !category.isActive })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo actualizar la categoria."));
+      const updatedCategory = json?.category;
+      setCategories((current) =>
+        current
+          .map((item) => (item.id === category.id ? updatedCategory : item))
+          .sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")))
+      );
+      toast.success(updatedCategory?.isActive ? "Categoria activada" : "Categoria archivada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo actualizar la categoria.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al actualizar categoria", message);
+    } finally {
+      setCategoryActionId(null);
+    }
+  }
+
+  async function deleteCategory(category: ProductCategory) {
+    if (readOnly) return;
+    const confirmed = window.confirm(`Se eliminara la categoria "${category.name}". Esta accion no se puede deshacer.`);
+    if (!confirmed) return;
+
+    setCategoryActionId(category.id);
+    try {
+      const response = await fetch(`/api/app/catalog/categories/${category.id}`, {
+        method: "DELETE"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "No se pudo eliminar la categoria."));
+      setCategories((current) => current.filter((item) => item.id !== category.id));
+      setDraft((current) => (
+        current.categoryId === category.id
+          ? { ...current, categoryId: "" }
+          : current
+      ));
+      if (categoryEditingId === category.id) cancelCategoryRename();
+      toast.success("Categoria eliminada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo eliminar la categoria.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al eliminar categoria", message);
+    } finally {
+      setCategoryActionId(null);
+    }
   }
 
   async function reloadProducts(preferredId?: string | null) {
@@ -146,6 +359,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     const nextProducts = Array.isArray(json?.products) ? json.products : [];
     setProducts(nextProducts);
+    setSelectedIds((current) => current.filter((id) => nextProducts.some((product: Product) => product.id === id)));
 
     const nextSelected =
       nextProducts.find((product: Product) => product.id === preferredId) ||
@@ -157,6 +371,27 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     return nextSelected;
   }
 
+  function toggleSelection(productId: string) {
+    setSelectedIds((current) => (
+      current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId]
+    ));
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedIds((current) => current.filter((id) => !filteredProducts.some((product) => product.id === id)));
+      return;
+    }
+
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      filteredProducts.forEach((product) => next.add(product.id));
+      return Array.from(next);
+    });
+  }
+
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (readOnly) return;
@@ -165,6 +400,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     const price = Number(draft.price);
     const stock = Number.parseInt(draft.stock, 10);
+    const attributes = parseAttributesText(draft.attributesText);
 
     if (!draft.name.trim()) {
       setFeedback({ tone: "warning", text: "El producto necesita al menos un nombre." });
@@ -191,7 +427,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           price,
           vatRate: 0,
           stock,
-          currency: draft.currency.trim() || "ARS"
+          currency: draft.currency.trim() || "ARS",
+          categoryId: draft.categoryId || null,
+          subcategory: draft.subcategory.trim() || null,
+          attributes
         })
       });
       const json = await response.json().catch(() => null);
@@ -335,6 +574,89 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
   }
 
+  async function deleteProduct(product: Product) {
+    if (readOnly) return;
+
+    const confirmed = window.confirm(`Se eliminara "${product.name}". Esta accion no se puede deshacer.`);
+    if (!confirmed) return;
+
+    setDeletingId(product.id);
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`/api/app/catalog/${product.id}`, {
+        method: "DELETE"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.error || "No se pudo eliminar el producto.");
+      }
+
+      await reloadProducts(selectedId === product.id ? null : selectedId);
+      setSelectedIds((current) => current.filter((id) => id !== product.id));
+      setFeedback({ tone: "success", text: `Producto eliminado: ${product.name}.` });
+      toast.success("Producto eliminado");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo eliminar el producto.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al eliminar producto", message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function deleteSelectedProducts() {
+    if (readOnly || selectedIds.length === 0) return;
+
+    const names = products.filter((product) => selectedIds.includes(product.id)).map((product) => product.name);
+    const confirmed = window.confirm(
+      `Se eliminaran ${selectedIds.length} producto(s): ${names.slice(0, 3).join(", ")}${names.length > 3 ? "..." : ""}.`
+    );
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    setFeedback(null);
+
+    let deleted = 0;
+    let blocked = 0;
+
+    try {
+      for (const productId of selectedIds) {
+        const response = await fetch(`/api/app/catalog/${productId}`, { method: "DELETE" });
+        if (response.ok) {
+          deleted += 1;
+          continue;
+        }
+
+        const json = await response.json().catch(() => null);
+        blocked += 1;
+        if (json?.error === "product_delete_blocked") {
+          continue;
+        }
+      }
+
+      await reloadProducts(selectedId);
+      setSelectedIds([]);
+
+      if (deleted > 0 && blocked === 0) {
+        setFeedback({ tone: "success", text: `Se eliminaron ${deleted} productos seleccionados.` });
+        toast.success("Productos eliminados");
+      } else if (deleted > 0) {
+        setFeedback({ tone: "warning", text: `Se eliminaron ${deleted} productos y ${blocked} no pudieron borrarse por referencias activas.` });
+        toast.success("Borrado masivo parcial");
+      } else {
+        setFeedback({ tone: "warning", text: "No se pudo eliminar ningun producto seleccionado." });
+        toast.error("Borrado masivo bloqueado");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudieron eliminar los productos seleccionados.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al eliminar seleccionados", message);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -354,7 +676,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
       {readOnly ? (
         <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-200">
-          Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear ni editar.
+          Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear, editar ni eliminar.
         </div>
       ) : null}
 
@@ -409,10 +731,20 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">{filteredProducts.length} visibles</Badge>}>
+          <CardHeader
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="muted">{filteredProducts.length} visibles</Badge>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setListExpanded((current) => !current)}>
+                  {listExpanded ? "Colapsar" : "Expandir"}
+                  {listExpanded ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
+                </Button>
+              </div>
+            }
+          >
             <div>
               <CardTitle className="text-xl">Catalogo del negocio</CardTitle>
-              <CardDescription>Lista simple de productos con precio, stock y estado operativo para usar luego en pedidos y commerce conversacional.</CardDescription>
+              <CardDescription>Lista operativa de productos con precio, stock y estado para revisar rapido, seleccionar en bloque y limpiar catalogo sin perder contexto.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -425,7 +757,32 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
-            {products.length === 0 ? (
+            {products.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <CheckSquare className="h-4 w-4 text-brandBright" />
+                  <span>{selectedIds.length} seleccionados</span>
+                  {selectedVisibleCount > 0 ? <span>· {selectedVisibleCount} visibles</span> : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={toggleSelectAllVisible}>
+                    {allVisibleSelected ? "Limpiar visibles" : "Seleccionar todo"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
+                    Limpiar seleccion
+                  </Button>
+                  <Button type="button" variant="destructive" size="sm" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    {bulkDeleting ? "Eliminando..." : "Eliminar seleccionados"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {!listExpanded && products.length > 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
+                Listado colapsado para ahorrar espacio operativo. Mantienes buscador y acciones masivas listas para expandir cuando necesites revisar productos.
+              </div>
+            ) : products.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-5 text-sm leading-7 text-muted">
                 Todavia no hay productos. Crea el primero desde el panel lateral o pega varias lineas en carga masiva para poblar rapido el catalogo.
               </div>
@@ -442,21 +799,35 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   }`}
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold">{product.name}</p>
-                        <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
-                          {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
-                        </Badge>
-                        <Badge variant={getStockState(resolveStock(product)).variant}>
-                          {getStockState(resolveStock(product)).label}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 text-sm text-muted">
-                        {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
-                    </button>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(product.id)}
+                        onChange={() => toggleSelection(product.id)}
+                        className="mt-1 h-4 w-4 rounded border border-[color:var(--border)] bg-transparent"
+                        aria-label={`Seleccionar ${product.name}`}
+                      />
+                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(product.id)}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold">{product.name}</p>
+                          <Badge variant={resolveStatus(product) === "active" ? "success" : "muted"}>
+                            {resolveStatus(product) === "active" ? "Activo" : "Archivado"}
+                          </Badge>
+                          <Badge variant={getStockState(resolveStock(product)).variant}>
+                            {getStockState(resolveStock(product)).label}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-muted">
+                          {product.sku || "Sin SKU"} · Stock {resolveStock(product)}
+                        </p>
+                        {product.categoryName || product.subcategory ? (
+                          <p className="mt-1 text-sm text-muted">
+                            {[product.categoryName, product.subcategory].filter(Boolean).join(" · ")}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 line-clamp-2 text-sm text-muted">{product.description || "Sin descripcion cargada."}</p>
+                      </button>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium">{formatCurrency(resolvePrice(product), product.currency || "ARS")}</p>
@@ -468,6 +839,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       </Button>
                       <Button type="button" variant="secondary" size="sm" disabled={readOnly || statusUpdatingId === product.id} onClick={() => void toggleStatus(product)}>
                         {statusUpdatingId === product.id ? "Actualizando..." : resolveStatus(product) === "active" ? "Archivar" : "Activar"}
+                      </Button>
+                      <Button type="button" variant="destructive" size="sm" disabled={readOnly || deletingId === product.id || bulkDeleting} onClick={() => void deleteProduct(product)}>
+                        <Trash2 className="mr-1 h-4 w-4" />
+                        {deletingId === product.id ? "Eliminando..." : "Eliminar"}
                       </Button>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={`/app/catalog/${product.id}`}>
@@ -484,6 +859,114 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
 
         <div className="space-y-6">
+          <Card className="border-white/6 bg-card/90">
+            <CardHeader
+              action={
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="muted">{filteredCategories.length} categorias</Badge>
+                  {filteredCategories.length > 5 ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setCategoriesExpanded((current) => !current)}>
+                      {categoriesExpanded ? "Ver menos" : `Ver mas (${hiddenCategoriesCount})`}
+                    </Button>
+                  ) : null}
+                </div>
+              }
+            >
+              <div>
+                <CardTitle className="text-xl">Categorias</CardTitle>
+                <CardDescription>Gestiona el arbol comercial sin estirar el lateral. Busca, renombra o pausa categorias con contexto rapido.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                <Input
+                  className="pl-10"
+                  value={categorySearch}
+                  onChange={(event) => setCategorySearch(event.target.value)}
+                  placeholder="Buscar categoria por nombre"
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-1">
+                <Input
+                  value={categoryName}
+                  onChange={(event) => setCategoryName(event.target.value)}
+                  placeholder="Nueva categoria"
+                  disabled={readOnly || categorySaving}
+                />
+                <Button type="button" variant="secondary" onClick={() => void createCategory()} disabled={readOnly || categorySaving}>
+                  {categorySaving ? "Creando..." : "Agregar categoria"}
+                </Button>
+              </div>
+
+              {filteredCategories.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                  {categories.length === 0 ? "Todavia no hay categorias creadas." : "No encontramos categorias para esa busqueda."}
+                </div>
+              ) : (
+                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                  {visibleCategories.map((category) => {
+                    const isEditing = categoryEditingId === category.id;
+                    const isBusy = categoryActionId === category.id;
+                    return (
+                      <div key={category.id} className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            {isEditing ? (
+                              <Input
+                                value={categoryEditingName}
+                                onChange={(event) => setCategoryEditingName(event.target.value)}
+                                placeholder="Nombre de categoria"
+                                disabled={readOnly || isBusy}
+                              />
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="truncate text-sm font-semibold">{category.name}</p>
+                                <Badge variant={category.isActive ? "success" : "muted"}>{category.isActive ? "Activa" : "Pausada"}</Badge>
+                                <Badge variant="muted">{categoryProductCounts.get(category.id) || 0} productos</Badge>
+                              </div>
+                            )}
+                            <p className="mt-2 text-xs leading-6 text-muted">
+                              {category.isActive
+                                ? "Disponible para nuevas altas y filtros del catalogo."
+                                : "Oculta para nuevas altas, pero conserva historial y conteo."}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {isEditing ? (
+                              <>
+                                <Button type="button" variant="secondary" size="sm" disabled={readOnly || isBusy} onClick={() => void renameCategory(category)}>
+                                  {isBusy ? "Guardando..." : "Guardar"}
+                                </Button>
+                                <Button type="button" variant="ghost" size="sm" disabled={readOnly || isBusy} onClick={cancelCategoryRename}>
+                                  Cancelar
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button type="button" variant="secondary" size="sm" disabled={readOnly || isBusy} onClick={() => startCategoryRename(category)}>
+                                  Renombrar
+                                </Button>
+                                <Button type="button" variant="ghost" size="sm" disabled={readOnly || isBusy} onClick={() => void toggleCategoryStatus(category)}>
+                                  {isBusy ? "Actualizando..." : category.isActive ? "Desactivar" : "Activar"}
+                                </Button>
+                                <Button type="button" variant="destructive" size="sm" disabled={readOnly || isBusy} onClick={() => void deleteCategory(category)}>
+                                  Eliminar
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="border-white/6 bg-card/90">
             <CardHeader action={<Badge variant={mode === "bulk" ? "warning" : "muted"}>{mode === "bulk" ? "Carga masiva" : "Alta rapida"}</Badge>}>
               <div>
@@ -519,6 +1002,35 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
+                      <label className="text-sm font-medium">Categoria</label>
+                      <select
+                        className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                        value={draft.categoryId}
+                        onChange={(event) => setDraft((current) => ({ ...current, categoryId: event.target.value }))}
+                        disabled={readOnly}
+                      >
+                        <option value="">Sin categoria</option>
+                        {categories
+                          .filter((category) => category.isActive || category.id === draft.categoryId)
+                          .map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Subcategoria</label>
+                      <Input
+                        value={draft.subcategory}
+                        onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
+                        placeholder="Ej. Remeras, Celulares, Reparaciones"
+                        disabled={readOnly}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
                       <label className="text-sm font-medium">Precio</label>
                       <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
                     </div>
@@ -530,6 +1042,19 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Descripcion</label>
                     <Textarea className="min-h-[120px]" value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el producto de forma simple para el equipo y futuros flujos de venta." disabled={readOnly} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Atributos configurables</label>
+                    <Textarea
+                      className="min-h-[120px]"
+                      value={draft.attributesText}
+                      onChange={(event) => setDraft((current) => ({ ...current, attributesText: event.target.value }))}
+                      placeholder={"Talle: M, L, XL\nColor: Negro, Blanco"}
+                      disabled={readOnly}
+                    />
+                    <p className="text-xs leading-6 text-muted">
+                      Una linea por atributo. Formato: <span className="font-mono">Nombre: opcion 1, opcion 2</span>
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button type="button" variant="ghost" onClick={startCreate} disabled={readOnly}>
@@ -643,7 +1168,32 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                     <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                     <DetailStat label="Actualizado" value={formatDate(selectedProduct.updatedAt || selectedProduct.createdAt)} />
+                    <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
+                    <DetailStat label="Subcategoria" value={selectedProduct.subcategory || "Sin subcategoria"} />
                   </div>
+                  {Array.isArray(selectedProduct.attributes) && selectedProduct.attributes.length > 0 ? (
+                    <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/55 p-4">
+                      <p className="text-sm font-semibold">Atributos configurables</p>
+                      <div className="mt-3 space-y-3">
+                        {selectedProduct.attributes.map((attribute) => (
+                          <div key={`${attribute.name}-${attribute.options.join("|")}`}>
+                            <p className="text-sm font-medium">{attribute.name}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {attribute.options.length > 0 ? (
+                                attribute.options.map((option) => (
+                                  <Badge key={`${attribute.name}-${option}`} variant="muted">
+                                    {option}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <Badge variant="muted">Sin opciones</Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {!readOnly ? (
                     <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                       <Link href={`/app/catalog/${selectedProduct.id}/edit`}>
@@ -760,6 +1310,41 @@ function parseBulkRow(rawLine: string, sourceRow: number): BulkPreviewRow {
     description,
     valid: true
   };
+}
+
+function parseAttributesText(value: string) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf(":");
+      if (separatorIndex === -1) {
+        return {
+          name: line,
+          options: []
+        };
+      }
+
+      const name = line.slice(0, separatorIndex).trim();
+      const options = line
+        .slice(separatorIndex + 1)
+        .split(",")
+        .map((option) => option.trim())
+        .filter(Boolean);
+
+      if (!name) return null;
+      return {
+        name,
+        options: Array.from(new Set(options))
+      };
+    })
+    .filter((item): item is { name: string; options: string[] } => Boolean(item && item.name));
+}
+
+function formatAttributesText(attributes?: Array<{ name: string; options: string[] }>) {
+  if (!Array.isArray(attributes) || attributes.length === 0) return "";
+  return attributes.map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`.trim()).join("\n");
 }
 
 function humanizeBulkCode(code?: string) {
