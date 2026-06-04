@@ -1023,7 +1023,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_240px]">
+            <div className="grid gap-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <Input
@@ -1033,18 +1033,6 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   onChange={(event) => setSearch(event.target.value)}
                 />
               </div>
-              <select
-                className="h-12 w-full rounded-2xl border border-white/8 bg-[linear-gradient(135deg,rgba(12,20,32,0.92),rgba(9,15,24,0.92))] px-4 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-              >
-                <option value="">Todas las categorias ({products.length})</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name} ({categoryProductCounts.get(category.id) || 0}){category.isActive ? "" : " · Inactiva"}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -1077,11 +1065,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     {visibleProducts.length} visibles de {activeCategoryProductCount} producto{activeCategoryProductCount === 1 ? "" : "s"} en esta categoria.
                   </p>
                 </div>
-                {!readOnly ? (
-                  <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => openQuickCreate(activeCategory.id)}>
-                    Agregar producto
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                  <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setCategoryFilter("")}>
+                    Quitar filtro
                   </Button>
-                ) : null}
+                  {!readOnly ? (
+                    <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => openQuickCreate(activeCategory.id)}>
+                      Agregar producto
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.86),rgba(9,15,24,0.92))] px-4 py-3">
@@ -1531,6 +1524,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      {editingCategoryId === category.id ? null : (
+                        <Button
+                          type="button"
+                          variant={categoryFilter === category.id ? "secondary" : "ghost"}
+                          size="sm"
+                          onClick={() => setCategoryFilter((current) => (current === category.id ? "" : category.id))}
+                        >
+                          {categoryFilter === category.id ? "Quitar filtro" : "Ver productos"}
+                        </Button>
+                      )}
                       {editingCategoryId === category.id ? null : (
                         <Button
                           type="button"
