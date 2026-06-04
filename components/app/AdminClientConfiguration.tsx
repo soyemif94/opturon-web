@@ -315,7 +315,9 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
         body: JSON.stringify(payload)
       });
       const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(json?.error || "billing_subscription_create_failed");
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "billing_subscription_create_failed");
+      }
       const subscription = json?.subscription as AdminBillingSubscription;
       setSubscriptions((current) => [subscription, ...current.filter((item) => item.id !== subscription.id)]);
       toast.success("Suscripcion creada");
