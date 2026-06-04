@@ -39,6 +39,39 @@ export type AdminTenantPolicyRow = {
   policy: TenantPolicy;
 };
 
+export type AdminBillingSubscription = {
+  id: string;
+  clinicId: string;
+  externalTenantId: string;
+  clientId?: string | null;
+  planCode: "inicial" | "crecimiento" | "empresa";
+  amount: number;
+  currency: string;
+  billingInterval: "monthly";
+  mercadoPagoPreapprovalId?: string | null;
+  mercadoPagoPayerEmail?: string | null;
+  mercadoPagoStatus?: string | null;
+  localStatus: "pending" | "active" | "paused" | "canceled" | "payment_failed" | "suspended";
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  nextBillingDate?: string | null;
+  lastPaymentId?: string | null;
+  lastPaymentStatus?: string | null;
+  externalReference: string;
+  authorizationUrl?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type CreateAdminBillingSubscriptionPayload = {
+  tenantId: string;
+  planCode: "inicial" | "crecimiento" | "empresa";
+  payerEmail: string;
+  amount: number;
+  currency?: string;
+};
+
 function getApiBase() {
   const candidates = [
     process.env.BACKEND_BASE_URL,
@@ -172,5 +205,55 @@ export async function patchAdminTenantPolicy(
   }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`, {
     method: "PATCH",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function listAdminBillingSubscriptions(tenantId?: string) {
+  const search = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      subscriptions: AdminBillingSubscription[];
+    };
+  }>(`/api/admin/billing/subscriptions${search}`);
+}
+
+export async function createAdminBillingSubscription(payload: CreateAdminBillingSubscriptionPayload) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      subscription: AdminBillingSubscription;
+    };
+  }>("/api/admin/billing/subscriptions", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getAdminBillingSubscription(subscriptionId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      subscription: AdminBillingSubscription;
+    };
+  }>(`/api/admin/billing/subscriptions/${encodeURIComponent(subscriptionId)}`);
+}
+
+export async function postAdminBillingSubscriptionAction(
+  subscriptionId: string,
+  action: "cancel" | "pause" | "reactivate"
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      subscription: AdminBillingSubscription;
+    };
+  }>(`/api/admin/billing/subscriptions/${encodeURIComponent(subscriptionId)}/${action}`, {
+    method: "POST",
+    body: JSON.stringify({})
   });
 }
