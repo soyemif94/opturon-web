@@ -9,9 +9,9 @@ import type { AdminBillingSubscription, AdminTenantPolicyRow, TenantPolicy } fro
 
 const PLAN_CODES = ["basic", "growth", "pro", "enterprise"];
 const BILLING_PLAN_OPTIONS = [
-  { value: "inicial", label: "Plan Inicial" },
-  { value: "crecimiento", label: "Plan Crecimiento" },
-  { value: "empresa", label: "Plan Empresa" }
+  { value: "inicial", label: "Plan Inicial", amount: 40600, currency: "ARS" },
+  { value: "crecimiento", label: "Plan Crecimiento", amount: 68600, currency: "ARS" },
+  { value: "empresa", label: "Plan Empresa", amount: 208600, currency: "ARS" }
 ] as const;
 const LIMIT_KEYS = [
   { key: "maxPortalUsers", label: "Usuarios portal" },
@@ -31,6 +31,13 @@ const CAPABILITIES = [
   "loyalty"
 ];
 const MODULES = ["inbox", "agenda", "catalog", "automations", "sales", "loyalty", "payments"];
+type BillingPlanCode = (typeof BILLING_PLAN_OPTIONS)[number]["value"];
+type BillingDraftState = {
+  planCode: BillingPlanCode;
+  payerEmail: string;
+  amount: string;
+  currency: string;
+};
 
 function normalizePolicy(policy: TenantPolicy): TenantPolicy {
   return {
@@ -86,6 +93,10 @@ function normalizeSubscriptions(payload: unknown): AdminBillingSubscription[] {
   return Array.isArray(list) ? (list as AdminBillingSubscription[]) : [];
 }
 
+function getBillingPlanDefinition(planCode: string) {
+  return BILLING_PLAN_OPTIONS.find((plan) => plan.value === planCode) || BILLING_PLAN_OPTIONS[0];
+}
+
 export function AdminClientConfiguration({ initialTenants }: { initialTenants: AdminTenantPolicyRow[] }) {
   const [tenants, setTenants] = useState(
     initialTenants.map((tenant) => ({ ...tenant, policy: normalizePolicy(tenant.policy) }))
@@ -101,11 +112,11 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [actingSubscriptionId, setActingSubscriptionId] = useState<string | null>(null);
-  const [billingDraft, setBillingDraft] = useState({
-    planCode: "inicial",
+  const [billingDraft, setBillingDraft] = useState<BillingDraftState>({
+    planCode: BILLING_PLAN_OPTIONS[0].value,
     payerEmail: selectedTenant?.primaryEmail || "",
-    amount: "0",
-    currency: "ARS"
+    amount: String(BILLING_PLAN_OPTIONS[0].amount),
+    currency: BILLING_PLAN_OPTIONS[0].currency
   });
 
   const currentSubscription = subscriptions[0] || null;
@@ -118,6 +129,22 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       payerEmail: current.payerEmail || selectedTenant.primaryEmail || ""
     }));
   }, [selectedTenant]);
+
+  useEffect(() => {
+    const planDefinition = getBillingPlanDefinition(billingDraft.planCode);
+    setBillingDraft((current) => {
+      const nextAmount = String(planDefinition.amount);
+      const nextCurrency = planDefinition.currency;
+      if (current.amount === nextAmount && current.currency === nextCurrency) {
+        return current;
+      }
+      return {
+        ...current,
+        amount: nextAmount,
+        currency: nextCurrency
+      };
+    });
+  }, [billingDraft.planCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -510,7 +537,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                   Plan comercial
                   <select
                     value={billingDraft.planCode}
-                    onChange={(event) => setBillingDraft((current) => ({ ...current, planCode: event.target.value }))}
+                    onChange={(event) =>
+                      setBillingDraft((current) => ({
+                        ...current,
+                        planCode: event.target.value as BillingPlanCode
+                      }))
+                    }
                     className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
                   >
                     {BILLING_PLAN_OPTIONS.map((plan) => (
@@ -535,10 +567,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     Monto
                     <input
                       type="number"
-                      min="0"
-                      step="0.01"
+                      readOnly
                       value={billingDraft.amount}
-                      onChange={(event) => setBillingDraft((current) => ({ ...current, amount: event.target.value }))}
                       className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
                     />
                   </label>
@@ -546,12 +576,13 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     Moneda
                     <input
                       type="text"
+                      readOnly
                       value={billingDraft.currency}
-                      onChange={(event) => setBillingDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))}
                       className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
                     />
                   </label>
                 </div>
+                <p className="text-xs text-muted">El monto oficial del plan se completa automaticamente para esta fase.</p>
 
                 <Button onClick={createSubscription} disabled={creatingSubscription} className="gap-2">
                   {creatingSubscription ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
