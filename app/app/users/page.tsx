@@ -21,14 +21,26 @@ export default async function AppUsersPage({ searchParams }: { searchParams: Pro
   const canManage = canManageUsers(ctx);
   const backendUsersReady = tenantId && isBackendConfigured() && isPortalInternalAuthConfigured();
 
-  let users: Array<{ id: string; email: string; name: string; tenantRole: string; accountKind: "primary" | "subaccount" }> =
+  let users: Array<{
+    id: string;
+    email: string;
+    name: string;
+    tenantRole: string;
+    accountKind: "primary" | "subaccount";
+    invitationStatus?: string;
+    invitationExpiresAt?: string | null;
+    invitationSentAt?: string | null;
+  }> =
     canUseLocalDemoData && !backendUsersReady
       ? listTenantMembers(tenantId).map((user) => ({
           id: user.id,
           email: user.email,
           name: user.name,
           tenantRole: user.tenantRole,
-          accountKind: user.tenantRole === "owner" ? "primary" : "subaccount"
+          accountKind: user.tenantRole === "owner" ? "primary" : "subaccount",
+          invitationStatus: user.passwordHash ? "active" : "invited",
+          invitationExpiresAt: null,
+          invitationSentAt: null
         }))
       : [];
   let initialMeta: PortalUsersMeta = {
@@ -54,7 +66,10 @@ export default async function AppUsersPage({ searchParams }: { searchParams: Pro
         email: user.email,
         name: user.name,
         tenantRole: user.role,
-        accountKind: user.accountKind === "primary" ? "primary" : "subaccount"
+        accountKind: user.accountKind === "primary" ? "primary" : "subaccount",
+        invitationStatus: user.invitationStatus,
+        invitationExpiresAt: user.invitationExpiresAt || null,
+        invitationSentAt: user.invitationSentAt || null
       }));
       initialMeta = response.data.meta || initialMeta;
       initialActivity = response.data.activity || [];

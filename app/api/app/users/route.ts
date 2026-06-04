@@ -1,4 +1,3 @@
-import { hashSync } from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -12,6 +11,12 @@ import {
   patchPortalUser,
   patchPortalPrimaryUser,
 } from "@/lib/api";
+import {
+  buildPortalInvitationAcceptLink,
+  createLocalPortalUserInvitation,
+  listLatestLocalPortalInvitationsByTenantId,
+  sendPortalUserInvitationEmail
+} from "@/lib/portal-user-invitations";
 import { canManageUsers, isStaffRole, normalizeTenantRole } from "@/lib/app-permissions";
 import { requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, listTenantMembers, newId, readSaasData, writeSaasData } from "@/lib/saas/store";
@@ -21,7 +26,6 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
   role: z.enum(["owner", "manager", "seller", "viewer"]),
-  password: z.string().min(6).optional(),
   tenantId: z.string().min(1).optional()
 });
 
@@ -47,6 +51,9 @@ type RouteUserRow = {
   name: string;
   tenantRole: string;
   accountKind: "primary" | "subaccount";
+  invitationStatus?: "active" | "invited" | "pending" | "expired";
+  invitationExpiresAt?: string | null;
+  invitationSentAt?: string | null;
 };
 
 type RouteUsersMeta = {
@@ -153,28 +160,68 @@ function resolveBackendActorUserId(userId?: string | null) {
     : null;
 }
 
-function resolvePortalUserPassword(password?: string) {
-  const explicitPassword = password?.trim();
-  if (explicitPassword) return explicitPassword;
-
-  const envPassword = String(process.env.PORTAL_USER_DEFAULT_PASSWORD || "").trim();
-  if (envPassword) return envPassword;
-
-  return null;
+function resolveTenantName(tenantId: string) {
+  const data = readSaasData();
+  return data.tenants.find((tenant) => tenant.id === tenantId)?.name || null;
 }
 
-function normalizeRouteUser(user: { id: string; email: string; name: string; role?: string; tenantRole?: string }): RouteUserRow {
+function resolveRouteInvitationStatus(input?: string | null, hasPasswordHash = false) {
+  const value = String(input || "").trim().toLowerCase();
+  if (value === "active" || hasPasswordHash) return "active";
+  if (value === "pending") return "pending";
+  if (value === "expired") return "expired";
+  return "invited";
+}
+
+function resolveLocalInvitationState(invitation?: {
+  expiresAt?: string | null;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+} | null) {
+  if (!invitation) return "invited";
+  if (invitation.acceptedAt) return "active";
+  if (invitation.revokedAt) return "invited";
+  const expiresAtMs = new Date(String(invitation.expiresAt || "")).getTime();
+  if (!Number.isNaN(expiresAtMs) && expiresAtMs <= Date.now()) {
+    return "expired";
+  }
+  return "pending";
+}
+
+function normalizeRouteUser(user: {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  tenantRole?: string;
+  invitationStatus?: string | null;
+  invitationExpiresAt?: string | null;
+  invitationSentAt?: string | null;
+}): RouteUserRow {
   const tenantRole = String(user.role || user.tenantRole || "viewer");
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     tenantRole,
-    accountKind: tenantRole === "owner" ? "primary" : "subaccount"
+    accountKind: tenantRole === "owner" ? "primary" : "subaccount",
+    invitationStatus: resolveRouteInvitationStatus(user.invitationStatus),
+    invitationExpiresAt: user.invitationExpiresAt || null,
+    invitationSentAt: user.invitationSentAt || null
   };
 }
 
-function normalizeRouteUserWithKind(user: { id: string; email: string; name: string; role?: string; tenantRole?: string; accountKind?: string }): RouteUserRow {
+function normalizeRouteUserWithKind(user: {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  tenantRole?: string;
+  accountKind?: string;
+  invitationStatus?: string | null;
+  invitationExpiresAt?: string | null;
+  invitationSentAt?: string | null;
+}): RouteUserRow {
   const base = normalizeRouteUser(user);
   const accountKind = String(user.accountKind || "").trim().toLowerCase() === "primary" ? "primary" : base.accountKind;
   return {
@@ -226,12 +273,19 @@ async function listRouteUsers(tenantId: string): Promise<RouteUserRow[]> {
     return (response.data.users || []).map((user) => normalizeRouteUserWithKind(user));
   }
 
+  const localInvitations = listLatestLocalPortalInvitationsByTenantId(tenantId);
   return listTenantMembers(tenantId).map((user) =>
     normalizeRouteUserWithKind({
       id: user.id,
       email: user.email,
       name: user.name,
-      tenantRole: user.tenantRole
+      tenantRole: user.tenantRole,
+      invitationStatus: resolveRouteInvitationStatus(
+        user.passwordHash ? "active" : resolveLocalInvitationState(localInvitations.get(user.id) || null),
+        Boolean(user.passwordHash)
+      ),
+      invitationExpiresAt: localInvitations.get(user.id)?.expiresAt || null,
+      invitationSentAt: localInvitations.get(user.id)?.createdAt || null
     })
   );
 }
@@ -288,17 +342,6 @@ export async function GET(request: NextRequest) {
   const requestedTenantId = new URL(request.url).searchParams.get("tenantId");
   const tenantId = resolveTargetTenantId(guard.ctx || {}, requestedTenantId);
   if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
-  if (tenantId && !isBackendConfigured()) {
-    return NextResponse.json(
-      {
-        users: [],
-        source: "empty_real_tenant",
-        activity: [],
-        meta: buildRouteUsersMeta([], policy.allowedRoles)
-      },
-      { status: 200 }
-    );
-  }
 
   if (isBackendConfigured()) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
@@ -316,14 +359,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const users = listTenantMembers(tenantId).map((user) =>
-    normalizeRouteUserWithKind({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      tenantRole: user.tenantRole
-    })
-  );
+  const users = await listRouteUsers(tenantId);
   return NextResponse.json({
     users,
     activity: [],
@@ -353,27 +389,7 @@ export async function POST(request: NextRequest) {
   if (!tenantId) return NextResponse.json({ error: "missing_target_tenant_id" }, { status: 400 });
   const email = parsed.data.email.toLowerCase();
   const countsAsSubaccount = parsed.data.role !== "owner";
-  const resolvedPassword = resolvePortalUserPassword(parsed.data.password);
-
-  if (!resolvedPassword) {
-    return NextResponse.json(
-      {
-        error: "tenant_user_password_required",
-        detail: "Debes enviar password o configurar PORTAL_USER_DEFAULT_PASSWORD."
-      },
-      { status: 400 }
-    );
-  }
-
-  if (tenantId && !isBackendConfigured()) {
-    return NextResponse.json(
-      {
-        error: "portal_users_backend_unavailable",
-        detail: "La gestion de usuarios para workspaces reales requiere backend persistente tenant-scoped."
-      },
-      { status: 503 }
-    );
-  }
+  const tenantName = resolveTenantName(tenantId);
 
   if (isBackendConfigured()) {
     const backendRequirement = requirePortalUsersBackend(tenantId);
@@ -382,9 +398,29 @@ export async function POST(request: NextRequest) {
       const response = await createPortalUser(tenantId, {
         email,
         name: parsed.data.name,
-        role: parsed.data.role,
-        password: resolvedPassword
+        role: parsed.data.role
       }, resolveBackendActorUserId(guard.ctx?.userId));
+
+      const invitation = response.data.invitation;
+      if (!invitation?.token) {
+        return NextResponse.json(
+          {
+            error: "portal_invitation_missing",
+            detail: "El backend no devolvio el token de invitacion esperado."
+          },
+          { status: 502 }
+        );
+      }
+
+      const acceptLink = buildPortalInvitationAcceptLink(invitation.token);
+      await sendPortalUserInvitationEmail({
+        email,
+        invitedName: parsed.data.name,
+        tenantName,
+        role: parsed.data.role,
+        acceptLink,
+        expiresAt: invitation.expiresAt
+      });
 
       safeAppendUsersAuditLog({
         tenantId,
@@ -437,20 +473,34 @@ export async function POST(request: NextRequest) {
     );
   }
   let user = data.users.find((item) => item.email.toLowerCase() === email);
+  const existingMembership = user
+    ? data.memberships.find((membership) => membership.userId === user!.id && membership.tenantId === tenantId)
+    : null;
+
+  if (user?.passwordHash && existingMembership) {
+    return NextResponse.json(
+      {
+        error: "duplicate_user_email",
+        detail: "Ya existe un usuario activo con este email en el espacio."
+      },
+      { status: 409 }
+    );
+  }
+
   if (!user) {
     user = {
       id: newId("usr"),
       email,
       name: parsed.data.name,
       globalRole: "client",
-      passwordHash: hashSync(resolvedPassword, 10),
       createdAt: new Date().toISOString()
     };
     data.users.push(user);
+  } else {
+    user.name = parsed.data.name;
   }
 
-  const hasMembership = data.memberships.some((m) => m.userId === user!.id && m.tenantId === tenantId);
-  if (!hasMembership) {
+  if (!existingMembership) {
     data.memberships.push({
       id: newId("mbr"),
       userId: user.id,
@@ -468,6 +518,35 @@ export async function POST(request: NextRequest) {
         error: "User was not persisted",
         detail: error instanceof Error ? error.message : String(error),
         storagePath: resolveRuntimeDataDir()
+      },
+      { status: 500 }
+    );
+  }
+
+  const { token, invitation } = createLocalPortalUserInvitation({
+    tenantId,
+    tenantName,
+    userId: user.id,
+    email,
+    name: parsed.data.name,
+    role: parsed.data.role
+  });
+
+  const acceptLink = buildPortalInvitationAcceptLink(token);
+  try {
+    await sendPortalUserInvitationEmail({
+      email,
+      invitedName: parsed.data.name,
+      tenantName,
+      role: parsed.data.role,
+      acceptLink,
+      expiresAt: invitation.expiresAt
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "portal_invitation_email_failed",
+        detail: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     );
@@ -515,15 +594,6 @@ export async function PATCH(request: NextRequest) {
         detail: "La cuenta principal no puede modificar otra cuenta principal ni roles elevados."
       },
       { status: 403 }
-    );
-  }
-  if (tenantId && !isBackendConfigured()) {
-    return NextResponse.json(
-      {
-        error: "portal_users_backend_unavailable",
-        detail: "La gestion de usuarios para workspaces reales requiere backend persistente tenant-scoped."
-      },
-      { status: 503 }
     );
   }
 
@@ -683,15 +753,6 @@ export async function DELETE(request: NextRequest) {
         detail: "La cuenta principal no puede eliminar otra cuenta principal ni roles elevados."
       },
       { status: 403 }
-    );
-  }
-  if (tenantId && !isBackendConfigured()) {
-    return NextResponse.json(
-      {
-        error: "portal_users_backend_unavailable",
-        detail: "La gestion de usuarios para workspaces reales requiere backend persistente tenant-scoped."
-      },
-      { status: 503 }
     );
   }
 

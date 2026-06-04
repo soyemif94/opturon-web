@@ -549,6 +549,9 @@ export type PortalUser = {
   isOperationalAssignee?: boolean;
   accountKind?: "primary" | "subaccount";
   active: boolean;
+  invitationStatus?: "active" | "invited" | "pending" | "expired";
+  invitationExpiresAt?: string | null;
+  invitationSentAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -596,7 +599,7 @@ export async function getPortalUsers(tenantId: string) {
 
 export async function createPortalUser(
   tenantId: string,
-  payload: { email: string; name: string; role: string; password: string },
+  payload: { email: string; name: string; role: string; password?: string },
   actorUserId?: string | null
   ) {
   const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
@@ -605,6 +608,11 @@ export async function createPortalUser(
     data: {
       tenantId: string;
       user: PortalUser;
+      invitation?: {
+        token: string;
+        expiresAt: string;
+        sentAt: string;
+      } | null;
       meta?: PortalUsersMeta | null;
     };
   }>(`/portal/tenants/${tenantId}/users`, {
@@ -701,6 +709,44 @@ export async function deletePortalUser(tenantId: string, userId: string, current
   }>(`/portal/tenants/${tenantId}/users/${userId}`, {
     method: "DELETE",
     headers
+  });
+}
+
+export type PortalInvitationSummary = {
+  tenantId: string;
+  tenantName: string | null;
+  clinicId?: string;
+  userId: string;
+  email: string;
+  name: string | null;
+  role: string;
+  expiresAt: string;
+};
+
+export async function getPortalInvitation(token: string) {
+  return backendFetch<{
+    success: boolean;
+    data: PortalInvitationSummary;
+  }>(`/portal/auth/invitations?token=${encodeURIComponent(token)}`, undefined, false);
+}
+
+export async function acceptPortalInvitation(token: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      ok?: boolean;
+      tenantId: string;
+      tenantName: string | null;
+      user: {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+      };
+    };
+  }>("/portal/auth/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify({ token, password })
   });
 }
 

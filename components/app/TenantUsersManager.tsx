@@ -29,7 +29,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { toast } from "@/components/ui/toast";
 
-type UserRow = { id: string; email: string; name: string; tenantRole: string; accountKind?: "primary" | "subaccount" };
+type UserRow = {
+  id: string;
+  email: string;
+  name: string;
+  tenantRole: string;
+  accountKind?: "primary" | "subaccount";
+  invitationStatus?: string;
+  invitationExpiresAt?: string | null;
+  invitationSentAt?: string | null;
+};
 type UsersMeta = {
   subaccountCount: number;
   primaryAccountCount: number;
@@ -83,7 +92,7 @@ export function TenantUsersManager({
   const [users, setUsers] = useState(initialUsers);
   const [meta, setMeta] = useState(initialMeta);
   const [activity, setActivity] = useState(initialActivity);
-  const [form, setForm] = useState({ email: "", name: "", role: "seller", password: "" });
+  const [form, setForm] = useState({ email: "", name: "", role: "seller" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
   const [pendingPrimaryUserId, setPendingPrimaryUserId] = useState<string | null>(null);
@@ -94,7 +103,6 @@ export function TenantUsersManager({
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | null; text: string }>({ tone: null, text: "" });
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<"all" | "manager" | "seller" | "other">("all");
   const [search, setSearch] = useState("");
-  const [useTemporaryPassword, setUseTemporaryPassword] = useState(false);
 
   const isStaffManager = currentGlobalRole === "superadmin" || currentGlobalRole === "ops_admin";
   const isOpturonAdminScope = meta.accountScope === "opturon_admin";
@@ -190,7 +198,6 @@ export function TenantUsersManager({
     event?.preventDefault();
     const email = form.email.trim().toLowerCase();
     const name = form.name.trim();
-    const password = useTemporaryPassword ? form.password.trim() : "";
 
     if (!name || name.length < 2) {
       setFeedback({ tone: "error", text: "Ingresa un nombre valido." });
@@ -202,11 +209,6 @@ export function TenantUsersManager({
       toast.error("Email invalido");
       return;
     }
-    if (password.length > 0 && password.length < 6) {
-      setFeedback({ tone: "error", text: "La password temporal debe tener al menos 6 caracteres." });
-      toast.error("Password temporal demasiado corta");
-      return;
-    }
 
     setIsSubmitting(true);
     setFeedback({ tone: null, text: "" });
@@ -215,7 +217,7 @@ export function TenantUsersManager({
       const response = await fetch(usersEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, email, name, password, tenantId: targetTenantId })
+        body: JSON.stringify({ ...form, email, name, tenantId: targetTenantId })
       });
 
       if (!response.ok) {
@@ -228,9 +230,8 @@ export function TenantUsersManager({
       }
 
       await reloadUsers();
-      setForm({ email: "", name: "", role: "seller", password: "" });
-      setUseTemporaryPassword(false);
-      setFeedback({ tone: "success", text: "Usuario invitado correctamente." });
+      setForm({ email: "", name: "", role: "seller" });
+      setFeedback({ tone: "success", text: "Invitacion enviada correctamente." });
       toast.success("Invitacion enviada");
     } catch {
       setFeedback({ tone: "error", text: "Ocurrio un error de red al invitar al usuario." });
@@ -441,7 +442,7 @@ export function TenantUsersManager({
           <div className="flex justify-start lg:justify-end">
             <Button type="button" className="w-full rounded-2xl bg-[linear-gradient(135deg,#7c3aed,#a855f7)] hover:bg-[linear-gradient(135deg,#8b5cf6,#c084fc)] lg:w-auto" onClick={() => document.getElementById("invite-user-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
               <UserPlus className="mr-2 h-4 w-4" />
-              Invitar usuario
+              Enviar invitacion
             </Button>
           </div>
         </CardContent>
@@ -451,13 +452,13 @@ export function TenantUsersManager({
         <CardContent className="space-y-5 p-5">
           <div>
             <h2 className="text-2xl font-semibold text-white">Invitar nuevo usuario</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">Agrega un nuevo miembro a tu equipo y asignale un rol.</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Agrega un nuevo miembro y enviale un enlace real para activar su cuenta y crear su contrasena.</p>
             {!canManage ? <p className="mt-2 text-sm text-muted">Solo propietario puede gestionar usuarios y permisos.</p> : null}
             {inviteBlockedByLimit ? <p className="mt-2 text-sm text-amber-300">Alcanzaste el limite de usuarios de tu plan. Para crear otra subcuenta, primero hay que liberar cupo.</p> : null}
           </div>
 
           {canManage ? (
-            <form className="grid gap-4 xl:grid-cols-[1fr_1fr_280px_300px] xl:items-start" onSubmit={invite}>
+            <form className="grid gap-4 xl:grid-cols-[1fr_1fr_280px] xl:items-start" onSubmit={invite}>
               <FieldGroup label="Nombre completo">
                 <Input placeholder="Ej: Juan Perez" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
               </FieldGroup>
@@ -473,31 +474,10 @@ export function TenantUsersManager({
                   ))}
                 </select>
               </FieldGroup>
-              <div className="space-y-3">
-                <FieldGroup label="Generar contrasena temporal">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUseTemporaryPassword((current) => !current);
-                      if (useTemporaryPassword) {
-                        setForm((p) => ({ ...p, password: "" }));
-                      }
-                    }}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full border transition-colors ${useTemporaryPassword ? "border-violet-400/40 bg-violet-500/30" : "border-white/10 bg-white/8"}`}
-                  >
-                    <span className={`inline-flex h-5 w-5 transform rounded-full bg-white transition-transform ${useTemporaryPassword ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
-                </FieldGroup>
-                <p className="text-sm leading-6 text-muted">El usuario podra cambiarla al iniciar sesion.</p>
+              <div className="rounded-[20px] border border-white/8 bg-white/5 p-4 text-sm leading-6 text-muted">
+                El usuario recibira un email de Opturon con un enlace seguro para activar su cuenta.
               </div>
-              {useTemporaryPassword ? (
-                <div className="xl:col-span-3">
-                  <FieldGroup label="Contrasena temporal">
-                    <Input placeholder="Minimo 6 caracteres" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
-                  </FieldGroup>
-                </div>
-              ) : null}
-              <div className="xl:col-span-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+              <div className="xl:col-span-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
                 {feedback.tone ? <p className={`text-sm ${feedback.tone === "success" ? "text-emerald-300" : "text-red-300"}`}>{feedback.text}</p> : null}
                 <Button type="submit" disabled={isSubmitting || inviteBlockedByLimit} className="rounded-2xl bg-[linear-gradient(135deg,#7c3aed,#a855f7)] hover:bg-[linear-gradient(135deg,#8b5cf6,#c084fc)]">
                   <Wand2 className="mr-2 h-4 w-4" />
@@ -621,10 +601,7 @@ export function TenantUsersManager({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-sm text-emerald-300">
-                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                        Activo
-                      </div>
+                      <InvitationStatusBadge status={user.invitationStatus} expiresAt={user.invitationExpiresAt} />
 
                       <div className="text-sm">
                         <p className="text-white">{latestActivity ? formatActivityTimestamp(latestActivity.createdAt) : "Sin registro"}</p>
@@ -706,7 +683,7 @@ export function TenantUsersManager({
               <SidebarInfo
                 icon={<KeyRound className="h-4 w-4" />}
                 title="Seguridad"
-                copy="Las contrasenas temporales se pueden compartir solo si el flujo real lo necesita."
+                copy="Cada usuario activa su cuenta desde un enlace unico y define su propia contrasena."
                 tone="amber"
               />
               <SidebarInfo
@@ -794,6 +771,31 @@ function accessDescriptor(user: UserRow) {
     return { title: "Acceso operativo", copy: "Inbox, clientes y ventas" };
   }
   return { title: "Acceso limitado", copy: "Vista restringida del espacio" };
+}
+
+function InvitationStatusBadge({ status, expiresAt }: { status?: string; expiresAt?: string | null }) {
+  const normalized = String(status || "").trim().toLowerCase();
+  const expired = normalized === "expired";
+  const pending = normalized === "pending";
+  const invited = normalized === "invited";
+  const active = !expired && !pending && !invited;
+
+  const toneClass = active
+    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+    : expired
+      ? "border-red-500/20 bg-red-500/10 text-red-200"
+      : "border-amber-500/20 bg-amber-500/10 text-amber-200";
+
+  const label = active ? "Activo" : expired ? "Expirado" : pending ? "Pendiente" : "Invitado";
+
+  return (
+    <div className="text-sm">
+      <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${toneClass}`}>
+        {label}
+      </span>
+      {!active && expiresAt ? <p className="mt-1 text-xs text-muted">Vence {formatActivityTimestamp(expiresAt)}</p> : null}
+    </div>
+  );
 }
 
 function RoleBadge({ role, accountKind }: { role: string; accountKind?: "primary" | "subaccount" }) {
