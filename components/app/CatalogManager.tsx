@@ -180,11 +180,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [discountDraft, setDiscountDraft] = useState("");
   const [discountSavingId, setDiscountSavingId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
   const [categorySaving, setCategorySaving] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [categoryUpdatingId, setCategoryUpdatingId] = useState<string | null>(null);
   const [categoryDeletingId, setCategoryDeletingId] = useState<string | null>(null);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -216,6 +218,17 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
     return counts;
   }, [products]);
+  const sortedCategories = useMemo(
+    () => [...categories].sort((left, right) => left.name.localeCompare(right.name)),
+    [categories]
+  );
+  const filteredCategoryRail = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return sortedCategories;
+    return sortedCategories.filter((category) => category.name.toLowerCase().includes(query));
+  }, [categorySearch, sortedCategories]);
+  const visibleCategoryRail = categoriesExpanded ? filteredCategoryRail : filteredCategoryRail.slice(0, 5);
+  const hiddenCategoryRailCount = Math.max(filteredCategoryRail.length - visibleCategoryRail.length, 0);
   const activeCategory = useMemo(
     () => categories.find((category) => category.id === categoryFilter) || null,
     [categories, categoryFilter]
@@ -1429,14 +1442,34 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
 
         <Card id="catalog-load-section" className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
-          <CardHeader action={<Badge variant="muted">Categorias</Badge>}>
+          <CardHeader
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="muted">{filteredCategoryRail.length} categorias</Badge>
+                {filteredCategoryRail.length > 5 ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCategoriesExpanded((current) => !current)}>
+                    {categoriesExpanded ? "Ver menos" : `Ver mas (${hiddenCategoryRailCount})`}
+                  </Button>
+                ) : null}
+              </div>
+            }
+          >
             <div>
               <CardTitle className="text-xl">Categorias</CardTitle>
-              <CardDescription>Gestiona y organiza tus productos para el catalogo y el bot.</CardDescription>
+              <CardDescription>Gestiona categorias sin estirar el lateral: busca, filtra y actua desde un rail compacto.</CardDescription>
             </div>
           </CardHeader>
           <CardContent id="catalog-categories" className="space-y-4 pt-0">
-            <div className="flex flex-wrap gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <Input
+                className="pl-10"
+                value={categorySearch}
+                onChange={(event) => setCategorySearch(event.target.value)}
+                placeholder="Buscar categoria por nombre"
+              />
+            </div>
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
               <Input
                 value={categoryName}
                 onChange={(event) => setCategoryName(event.target.value)}
@@ -1451,9 +1484,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
                 Todavia no hay categorias. Si no cargas ninguna, el bot mantiene el flujo general actual.
               </div>
+            ) : filteredCategoryRail.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-surface/45 p-4 text-sm text-muted">
+                No encontramos categorias para esa busqueda.
+              </div>
             ) : (
-              <div className="space-y-2">
-                {categories.map((category) => (
+              <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                {visibleCategoryRail.map((category) => (
                   <div key={category.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] p-3">
                     <div className="min-w-0 flex-1">
                       {editingCategoryId === category.id ? (
@@ -1489,6 +1526,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                           <Badge variant={(categoryProductCounts.get(category.id) || 0) > 0 ? "muted" : "outline"}>
                             {categoryProductCounts.get(category.id) || 0} producto{(categoryProductCounts.get(category.id) || 0) === 1 ? "" : "s"}
                           </Badge>
+                          {categoryFilter === category.id ? <Badge variant="outline">Filtrando catalogo</Badge> : null}
                         </div>
                       )}
                     </div>
