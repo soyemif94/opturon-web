@@ -170,6 +170,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [actingSubscriptionId, setActingSubscriptionId] = useState<string | null>(null);
+  const [sendingBillingLinkEmail, setSendingBillingLinkEmail] = useState(false);
   const [billingDraft, setBillingDraft] = useState<BillingDraftState>({
     planCode: BILLING_PLAN_OPTIONS[0].value,
     payerEmail: selectedTenant?.primaryEmail || "",
@@ -362,6 +363,34 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     }
   }
 
+  async function sendAuthorizationLinkEmail() {
+    if (!selectedTenant || !currentSubscription || sendingBillingLinkEmail) return;
+    setSendingBillingLinkEmail(true);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/billing/subscription/send-link`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "billing_subscription_send_link_failed");
+      }
+      const subscription = json?.subscription as AdminBillingSubscription;
+      if (subscription?.id) {
+        setSubscriptions((current) => [subscription, ...current.filter((item) => item.id !== subscription.id)]);
+      }
+      toast.success("Link enviado al email del cliente");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo enviar el link por email.");
+    } finally {
+      setSendingBillingLinkEmail(false);
+    }
+  }
+
   if (!selectedTenant || !draft) {
     return (
       <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-6 text-sm text-muted">
@@ -369,6 +398,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       </div>
     );
   }
+
+  const canSendBillingLinkEmail =
+    Boolean(selectedTenant?.tenantId) &&
+    Boolean(currentSubscription?.authorizationUrl) &&
+    currentSubscription?.localStatus === "pending" &&
+    Boolean(currentSubscription?.mercadoPagoPayerEmail);
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(280px,360px)_1fr]">
@@ -619,6 +654,16 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     <Button
                       type="button"
                       variant="secondary"
+                      onClick={sendAuthorizationLinkEmail}
+                      disabled={!canSendBillingLinkEmail || sendingBillingLinkEmail}
+                      className="justify-start gap-2"
+                    >
+                      {sendingBillingLinkEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Enviar link por email
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
                       onClick={() => currentSubscription.authorizationUrl && window.open(currentSubscription.authorizationUrl, "_blank")}
                       disabled={!currentSubscription.authorizationUrl}
                       className="justify-start gap-2"
@@ -627,6 +672,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       Abrir checkout de suscripcion
                     </Button>
                   </div>
+
+                  {currentSubscription.localStatus === "pending" && !currentSubscription.mercadoPagoPayerEmail ? (
+                    <p className="text-xs text-amber-700">
+                      Falta email del pagador en la suscripcion para poder enviar el link por correo.
+                    </p>
+                  ) : null}
 
                   <div className="grid gap-2">
                     <Button

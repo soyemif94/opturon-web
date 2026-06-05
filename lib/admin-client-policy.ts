@@ -257,3 +257,21 @@ export async function postAdminBillingSubscriptionAction(
     body: JSON.stringify({})
   });
 }
+
+export async function sendAdminBillingSubscriptionLink(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      subscription: AdminBillingSubscription;
+      delivery: {
+        to: string;
+        provider: string;
+        sentAt: string;
+      };
+    };
+  }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/billing/subscription/send-link`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
