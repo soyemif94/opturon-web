@@ -342,50 +342,72 @@ export function IntegrationsHub({
     }
   }
 
-  const readinessItems = [
-    { label: "Canal del espacio", value: meta.channelValue, tone: meta.variant },
-    { label: "Webhook", value: meta.webhookValue, tone: meta.webhookTone },
-    { label: "Numero conectado", value: liveWhatsApp.connectedNumber || "Pendiente", tone: liveWhatsApp.connectedNumber ? "muted" : "warning" }
-  ] as const;
+  const connected = liveWhatsApp.state === "connected" || Boolean(liveWhatsAppStatus?.channel.connected);
+  const webhookRecent = Number(liveWhatsAppStatus?.webhook.events24h || 0) > 0;
+  const handoffsOpen = Number(liveWhatsAppStatus?.handoffs.openCount || 0) > 0;
+  const connectedNumber = liveWhatsAppStatus?.channel.displayPhoneNumber || liveWhatsApp.connectedNumber || liveWhatsAppStatus?.channel.phoneNumberId || "Pendiente";
+  const lastWebhook = formatDateTime(liveWhatsAppStatus?.webhook.lastReceived?.receivedAt || null) || "Sin registro";
+  const healthLabel = connected && webhookRecent ? "Canal operativo" : connected ? "Revisar entrega Meta/Webhooks" : "Pendiente de conexion";
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <Card className="overflow-hidden border-brand/25 bg-[linear-gradient(135deg,rgba(192,80,0,0.18),rgba(24,24,24,0.96))] shadow-[0_18px_60px_rgba(176,80,0,0.16)]">
-          <CardHeader action={<Badge variant={meta.variant}>{meta.label}</Badge>}>
-            <div className="flex items-start gap-4">
-              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-brand/30 bg-brand/15 text-brandBright">
-                {meta.state === "ambiguous_configuration" ? <ShieldAlert className="h-6 w-6" /> : <PhoneCall className="h-6 w-6" />}
-              </span>
-              <div>
-                <CardTitle className="text-2xl">{meta.title}</CardTitle>
-                <CardDescription>{meta.description}</CardDescription>
-              </div>
+    <div className="space-y-8">
+      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(236,128,38,0.28),transparent_34%),linear-gradient(135deg,rgba(18,18,18,0.98),rgba(7,7,8,0.94))] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="max-w-3xl">
+            <div className="mb-5 flex flex-wrap gap-2">
+              <Badge variant={connected ? "success" : "warning"}>{connected ? "WhatsApp activo" : "WhatsApp pendiente"}</Badge>
+              <Badge variant={webhookRecent ? "success" : "muted"}>Operacion en vivo</Badge>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-5 pt-0">
-            <div className="rounded-[24px] border border-white/10 bg-black/15 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">Estado del canal</p>
-              <div className="mt-2 flex items-center gap-3">
-                <span className={`inline-flex h-3 w-3 rounded-full ${meta.dotClass}`} />
-                <p className="text-lg font-semibold text-white">{meta.label}</p>
-              </div>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-white/70">{meta.helper}</p>
-            </div>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white md:text-5xl">Integraciones</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/68 md:text-base">
+              Conexiones reales del producto, estado operativo y proximos canales.
+            </p>
+          </div>
+          <div className="rounded-[26px] border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-white/72">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Salud del canal</p>
+            <p className="mt-2 text-lg font-semibold text-white">{healthLabel}</p>
+            <p className="mt-1">Ultimo webhook: {lastWebhook}</p>
+          </div>
+        </div>
+      </section>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              {readinessItems.map((item) => (
-                <StatusStat key={item.label} label={item.label} value={item.value} tone={item.tone} />
-              ))}
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {meta.benefits.map((item) => (
-                <div key={item.title} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm leading-6 text-muted">{item.detail}</p>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
+        <Card className="overflow-hidden border-brand/20 bg-[linear-gradient(150deg,rgba(192,80,0,0.14),rgba(22,22,24,0.98)_42%,rgba(12,12,13,0.96))] shadow-[0_18px_60px_rgba(0,0,0,0.22)]">
+          <CardContent className="space-y-6 p-5 md:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-brand/30 bg-brand/15 text-brandBright">
+                  {meta.state === "ambiguous_configuration" ? <ShieldAlert className="h-6 w-6" /> : <PhoneCall className="h-6 w-6" />}
+                </span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">WhatsApp Business</h2>
+                    <Badge variant={meta.variant}>{meta.label}</Badge>
+                  </div>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/64">{meta.description}</p>
                 </div>
-              ))}
+              </div>
+              <Badge variant={handoffsOpen ? "warning" : "success"}>{handoffsOpen ? "Handoffs abiertos" : healthLabel}</Badge>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-4">
+              <StatusMetric label="Numero conectado" value={connectedNumber} elevated />
+              <StatusMetric label="Bot" value={liveWhatsAppStatus?.botRuntime.enabled === false ? "Pausado" : "Activo"} icon={<Bot className="h-4 w-4" />} elevated />
+              <StatusMetric label="Webhook" value={lastWebhook} icon={<Clock3 className="h-4 w-4" />} elevated />
+              <StatusMetric label="Provider" value={liveWhatsAppStatus?.channel.provider || liveWhatsApp.channelStatus || "-"} icon={<PlugZap className="h-4 w-4" />} elevated />
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`inline-flex h-2.5 w-2.5 rounded-full ${meta.dotClass}`} />
+                <p className="font-medium text-white">{healthLabel}</p>
+              </div>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/62">{meta.helper}</p>
+              {handoffsOpen ? (
+                <p className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
+                  {liveWhatsAppStatus?.handoffs.openCount || 0} conversaciones estan derivadas a humano; el bot no responde ahi hasta cerrar handoff o reactivar bot.
+                </p>
+              ) : null}
             </div>
 
             {launchMessage ? (
@@ -403,11 +425,10 @@ export function IntegrationsHub({
                   <Link href={meta.primaryHref || "/app/inbox"}>{meta.primaryLabel}</Link>
                 </Button>
               )}
-              {meta.secondaryHref ? (
-                <Button asChild variant="secondary" className="rounded-2xl px-5">
-                  <Link href={meta.secondaryHref}>{meta.secondaryLabel}</Link>
-                </Button>
-              ) : null}
+              <Button variant="secondary" className="rounded-2xl px-5" onClick={() => void refreshWhatsAppStatus()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refrescar estado
+              </Button>
               <Button asChild variant="ghost" className="rounded-2xl px-5">
                 <a href={SUPPORT_LINK} target="_blank" rel="noreferrer">
                   <LifeBuoy className="mr-2 h-4 w-4" />
@@ -418,43 +439,43 @@ export function IntegrationsHub({
           </CardContent>
         </Card>
 
-        <Card className="border-white/6 bg-card/90">
-          <CardHeader action={<Badge variant="muted">Foco actual</Badge>}>
+        <Card className="border-white/8 bg-card/90">
+          <CardHeader action={<Badge variant="muted">Identidad</Badge>}>
             <div>
-              <CardTitle className="text-xl">Como queda la jerarquia</CardTitle>
-              <CardDescription>La pantalla ahora comunica foco, solidez y estado real del producto.</CardDescription>
+              <CardTitle className="text-xl">Bot configurado</CardTitle>
+              <CardDescription>La identidad que usa WhatsApp en esta conexion.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            {[
-              "WhatsApp queda como integracion principal y conserva toda su profundidad operativa.",
-              "CRM externo queda visible como siguiente fase real, sin abrir una promesa sobredimensionada.",
-              "Agenda pasa a ser un modulo interno del dashboard, no una integracion externa."
-            ].map((item) => (
-              <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">
-                {item}
-              </div>
-            ))}
+            <div className="rounded-[24px] border border-brand/20 bg-brand/10 p-5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Nombre del bot</p>
+              <p className="mt-2 text-3xl font-semibold tracking-[-0.03em]">{liveWhatsAppStatus?.botConfig.botName || "Sin personalizar"}</p>
+            </div>
+            <div className="grid gap-3">
+              <StatusRow label="Config personalizada" value={liveWhatsAppStatus?.botConfig.hasCustomConfig ? "Si" : "No"} />
+              <StatusRow label="Saludo personalizado" value={liveWhatsAppStatus?.botConfig.hasCustomGreeting ? "Si" : "No"} />
+              <StatusRow label="Fallback personalizado" value={liveWhatsAppStatus?.botConfig.hasCustomFallback ? "Si" : "No"} />
+            </div>
           </CardContent>
         </Card>
       </section>
 
       <WhatsAppStatusPanel status={liveWhatsAppStatus} onRefresh={() => void refreshWhatsAppStatus()} />
 
-      <section>
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">Panorama de producto</h2>
-            <p className="text-sm text-muted">Solo mostramos lo que hoy aporta valor real o lo que ya tiene una direccion clara dentro de Opturon.</p>
+            <h2 className="text-xl font-semibold">Roadmap de conexiones</h2>
+            <p className="text-sm text-muted">WhatsApp queda al frente; el resto acompana sin competir por jerarquia.</p>
           </div>
-          <Badge variant="muted">Promesa acotada</Badge>
+          <Badge variant="muted">Proximos canales</Badge>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.9fr)]">
+        <div className="grid gap-4 xl:grid-cols-3">
           {productCards.map((integration) => {
             const state = stateMeta(integration.state);
             return (
-              <Card key={integration.id} className="border-white/6 bg-card/90">
+              <Card key={integration.id} className="border-white/6 bg-card/80">
                 <CardHeader action={<Badge variant={state.variant}>{state.label}</Badge>}>
                   <div>
                     <CardTitle className="text-xl">{integration.name}</CardTitle>
@@ -466,7 +487,7 @@ export function IntegrationsHub({
                     <Badge variant="outline">{integration.availability}</Badge>
                     <Badge variant="muted">{integration.helper}</Badge>
                   </div>
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4 text-sm leading-6 text-muted">{integration.detail}</div>
+                  <p className="text-sm leading-6 text-muted">{integration.detail}</p>
                   {integration.href ? (
                     <Button asChild variant="secondary" className="w-full rounded-2xl">
                       <Link href={integration.href}>Abrir modulo</Link>
@@ -481,21 +502,20 @@ export function IntegrationsHub({
             );
           })}
 
-          <Card className="border-white/6 bg-card/90">
-            <CardHeader action={<Badge variant="warning">Fuera de foco</Badge>}>
+          <Card className="border-white/6 bg-card/60">
+            <CardHeader action={<Badge variant="muted">Secundario</Badge>}>
               <div>
-                <CardTitle className="text-xl">Integraciones que salen del frente</CardTitle>
-                <CardDescription>No ocupan protagonismo en esta fase para no prometer mas de lo que hoy esta consolidado.</CardDescription>
+                <CardTitle className="text-xl">Fuera de foco</CardTitle>
+                <CardDescription>Canales que no compiten con WhatsApp hasta tener madurez operativa.</CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 pt-0">
+            <CardContent className="space-y-2 pt-0">
               {[
-                "Instagram deja de aparecer como canal principal activo.",
-                "Facebook Messenger deja de aparecer como integracion principal.",
-                "Webchat no compite por jerarquia mientras no tenga madurez real.",
-                "Google Calendar no se abre en esta fase porque Agenda es nativa."
+                "Instagram y Messenger quedan fuera del frente principal.",
+                "Webchat no compite hasta tener madurez real.",
+                "Google Calendar no se abre porque Agenda es nativa."
               ].map((item) => (
-                <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm text-muted">{item}</div>
+                <p key={item} className="text-sm leading-6 text-muted">{item}</p>
               ))}
             </CardContent>
           </Card>
@@ -705,13 +725,19 @@ function WhatsAppStatusPanel({
   const deliveryIssue = connected && !webhookRecent;
   const handoffsOpen = Number(status?.handoffs.openCount || 0) > 0;
   const generatedAt = formatDateTime(status?.generatedAt || null);
+  const lastWebhookAt = formatDateTime(status?.webhook.lastReceived?.receivedAt || null) || "Sin registro";
+  const lastInboundAt = formatDateTime(status?.messages.lastInbound?.createdAt || null) || "Sin registro";
+  const lastOutboundAt = formatDateTime(status?.messages.lastOutbound?.createdAt || null) || "Sin registro";
+  const job = status?.jobs.lastConversationReply || null;
+  const lastWebhookError = status?.errors.lastWebhookError?.reason || "Sin errores de webhook";
+  const lastJobError = status?.errors.lastJobError?.lastError || "Sin errores de job";
 
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Estado de WhatsApp</h2>
-          <p className="text-sm text-muted">Lectura operativa del canal, webhooks, mensajes y bloqueos humanos del workspace.</p>
+          <h2 className="text-xl font-semibold">Diagnostico operativo</h2>
+          <p className="text-sm text-muted">Senales compactas para saber si Meta entrega, Opturon guarda y el bot puede responder.</p>
         </div>
         <Button variant="secondary" className="rounded-2xl" onClick={onRefresh}>
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -719,13 +745,13 @@ function WhatsAppStatusPanel({
         </Button>
       </div>
 
-      <Card className="border-white/6 bg-card/90">
+      <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))]">
         <CardHeader
           action={
             <div className="flex flex-wrap gap-2">
               <Badge variant={connected ? "success" : "warning"}>{connected ? "Conectado" : "Sin conectar"}</Badge>
               <Badge variant={webhookRecent ? "success" : "warning"}>
-                {webhookRecent ? "Webhook activo recientemente" : "Sin eventos recientes"}
+                {webhookRecent ? "Webhook reciente" : "Sin eventos recientes"}
               </Badge>
               {deliveryIssue ? <Badge variant="danger">Posible problema de entrega</Badge> : null}
               {handoffsOpen ? <Badge variant="warning">Handoffs abiertos</Badge> : null}
@@ -733,73 +759,66 @@ function WhatsAppStatusPanel({
           }
         >
           <div>
-            <CardTitle className="text-xl">Diagnostico del canal</CardTitle>
+            <CardTitle className="text-xl">Lectura del canal</CardTitle>
             <CardDescription>
               Si WhatsApp muestra doble tilde pero no cambia el ultimo webhook, el problema esta antes de Opturon: Meta/Webhook delivery.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-5 pt-0">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <StatusMetric icon={<PlugZap className="h-4 w-4" />} label="Provider" value={status?.channel.provider || "-"} />
-            <StatusMetric icon={<PhoneCall className="h-4 w-4" />} label="Numero" value={status?.channel.displayPhoneNumber || status?.channel.phoneNumberId || "-"} />
-            <StatusMetric icon={<Bot className="h-4 w-4" />} label="Bot" value={status?.botRuntime.enabled === false ? "Pausado" : "Activo"} />
-            <StatusMetric icon={<Clock3 className="h-4 w-4" />} label="Actualizado" value={generatedAt || "-"} />
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
             <div className="grid gap-3 md:grid-cols-3">
-              <StatusMetric icon={<Activity className="h-4 w-4" />} label="Webhooks 24 hs" value={String(status?.webhook.events24h ?? 0)} />
-              <StatusMetric icon={<MessageSquareText className="h-4 w-4" />} label="Inbound 24 hs" value={String(status?.messages.inbound24h ?? 0)} />
-              <StatusMetric icon={<MessageSquareText className="h-4 w-4" />} label="Outbound 24 hs" value={String(status?.messages.outbound24h ?? 0)} />
-              <StatusMetric label="Ultimo webhook" value={formatDateTime(status?.webhook.lastReceived?.receivedAt || null) || "Sin registro"} />
-              <StatusMetric label="Ultimo inbound" value={formatDateTime(status?.messages.lastInbound?.createdAt || null) || "Sin registro"} />
-              <StatusMetric label="Ultimo outbound" value={formatDateTime(status?.messages.lastOutbound?.createdAt || null) || "Sin registro"} />
+              <StatusMetric icon={<Activity className="h-4 w-4" />} label="Webhooks 24 hs" value={String(status?.webhook.events24h ?? 0)} elevated />
+              <StatusMetric icon={<MessageSquareText className="h-4 w-4" />} label="Inbound 24 hs" value={String(status?.messages.inbound24h ?? 0)} elevated />
+              <StatusMetric icon={<MessageSquareText className="h-4 w-4" />} label="Outbound 24 hs" value={String(status?.messages.outbound24h ?? 0)} elevated />
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-              <p className="text-sm font-medium">Prueba manual</p>
-              <p className="text-sm leading-6 text-muted">
-                Envia un WhatsApp al numero conectado y verifica si aparece en ultimo webhook recibido.
+            <div className="rounded-[24px] border border-white/8 bg-surface/55 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Prueba manual</p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                Envia un WhatsApp al numero conectado y verifica si cambia el ultimo webhook.
               </p>
-              <div className="rounded-xl border border-dashed border-[color:var(--border)] bg-bg/50 px-3 py-2 text-sm text-muted">
-                Si no se mueve el webhook pero el telefono marca doble tilde, revisa entrega en Meta Webhooks.
-              </div>
+              <p className="mt-3 rounded-2xl border border-dashed border-[color:var(--border)] bg-bg/45 px-3 py-2 text-sm text-muted">
+                Si el telefono marca doble tilde y este panel no actualiza, revisa entrega en Meta Webhooks.
+              </p>
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <StatusDetail
-              title="Ultimo job de respuesta"
+          <div className="grid gap-4 xl:grid-cols-4">
+            <StatusGroup title="Ultima actividad" rows={[["Webhook", lastWebhookAt], ["Inbound", lastInboundAt], ["Outbound", lastOutboundAt]]} />
+            <StatusGroup
+              title="Automatizacion"
               rows={[
-                ["Estado", status?.jobs.lastConversationReply?.status || "Sin registro"],
-                ["Intentos", status?.jobs.lastConversationReply ? String(status.jobs.lastConversationReply.attempts) : "-"],
-                ["Actualizado", formatDateTime(status?.jobs.lastConversationReply?.updatedAt || null) || "-"]
+                ["Ultimo job", job?.status || "Sin registro"],
+                ["Intentos", job ? String(job.attempts) : "-"],
+                ["Actualizado", formatDateTime(job?.updatedAt || null) || "-"]
               ]}
             />
-            <StatusDetail
-              title="Errores recientes"
+            <StatusGroup
+              title="Bloqueos humanos"
               rows={[
-                ["Webhook", status?.errors.lastWebhookError?.reason || "Sin errores"],
-                ["Job", status?.errors.lastJobError?.lastError || "Sin errores"],
-                ["Fecha", formatDateTime(status?.errors.lastWebhookError?.receivedAt || status?.errors.lastJobError?.updatedAt || null) || "-"]
-              ]}
-            />
-            <StatusDetail
-              title="Handoff"
-              rows={[
-                ["Abiertos", String(status?.handoffs.openCount ?? 0)],
-                ["Conversaciones bloqueadas", String(status?.handoffs.blockedConversationCount ?? 0)],
+                ["Handoffs", String(status?.handoffs.openCount ?? 0)],
+                ["Bloqueadas", String(status?.handoffs.blockedConversationCount ?? 0)],
                 ["Regla", status?.handoffs.explanation || "Sin handoffs abiertos"]
               ]}
             />
+            <StatusGroup title="Canal" rows={[["Provider", status?.channel.provider || "-"], ["Actualizado", generatedAt || "-"], ["Bot", status?.botRuntime.enabled === false ? "Pausado" : "Activo"]]} />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <StatusMetric label="Nombre del bot" value={status?.botConfig.botName || "Sin personalizar"} />
-            <StatusMetric label="Config personalizada" value={status?.botConfig.hasCustomConfig ? "Si" : "No"} />
-            <StatusMetric label="Saludo personalizado" value={status?.botConfig.hasCustomGreeting ? "Si" : "No"} />
-            <StatusMetric label="Fallback personalizado" value={status?.botConfig.hasCustomFallback ? "Si" : "No"} />
+          <div className="rounded-[24px] border border-white/8 bg-bg/35 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Errores recientes</p>
+                <p className="mt-1 text-sm text-muted">Senales de webhook y job sin romper el layout si el error es largo.</p>
+              </div>
+              <Badge variant={lastWebhookError.includes("Sin errores") && lastJobError.includes("Sin errores") ? "success" : "warning"}>
+                {lastWebhookError.includes("Sin errores") && lastJobError.includes("Sin errores") ? "Sin errores" : "Revisar"}
+              </Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <ErrorLine label="Webhook" value={lastWebhookError} />
+              <ErrorLine label="Job" value={lastJobError} />
+            </div>
           </div>
 
           <div className="grid gap-2 text-xs text-muted md:grid-cols-2">
@@ -815,14 +834,16 @@ function WhatsAppStatusPanel({
 function StatusMetric({
   icon,
   label,
-  value
+  value,
+  elevated = false
 }: {
   icon?: ReactNode;
   label: string;
   value: string;
+  elevated?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+    <div className={`rounded-2xl border p-4 ${elevated ? "border-white/10 bg-white/[0.045]" : "border-[color:var(--border)] bg-surface/65"}`}>
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted">
         {icon ? <span className="text-brandBright">{icon}</span> : null}
         <span>{label}</span>
@@ -832,7 +853,7 @@ function StatusMetric({
   );
 }
 
-function StatusDetail({
+function StatusGroup({
   title,
   rows
 }: {
@@ -840,7 +861,7 @@ function StatusDetail({
   rows: Array<[string, string]>;
 }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+    <div className="rounded-[24px] border border-white/8 bg-surface/55 p-4">
       <p className="text-sm font-medium">{title}</p>
       <div className="mt-3 space-y-2">
         {rows.map(([label, value]) => (
@@ -850,6 +871,24 @@ function StatusDetail({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function StatusRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="font-medium text-text">{value}</span>
+    </div>
+  );
+}
+
+function ErrorLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-[color:var(--border)] bg-surface/60 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
+      <p className="mt-2 line-clamp-3 break-words text-sm text-text">{value}</p>
     </div>
   );
 }
@@ -909,25 +948,6 @@ function HelperBlock({
       </div>
       <div className="mt-3 rounded-xl border border-[color:var(--border)] bg-bg/80 px-3 py-2 text-sm text-text">
         {title}: {example}
-      </div>
-    </div>
-  );
-}
-
-function StatusStat({
-  label,
-  value,
-  tone
-}: {
-  label: string;
-  value: string;
-  tone: "muted" | "warning" | "success" | "danger";
-}) {
-  return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-        <Badge variant={tone}>{value}</Badge>
       </div>
     </div>
   );
