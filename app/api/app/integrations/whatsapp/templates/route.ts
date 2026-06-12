@@ -7,7 +7,7 @@ import {
   isBackendConfigured,
   syncPortalWhatsAppTemplates
 } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireAppApi, requireOpturonAdminApi } from "@/lib/saas/access";
 
 export async function GET() {
   const auth = await requireAppApi({ permission: "manage_workspace" });
@@ -42,12 +42,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAppApi({ permission: "manage_workspace" });
+  const auth = await requireOpturonAdminApi();
   if (auth.error) return auth.error;
-
-  if (!auth.ctx.tenantId) {
-    return NextResponse.json({ error: "missing_tenant_context" }, { status: 400 });
-  }
 
   if (!isBackendConfigured()) {
     return NextResponse.json(
@@ -56,20 +52,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let payload: { action?: string; templateKey?: string; language?: string } = {};
+  let payload: { tenantId?: string; action?: string; templateKey?: string; language?: string } = {};
   try {
     payload = await request.json();
   } catch {
     payload = {};
   }
 
+  const tenantId = String(payload.tenantId || "").trim();
+  if (!tenantId) {
+    return NextResponse.json({ error: "missing_tenant_id", detail: "Las mutaciones de templates solo se ejecutan desde Admin Opturon con tenant explicito." }, { status: 400 });
+  }
+
   try {
     if (payload.action === "sync") {
-      const result = await syncPortalWhatsAppTemplates(auth.ctx.tenantId);
+      const result = await syncPortalWhatsAppTemplates(tenantId);
       return NextResponse.json(result);
     }
 
-    const result = await createPortalWhatsAppTemplateFromBlueprint(auth.ctx.tenantId, {
+    const result = await createPortalWhatsAppTemplateFromBlueprint(tenantId, {
       templateKey: String(payload.templateKey || "").trim(),
       language: payload.language ? String(payload.language).trim() : undefined
     });

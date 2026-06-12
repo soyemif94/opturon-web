@@ -5,15 +5,11 @@ import {
   getBackendErrorStatus,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireOpturonAdminApi } from "@/lib/saas/access";
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAppApi({ permission: "manage_workspace" });
+  const auth = await requireOpturonAdminApi();
   if (auth.error) return auth.error;
-
-  if (!auth.ctx.tenantId) {
-    return NextResponse.json({ error: "missing_tenant_context" }, { status: 400 });
-  }
 
   if (!isBackendConfigured()) {
     return NextResponse.json(
@@ -22,15 +18,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let payload: { accessToken?: string } = {};
+  let payload: { tenantId?: string; accessToken?: string } = {};
   try {
     payload = await request.json();
   } catch {
     payload = {};
   }
 
+  const tenantId = String(payload.tenantId || "").trim();
+  if (!tenantId) {
+    return NextResponse.json({ error: "missing_tenant_id", detail: "La autodeteccion solo se ejecuta desde Admin Opturon con tenant explicito." }, { status: 400 });
+  }
+
   try {
-    const result = await discoverPortalWhatsAppAssets(auth.ctx.tenantId, {
+    const result = await discoverPortalWhatsAppAssets(tenantId, {
       accessToken: String(payload.accessToken || "").trim()
     });
     return NextResponse.json(result);

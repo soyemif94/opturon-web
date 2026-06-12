@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, Loader2, PauseCircle, PlayCircle, Save, XCircle } from "lucide-react";
+import { Activity, Check, Copy, ExternalLink, Loader2, PauseCircle, PlayCircle, RefreshCw, Save, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import type { AdminBillingSubscription, AdminTenantPolicyRow, TenantPolicy } from "@/lib/admin-client-policy";
+import type { PortalWhatsAppStatus } from "@/lib/api";
 
 const PLAN_OPTIONS = [
   { value: "basic", label: "Inicial" },
@@ -125,6 +126,18 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "Sin fecha" : date.toLocaleString("es-AR");
 }
 
+function formatShortDate(value?: string | null) {
+  if (!value) return "Sin registro";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sin registro";
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 function formatMoney(amount?: number | null, currency = "ARS") {
   if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return "-";
   return new Intl.NumberFormat("es-AR", {
@@ -171,6 +184,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [actingSubscriptionId, setActingSubscriptionId] = useState<string | null>(null);
   const [sendingBillingLinkEmail, setSendingBillingLinkEmail] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState<PortalWhatsAppStatus | null>(null);
+  const [loadingWhatsappStatus, setLoadingWhatsappStatus] = useState(false);
   const [billingDraft, setBillingDraft] = useState<BillingDraftState>({
     planCode: BILLING_PLAN_OPTIONS[0].value,
     payerEmail: selectedTenant?.primaryEmail || "",
@@ -243,6 +258,10 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       cancelled = true;
     };
   }, [selectedTenant]);
+
+  useEffect(() => {
+    void loadWhatsappStatus();
+  }, [selectedTenant?.tenantId]);
 
   function selectTenant(tenant: AdminTenantPolicyRow) {
     setSelectedTenantId(tenant.tenantId);
@@ -388,6 +407,29 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       toast.error(error instanceof Error ? error.message : "No se pudo enviar el link por email.");
     } finally {
       setSendingBillingLinkEmail(false);
+    }
+  }
+
+  async function loadWhatsappStatus() {
+    if (!selectedTenant) {
+      setWhatsappStatus(null);
+      return;
+    }
+
+    setLoadingWhatsappStatus(true);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/status`,
+        { cache: "no-store" }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.detail || json?.error || "admin_whatsapp_status_failed");
+      setWhatsappStatus(json?.data || json || null);
+    } catch (error) {
+      setWhatsappStatus(null);
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar WhatsApp del tenant.");
+    } finally {
+      setLoadingWhatsappStatus(false);
     }
   }
 
@@ -611,6 +653,13 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </div>
 
           <aside className="space-y-5">
+            <AdminWhatsAppCard
+              status={whatsappStatus}
+              loading={loadingWhatsappStatus}
+              tenantId={selectedTenant.tenantId}
+              onRefresh={() => void loadWhatsappStatus()}
+            />
+
             <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -784,6 +833,111 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </aside>
         </div>
       </section>
+    </div>
+  );
+}
+
+function AdminWhatsAppCard({
+  status,
+  loading,
+  tenantId,
+  onRefresh
+}: {
+  status: PortalWhatsAppStatus | null;
+  loading: boolean;
+  tenantId: string;
+  onRefresh: () => void;
+}) {
+  const connected = Boolean(status?.channel.connected);
+  const webhookRecent = Number(status?.webhook.events24h || 0) > 0;
+  const hasErrors = Boolean(status?.errors.lastWebhookError || status?.errors.lastJobError);
+
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold">WhatsApp del cliente</h3>
+            <Badge variant={connected ? "success" : "warning"}>{connected ? "Conectado" : "Sin canal"}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted">Consola interna para diagnosticar la integracion del tenant.</p>
+        </div>
+        <Button type="button" variant="secondary" size="sm" onClick={onRefresh} disabled={loading} className="gap-2">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Verificar
+        </Button>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Estado operativo</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant={webhookRecent ? "success" : "warning"}>{webhookRecent ? "Webhook reciente" : "Sin webhook reciente"}</Badge>
+            <Badge variant={hasErrors ? "warning" : "success"}>{hasErrors ? "Revisar errores" : "Sin errores recientes"}</Badge>
+            {Number(status?.handoffs.openCount || 0) > 0 ? <Badge variant="warning">Handoffs abiertos</Badge> : null}
+          </div>
+        </div>
+
+        <AdminStatusRows
+          rows={[
+            ["Tenant", tenantId],
+            ["Provider", status?.channel.provider || "-"],
+            ["Numero", status?.channel.displayPhoneNumber || "-"],
+            ["Phone Number ID", status?.channel.phoneNumberId || "-"],
+            ["WABA ID", status?.channel.wabaId || "-"]
+          ]}
+        />
+
+        <AdminStatusRows
+          rows={[
+            ["Ultimo webhook", formatShortDate(status?.webhook.lastReceived?.receivedAt)],
+            ["Ultimo inbound", formatShortDate(status?.messages.lastInbound?.createdAt)],
+            ["Ultimo outbound", formatShortDate(status?.messages.lastOutbound?.createdAt)],
+            ["Job respuesta", status?.jobs.lastConversationReply?.status || "Sin registro"],
+            ["Handoffs", String(status?.handoffs.openCount ?? 0)]
+          ]}
+        />
+
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Activity className="h-4 w-4 text-brandBright" />
+            Acciones internas
+          </div>
+          <div className="mt-3 grid gap-2">
+            <Button type="button" variant="secondary" className="justify-start gap-2" onClick={onRefresh} disabled={loading}>
+              <RefreshCw className="h-4 w-4" />
+              Ver diagnostico
+            </Button>
+            <Button type="button" variant="secondary" className="justify-start gap-2" disabled>
+              Copiar callback
+            </Button>
+            <Button type="button" variant="secondary" className="justify-start gap-2" disabled>
+              Marcar para revision
+            </Button>
+            <Button type="button" variant="secondary" className="justify-start gap-2" disabled>
+              Conectar WhatsApp
+            </Button>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted">
+            Token y resuscripcion Meta quedan reservados para flujos Admin write-only. Nunca se muestran al cliente.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminStatusRows({ rows }: { rows: Array<[string, string]> }) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+      <div className="grid gap-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex gap-3 text-sm">
+            <span className="w-28 shrink-0 text-muted">{label}</span>
+            <span className="min-w-0 break-words font-medium text-text">{value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

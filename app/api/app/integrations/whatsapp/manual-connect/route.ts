@@ -5,15 +5,11 @@ import {
   getBackendErrorStatus,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireOpturonAdminApi } from "@/lib/saas/access";
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAppApi({ permission: "manage_workspace" });
+  const auth = await requireOpturonAdminApi();
   if (auth.error) return auth.error;
-
-  if (!auth.ctx.tenantId) {
-    return NextResponse.json({ error: "missing_tenant_context" }, { status: 400 });
-  }
 
   if (!isBackendConfigured()) {
     return NextResponse.json(
@@ -23,6 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   let payload: {
+    tenantId?: string;
     wabaId?: string;
     phoneNumberId?: string;
     accessToken?: string;
@@ -35,8 +32,13 @@ export async function POST(request: NextRequest) {
     payload = {};
   }
 
+  const tenantId = String(payload.tenantId || "").trim();
+  if (!tenantId) {
+    return NextResponse.json({ error: "missing_tenant_id", detail: "La conexion manual solo se ejecuta desde Admin Opturon con tenant explicito." }, { status: 400 });
+  }
+
   try {
-    const result = await connectPortalWhatsAppManual(auth.ctx.tenantId, {
+    const result = await connectPortalWhatsAppManual(tenantId, {
       wabaId: String(payload.wabaId || "").trim(),
       phoneNumberId: String(payload.phoneNumberId || "").trim(),
       accessToken: String(payload.accessToken || "").trim(),
