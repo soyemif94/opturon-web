@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Banknote,
+  Bot,
   Building2,
   CheckCircle2,
   Cog,
@@ -16,12 +17,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { canManageUsers, isStaffRole } from "@/lib/app-permissions";
 import {
   getPortalBotTransferConfig,
+  getPortalBotSettings,
   getPortalBusinessSettings,
   getPortalTenantContext,
   getPortalUsers,
   isBackendConfigured,
+  type PortalBotConfig,
   type PortalBotTransferConfig,
   type PortalBusinessSettings,
+  type PortalBotSettings,
   type PortalUser,
   type PortalUsersMeta
 } from "@/lib/api";
@@ -63,6 +67,16 @@ const EMPTY_TRANSFER_CONFIG: PortalBotTransferConfig = {
   reference: null
 };
 
+const EMPTY_BOT_CONFIG: PortalBotConfig = {
+  name: "",
+  greetingMessage: "",
+  tone: "amigable",
+  treatment: "vos",
+  outOfHoursMessage: "",
+  fallbackMessage: "",
+  handoffMessage: ""
+};
+
 const DEFAULT_USERS_META: PortalUsersMeta = {
   subaccountCount: 0,
   primaryAccountCount: 0,
@@ -88,20 +102,29 @@ export default async function AppSettingsPage() {
   let clinicName = "Espacio del cliente";
   let businessSettings = EMPTY_BUSINESS_SETTINGS;
   let transferConfig = EMPTY_TRANSFER_CONFIG;
+  let botSettings: PortalBotSettings = {
+    tenantId,
+    clinicId: "",
+    clinicName: clinicName,
+    mode: "automatic",
+    botConfig: EMPTY_BOT_CONFIG
+  };
   let users: PortalUser[] = [];
   let usersMeta: PortalUsersMeta = DEFAULT_USERS_META;
 
   if (backendReady) {
-    const [tenantContext, businessResult, transferResult, usersResult] = await Promise.all([
+    const [tenantContext, businessResult, transferResult, botResult, usersResult] = await Promise.all([
       getPortalTenantContext(tenantId).catch(() => null),
       getPortalBusinessSettings(tenantId).catch(() => null),
       getPortalBotTransferConfig(tenantId).catch(() => null),
+      getPortalBotSettings(tenantId).catch(() => null),
       allowUsers ? getPortalUsers(tenantId).catch(() => null) : Promise.resolve(null)
     ]);
 
     clinicName = tenantContext?.data?.clinic?.name || transferResult?.data?.settings?.clinicName || clinicName;
     businessSettings = { ...EMPTY_BUSINESS_SETTINGS, ...(businessResult?.data?.settings || {}), tenantId };
     transferConfig = transferResult?.data?.settings?.transferConfig || EMPTY_TRANSFER_CONFIG;
+    botSettings = botResult?.data?.settings || { ...botSettings, clinicName, tenantId };
     users = usersResult?.data?.users || [];
     usersMeta = usersResult?.data?.meta || DEFAULT_USERS_META;
   } else if (canUseLocalDemoData) {
@@ -289,6 +312,38 @@ export default async function AppSettingsPage() {
               <MiniMetric label="Otros" value={String(otherUsersCount)} />
               <MiniMetric label="Disponibles" value={String(Math.max(0, Number(usersMeta.remainingSubaccounts || 0)))} />
             </div>
+          </div>
+        </HubCard>
+
+        <HubCard
+          href="/app/settings/bot"
+          icon={<Bot className="h-6 w-6 text-sky-300" />}
+          title="Bot de WhatsApp"
+          subtitle="Voz y mensajes base"
+          description="Personaliza saludo, fallback, fuera de horario y derivacion a humano por tenant sin tocar el motor del bot."
+          cta="Editar bot"
+          accent="violet"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-surface/60 px-4 py-3">
+              <span className="text-sm text-muted">Tono actual</span>
+              <Badge variant="outline">{botSettings.botConfig.tone}</Badge>
+            </div>
+            <StatusRow
+              label="Saludo inicial"
+              value={botSettings.botConfig.greetingMessage || "Default actual"}
+              tone={botSettings.botConfig.greetingMessage ? "success" : "muted"}
+            />
+            <StatusRow
+              label="Fallback"
+              value={botSettings.botConfig.fallbackMessage ? "Personalizado" : "Default actual"}
+              tone={botSettings.botConfig.fallbackMessage ? "success" : "muted"}
+            />
+            <StatusRow
+              label="Humano"
+              value={botSettings.botConfig.handoffMessage ? "Personalizado" : "Default actual"}
+              tone={botSettings.botConfig.handoffMessage ? "success" : "muted"}
+            />
           </div>
         </HubCard>
 
