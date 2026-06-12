@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CalendarDays,
+  Activity,
+  Bot,
   CheckCircle2,
+  Clock3,
   CopyPlus,
   KeyRound,
   LifeBuoy,
   LoaderCircle,
+  MessageSquareText,
   PhoneCall,
   PlugZap,
   RefreshCw,
@@ -31,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type {
   PortalWhatsAppDiscoveredAsset,
+  PortalWhatsAppStatus,
   PortalWhatsAppTemplate,
   PortalWhatsAppTemplateBlueprint
 } from "@/lib/api";
@@ -84,16 +89,19 @@ const productCards: ProductCard[] = [
 
 export function IntegrationsHub({
   whatsapp,
+  whatsappStatus,
   templateBlueprints,
   templates
 }: {
   whatsapp: WhatsAppConnectionStatus;
+  whatsappStatus: PortalWhatsAppStatus | null;
   templateBlueprints: PortalWhatsAppTemplateBlueprint[];
   templates: PortalWhatsAppTemplate[];
 }) {
   const router = useRouter();
   const manualConnectionRef = useRef<HTMLElement | null>(null);
   const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
+  const [liveWhatsAppStatus, setLiveWhatsAppStatus] = useState(whatsappStatus);
   const [liveTemplates, setLiveTemplates] = useState(templates);
   const [launchState, setLaunchState] = useState<"idle" | "launching" | "pending_meta">("idle");
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
@@ -135,13 +143,26 @@ export function IntegrationsHub({
   }, [liveTemplates]);
 
   async function refreshWhatsAppStatus() {
-    const response = await fetch("/api/app/integrations/whatsapp", { cache: "no-store" });
-    if (!response.ok) return;
-    const json = (await response.json().catch(() => null)) as { data?: WhatsAppConnectionStatus } | null;
-    if (json?.data) {
-      setLiveWhatsApp(json.data);
-      router.refresh();
+    const [connectionResponse, statusResponse] = await Promise.all([
+      fetch("/api/app/integrations/whatsapp", { cache: "no-store" }),
+      fetch("/api/app/integrations/whatsapp/status", { cache: "no-store" }).catch(() => null)
+    ]);
+
+    if (connectionResponse.ok) {
+      const json = (await connectionResponse.json().catch(() => null)) as { data?: WhatsAppConnectionStatus } | null;
+      if (json?.data) {
+        setLiveWhatsApp(json.data);
+      }
     }
+
+    if (statusResponse && statusResponse.ok) {
+      const statusJson = (await statusResponse.json().catch(() => null)) as { data?: PortalWhatsAppStatus } | null;
+      if (statusJson?.data) {
+        setLiveWhatsAppStatus(statusJson.data);
+      }
+    }
+
+    router.refresh();
   }
 
   async function refreshTemplates() {
@@ -418,6 +439,8 @@ export function IntegrationsHub({
         </Card>
       </section>
 
+      <WhatsAppStatusPanel status={liveWhatsAppStatus} onRefresh={() => void refreshWhatsAppStatus()} />
+
       <section>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -668,6 +691,179 @@ function formatDiscoverAssetsError(errorCode: string | null | undefined, detail:
     return "No encontramos activos accesibles con ese token. Si ya conoces tu WABA ID y tu Phone Number ID, puedes continuar con conexion manual.";
   }
   return String(detail || "").trim() || "No pudimos autodetectar activos desde Meta. Puedes continuar con conexion manual.";
+}
+
+function WhatsAppStatusPanel({
+  status,
+  onRefresh
+}: {
+  status: PortalWhatsAppStatus | null;
+  onRefresh: () => void;
+}) {
+  const connected = Boolean(status?.channel.connected);
+  const webhookRecent = Number(status?.webhook.events24h || 0) > 0;
+  const deliveryIssue = connected && !webhookRecent;
+  const handoffsOpen = Number(status?.handoffs.openCount || 0) > 0;
+  const generatedAt = formatDateTime(status?.generatedAt || null);
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Estado de WhatsApp</h2>
+          <p className="text-sm text-muted">Lectura operativa del canal, webhooks, mensajes y bloqueos humanos del workspace.</p>
+        </div>
+        <Button variant="secondary" className="rounded-2xl" onClick={onRefresh}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refrescar estado
+        </Button>
+      </div>
+
+      <Card className="border-white/6 bg-card/90">
+        <CardHeader
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={connected ? "success" : "warning"}>{connected ? "Conectado" : "Sin conectar"}</Badge>
+              <Badge variant={webhookRecent ? "success" : "warning"}>
+                {webhookRecent ? "Webhook activo recientemente" : "Sin eventos recientes"}
+              </Badge>
+              {deliveryIssue ? <Badge variant="danger">Posible problema de entrega</Badge> : null}
+              {handoffsOpen ? <Badge variant="warning">Handoffs abiertos</Badge> : null}
+            </div>
+          }
+        >
+          <div>
+            <CardTitle className="text-xl">Diagnostico del canal</CardTitle>
+            <CardDescription>
+              Si WhatsApp muestra doble tilde pero no cambia el ultimo webhook, el problema esta antes de Opturon: Meta/Webhook delivery.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 pt-0">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <StatusMetric icon={<PlugZap className="h-4 w-4" />} label="Provider" value={status?.channel.provider || "-"} />
+            <StatusMetric icon={<PhoneCall className="h-4 w-4" />} label="Numero" value={status?.channel.displayPhoneNumber || status?.channel.phoneNumberId || "-"} />
+            <StatusMetric icon={<Bot className="h-4 w-4" />} label="Bot" value={status?.botRuntime.enabled === false ? "Pausado" : "Activo"} />
+            <StatusMetric icon={<Clock3 className="h-4 w-4" />} label="Actualizado" value={generatedAt || "-"} />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+            <div className="grid gap-3 md:grid-cols-3">
+              <StatusMetric icon={<Activity className="h-4 w-4" />} label="Webhooks 24 hs" value={String(status?.webhook.events24h ?? 0)} />
+              <StatusMetric icon={<MessageSquareText className="h-4 w-4" />} label="Inbound 24 hs" value={String(status?.messages.inbound24h ?? 0)} />
+              <StatusMetric icon={<MessageSquareText className="h-4 w-4" />} label="Outbound 24 hs" value={String(status?.messages.outbound24h ?? 0)} />
+              <StatusMetric label="Ultimo webhook" value={formatDateTime(status?.webhook.lastReceived?.receivedAt || null) || "Sin registro"} />
+              <StatusMetric label="Ultimo inbound" value={formatDateTime(status?.messages.lastInbound?.createdAt || null) || "Sin registro"} />
+              <StatusMetric label="Ultimo outbound" value={formatDateTime(status?.messages.lastOutbound?.createdAt || null) || "Sin registro"} />
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+              <p className="text-sm font-medium">Prueba manual</p>
+              <p className="text-sm leading-6 text-muted">
+                Envia un WhatsApp al numero conectado y verifica si aparece en ultimo webhook recibido.
+              </p>
+              <div className="rounded-xl border border-dashed border-[color:var(--border)] bg-bg/50 px-3 py-2 text-sm text-muted">
+                Si no se mueve el webhook pero el telefono marca doble tilde, revisa entrega en Meta Webhooks.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <StatusDetail
+              title="Ultimo job de respuesta"
+              rows={[
+                ["Estado", status?.jobs.lastConversationReply?.status || "Sin registro"],
+                ["Intentos", status?.jobs.lastConversationReply ? String(status.jobs.lastConversationReply.attempts) : "-"],
+                ["Actualizado", formatDateTime(status?.jobs.lastConversationReply?.updatedAt || null) || "-"]
+              ]}
+            />
+            <StatusDetail
+              title="Errores recientes"
+              rows={[
+                ["Webhook", status?.errors.lastWebhookError?.reason || "Sin errores"],
+                ["Job", status?.errors.lastJobError?.lastError || "Sin errores"],
+                ["Fecha", formatDateTime(status?.errors.lastWebhookError?.receivedAt || status?.errors.lastJobError?.updatedAt || null) || "-"]
+              ]}
+            />
+            <StatusDetail
+              title="Handoff"
+              rows={[
+                ["Abiertos", String(status?.handoffs.openCount ?? 0)],
+                ["Conversaciones bloqueadas", String(status?.handoffs.blockedConversationCount ?? 0)],
+                ["Regla", status?.handoffs.explanation || "Sin handoffs abiertos"]
+              ]}
+            />
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <StatusMetric label="Nombre del bot" value={status?.botConfig.botName || "Sin personalizar"} />
+            <StatusMetric label="Config personalizada" value={status?.botConfig.hasCustomConfig ? "Si" : "No"} />
+            <StatusMetric label="Saludo personalizado" value={status?.botConfig.hasCustomGreeting ? "Si" : "No"} />
+            <StatusMetric label="Fallback personalizado" value={status?.botConfig.hasCustomFallback ? "Si" : "No"} />
+          </div>
+
+          <div className="grid gap-2 text-xs text-muted md:grid-cols-2">
+            <p>Phone Number ID: {status?.channel.phoneNumberId || "-"}</p>
+            <p>WABA ID: {status?.channel.wabaId || "-"}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function StatusMetric({
+  icon,
+  label,
+  value
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted">
+        {icon ? <span className="text-brandBright">{icon}</span> : null}
+        <span>{label}</span>
+      </div>
+      <p className="mt-2 break-words text-sm font-medium text-text">{value}</p>
+    </div>
+  );
+}
+
+function StatusDetail({
+  title,
+  rows
+}: {
+  title: string;
+  rows: Array<[string, string]>;
+}) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/65 p-4">
+      <p className="text-sm font-medium">{title}</p>
+      <div className="mt-3 space-y-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex gap-3 text-sm">
+            <span className="w-28 shrink-0 text-muted">{label}</span>
+            <span className="min-w-0 break-words text-text">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }
 
 function templateStatusMeta(status: string): {

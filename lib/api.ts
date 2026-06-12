@@ -327,6 +327,101 @@ export type PortalWhatsAppTemplate = {
   updatedAt: string | null;
 };
 
+export type PortalWhatsAppStatus = {
+  ok: boolean;
+  tenantId: string;
+  clinicId: string;
+  generatedAt: string;
+  channel: {
+    connected: boolean;
+    provider: string | null;
+    channelId: string | null;
+    phoneNumberId: string | null;
+    wabaId: string | null;
+    displayPhoneNumber: string | null;
+    verifiedName: string | null;
+    status: string | null;
+  };
+  botRuntime: {
+    enabled: boolean | null;
+  };
+  webhook: {
+    lastReceived: {
+      id: string | null;
+      receivedAt: string | null;
+      eventType: string | null;
+      waMessageId: string | null;
+      waFrom: string | null;
+      waTo: string | null;
+    } | null;
+    events24h: number;
+  };
+  messages: {
+    lastInbound: {
+      id: string | null;
+      conversationId: string | null;
+      direction: string | null;
+      waMessageId: string | null;
+      textPreview: string | null;
+      createdAt: string | null;
+    } | null;
+    lastOutbound: {
+      id: string | null;
+      conversationId: string | null;
+      direction: string | null;
+      waMessageId: string | null;
+      textPreview: string | null;
+      createdAt: string | null;
+    } | null;
+    inbound24h: number;
+    outbound24h: number;
+  };
+  jobs: {
+    lastConversationReply: {
+      id: string | null;
+      type: string | null;
+      status: string | null;
+      attempts: number;
+      lastError: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    } | null;
+  };
+  errors: {
+    lastWebhookError: {
+      id: string | null;
+      receivedAt: string | null;
+      reason: string | null;
+      phoneNumberId: string | null;
+      providerMessageId: string | null;
+      error: string | null;
+    } | null;
+    lastJobError: {
+      id: string | null;
+      type: string | null;
+      status: string | null;
+      attempts: number;
+      lastError: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    } | null;
+  };
+  handoffs: {
+    openCount: number;
+    blockedConversationCount: number;
+    explanation: string;
+  };
+  botConfig: {
+    mode: string | null;
+    botName: string | null;
+    hasCustomConfig: boolean;
+    hasCustomGreeting: boolean;
+    hasCustomFallback: boolean;
+    hasCustomHandoff: boolean;
+  };
+  badges: string[];
+};
+
 export async function getPortalTenantContext(tenantId: string) {
   return backendFetch<{ success: boolean; data: PortalTenantContext }>(`/portal/tenants/${tenantId}/context`, undefined, false);
 }
@@ -357,6 +452,13 @@ export async function getPortalWhatsAppEmbeddedSignupStatus(tenantId: string) {
     success: boolean;
     data: PortalWhatsAppEmbeddedSignupStatus;
   }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/status`);
+}
+
+export async function getPortalWhatsAppStatus(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalWhatsAppStatus;
+  }>(`/portal/tenants/${tenantId}/whatsapp/status`);
 }
 
 export async function createPortalWhatsAppEmbeddedSignupBootstrap(
