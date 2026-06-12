@@ -980,6 +980,24 @@ export type PortalBotTransferConfig = {
   reference?: string | null;
 };
 
+export type PortalBotConfig = {
+  name: string;
+  greetingMessage: string;
+  tone: "amigable" | "profesional" | "calido";
+  treatment: "vos" | "usted";
+  outOfHoursMessage: string;
+  fallbackMessage: string;
+  handoffMessage: string;
+};
+
+export type PortalBotSettings = {
+  tenantId: string;
+  clinicId: string;
+  clinicName: string | null;
+  mode: "automatic" | "sales" | "agenda";
+  botConfig: PortalBotConfig;
+};
+
 export async function getPortalBusinessSettings(tenantId: string) {
   return backendPortalFetch<{
     success: boolean;
@@ -1003,6 +1021,34 @@ export async function patchPortalBusinessSettings(
       settings: PortalBusinessSettings;
     };
   }>(`/portal/tenants/${tenantId}/business`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalBotSettings(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      settings: PortalBotSettings;
+    };
+  }>(`/portal/tenants/${tenantId}/bot-settings`);
+}
+
+export async function patchPortalBotSettings(
+  tenantId: string,
+  payload: Partial<PortalBotSettings> & { botConfig?: Partial<PortalBotConfig> }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      clinicId: string;
+      settings: PortalBotSettings;
+    };
+  }>(`/portal/tenants/${tenantId}/bot-settings`, {
     method: "PATCH",
     body: JSON.stringify(payload)
   });
