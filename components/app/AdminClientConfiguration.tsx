@@ -5,7 +5,13 @@ import { Activity, Check, Copy, ExternalLink, Loader2, PauseCircle, PlayCircle, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import type { AdminBillingSubscription, AdminTenantPolicyRow, TenantPolicy } from "@/lib/admin-client-policy";
+import type {
+  AdminBillingSubscription,
+  AdminTenantPolicyRow,
+  MetaEmbeddedReadinessCheck,
+  MetaEmbeddedSignupReadiness,
+  TenantPolicy
+} from "@/lib/admin-client-policy";
 import type { PortalWhatsAppStatus } from "@/lib/api";
 
 const PLAN_OPTIONS = [
@@ -186,6 +192,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [sendingBillingLinkEmail, setSendingBillingLinkEmail] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<PortalWhatsAppStatus | null>(null);
   const [loadingWhatsappStatus, setLoadingWhatsappStatus] = useState(false);
+  const [metaReadiness, setMetaReadiness] = useState<MetaEmbeddedSignupReadiness | null>(null);
+  const [loadingMetaReadiness, setLoadingMetaReadiness] = useState(false);
   const [billingDraft, setBillingDraft] = useState<BillingDraftState>({
     planCode: BILLING_PLAN_OPTIONS[0].value,
     payerEmail: selectedTenant?.primaryEmail || "",
@@ -262,6 +270,10 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   useEffect(() => {
     void loadWhatsappStatus();
   }, [selectedTenant?.tenantId]);
+
+  useEffect(() => {
+    void loadMetaReadiness();
+  }, []);
 
   function selectTenant(tenant: AdminTenantPolicyRow) {
     setSelectedTenantId(tenant.tenantId);
@@ -430,6 +442,23 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       toast.error(error instanceof Error ? error.message : "No se pudo cargar WhatsApp del tenant.");
     } finally {
       setLoadingWhatsappStatus(false);
+    }
+  }
+
+  async function loadMetaReadiness() {
+    setLoadingMetaReadiness(true);
+    try {
+      const response = await fetch("/api/app/admin/meta/embedded-signup/readiness", {
+        cache: "no-store"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.detail || json?.error || "meta_readiness_failed");
+      setMetaReadiness(json?.data || json || null);
+    } catch (error) {
+      setMetaReadiness(null);
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar la preparacion de Meta.");
+    } finally {
+      setLoadingMetaReadiness(false);
     }
   }
 
@@ -653,6 +682,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </div>
 
           <aside className="space-y-5">
+            <AdminMetaReadinessCard readiness={metaReadiness} loading={loadingMetaReadiness} onRefresh={() => void loadMetaReadiness()} />
+
             <AdminWhatsAppCard
               status={whatsappStatus}
               loading={loadingWhatsappStatus}
@@ -833,6 +864,163 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </aside>
         </div>
       </section>
+    </div>
+  );
+}
+
+function getReadinessBadgeVariant(
+  readiness: MetaEmbeddedSignupReadiness | null
+): "success" | "warning" | "danger" | "muted" {
+  if (!readiness) return "muted";
+  if (readiness.readyForTest) return "success";
+  if ((readiness.blockingChecks || []).length > 0) return "danger";
+  return "warning";
+}
+
+function getReadinessBadgeLabel(readiness: MetaEmbeddedSignupReadiness | null) {
+  if (!readiness) return "Sin diagnostico";
+  if (readiness.readyForTest) return "Listo para prueba";
+  if ((readiness.blockingChecks || []).length > 0) return "Configuracion incompleta";
+  return "Revision manual";
+}
+
+function normalizeCheckLabel(key: string) {
+  const labels: Record<string, string> = {
+    appId: "App ID",
+    appSecret: "App Secret",
+    configId: "Config ID",
+    graphVersion: "Graph version",
+    publicAppUrl: "URL publica app",
+    redirectUri: "Redirect URI",
+    webhookCallback: "Webhook callback",
+    verifyToken: "Verify token",
+    tokenEncryption: "Cifrado de tokens",
+    onboardingTable: "Sesion onboarding",
+    dependencies: "Servicios backend",
+    frontendLaunchPayload: "Payload frontend",
+    appPublished: "App publicada",
+    businessVerification: "Business Verification",
+    techProviderVerification: "Tech Provider",
+    appReview: "App Review",
+    customerWabaBilling: "Billing WABA cliente",
+    numberMigration: "Migracion numero"
+  };
+
+  return labels[key] || key;
+}
+
+function renderAutomaticCheckState(check: MetaEmbeddedReadinessCheck) {
+  if (check.kind !== "automatic") return "Pendiente";
+  if (check.blocking) return "Bloqueante";
+  if (check.reachable === false || check.valid === false || check.available === false || check.ready === false) {
+    return "Revisar";
+  }
+  return "Listo";
+}
+
+function renderAutomaticCheckDetail(check: MetaEmbeddedReadinessCheck) {
+  if (check.kind !== "automatic") return "";
+  if (check.value) return check.value;
+  if (check.safeDisplay) return check.safeDisplay;
+  if (typeof check.httpStatus === "number") return `HTTP ${check.httpStatus}`;
+  if (check.deliveryMode) return check.deliveryMode;
+  if (check.configured) return "Configurado";
+  return "Faltante";
+}
+
+function AdminMetaReadinessCard({
+  readiness,
+  loading,
+  onRefresh
+}: {
+  readiness: MetaEmbeddedSignupReadiness | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const automaticChecks = Object.entries(readiness?.checks || {}).filter(([, check]) => check.kind === "automatic");
+  const manualChecks = Object.entries(readiness?.checks || {}).filter(([, check]) => check.kind === "manual");
+
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold">Preparacion de conexion Meta</h3>
+            <Badge variant={getReadinessBadgeVariant(readiness)}>{getReadinessBadgeLabel(readiness)}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            El cliente no tendra que cargar WABA ID, Phone Number ID ni tokens. La conexion se realizara con la ventana oficial de Meta.
+          </p>
+        </div>
+        <Button type="button" variant="secondary" size="sm" onClick={onRefresh} disabled={loading} className="gap-2">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Actualizar
+        </Button>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Resultado general</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge variant={readiness?.readyForTest ? "success" : "warning"}>
+            {readiness ? `${readiness.automaticChecksReady} de ${readiness.automaticChecksTotal} controles tecnicos listos` : "Sin datos"}
+          </Badge>
+          <Badge variant={readiness?.blockingChecks?.length ? "danger" : "success"}>
+            {readiness?.blockingChecks?.length ? `${readiness.blockingChecks.length} bloqueos` : "Sin bloqueos tecnicos"}
+          </Badge>
+          <Badge variant="warning">{manualChecks.length} revisiones manuales</Badge>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <p className="text-sm font-medium">Checks automaticos</p>
+          <div className="mt-3 grid gap-2">
+            {automaticChecks.map(([key, check]) => (
+              <div key={key} className="flex items-start justify-between gap-3 rounded-xl border border-[color:var(--border)] bg-card/70 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium">{normalizeCheckLabel(key)}</p>
+                  <p className="mt-1 break-words text-xs text-muted">{renderAutomaticCheckDetail(check)}</p>
+                </div>
+                <Badge variant={check.kind === "automatic" && check.blocking ? "danger" : "success"}>{renderAutomaticCheckState(check)}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <p className="text-sm font-medium">Revisiones manuales</p>
+          <div className="mt-3 grid gap-2">
+            {manualChecks.map(([key, check]) => (
+              <div key={key} className="rounded-xl border border-[color:var(--border)] bg-card/70 px-3 py-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium">{normalizeCheckLabel(key)}</p>
+                  <Badge variant="warning">Revision manual</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted">{check.kind === "manual" ? check.instruction : ""}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Activity className="h-4 w-4 text-brandBright" />
+            Acciones internas
+          </div>
+          <div className="mt-3 grid gap-2">
+            <Button type="button" variant="secondary" className="justify-start gap-2" onClick={onRefresh} disabled={loading}>
+              <RefreshCw className="h-4 w-4" />
+              Actualizar diagnostico
+            </Button>
+            <Button type="button" variant="secondary" className="justify-start gap-2" disabled={!readiness?.readyForTest}>
+              Conectar WhatsApp
+            </Button>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted">
+            Este bloque mide la preparacion global de Opturon para Embedded Signup. El estado particular de cada cliente sigue viendose por separado.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

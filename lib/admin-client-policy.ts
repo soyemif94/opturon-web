@@ -72,6 +72,42 @@ export type CreateAdminBillingSubscriptionPayload = {
   currency?: string;
 };
 
+export type MetaEmbeddedReadinessCheck =
+  | {
+      kind: "automatic";
+      configured: boolean;
+      blocking?: boolean;
+      valid?: boolean;
+      validHttps?: boolean;
+      reachable?: boolean;
+      ready?: boolean;
+      available?: boolean;
+      safe?: boolean;
+      value?: string | null;
+      safeDisplay?: string | null;
+      httpStatus?: number | null;
+      deliveryMode?: string | null;
+      details?: Array<{ key: string; loaded: boolean; error?: string }>;
+    }
+  | {
+      kind: "manual";
+      status: "manual_review_required";
+      label: string;
+      instruction: string;
+    };
+
+export type MetaEmbeddedSignupReadiness = {
+  ok: boolean;
+  readyForTest: boolean;
+  readyForProduction: boolean;
+  status: "configuration_incomplete" | "ready_for_test";
+  automaticChecksReady: number;
+  automaticChecksTotal: number;
+  checks: Record<string, MetaEmbeddedReadinessCheck>;
+  blockingChecks: string[];
+  manualChecks: string[];
+};
+
 function getApiBase() {
   const candidates = [
     process.env.BACKEND_BASE_URL,
@@ -256,6 +292,13 @@ export async function postAdminBillingSubscriptionAction(
     method: "POST",
     body: JSON.stringify({})
   });
+}
+
+export async function getAdminMetaEmbeddedSignupReadiness() {
+  return backendPortalFetch<{
+    success: boolean;
+    data: MetaEmbeddedSignupReadiness;
+  }>("/api/admin/meta/embedded-signup/readiness");
 }
 
 export async function sendAdminBillingSubscriptionLink(tenantId: string) {
