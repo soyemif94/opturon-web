@@ -33,6 +33,13 @@ export type MetaEmbeddedSignupLaunchResult = {
   displayPhoneNumber: string | null;
 };
 
+export type MetaEmbeddedSignupProgressStage =
+  | "bootstrapping"
+  | "opening_meta"
+  | "awaiting_callback"
+  | "configuring_channel"
+  | "completed";
+
 export type MetaEmbeddedSignupErrorKind = "meta_blocked" | "cancelled" | "config" | "timeout" | "unknown";
 
 export type MetaEmbeddedSignupErrorDetails = {
@@ -58,6 +65,12 @@ type MetaEmbeddedEvent = {
   errorCode: string | null;
   errorMessage: string | null;
   raw: Record<string, unknown>;
+};
+
+type BeginMetaWhatsAppConnectionOptions = {
+  bootstrapEndpoint?: string;
+  finalizeEndpoint?: string;
+  onProgress?: (stage: MetaEmbeddedSignupProgressStage) => void;
 };
 
 declare global {
@@ -330,9 +343,9 @@ function loadFacebookSdk(appId: string, graphVersion: string) {
   return sdkPromise;
 }
 
-async function bootstrapEmbeddedSignup(): Promise<MetaEmbeddedSignupBootstrap> {
+async function bootstrapEmbeddedSignup(endpoint = "/api/app/integrations/whatsapp/embedded-signup"): Promise<MetaEmbeddedSignupBootstrap> {
   debugLog("bootstrap_start");
-  const response = await fetch("/api/app/integrations/whatsapp/embedded-signup", {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({})
@@ -423,6 +436,7 @@ function waitForMetaCompletion(stateToken: string) {
 }
 
 async function finalizeEmbeddedSignup(input: {
+  finalizeEndpoint?: string;
   stateToken: string;
   code?: string | null;
   redirectUri: string;
@@ -439,7 +453,7 @@ async function finalizeEmbeddedSignup(input: {
     hasMetaPayload: Boolean(input.metaPayload),
     error: input.error || null
   });
-  const response = await fetch("/api/app/integrations/whatsapp/embedded-signup/callback", {
+  const response = await fetch(input.finalizeEndpoint || "/api/app/integrations/whatsapp/embedded-signup/callback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -475,9 +489,12 @@ async function finalizeEmbeddedSignup(input: {
   return json.data;
 }
 
-export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupLaunchResult> {
+export async function beginMetaWhatsAppConnection(
+  options: BeginMetaWhatsAppConnectionOptions = {}
+): Promise<MetaEmbeddedSignupLaunchResult> {
   debugLog("click_received");
-  const bootstrap = await bootstrapEmbeddedSignup();
+  options.onProgress?.("bootstrapping");
+  const bootstrap = await bootstrapEmbeddedSignup(options.bootstrapEndpoint);
 
   if (!bootstrap.ready || !bootstrap.appId || !bootstrap.configId || !bootstrap.stateToken) {
     const missingConfig = Array.isArray(bootstrap.missingConfig) ? bootstrap.missingConfig.join(", ") : "";
@@ -501,6 +518,7 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
     });
   }
 
+  options.onProgress?.("opening_meta");
   debugLog("sdk_load_start", {
     appIdPresent: Boolean(bootstrap.appId),
     configIdPresent: Boolean(bootstrap.configId),
@@ -517,6 +535,7 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
     });
   }
 
+  options.onProgress?.("awaiting_callback");
   const completionPromise = waitForMetaCompletion(bootstrap.stateToken);
   let immediateCode: string | null = null;
 
@@ -578,7 +597,9 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
 
   let finalized;
   try {
+    options.onProgress?.("configuring_channel");
     finalized = await finalizeEmbeddedSignup({
+      finalizeEndpoint: options.finalizeEndpoint,
       stateToken: bootstrap.stateToken,
       code: callbackCode,
       redirectUri: bootstrap.redirectUri,
@@ -593,6 +614,7 @@ export async function beginMetaWhatsAppConnection(): Promise<MetaEmbeddedSignupL
     });
   }
 
+  options.onProgress?.("completed");
   return {
     state: finalized.status,
     message:

@@ -12,7 +12,12 @@ import type {
   MetaEmbeddedSignupReadiness,
   TenantPolicy
 } from "@/lib/admin-client-policy";
-import type { PortalWhatsAppStatus } from "@/lib/api";
+import type { PortalWhatsAppEmbeddedSignupStatus, PortalWhatsAppStatus } from "@/lib/api";
+import {
+  beginMetaWhatsAppConnection,
+  getMetaEmbeddedSignupErrorDetails,
+  type MetaEmbeddedSignupProgressStage
+} from "@/lib/meta-whatsapp-signup";
 
 const PLAN_OPTIONS = [
   { value: "basic", label: "Inicial" },
@@ -170,6 +175,27 @@ function getBillingPlanDefinition(planCode: string) {
   return BILLING_PLAN_OPTIONS.find((plan) => plan.value === planCode) || BILLING_PLAN_OPTIONS[0];
 }
 
+type AdminEmbeddedConnectFeedback = {
+  tone: "success" | "warning" | "danger" | "muted";
+  title: string;
+  message: string;
+  technicalDetail?: string | null;
+};
+
+function maskTechnicalValue(value?: string | null) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) return "-";
+  if (safeValue.length <= 8) return `${safeValue.slice(0, 2)}***`;
+  return `${safeValue.slice(0, 4)}***${safeValue.slice(-4)}`;
+}
+
+function getProgressCopy(stage: MetaEmbeddedSignupProgressStage | null) {
+  if (stage === "opening_meta") return "Abriendo Meta...";
+  if (stage === "awaiting_callback") return "Esperando autorizacion...";
+  if (stage === "configuring_channel") return "Configurando canal...";
+  return "Preparando conexion...";
+}
+
 export function AdminClientConfiguration({ initialTenants }: { initialTenants: AdminTenantPolicyRow[] }) {
   const [tenants, setTenants] = useState(
     initialTenants.map((tenant) => ({ ...tenant, policy: normalizePolicy(tenant.policy) }))
@@ -192,6 +218,11 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [sendingBillingLinkEmail, setSendingBillingLinkEmail] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<PortalWhatsAppStatus | null>(null);
   const [loadingWhatsappStatus, setLoadingWhatsappStatus] = useState(false);
+  const [embeddedSignupStatus, setEmbeddedSignupStatus] = useState<PortalWhatsAppEmbeddedSignupStatus | null>(null);
+  const [loadingEmbeddedSignupStatus, setLoadingEmbeddedSignupStatus] = useState(false);
+  const [connectingWhatsApp, setConnectingWhatsApp] = useState(false);
+  const [connectProgressStage, setConnectProgressStage] = useState<MetaEmbeddedSignupProgressStage | null>(null);
+  const [connectFeedback, setConnectFeedback] = useState<AdminEmbeddedConnectFeedback | null>(null);
   const [metaReadiness, setMetaReadiness] = useState<MetaEmbeddedSignupReadiness | null>(null);
   const [loadingMetaReadiness, setLoadingMetaReadiness] = useState(false);
   const [billingDraft, setBillingDraft] = useState<BillingDraftState>({
@@ -269,6 +300,10 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
   useEffect(() => {
     void loadWhatsappStatus();
+  }, [selectedTenant?.tenantId]);
+
+  useEffect(() => {
+    void loadEmbeddedSignupStatus();
   }, [selectedTenant?.tenantId]);
 
   useEffect(() => {
@@ -445,6 +480,29 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     }
   }
 
+  async function loadEmbeddedSignupStatus() {
+    if (!selectedTenant) {
+      setEmbeddedSignupStatus(null);
+      return;
+    }
+
+    setLoadingEmbeddedSignupStatus(true);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/status`,
+        { cache: "no-store" }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.detail || json?.error || "admin_embedded_signup_status_failed");
+      setEmbeddedSignupStatus(json?.data || json || null);
+    } catch (error) {
+      setEmbeddedSignupStatus(null);
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar la sesion de onboarding.");
+    } finally {
+      setLoadingEmbeddedSignupStatus(false);
+    }
+  }
+
   async function loadMetaReadiness() {
     setLoadingMetaReadiness(true);
     try {
@@ -459,6 +517,71 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       toast.error(error instanceof Error ? error.message : "No se pudo cargar la preparacion de Meta.");
     } finally {
       setLoadingMetaReadiness(false);
+    }
+  }
+
+  async function handleConnectWhatsApp() {
+    if (!selectedTenant || !metaReadiness?.readyForTest || connectingWhatsApp) return;
+
+    const hasConflictingSession = ["launching", "pending_meta"].includes(
+      String(embeddedSignupStatus?.session?.status || "").trim().toLowerCase()
+    );
+    if (hasConflictingSession) {
+      toast.error("Ya existe una sesion de onboarding activa para este tenant. Actualiza el estado antes de reintentar.");
+      return;
+    }
+
+    const alreadyConnected = Boolean(whatsappStatus?.channel.connected);
+    if (alreadyConnected) {
+      const confirmed = window.confirm(
+        "Este tenant ya tiene un canal conectado. Si Meta devuelve otra conexion, Opturon actualizara el canal del tenant de forma controlada. Quieres continuar?"
+      );
+      if (!confirmed) return;
+    }
+
+    setConnectingWhatsApp(true);
+    setConnectProgressStage("bootstrapping");
+    setConnectFeedback(null);
+
+    try {
+      const result = await beginMetaWhatsAppConnection({
+        bootstrapEndpoint: `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/bootstrap`,
+        finalizeEndpoint: `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/finalize`,
+        onProgress: (stage) => setConnectProgressStage(stage)
+      });
+
+      if (result.state === "connected") {
+        setConnectFeedback({
+          tone: "success",
+          title: "Canal conectado",
+          message: result.displayPhoneNumber
+            ? `Meta confirmo la conexion del numero ${result.displayPhoneNumber}.`
+            : "Meta confirmo la conexion del canal del tenant."
+        });
+        toast.success("WhatsApp conectado");
+      } else {
+        setConnectFeedback({
+          tone: "warning",
+          title: "Conexion pendiente",
+          message: result.message
+        });
+        toast.success("La conexion quedo pendiente de una validacion final en Meta.");
+      }
+
+      await Promise.all([loadWhatsappStatus(), loadEmbeddedSignupStatus()]);
+    } catch (error) {
+      const details = getMetaEmbeddedSignupErrorDetails(error);
+      setConnectFeedback({
+        tone: details.kind === "cancelled" ? "warning" : "danger",
+        title: details.kind === "cancelled" ? "Conexion cancelada" : "No pudimos completar la conexion",
+        message: details.message,
+        technicalDetail: details.code
+      });
+      toast.error(details.message);
+      await loadEmbeddedSignupStatus();
+    } finally {
+      setConnectingWhatsApp(false);
+      setConnectProgressStage(null);
     }
   }
 
@@ -685,10 +808,20 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
             <AdminMetaReadinessCard readiness={metaReadiness} loading={loadingMetaReadiness} onRefresh={() => void loadMetaReadiness()} />
 
             <AdminWhatsAppCard
+              readiness={metaReadiness}
               status={whatsappStatus}
+              embeddedSignupStatus={embeddedSignupStatus}
               loading={loadingWhatsappStatus}
+              onboardingLoading={loadingEmbeddedSignupStatus}
+              connecting={connectingWhatsApp}
+              connectProgressStage={connectProgressStage}
+              connectFeedback={connectFeedback}
               tenantId={selectedTenant.tenantId}
-              onRefresh={() => void loadWhatsappStatus()}
+              onConnect={() => void handleConnectWhatsApp()}
+              onRefresh={() => {
+                void loadWhatsappStatus();
+                void loadEmbeddedSignupStatus();
+              }}
             />
 
             <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
@@ -1034,19 +1167,42 @@ function AdminMetaReadinessCard({
 }
 
 function AdminWhatsAppCard({
+  readiness,
   status,
+  embeddedSignupStatus,
   loading,
+  onboardingLoading,
+  connecting,
+  connectProgressStage,
+  connectFeedback,
   tenantId,
+  onConnect,
   onRefresh
 }: {
+  readiness: MetaEmbeddedSignupReadiness | null;
   status: PortalWhatsAppStatus | null;
+  embeddedSignupStatus: PortalWhatsAppEmbeddedSignupStatus | null;
   loading: boolean;
+  onboardingLoading: boolean;
+  connecting: boolean;
+  connectProgressStage: MetaEmbeddedSignupProgressStage | null;
+  connectFeedback: AdminEmbeddedConnectFeedback | null;
   tenantId: string;
+  onConnect: () => void;
   onRefresh: () => void;
 }) {
   const connected = Boolean(status?.channel.connected);
   const webhookRecent = Number(status?.webhook.events24h || 0) > 0;
   const hasErrors = Boolean(status?.errors.lastWebhookError || status?.errors.lastJobError);
+  const onboardingSession = embeddedSignupStatus?.session || null;
+  const onboardingState = String(embeddedSignupStatus?.onboardingState || "").trim().toLowerCase();
+  const hasActiveConflict = ["launching", "pending_meta"].includes(String(onboardingSession?.status || "").trim().toLowerCase());
+  const canConnect = Boolean(readiness?.readyForTest && tenantId && !connecting && !hasActiveConflict);
+  const maskedPhoneNumberId = maskTechnicalValue(status?.channel.phoneNumberId || onboardingSession?.phoneNumberId || null);
+  const maskedWabaId = maskTechnicalValue(status?.channel.wabaId || onboardingSession?.wabaId || null);
+  const connectionTimestamp = onboardingSession?.completedAt || onboardingSession?.updatedAt || null;
+  const showControlledTestCopy = !connected;
+  const progressLabel = connecting ? getProgressCopy(connectProgressStage) : null;
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
@@ -1058,8 +1214,8 @@ function AdminWhatsAppCard({
           </div>
           <p className="mt-1 text-sm text-muted">Consola interna para diagnosticar la integracion del tenant.</p>
         </div>
-        <Button type="button" variant="secondary" size="sm" onClick={onRefresh} disabled={loading} className="gap-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        <Button type="button" variant="secondary" size="sm" onClick={onRefresh} disabled={loading || onboardingLoading} className="gap-2">
+          {loading || onboardingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Verificar
         </Button>
       </div>
@@ -1110,13 +1266,68 @@ function AdminWhatsAppCard({
             <Button type="button" variant="secondary" className="justify-start gap-2" disabled>
               Marcar para revision
             </Button>
-            <Button type="button" variant="secondary" className="justify-start gap-2" disabled>
-              Conectar WhatsApp
+            <Button type="button" variant="secondary" className="justify-start gap-2" onClick={onConnect} disabled={!canConnect}>
+              {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {connecting ? progressLabel : "Conectar WhatsApp"}
             </Button>
           </div>
+          {showControlledTestCopy ? (
+            <p className="mt-3 text-xs leading-5 text-muted">
+              Conexion de prueba controlada. La conexion se realiza mediante la ventana oficial de Meta. No hace falta cargar IDs ni tokens manualmente.
+            </p>
+          ) : null}
+          {hasActiveConflict ? (
+            <p className="mt-3 text-xs leading-5 text-amber-700">
+              Hay una sesion activa para este tenant. Espera a que Meta responda o actualiza el estado antes de abrir otra.
+            </p>
+          ) : null}
+          {!readiness?.readyForTest ? (
+            <p className="mt-3 text-xs leading-5 text-amber-700">
+              El CTA queda habilitado solo cuando la preparacion global de Meta esta lista para prueba controlada.
+            </p>
+          ) : null}
           <p className="mt-3 text-xs leading-5 text-muted">
             Token y resuscripcion Meta quedan reservados para flujos Admin write-only. Nunca se muestran al cliente.
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <p className="text-sm font-medium">Conexion Embedded Signup</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant={connected ? "success" : onboardingState === "pending_meta" ? "warning" : "muted"}>
+              {connected ? "Conectado" : onboardingState === "pending_meta" ? "Pendiente" : "Sin conexion"}
+            </Badge>
+            {onboardingSession?.status === "failed" ? <Badge variant="danger">Fallido</Badge> : null}
+            {onboardingSession?.status === "completed" ? <Badge variant="success">Webhook listo</Badge> : null}
+          </div>
+          <div className="mt-3 grid gap-2 text-sm">
+            <p>Numero conectado: {status?.channel.displayPhoneNumber || onboardingSession?.displayPhoneNumber || "-"}</p>
+            <p>WABA: {maskedWabaId}</p>
+            <p>Phone Number ID: {maskedPhoneNumberId}</p>
+            <p>Suscripcion/webhook: {connected ? "Activa" : onboardingSession?.status === "completed" ? "Activa" : "Pendiente"}</p>
+            <p>Fecha de conexion: {formatDate(connectionTimestamp)}</p>
+          </div>
+          {connectFeedback ? (
+            <div className="mt-3 rounded-xl border border-[color:var(--border)] bg-card/70 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">{connectFeedback.title}</p>
+                <Badge variant={connectFeedback.tone}>{connectFeedback.tone === "success" ? "Listo" : connectFeedback.tone === "warning" ? "Pendiente" : "Revisar"}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted">{connectFeedback.message}</p>
+              {connectFeedback.technicalDetail ? (
+                <p className="mt-2 text-[11px] text-muted">Detalle tecnico seguro: {connectFeedback.technicalDetail}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {onboardingSession?.errorMessage && !connectFeedback ? (
+            <div className="mt-3 rounded-xl border border-[color:var(--border)] bg-card/70 p-3">
+              <p className="text-sm font-medium">Ultimo error seguro</p>
+              <p className="mt-1 text-xs text-muted">{onboardingSession.errorMessage}</p>
+              {onboardingSession.errorCode ? (
+                <p className="mt-2 text-[11px] text-muted">Detalle tecnico seguro: {onboardingSession.errorCode}</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
