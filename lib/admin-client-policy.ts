@@ -87,6 +87,8 @@ export type MetaEmbeddedReadinessCheck =
       safeDisplay?: string | null;
       httpStatus?: number | null;
       deliveryMode?: string | null;
+      fields?: string[];
+      missingConfig?: string[];
       details?: Array<{ key: string; loaded: boolean; error?: string }>;
     }
   | {

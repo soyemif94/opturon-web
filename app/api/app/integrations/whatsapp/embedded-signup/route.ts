@@ -9,33 +9,7 @@ import {
 } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
-
-function resolveMetaEmbeddedSignupConfig() {
-  const appId = String(
-    process.env.NEXT_PUBLIC_META_APP_ID ||
-      process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_APP_ID ||
-      process.env.WHATSAPP_APP_ID ||
-      ""
-  ).trim();
-  const configId = String(
-    process.env.META_EMBEDDED_SIGNUP_CONFIG_ID ||
-      process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID ||
-      ""
-  ).trim();
-  const missingConfig = [
-    ...(appId ? [] : ["META_APP_ID"]),
-    ...(configId ? [] : ["META_EMBEDDED_SIGNUP_CONFIG_ID"])
-  ];
-
-  return {
-    ready: Boolean(appId && configId),
-    appId: appId || null,
-    configId: configId || null,
-    missingConfig,
-    graphVersion: String(process.env.NEXT_PUBLIC_WHATSAPP_GRAPH_VERSION || process.env.WHATSAPP_GRAPH_VERSION || "v25.0").trim(),
-    callbackPath: "/api/app/integrations/whatsapp/embedded-signup/callback"
-  };
-}
+import { resolveMetaEmbeddedSignupConfig } from "@/lib/meta-embedded-signup-config";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAppApi({ permission: "manage_workspace" });

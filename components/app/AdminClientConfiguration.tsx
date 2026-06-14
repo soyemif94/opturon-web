@@ -911,6 +911,7 @@ function normalizeCheckLabel(key: string) {
 
 function renderAutomaticCheckState(check: MetaEmbeddedReadinessCheck) {
   if (check.kind !== "automatic") return "Pendiente";
+  if (check.configured && check.valid === false) return check.blocking ? "Bloqueante" : "Revisar";
   if (check.blocking) return "Bloqueante";
   if (check.reachable === false || check.valid === false || check.available === false || check.ready === false) {
     return "Revisar";
@@ -920,6 +921,13 @@ function renderAutomaticCheckState(check: MetaEmbeddedReadinessCheck) {
 
 function renderAutomaticCheckDetail(check: MetaEmbeddedReadinessCheck) {
   if (check.kind !== "automatic") return "";
+  if (check.configured && check.valid === false) return "Clave presente pero invalida";
+  if (Array.isArray(check.missingConfig) && check.missingConfig.length > 0) {
+    return `Falta ${check.missingConfig.join(", ")}`;
+  }
+  if (check.deliveryMode && Array.isArray(check.fields) && check.fields.length > 0) {
+    return `${check.deliveryMode}: ${check.fields.join(", ")}`;
+  }
   if (check.value) return check.value;
   if (check.safeDisplay) return check.safeDisplay;
   if (typeof check.httpStatus === "number") return `HTTP ${check.httpStatus}`;
