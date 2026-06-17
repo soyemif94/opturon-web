@@ -294,6 +294,11 @@ export type PortalWhatsAppEmbeddedSignupStatus = {
   clinicId: string | null;
   session: PortalWhatsAppOnboardingSession | null;
   onboardingState: "idle" | "pending_meta" | "connected" | "error";
+  activeSession?: boolean;
+  recoverableSession?: boolean;
+  processingSession?: boolean;
+  canCancel?: boolean;
+  canStartNewAttempt?: boolean;
 };
 
 export type PortalWhatsAppTemplateBlueprint = {
@@ -455,6 +460,41 @@ export async function getPortalWhatsAppEmbeddedSignupStatus(tenantId: string) {
     success: boolean;
     data: PortalWhatsAppEmbeddedSignupStatus;
   }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/status`);
+}
+
+export async function refreshPortalWhatsAppEmbeddedSignupStatus(
+  tenantId: string,
+  payload?: { reason?: string; source?: string; actorUserId?: string | null }
+) {
+  const headers = payload?.actorUserId ? { "x-portal-actor-id": payload.actorUserId } : undefined;
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalWhatsAppEmbeddedSignupStatus;
+  }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/refresh`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      reason: payload?.reason || "manual_refresh",
+      source: payload?.source || "frontend_refresh"
+    })
+  });
+}
+
+export async function cancelPortalWhatsAppEmbeddedSignupSession(
+  tenantId: string,
+  payload?: { source?: string; actorUserId?: string | null }
+) {
+  const headers = payload?.actorUserId ? { "x-portal-actor-id": payload.actorUserId } : undefined;
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalWhatsAppEmbeddedSignupStatus;
+  }>(`/portal/tenants/${tenantId}/whatsapp/embedded-signup/cancel`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      source: payload?.source || "frontend_cancel"
+    })
+  });
 }
 
 export async function getPortalWhatsAppStatus(tenantId: string) {

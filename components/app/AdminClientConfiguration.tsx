@@ -18,6 +18,10 @@ import {
   getMetaEmbeddedSignupErrorDetails,
   type MetaEmbeddedSignupProgressStage
 } from "@/lib/meta-whatsapp-signup";
+import {
+  buildAdminEmbeddedSignupErrorMessage,
+  buildAdminEmbeddedSignupViewModel
+} from "@/lib/admin-whatsapp-embedded-signup";
 
 const PLAN_OPTIONS = [
   { value: "basic", label: "Inicial" },
@@ -503,6 +507,70 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     }
   }
 
+  async function refreshEmbeddedSignupStatus(reason: "manual_refresh" | "popup_closed_without_callback" | "meta_flow_not_completed" = "manual_refresh") {
+    if (!selectedTenant) {
+      setEmbeddedSignupStatus(null);
+      return null;
+    }
+
+    setLoadingEmbeddedSignupStatus(true);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/refresh`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reason,
+            source: "admin_client_configuration"
+          })
+        }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.detail || json?.error || "admin_embedded_signup_refresh_failed");
+      const nextStatus = json?.data || null;
+      setEmbeddedSignupStatus(nextStatus);
+      return nextStatus as PortalWhatsAppEmbeddedSignupStatus | null;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar la sesion de onboarding.");
+      return null;
+    } finally {
+      setLoadingEmbeddedSignupStatus(false);
+    }
+  }
+
+  async function cancelEmbeddedSignupAttempt() {
+    if (!selectedTenant || !embeddedSignupStatus?.canCancel) return;
+
+    const confirmed = window.confirm(
+      "Se cancelara el intento actual de Embedded Signup para este tenant. El historial se conserva y no se modificaran canales existentes. Quieres continuar?"
+    );
+    if (!confirmed) return;
+
+    setLoadingEmbeddedSignupStatus(true);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "admin_client_configuration"
+          })
+        }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.detail || json?.error || "admin_embedded_signup_cancel_failed");
+      setEmbeddedSignupStatus(json?.data || null);
+      toast.success("El intento actual fue cancelado.");
+      await loadWhatsappStatus();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cancelar el intento actual.");
+    } finally {
+      setLoadingEmbeddedSignupStatus(false);
+    }
+  }
+
   async function loadMetaReadiness() {
     setLoadingMetaReadiness(true);
     try {
@@ -523,9 +591,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   async function handleConnectWhatsApp() {
     if (!selectedTenant || !metaReadiness?.readyForTest || connectingWhatsApp) return;
 
-    const hasConflictingSession = ["launching", "pending_meta"].includes(
-      String(embeddedSignupStatus?.session?.status || "").trim().toLowerCase()
-    );
+    const hasConflictingSession = Boolean(embeddedSignupStatus?.activeSession);
     if (hasConflictingSession) {
       toast.error("Ya existe una sesion de onboarding activa para este tenant. Actualiza el estado antes de reintentar.");
       return;
@@ -547,6 +613,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       const result = await beginMetaWhatsAppConnection({
         bootstrapEndpoint: `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/bootstrap`,
         finalizeEndpoint: `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/finalize`,
+        recoverEndpoint: `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/whatsapp/embedded-signup/refresh`,
         onProgress: (stage) => setConnectProgressStage(stage)
       });
 
@@ -571,13 +638,14 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       await Promise.all([loadWhatsappStatus(), loadEmbeddedSignupStatus()]);
     } catch (error) {
       const details = getMetaEmbeddedSignupErrorDetails(error);
+      const safeMessage = buildAdminEmbeddedSignupErrorMessage(details);
       setConnectFeedback({
         tone: details.kind === "cancelled" ? "warning" : "danger",
         title: details.kind === "cancelled" ? "Conexion cancelada" : "No pudimos completar la conexion",
-        message: details.message,
+        message: safeMessage,
         technicalDetail: details.code
       });
-      toast.error(details.message);
+      toast.error(safeMessage);
       await loadEmbeddedSignupStatus();
     } finally {
       setConnectingWhatsApp(false);
@@ -820,8 +888,9 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
               onConnect={() => void handleConnectWhatsApp()}
               onRefresh={() => {
                 void loadWhatsappStatus();
-                void loadEmbeddedSignupStatus();
+                void refreshEmbeddedSignupStatus();
               }}
+              onCancelCurrent={() => void cancelEmbeddedSignupAttempt()}
             />
 
             <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
@@ -1177,7 +1246,8 @@ function AdminWhatsAppCard({
   connectFeedback,
   tenantId,
   onConnect,
-  onRefresh
+  onRefresh,
+  onCancelCurrent
 }: {
   readiness: MetaEmbeddedSignupReadiness | null;
   status: PortalWhatsAppStatus | null;
@@ -1190,14 +1260,20 @@ function AdminWhatsAppCard({
   tenantId: string;
   onConnect: () => void;
   onRefresh: () => void;
+  onCancelCurrent: () => void;
 }) {
   const connected = Boolean(status?.channel.connected);
   const webhookRecent = Number(status?.webhook.events24h || 0) > 0;
   const hasErrors = Boolean(status?.errors.lastWebhookError || status?.errors.lastJobError);
   const onboardingSession = embeddedSignupStatus?.session || null;
   const onboardingState = String(embeddedSignupStatus?.onboardingState || "").trim().toLowerCase();
-  const hasActiveConflict = ["launching", "pending_meta"].includes(String(onboardingSession?.status || "").trim().toLowerCase());
-  const canConnect = Boolean(readiness?.readyForTest && tenantId && !connecting && !hasActiveConflict);
+  const { hasActiveConflict, canConnect, canCancelCurrent } = buildAdminEmbeddedSignupViewModel({
+    embeddedSignupStatus,
+    readinessReady: Boolean(readiness?.readyForTest),
+    tenantId,
+    connecting,
+    onboardingLoading
+  });
   const maskedPhoneNumberId = maskTechnicalValue(status?.channel.phoneNumberId || onboardingSession?.phoneNumberId || null);
   const maskedWabaId = maskTechnicalValue(status?.channel.wabaId || onboardingSession?.wabaId || null);
   const connectionTimestamp = onboardingSession?.completedAt || onboardingSession?.updatedAt || null;
@@ -1216,7 +1292,7 @@ function AdminWhatsAppCard({
         </div>
         <Button type="button" variant="secondary" size="sm" onClick={onRefresh} disabled={loading || onboardingLoading} className="gap-2">
           {loading || onboardingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Verificar
+          Actualizar estado
         </Button>
       </div>
 
@@ -1258,7 +1334,7 @@ function AdminWhatsAppCard({
           <div className="mt-3 grid gap-2">
             <Button type="button" variant="secondary" className="justify-start gap-2" onClick={onRefresh} disabled={loading}>
               <RefreshCw className="h-4 w-4" />
-              Ver diagnostico
+              Actualizar estado
             </Button>
             <Button type="button" variant="secondary" className="justify-start gap-2" disabled>
               Copiar callback
@@ -1270,6 +1346,12 @@ function AdminWhatsAppCard({
               {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {connecting ? progressLabel : "Conectar WhatsApp"}
             </Button>
+            {canCancelCurrent ? (
+              <Button type="button" variant="secondary" className="justify-start gap-2" onClick={onCancelCurrent}>
+                <XCircle className="h-4 w-4" />
+                Cancelar intento actual
+              </Button>
+            ) : null}
           </div>
           {showControlledTestCopy ? (
             <p className="mt-3 text-xs leading-5 text-muted">
@@ -1278,7 +1360,7 @@ function AdminWhatsAppCard({
           ) : null}
           {hasActiveConflict ? (
             <p className="mt-3 text-xs leading-5 text-amber-700">
-              Hay una sesion activa para este tenant. Espera a que Meta responda o actualiza el estado antes de abrir otra.
+              Hay una sesion activa para este tenant. Actualiza el estado para recuperar intentos cerrados o espera a que termine el backend si Meta ya devolvio el callback.
             </p>
           ) : null}
           {!readiness?.readyForTest ? (

@@ -70,6 +70,7 @@ type MetaEmbeddedEvent = {
 type BeginMetaWhatsAppConnectionOptions = {
   bootstrapEndpoint?: string;
   finalizeEndpoint?: string;
+  recoverEndpoint?: string;
   onProgress?: (stage: MetaEmbeddedSignupProgressStage) => void;
 };
 
@@ -489,6 +490,39 @@ async function finalizeEmbeddedSignup(input: {
   return json.data;
 }
 
+async function recoverEmbeddedSignupAttempt(input: {
+  recoverEndpoint: string;
+  reason: "popup_closed_without_callback" | "meta_flow_not_completed";
+}) {
+  const response = await fetch(input.recoverEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reason: input.reason,
+      source: "meta_embedded_signup_frontend"
+    })
+  });
+
+  const json = (await response.json().catch(() => null)) as
+    | {
+        data?: {
+          session?: {
+            errorCode?: string | null;
+            errorMessage?: string | null;
+          } | null;
+        };
+        error?: string;
+        detail?: string;
+      }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(json?.detail || json?.error || `embedded_signup_recovery_failed_${response.status}`);
+  }
+
+  return json?.data || null;
+}
+
 export async function beginMetaWhatsAppConnection(
   options: BeginMetaWhatsAppConnectionOptions = {}
 ): Promise<MetaEmbeddedSignupLaunchResult> {
@@ -581,6 +615,28 @@ export async function beginMetaWhatsAppConnection(
   try {
     ({ callback, metaEvent } = await completionPromise);
   } catch (error) {
+    let recoveredError: MetaEmbeddedSignupError | null = null;
+    if (options.recoverEndpoint) {
+      try {
+        const recovered = await recoverEmbeddedSignupAttempt({
+          recoverEndpoint: options.recoverEndpoint,
+          reason: "popup_closed_without_callback"
+        });
+        const recoveredMessage = sanitizeMessage(recovered?.session?.errorMessage);
+        const recoveredCode = sanitizeMessage(recovered?.session?.errorCode);
+        if (recoveredMessage || recoveredCode) {
+          recoveredError = buildMetaEmbeddedSignupError({
+            message: recoveredMessage || (error instanceof Error ? error.message : "meta_embedded_signup_timeout"),
+            code: recoveredCode || (error instanceof Error ? error.message : "meta_embedded_signup_timeout")
+          });
+        }
+      } catch (recoveryError) {
+        debugError("recovery_fail", recoveryError);
+      }
+    }
+    if (recoveredError) {
+      throw recoveredError;
+    }
     throw buildMetaEmbeddedSignupError({
       message: error instanceof Error ? error.message : "meta_embedded_signup_timeout",
       code: error instanceof Error ? error.message : "meta_embedded_signup_timeout"
