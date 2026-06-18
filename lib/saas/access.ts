@@ -6,8 +6,9 @@ import { authOptions } from "@/lib/auth";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
 
-const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
-const OPTURON_ADMIN_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin"]);
+const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+const OPTURON_ADMIN_ROLES = new Set(["superadmin", "ops_admin"]);
+const PARTNER_ROLE = "partner";
 
 function resolveDemoTenantId(requestedTenantId?: string) {
   if (requestedTenantId) return requestedTenantId;
@@ -45,6 +46,7 @@ export async function requireOpturonAdminPage(callbackUrl = "/app/client-managem
 export async function requireAppPage(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
+  if (ctx.globalRole === PARTNER_ROLE) redirect("/partners");
   const permission = options?.permission || "view_workspace";
   if (!hasAppPermission(ctx, permission)) {
     if (!hasAppPermission(ctx, "view_workspace")) redirect("/login?callbackUrl=/app");
@@ -74,6 +76,9 @@ export async function requireOpturonAdminApi() {
 export async function requireAppApi(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (ctx.globalRole === PARTNER_ROLE) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
   if (!ctx.tenantId && !isStaffRole(ctx.globalRole)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
@@ -82,6 +87,13 @@ export async function requireAppApi(options?: { permission?: AppPermission }) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ctx };
+}
+
+export async function requirePartnerPage() {
+  const ctx = await getSessionContext();
+  if (!ctx.session) redirect("/login?callbackUrl=/partners");
+  if (ctx.globalRole !== PARTNER_ROLE || !ctx.session.user?.partnerId) redirect("/app");
+  return ctx;
 }
 
 export async function resolveAppTenant(options?: {

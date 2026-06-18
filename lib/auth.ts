@@ -1,18 +1,20 @@
 import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
-import { getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPortalUser } from "@/lib/api";
+import { getPartnerAuthUserByEmail, getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPartnerUser, loginPortalUser } from "@/lib/api";
 import { normalizeTenantRole } from "@/lib/app-permissions";
 import { getLocalBootstrapAuthUserByEmail } from "@/lib/auth-store";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
+
+type AuthGlobalRole = GlobalRole | "partner";
 
 function isProduction() {
   return String(process.env.NODE_ENV || "").toLowerCase() === "production";
 }
 
-function normalizeGlobalRole(role?: string): GlobalRole {
-  const allowed: GlobalRole[] = ["superadmin", "ops_admin", "sales_rep", "support_agent", "client"];
-  if (role && allowed.includes(role as GlobalRole)) return role as GlobalRole;
+function normalizeGlobalRole(role?: string): AuthGlobalRole {
+  const allowed: AuthGlobalRole[] = ["superadmin", "ops_admin", "sales_rep", "support_agent", "client", "partner"];
+  if (role && allowed.includes(role as AuthGlobalRole)) return role as AuthGlobalRole;
   return "client";
 }
 
@@ -20,7 +22,7 @@ function isStaffGlobalRole(role?: string) {
   return ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(role || ""));
 }
 
-function canUseLocalBootstrapAuth(globalRole: GlobalRole) {
+function canUseLocalBootstrapAuth(globalRole: AuthGlobalRole) {
   return !isPersistentPortalIdentityEnabled() || isStaffGlobalRole(globalRole);
 }
 
@@ -101,6 +103,27 @@ export const authOptions: NextAuthOptions = {
                 console.error("AUTH_BACKEND_LOGIN_ERROR", { email, status, message: String(error) });
               }
             }
+
+            try {
+              const response = await loginPartnerUser(email, password);
+              const backendUser = response.data;
+              const globalRole = normalizeGlobalRole(backendUser.globalRole);
+              return {
+                id: backendUser.id,
+                email: backendUser.email,
+                name: backendUser.name,
+                role: globalRole,
+                globalRole,
+                partnerId: backendUser.partnerId,
+                accountScope: backendUser.accountScope,
+                authSource: "backend"
+              };
+            } catch (error) {
+              const status = error && typeof error === "object" && "status" in error ? Number((error as any).status) : 0;
+              if (status !== 401) {
+                console.error("AUTH_BACKEND_PARTNER_LOGIN_ERROR", { email, status, message: String(error) });
+              }
+            }
           }
 
           const user = await getLocalBootstrapAuthUserByEmail(email);
@@ -166,6 +189,7 @@ export const authOptions: NextAuthOptions = {
           token.role = token.globalRole;
           token.tenantId = (user as any).tenantId;
           token.tenantRole = (user as any).tenantRole;
+          token.partnerId = (user as any).partnerId;
           token.accountScope = (user as any).accountScope;
           token.authSource = (user as any).authSource || token.authSource || "local";
         }
@@ -178,9 +202,29 @@ export const authOptions: NextAuthOptions = {
           if (shouldHydratePersistentPortalIdentity) {
             const tokenTenantId = String(token.tenantId || "").trim();
             if (!tokenTenantId) {
+              if (tokenGlobalRole === "partner") {
+                try {
+                  const response = await getPartnerAuthUserByEmail(String(token.email));
+                  const hydratedPartner = response.data;
+                  if (hydratedPartner) {
+                    token.userId = hydratedPartner.id;
+                    token.globalRole = "partner";
+                    token.role = "partner";
+                    token.partnerId = hydratedPartner.partnerId;
+                    token.tenantId = undefined;
+                    token.tenantRole = undefined;
+                    token.accountScope = hydratedPartner.accountScope;
+                    token.authSource = "backend";
+                    return token;
+                  }
+                } catch (error) {
+                  console.error("JWT_BACKEND_PARTNER_HYDRATE_ERROR", { msg: String(error) });
+                }
+              }
               token.userId = undefined;
               token.tenantId = undefined;
               token.tenantRole = undefined;
+              token.partnerId = undefined;
               token.accountScope = undefined;
               token.globalRole = "client";
               token.role = "client";
@@ -196,12 +240,14 @@ export const authOptions: NextAuthOptions = {
                 token.role = token.globalRole;
                 token.tenantId = hydratedUser.tenantId;
                 token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+                token.partnerId = undefined;
                 token.accountScope = hydratedUser.accountScope;
                 token.authSource = "backend";
               } else {
                 token.userId = undefined;
                 token.tenantId = undefined;
                 token.tenantRole = undefined;
+                token.partnerId = undefined;
                 token.accountScope = undefined;
                 token.globalRole = "client";
                 token.role = "client";
@@ -237,6 +283,7 @@ export const authOptions: NextAuthOptions = {
             token.role = token.globalRole;
             token.tenantId = hydratedUser.tenantId;
             token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+            token.partnerId = undefined;
           }
         }
 
@@ -246,6 +293,7 @@ export const authOptions: NextAuthOptions = {
           session.user.role = session.user.globalRole;
           session.user.tenantId = token.tenantId ? String(token.tenantId) : undefined;
           session.user.tenantRole = token.tenantRole as any;
+          session.user.partnerId = token.partnerId ? String(token.partnerId) : undefined;
           session.user.accountScope = token.accountScope ? String(token.accountScope) : undefined;
         }
       } catch (error) {

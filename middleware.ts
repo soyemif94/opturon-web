@@ -1,4 +1,4 @@
-﻿import { getToken } from "next-auth/jwt";
+import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
 
 const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
@@ -8,12 +8,13 @@ export async function middleware(request: NextRequest) {
   const isOps = path.startsWith("/ops");
   const isApp = path.startsWith("/app");
   const isBot = path.startsWith("/bot");
+  const isPartners = path.startsWith("/partners");
 
   if (isBot) {
     return NextResponse.redirect(new URL("/app", request.url));
   }
 
-  if (!isOps && !isApp && !isBot) {
+  if (!isOps && !isApp && !isBot && !isPartners) {
     return NextResponse.next();
   }
 
@@ -26,6 +27,17 @@ export async function middleware(request: NextRequest) {
 
   const globalRole = String(token.globalRole || "");
 
+  if (isPartners) {
+    if (globalRole !== "partner") {
+      return NextResponse.redirect(new URL("/app", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (globalRole === "partner") {
+    return NextResponse.redirect(new URL("/partners", request.url));
+  }
+
   if (isOps && !STAFF_ROLES.has(globalRole)) {
     return NextResponse.redirect(new URL("/app", request.url));
   }
@@ -34,6 +46,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/bot/:path*", "/ops/:path*", "/app/:path*"]
+  matcher: ["/bot/:path*", "/ops/:path*", "/app/:path*", "/partners/:path*"]
 };
-

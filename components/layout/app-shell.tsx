@@ -40,6 +40,8 @@ import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
 
+type AuthGlobalRole = GlobalRole | "partner";
+
 const navItems: Array<{
   href: string;
   label: string;
@@ -496,7 +498,7 @@ export function AppShell({
   buildMarker?: string;
   buildEnv?: string;
   deploymentId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
   whatsappStatus?: WhatsAppConnectionStatus;

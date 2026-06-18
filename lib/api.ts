@@ -787,6 +787,28 @@ export async function loginPortalUser(email: string, password: string) {
   );
 }
 
+export async function loginPartnerUser(email: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      email: string;
+      name: string;
+      globalRole: "partner";
+      accountScope: "partner";
+      partnerId: string;
+    };
+  }>(
+    "/api/partners/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    },
+    false,
+    AUTH_API_TIMEOUT_MS
+  );
+}
+
 export async function getPortalAuthUserByEmail(email: string, tenantId?: string) {
   const params = new URLSearchParams({ email });
   if (tenantId) params.set("tenantId", tenantId);
@@ -802,6 +824,21 @@ export async function getPortalAuthUserByEmail(email: string, tenantId?: string)
       accountScope?: string;
     } | null;
   }>(`/portal/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
+}
+
+export async function getPartnerAuthUserByEmail(email: string) {
+  const params = new URLSearchParams({ email });
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      email: string;
+      name: string;
+      globalRole: "partner";
+      accountScope: "partner";
+      partnerId: string;
+    } | null;
+  }>(`/api/partners/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
 }
 
 export async function patchPortalUser(

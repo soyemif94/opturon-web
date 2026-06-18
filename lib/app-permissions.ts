@@ -1,5 +1,7 @@
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 
+type AuthGlobalRole = GlobalRole | "partner";
+
 export type AppPermission =
   | "view_workspace"
   | "edit_workspace"
@@ -29,7 +31,7 @@ export type AppModule =
   | "users";
 
 type AccessContext = {
-  globalRole?: GlobalRole;
+  globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
 };
@@ -83,14 +85,14 @@ export function normalizeTenantRole(role?: string): TenantRole | undefined {
   return undefined;
 }
 
-export function isStaffRole(role?: GlobalRole) {
-  return Boolean(role && STAFF_ROLES.has(role));
+export function isStaffRole(role?: AuthGlobalRole) {
+  return Boolean(role && STAFF_ROLES.has(role as GlobalRole));
 }
 
 export function hasAppPermission(context: AccessContext, permission: AppPermission) {
   if (isStaffRole(context.globalRole)) {
     if (permission === "manage_users") {
-      return Boolean(context.globalRole && STAFF_USER_MANAGERS.has(context.globalRole));
+      return Boolean(context.globalRole && STAFF_USER_MANAGERS.has(context.globalRole as GlobalRole));
     }
     return true;
   }

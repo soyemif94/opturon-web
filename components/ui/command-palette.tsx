@@ -16,6 +16,8 @@ import { cn } from "@/lib/ui/cn";
 import { timeAgo } from "@/lib/ui/format";
 import { toast } from "@/components/ui/toast";
 
+type AuthGlobalRole = GlobalRole | "partner";
+
 export type CommandPaletteContextValue = {
   tenantId?: string;
   conversationId?: string;
@@ -33,7 +35,7 @@ type RuntimeContext = CommandPaletteContextValue & {
   scope: PaletteScope;
   isStaff: boolean;
   userId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
 };
@@ -150,7 +152,7 @@ export function CommandPaletteProvider({
   tenantId?: string;
   isStaff?: boolean;
   userId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
 }) {
@@ -217,7 +219,7 @@ export function CommandPalette({
   scope: PaletteScope;
   isStaff: boolean;
   userId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
 }) {
