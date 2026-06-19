@@ -26,8 +26,10 @@ function testMiddlewareProtectsPartnersRoute() {
 
 function testPartnerPageExists() {
   const source = read('app/partners/page.tsx');
-  assert.match(source, /requirePartnerPage/);
-  assert.match(source, /Partner Portal/);
+  const layoutSource = read('app/partners/layout.tsx');
+  assert.match(source, /PartnerPortalWorkspace/);
+  assert.match(layoutSource, /requirePartnerPage/);
+  assert.match(layoutSource, /PartnerPortalShell/);
 }
 
 function testPartnerApiRoutesRequirePartnerGuard() {

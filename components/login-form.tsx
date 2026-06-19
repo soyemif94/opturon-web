@@ -7,7 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
-export function LoginForm() {
+export function LoginForm({
+  defaultCallbackUrl = "/app",
+  emailPlaceholder = "admin@opturon.com",
+  submitLabel = "Ingresar",
+  forgotPasswordHref = "/forgot-password",
+  forgotPasswordLabel = "¿Olvidaste tu contraseña?"
+}: {
+  defaultCallbackUrl?: string;
+  emailPlaceholder?: string;
+  submitLabel?: string;
+  forgotPasswordHref?: string;
+  forgotPasswordLabel?: string;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +41,7 @@ export function LoginForm() {
     let didTimeout = false;
 
     try {
-      const callbackUrl = params.get("callbackUrl") || "/app";
+      const callbackUrl = params.get("callbackUrl") || defaultCallbackUrl;
       timeoutId = setTimeout(() => {
         didTimeout = true;
         setLoading(false);
@@ -74,7 +86,7 @@ export function LoginForm() {
       }
 
       setDebugStatus("ok");
-      router.push(result.url || "/app");
+      router.push(result.url || defaultCallbackUrl);
       router.refresh();
     } catch (err) {
       if (err instanceof Error && err.message === "timeout") {
@@ -99,31 +111,17 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Input
-        type="email"
-        placeholder="admin@opturon.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
-      <Input
-        type="password"
-        placeholder="********"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
+      <Input type="email" placeholder={emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <Input type="password" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required />
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Ingresando..." : "Ingresar"}
+        {loading ? "Ingresando..." : submitLabel}
       </Button>
       <div className="text-center text-sm text-muted-foreground">
-        <a href="/forgot-password" className="hover:text-foreground">
-          ¿Olvidaste tu contraseña?
+        <a href={forgotPasswordHref} className="hover:text-foreground">
+          {forgotPasswordLabel}
         </a>
-        <p className="mt-1 text-xs">
-          Te enviaremos un enlace temporal para crear una nueva contraseña.
-        </p>
+        <p className="mt-1 text-xs">Te enviaremos un enlace temporal para crear una nueva contraseña.</p>
       </div>
       {isDev ? <p className="text-xs text-muted-foreground">Debug status: {debugStatus}</p> : null}
     </form>
