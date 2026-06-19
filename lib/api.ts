@@ -841,6 +841,66 @@ export async function getPartnerAuthUserByEmail(email: string) {
   }>(`/api/partners/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
 }
 
+export async function getPartnerMe(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+    };
+  }>("/api/partners/me", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeSummary(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      summary: Record<string, unknown>;
+    };
+  }>("/api/partners/me/summary", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeClients(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      clients: Array<Record<string, unknown>>;
+    };
+  }>("/api/partners/me/clients", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeRankProgress(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      rankHistory: Array<Record<string, unknown>>;
+      latestEvaluation: Record<string, unknown> | null;
+    };
+  }>("/api/partners/me/rank-progress", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
 export async function patchPortalUser(
   tenantId: string,
   userId: string,

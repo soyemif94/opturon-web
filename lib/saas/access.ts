@@ -96,6 +96,15 @@ export async function requirePartnerPage() {
   return ctx;
 }
 
+export async function requirePartnerApi() {
+  const ctx = await getSessionContext();
+  if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (ctx.globalRole !== PARTNER_ROLE || !ctx.session.user?.partnerId) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  return { ctx };
+}
+
 export async function resolveAppTenant(options?: {
   requestedTenantId?: string;
   demo?: boolean;

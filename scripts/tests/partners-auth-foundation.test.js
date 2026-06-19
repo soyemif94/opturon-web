@@ -30,10 +30,29 @@ function testPartnerPageExists() {
   assert.match(source, /Partner Portal/);
 }
 
+function testPartnerApiRoutesRequirePartnerGuard() {
+  const accessSource = read('lib/saas/access.ts');
+  assert.match(accessSource, /export async function requirePartnerApi/);
+
+  const summaryRoute = read('app/api/partners/me/summary/route.ts');
+  const clientsRoute = read('app/api/partners/me/clients/route.ts');
+  const rankRoute = read('app/api/partners/me/rank-progress/route.ts');
+  const meRoute = read('app/api/partners/me/route.ts');
+
+  assert.match(summaryRoute, /requirePartnerApi/);
+  assert.match(clientsRoute, /requirePartnerApi/);
+  assert.match(rankRoute, /requirePartnerApi/);
+  assert.match(meRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.match(summaryRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.match(clientsRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.match(rankRoute, /session\?\.\s*user\?\.partnerId/);
+}
+
 function run() {
   testAuthIncludesPartnerLoginAndHydration();
   testMiddlewareProtectsPartnersRoute();
   testPartnerPageExists();
+  testPartnerApiRoutesRequirePartnerGuard();
   console.log('partners-auth-foundation.test.js: ok');
 }
 
