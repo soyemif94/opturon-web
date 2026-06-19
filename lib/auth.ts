@@ -1,7 +1,15 @@
 import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
-import { getPartnerAuthUserByEmail, getPortalAdminActor, getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPartnerUser, loginPortalUser } from "@/lib/api";
+import {
+  getPartnerAuthUserByEmail,
+  getPortalAdminActor,
+  getPortalAuthUserByEmail,
+  isPersistentPortalIdentityEnabled,
+  isPortalInternalAuthConfigured,
+  loginPartnerUser,
+  loginPortalUser
+} from "@/lib/api";
 import { isStaffGlobalRole, normalizeGlobalRole, resolveAccountScopeForIdentity, type AuthGlobalRole } from "@/lib/auth-identity";
 import { normalizeTenantRole } from "@/lib/app-permissions";
 import { getLocalBootstrapAuthUserByEmail } from "@/lib/auth-store";
@@ -21,6 +29,7 @@ async function resolvePortalActorIdForAdminIdentity(input: {
   email?: string;
 }) {
   if (String(input.accountScope || "").trim().toLowerCase() !== "opturon_admin") return undefined;
+  if (!isPortalInternalAuthConfigured() && !isProduction()) return undefined;
   const tenantId = String(input.tenantId || "").trim();
   if (!tenantId) return undefined;
 

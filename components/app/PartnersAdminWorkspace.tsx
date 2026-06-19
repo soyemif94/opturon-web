@@ -1,0 +1,866 @@
+"use client";
+
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  ArrowUpRight,
+  BadgeCheck,
+  CircleSlash,
+  Crown,
+  MoreHorizontal,
+  RefreshCcw,
+  ShieldCheck,
+  UserPlus2,
+  Users2
+} from "lucide-react";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { SkeletonLine } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/ui/cn";
+import {
+  type AdminPartner,
+  type AdminPartnerAttribution,
+  type AdminPartnerDetails,
+  type PartnerPreviewBundle,
+  type PartnerQueryState,
+  PARTNERS_ADMIN_CREATE_ENABLED,
+  PARTNERS_ADMIN_CREATE_TOOLTIP,
+  buildAuditHeadline,
+  buildPartnerKpis,
+  filterAndSortPartners,
+  formatPartnerDate,
+  formatPartnerDateTime,
+  getPartnerActionAvailability,
+  getPartnerCode,
+  getPartnerDisplayName,
+  getPartnerErrorMessage,
+  getPartnerPhone,
+  getPartnerPreviewBundle,
+  getPartnerRankLabel,
+  getPartnerRankTone,
+  getPartnerSponsorLabel,
+  getPartnerStatusLabel,
+  getPartnerStatusTone
+} from "@/lib/partners-admin-ui";
+
+type PartnersAdminWorkspaceProps = {
+  previewMode?: boolean;
+  previewBundle?: PartnerPreviewBundle;
+};
+
+type PartnersListResponse = {
+  success?: boolean;
+  data?: {
+    ok?: boolean;
+    partners?: AdminPartner[];
+  };
+  error?: string;
+};
+
+type PartnerDetailsResponse = {
+  success?: boolean;
+  data?: AdminPartnerDetails;
+  error?: string;
+};
+
+const INITIAL_QUERY: PartnerQueryState = {
+  search: "",
+  status: "all",
+  rank: "all",
+  sort: "recent"
+};
+
+const DEFAULT_PREVIEW_BUNDLE = getPartnerPreviewBundle();
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  icon: Icon
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  icon: typeof Users2;
+}) {
+  return (
+    <Card className="overflow-hidden bg-white/95">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardDescription className="text-[11px] uppercase tracking-[0.18em]">{label}</CardDescription>
+            <CardTitle className="mt-2 text-3xl font-semibold tracking-tight">{value}</CardTitle>
+          </div>
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/20 bg-brand/10 text-brandBright">
+            <Icon className="h-5 w-5" />
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <p className="text-sm leading-6 text-muted">{hint}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ToolbarSelect({
+  value,
+  onChange,
+  options,
+  ariaLabel
+}: {
+  value: string;
+  onChange: (nextValue: string) => void;
+  options: Array<{ value: string; label: string }>;
+  ariaLabel: string;
+}) {
+  return (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="h-11 rounded-2xl border border-[color:var(--field-border)] bg-white px-3 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function readErrorMessage(payload: unknown, fallback: string) {
+  if (payload && typeof payload === "object") {
+    const detail = String((payload as Record<string, unknown>).detail || "").trim();
+    const error = String((payload as Record<string, unknown>).error || "").trim();
+    if (detail) return detail;
+    if (error) return error;
+  }
+  return fallback;
+}
+
+async function readJsonSafe(response: Response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+export function PartnersAdminWorkspace({
+  previewMode = false,
+  previewBundle = DEFAULT_PREVIEW_BUNDLE
+}: PartnersAdminWorkspaceProps) {
+  const [partners, setPartners] = useState<AdminPartner[]>(previewMode ? previewBundle.partners : []);
+  const [query, setQuery] = useState(INITIAL_QUERY);
+  const deferredSearch = useDeferredValue(query.search);
+  const [loading, setLoading] = useState(!previewMode);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+  const [selectedPartnerDetails, setSelectedPartnerDetails] = useState<AdminPartnerDetails | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [statusDialog, setStatusDialog] = useState<{ partnerId: string; nextStatus: "active" | "suspended" } | null>(null);
+  const [busyPartnerId, setBusyPartnerId] = useState<string | null>(null);
+
+  const partnerMap = useMemo(() => new Map(partners.map((partner) => [partner.id, partner])), [partners]);
+  const filteredPartners = useMemo(
+    () =>
+      filterAndSortPartners(
+        partners,
+        {
+          ...query,
+          search: deferredSearch
+        },
+        partnerMap
+      ),
+    [deferredSearch, partnerMap, partners, query]
+  );
+  const kpis = useMemo(() => buildPartnerKpis(partners), [partners]);
+  const selectedPartner = selectedPartnerId ? partnerMap.get(selectedPartnerId) || null : null;
+
+  async function loadPartners(mode: "initial" | "refresh" = "initial") {
+    if (previewMode) {
+      setPartners(previewBundle.partners);
+      setErrorStatus(null);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    if (mode === "initial") setLoading(true);
+    if (mode === "refresh") setRefreshing(true);
+
+    try {
+      const response = await fetch("/api/app/admin/partners", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = (await readJsonSafe(response)) as PartnersListResponse | null;
+
+      if (!response.ok) {
+        setErrorStatus(response.status);
+        throw new Error(readErrorMessage(payload, getPartnerErrorMessage(response.status)));
+      }
+
+      setPartners(Array.isArray(payload?.data?.partners) ? payload.data?.partners || [] : []);
+      setErrorStatus(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : getPartnerErrorMessage();
+      if (mode === "refresh") {
+        toast.error(message);
+      }
+      if (mode === "initial") {
+        setPartners([]);
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  async function openPartnerDetails(partnerId: string) {
+    setSelectedPartnerId(partnerId);
+    setSelectedPartnerDetails(null);
+    setDetailsLoading(true);
+
+    if (previewMode) {
+      setSelectedPartnerDetails(previewBundle.detailsById[partnerId] || null);
+      setDetailsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = (await readJsonSafe(response)) as PartnerDetailsResponse | null;
+      if (!response.ok || !payload?.data) {
+        throw new Error(readErrorMessage(payload, "No pudimos cargar el detalle del asesor."));
+      }
+      setSelectedPartnerDetails(payload.data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No pudimos cargar el detalle del asesor.");
+      setSelectedPartnerDetails(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  }
+
+  async function changePartnerStatus(partnerId: string, nextStatus: "active" | "suspended") {
+    if (previewMode) {
+      toast.error("La vista local no ejecuta cambios reales.");
+      return;
+    }
+
+    setBusyPartnerId(partnerId);
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}/status`, {
+        method: "PATCH",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      const payload = (await readJsonSafe(response)) as { success?: boolean; data?: { partner?: AdminPartner }; error?: string } | null;
+      if (!response.ok) {
+        throw new Error(readErrorMessage(payload, "No se pudo actualizar el estado del asesor."));
+      }
+
+      const nextPartner = payload?.data?.partner;
+      if (nextPartner) {
+        setPartners((current) => current.map((partner) => (partner.id === nextPartner.id ? nextPartner : partner)));
+        setSelectedPartnerDetails((current) =>
+          current && current.partner.id === nextPartner.id
+            ? {
+                ...current,
+                partner: nextPartner
+              }
+            : current
+        );
+      } else {
+        await loadPartners("refresh");
+      }
+
+      toast.success(nextStatus === "active" ? "Asesor activado" : "Asesor suspendido");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el estado del asesor.");
+    } finally {
+      setBusyPartnerId(null);
+      setStatusDialog(null);
+    }
+  }
+
+  useEffect(() => {
+    void loadPartners("initial");
+  }, []);
+
+  function renderMainState() {
+    if (loading) {
+      return (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={`partners-kpi-skeleton-${index}`} className="bg-white/95">
+                <CardHeader>
+                  <SkeletonLine className="h-3 w-24" />
+                  <SkeletonLine className="h-8 w-20" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <SkeletonLine className="h-4 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="bg-white/95">
+            <CardHeader className="pb-3">
+              <SkeletonLine className="h-10 w-full max-w-[560px]" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <SkeletonLine key={`partners-row-skeleton-${index}`} className="h-14 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    if (errorStatus) {
+      return (
+        <Card className="bg-white/95">
+          <CardContent className="p-6">
+            <EmptyState
+              icon={<CircleSlash />}
+              title="No pudimos cargar la red de asesores."
+              description={getPartnerErrorMessage(errorStatus)}
+              action={{ label: "Reintentar", onClick: () => void loadPartners("refresh") }}
+            />
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard label="Asesores totales" value={kpis.total} hint="Base visible del programa partners administrada desde Opturon." icon={Users2} />
+          <KpiCard label="Activos" value={kpis.active} hint="Asesores actualmente operativos y con acceso habilitado." icon={ShieldCheck} />
+          <KpiCard label="Clientes atribuidos" value={kpis.attributedClients} hint="Suma real de atribuciones activas informadas por el backend." icon={ArrowUpRight} />
+          <KpiCard label="Con rango asignado" value={kpis.withAssignedRank} hint="Partners que ya tienen historial o rango comercial visible." icon={Crown} />
+        </div>
+
+        <Card className="overflow-hidden bg-white/95">
+          <CardHeader className="gap-4 pb-4">
+            <div>
+              <CardTitle className="text-xl">Vista operativa</CardTitle>
+              <CardDescription>Busca por nombre, email o codigo. Filtra por estado y rango sin salir del Admin.</CardDescription>
+            </div>
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="grid gap-3 md:grid-cols-2 xl:flex xl:flex-1 xl:flex-wrap">
+                <Input
+                  value={query.search}
+                  onChange={(event) => setQuery((current) => ({ ...current, search: event.target.value }))}
+                  placeholder="Buscar por nombre, email o codigo"
+                  className="min-w-[260px] bg-white"
+                />
+                <ToolbarSelect
+                  ariaLabel="Filtrar partners por estado"
+                  value={query.status}
+                  onChange={(nextValue) => setQuery((current) => ({ ...current, status: nextValue as PartnerQueryState["status"] }))}
+                  options={[
+                    { value: "all", label: "Todos los estados" },
+                    { value: "active", label: "Activo" },
+                    { value: "suspended", label: "Suspendido" },
+                    { value: "inactive", label: "Inactivo" }
+                  ]}
+                />
+                <ToolbarSelect
+                  ariaLabel="Filtrar partners por rango"
+                  value={query.rank}
+                  onChange={(nextValue) => setQuery((current) => ({ ...current, rank: nextValue as PartnerQueryState["rank"] }))}
+                  options={[
+                    { value: "all", label: "Todos los rangos" },
+                    { value: "sin_rango", label: "Sin rango" },
+                    { value: "asesor", label: "Asesor" },
+                    { value: "lider", label: "Lider" },
+                    { value: "coordinador", label: "Coordinador" },
+                    { value: "emperador", label: "Emperador" }
+                  ]}
+                />
+                <ToolbarSelect
+                  ariaLabel="Ordenar partners"
+                  value={query.sort}
+                  onChange={(nextValue) => setQuery((current) => ({ ...current, sort: nextValue as PartnerQueryState["sort"] }))}
+                  options={[
+                    { value: "recent", label: "Mas recientes" },
+                    { value: "oldest", label: "Mas antiguos" },
+                    { value: "name", label: "Nombre" },
+                    { value: "last_login", label: "Ultimo acceso" }
+                  ]}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                {previewMode ? <Badge variant="outline">Vista local</Badge> : null}
+                <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => void loadPartners("refresh")} disabled={refreshing}>
+                  <RefreshCcw className={cn("mr-2 h-4 w-4", refreshing ? "animate-spin" : "")} />
+                  Actualizar
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            {filteredPartners.length === 0 ? (
+              <div className="space-y-4">
+                <EmptyState
+                  icon={<Users2 />}
+                  title={partners.length === 0 ? "Todavia no hay asesores" : "No encontramos asesores para este filtro"}
+                  description={
+                    partners.length === 0
+                      ? "Cuando agregues asesores, vas a poder seguir su actividad, clientes y evolucion desde aca."
+                      : "Prueba con otro estado, rango o termino de busqueda para volver a ver la red."
+                  }
+                />
+                {partners.length === 0 ? (
+                  <div className="flex justify-center">
+                    <Button type="button" variant="secondary" className="rounded-2xl" disabled title={PARTNERS_ADMIN_CREATE_TOOLTIP}>
+                      <UserPlus2 className="mr-2 h-4 w-4" />
+                      Crear primer asesor
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {filteredPartners.length > 0 ? (
+              <>
+                <div className="hidden overflow-hidden rounded-[24px] border border-[color:var(--border)] lg:block">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="bg-[color:var(--surface-muted)] text-[11px] uppercase tracking-[0.16em] text-muted">
+                        <tr>
+                          <th className="px-5 py-4">Asesor</th>
+                          <th className="px-5 py-4">Codigo</th>
+                          <th className="px-5 py-4">Estado</th>
+                          <th className="px-5 py-4">Rango</th>
+                          <th className="px-5 py-4">Sponsor</th>
+                          <th className="px-5 py-4">Clientes activos</th>
+                          <th className="px-5 py-4">Ultimo acceso</th>
+                          <th className="px-5 py-4">Alta</th>
+                          <th className="px-5 py-4 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPartners.map((partner) => {
+                          const availability = getPartnerActionAvailability(partner);
+                          const nextStatus = availability.nextStatus;
+                          return (
+                            <tr
+                              key={partner.id}
+                              className="border-t border-[color:var(--border)] bg-white/90 transition-colors hover:bg-brand/5"
+                            >
+                              <td className="px-5 py-4">
+                                <button
+                                  type="button"
+                                  onClick={() => void openPartnerDetails(partner.id)}
+                                  className="flex items-center gap-3 text-left"
+                                >
+                                  <SimpleAvatar
+                                    name={getPartnerDisplayName(partner)}
+                                    className="h-11 w-11 rounded-2xl border border-brand/15 bg-brand/10"
+                                    fallbackClassName="bg-brand/10 text-sm text-brandBright"
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="block truncate font-medium text-text">{getPartnerDisplayName(partner)}</span>
+                                    <span className="block truncate text-xs text-muted">{partner.email}</span>
+                                  </span>
+                                </button>
+                              </td>
+                              <td className="px-5 py-4">
+                                <Badge variant="outline">{getPartnerCode(partner)}</Badge>
+                              </td>
+                              <td className="px-5 py-4">
+                                <Badge variant={getPartnerStatusTone(partner.status)}>{getPartnerStatusLabel(partner.status)}</Badge>
+                              </td>
+                              <td className="px-5 py-4">
+                                <Badge variant={getPartnerRankTone(partner.currentRankCode)}>{getPartnerRankLabel(partner.currentRankCode)}</Badge>
+                              </td>
+                              <td className="px-5 py-4 text-muted">{getPartnerSponsorLabel(partner, partnerMap)}</td>
+                              <td className="px-5 py-4 font-medium text-text">{Number(partner.activeAttributionCount || 0)}</td>
+                              <td className="px-5 py-4 text-muted">{formatPartnerDateTime(partner.lastLoginAt)}</td>
+                              <td className="px-5 py-4 text-muted">{formatPartnerDate(partner.createdAt)}</td>
+                              <td className="px-5 py-4 text-right">
+                                <PartnerRowActions
+                                  partner={partner}
+                                  busy={busyPartnerId === partner.id}
+                                  onViewDetail={() => void openPartnerDetails(partner.id)}
+                                  onToggleStatus={
+                                    availability.canChangeStatus && nextStatus
+                                      ? () => setStatusDialog({ partnerId: partner.id, nextStatus })
+                                      : undefined
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 lg:hidden">
+                  {filteredPartners.map((partner) => {
+                    const availability = getPartnerActionAvailability(partner);
+                    const nextStatus = availability.nextStatus;
+                    return (
+                      <Card key={partner.id} className="bg-white/95">
+                        <CardContent className="space-y-4 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <button type="button" onClick={() => void openPartnerDetails(partner.id)} className="flex min-w-0 items-center gap-3 text-left">
+                              <SimpleAvatar
+                                name={getPartnerDisplayName(partner)}
+                                className="h-11 w-11 rounded-2xl border border-brand/15 bg-brand/10"
+                                fallbackClassName="bg-brand/10 text-sm text-brandBright"
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate font-medium">{getPartnerDisplayName(partner)}</span>
+                                <span className="block truncate text-xs text-muted">{partner.email}</span>
+                              </span>
+                            </button>
+                            <PartnerRowActions
+                              partner={partner}
+                              busy={busyPartnerId === partner.id}
+                              onViewDetail={() => void openPartnerDetails(partner.id)}
+                              onToggleStatus={
+                                availability.canChangeStatus && nextStatus
+                                  ? () => setStatusDialog({ partnerId: partner.id, nextStatus })
+                                  : undefined
+                              }
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant={getPartnerStatusTone(partner.status)}>{getPartnerStatusLabel(partner.status)}</Badge>
+                            <Badge variant={getPartnerRankTone(partner.currentRankCode)}>{getPartnerRankLabel(partner.currentRankCode)}</Badge>
+                            <Badge variant="outline">{getPartnerCode(partner)}</Badge>
+                          </div>
+
+                          <div className="grid gap-3 text-sm text-muted sm:grid-cols-2">
+                            <InfoRow label="Sponsor" value={getPartnerSponsorLabel(partner, partnerMap)} />
+                            <InfoRow label="Clientes activos" value={String(Number(partner.activeAttributionCount || 0))} />
+                            <InfoRow label="Ultimo acceso" value={formatPartnerDateTime(partner.lastLoginAt)} />
+                            <InfoRow label="Alta" value={formatPartnerDate(partner.createdAt)} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {renderMainState()}
+
+      <Dialog
+        open={Boolean(selectedPartnerId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedPartnerId(null);
+            setSelectedPartnerDetails(null);
+          }
+        }}
+      >
+        <DialogContent className="left-auto right-0 top-0 h-screen max-w-[520px] translate-x-0 translate-y-0 overflow-y-auto rounded-none border-r-0 bg-[linear-gradient(180deg,#fffdf9_0%,#fff7ec_100%)] p-0">
+          <div className="border-b border-[color:var(--border)] px-6 py-5">
+            <DialogHeader>
+              <DialogTitle>Detalle del asesor</DialogTitle>
+              <DialogDescription>Identidad, carrera comercial y trazabilidad reciente del partner seleccionado.</DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-6 px-6 py-6">
+            {detailsLoading ? (
+              <div className="space-y-4">
+                <SkeletonLine className="h-24 w-full" />
+                <SkeletonLine className="h-32 w-full" />
+                <SkeletonLine className="h-32 w-full" />
+              </div>
+            ) : selectedPartner ? (
+              <>
+                <Card className="bg-white/95">
+                  <CardContent className="space-y-5 p-5">
+                    <div className="flex items-start gap-4">
+                      <SimpleAvatar
+                        name={getPartnerDisplayName(selectedPartner)}
+                        className="h-16 w-16 rounded-[24px] border border-brand/20 bg-brand/10"
+                        fallbackClassName="bg-brand/10 text-lg text-brandBright"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant={getPartnerStatusTone(selectedPartner.status)}>{getPartnerStatusLabel(selectedPartner.status)}</Badge>
+                          <Badge variant={getPartnerRankTone(selectedPartner.currentRankCode)}>{getPartnerRankLabel(selectedPartner.currentRankCode)}</Badge>
+                        </div>
+                        <h2 className="mt-3 text-2xl font-semibold tracking-tight">{getPartnerDisplayName(selectedPartner)}</h2>
+                        <p className="mt-1 text-sm text-muted">{selectedPartner.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <InfoRow label="Codigo" value={getPartnerCode(selectedPartner)} />
+                      <InfoRow label="Telefono" value={getPartnerPhone(selectedPartner)} />
+                      <InfoRow label="Fecha de alta" value={formatPartnerDate(selectedPartner.createdAt)} />
+                      <InfoRow label="Ultimo acceso" value={formatPartnerDateTime(selectedPartner.lastLoginAt)} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/95">
+                  <CardHeader>
+                    <div>
+                      <CardTitle>Carrera</CardTitle>
+                      <CardDescription>Vista actual del sponsor, el rango visible y la cartera activa del partner.</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 pt-0 sm:grid-cols-2">
+                    <InfoRow label="Rango actual" value={getPartnerRankLabel(selectedPartner.currentRankCode)} />
+                    <InfoRow label="Sponsor" value={getPartnerSponsorLabel(selectedPartner, partnerMap)} />
+                    <InfoRow label="Clientes activos" value={String(Number(selectedPartner.activeAttributionCount || 0))} />
+                    <InfoRow label="Notas" value={selectedPartner.profile?.notes || "Sin notas visibles"} />
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/95">
+                  <CardHeader
+                    action={
+                      getPartnerActionAvailability(selectedPartner).canChangeStatus && getPartnerActionAvailability(selectedPartner).nextStatus ? (
+                        <Button
+                          type="button"
+                          variant={getPartnerActionAvailability(selectedPartner).nextStatus === "active" ? "primary" : "secondary"}
+                          className="rounded-2xl"
+                          onClick={() =>
+                            setStatusDialog({
+                              partnerId: selectedPartner.id,
+                              nextStatus: getPartnerActionAvailability(selectedPartner).nextStatus as "active" | "suspended"
+                            })
+                          }
+                          disabled={busyPartnerId === selectedPartner.id}
+                        >
+                          {busyPartnerId === selectedPartner.id
+                            ? "Guardando..."
+                            : getPartnerActionAvailability(selectedPartner).nextStatus === "active"
+                              ? "Activar"
+                              : "Suspender"}
+                        </Button>
+                      ) : null
+                    }
+                  >
+                    <div>
+                      <CardTitle>Acciones</CardTitle>
+                      <CardDescription>Solo se conectan operaciones reales ya disponibles en el backend seguro.</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 pt-0">
+                    <ActionHint title="Editar perfil" description="Proximamente" disabled />
+                    <ActionHint title="Ver clientes atribuidos" description="Visible en la seccion de atribuciones de este panel." />
+                    <ActionHint title="Ver jerarquia" description="Proximamente" disabled />
+                    <ActionHint title="Ver auditoria" description="Visible en la trazabilidad reciente del asesor." />
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/95">
+                  <CardHeader>
+                    <div>
+                      <CardTitle>Clientes atribuidos</CardTitle>
+                      <CardDescription>Solo mostramos atribuciones reales entregadas por el endpoint admin.</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0">
+                    {selectedPartnerDetails?.attributions && selectedPartnerDetails.attributions.length > 0 ? (
+                      selectedPartnerDetails.attributions.slice(0, 6).map((attribution) => (
+                        <AttributionCard key={attribution.id} attribution={attribution} />
+                      ))
+                    ) : (
+                      <EmptyState
+                        className="min-h-[180px]"
+                        icon={<BadgeCheck />}
+                        title="Sin clientes atribuidos"
+                        description="Cuando este asesor tenga attributions activas en backend, se van a listar aca automaticamente."
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/95">
+                  <CardHeader>
+                    <div>
+                      <CardTitle>Auditoria reciente</CardTitle>
+                      <CardDescription>Historial breve sin exponer tokens, UUIDs completos ni datos internos sensibles.</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0">
+                    {selectedPartnerDetails?.audit && selectedPartnerDetails.audit.length > 0 ? (
+                      selectedPartnerDetails.audit.slice(0, 6).map((entry) => (
+                        <div key={entry.id} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
+                          <p className="text-sm font-medium text-text">{buildAuditHeadline(entry)}</p>
+                          <p className="mt-1 text-xs text-muted">
+                            {entry.actorType ? `Actor: ${entry.actorType}` : "Actor no informado"} · {formatPartnerDateTime(entry.createdAt)}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <EmptyState
+                        className="min-h-[180px]"
+                        icon={<ShieldCheck />}
+                        title="Sin eventos recientes"
+                        description="El historial de auditoria aparecera aca cuando el backend devuelva movimientos para este asesor."
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <EmptyState
+                icon={<Users2 />}
+                title="Selecciona un asesor"
+                description="Abre un detalle desde la tabla para revisar identidad, sponsor, clientes y auditoria."
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(statusDialog)}
+        onOpenChange={(open) => (!open ? setStatusDialog(null) : null)}
+        title={statusDialog?.nextStatus === "active" ? "Activar asesor" : "Suspender asesor"}
+        description={
+          statusDialog?.nextStatus === "active"
+            ? "El partner volvera a quedar habilitado para operar y autenticar en el portal partners."
+            : "El partner dejara de operar hasta nueva activacion. No se borra historial ni atribuciones."
+        }
+        confirmText={statusDialog?.nextStatus === "active" ? "Activar" : "Suspender"}
+        onConfirm={() =>
+          statusDialog ? changePartnerStatus(statusDialog.partnerId, statusDialog.nextStatus) : Promise.resolve()
+        }
+      />
+    </>
+  );
+}
+
+function PartnerRowActions({
+  partner,
+  busy,
+  onViewDetail,
+  onToggleStatus
+}: {
+  partner: AdminPartner;
+  busy?: boolean;
+  onViewDetail: () => void;
+  onToggleStatus?: () => void;
+}) {
+  const availability = getPartnerActionAvailability(partner);
+  const toggleLabel = availability.nextStatus === "active" ? "Activar" : "Suspender";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="h-10 w-10 rounded-2xl p-0" aria-label="Abrir acciones del asesor">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={onViewDetail}>Ver detalle</DropdownMenuItem>
+        <DropdownMenuItem disabled>Editar perfil · Proximamente</DropdownMenuItem>
+        <DropdownMenuItem disabled>Ver clientes · Proximamente</DropdownMenuItem>
+        <DropdownMenuItem disabled>Ver jerarquia · Proximamente</DropdownMenuItem>
+        <DropdownMenuItem disabled={!availability.canChangeStatus || busy} onClick={onToggleStatus}>
+          {busy ? "Procesando..." : `${toggleLabel} asesor`}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-white/90 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
+      <p className="mt-1 text-sm font-medium text-text">{value}</p>
+    </div>
+  );
+}
+
+function AttributionCard({ attribution }: { attribution: AdminPartnerAttribution }) {
+  return (
+    <div className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-text">{attribution.clinicName || attribution.tenantId || "Cliente atribuido"}</p>
+          <p className="mt-1 text-xs text-muted">
+            {attribution.attributionSource ? `${attribution.attributionSource} · ` : ""}
+            {formatPartnerDateTime(attribution.attributedAt)}
+          </p>
+        </div>
+        <Badge variant={String(attribution.status || "").toLowerCase() === "active" ? "success" : "muted"}>
+          {String(attribution.status || "").toLowerCase() === "active" ? "Activa" : "No activa"}
+        </Badge>
+      </div>
+      {attribution.notes ? <p className="mt-3 text-sm leading-6 text-muted">{attribution.notes}</p> : null}
+    </div>
+  );
+}
+
+function ActionHint({
+  title,
+  description,
+  disabled = false
+}: {
+  title: string;
+  description: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border px-4 py-3",
+        disabled ? "border-dashed border-[color:var(--border)] bg-surface/60 text-muted" : "border-[color:var(--border)] bg-white text-text"
+      )}
+    >
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1 text-xs leading-5">{description}</p>
+    </div>
+  );
+}
+
+export function PartnersAdminPrimaryAction() {
+  return (
+    <Button type="button" className="rounded-2xl" disabled={!PARTNERS_ADMIN_CREATE_ENABLED} title={PARTNERS_ADMIN_CREATE_TOOLTIP}>
+      <UserPlus2 className="mr-2 h-4 w-4" />
+      Nuevo asesor
+    </Button>
+  );
+}

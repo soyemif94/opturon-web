@@ -31,6 +31,7 @@ import {
   Settings,
   Sparkles,
   TrendingUp,
+  Users2,
   Warehouse,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -195,6 +196,15 @@ const navItems: Array<{
     module: "settings",
     adminOnly: true,
     match: (pathname: string) => pathname.startsWith("/app/client-management")
+  },
+  {
+    href: "/app/partners",
+    label: "Red de asesores",
+    description: "Partners, sponsors, clientes atribuidos y estado comercial",
+    icon: Users2,
+    module: "settings",
+    adminOnly: true,
+    match: (pathname: string) => pathname.startsWith("/app/partners")
   }
 ];
 
