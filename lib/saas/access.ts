@@ -29,6 +29,32 @@ export async function getSessionContext() {
   };
 }
 
+function normalizeScope(value?: string) {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function hasOpturonAdminApiAccess(ctx: {
+  session?: { user?: { id?: string; accountScope?: string } } | null;
+  userId?: string;
+  globalRole?: string;
+  accountScope?: string;
+}) {
+  if (!ctx.session) return false;
+  if (!ctx.userId || !String(ctx.userId).trim()) return false;
+  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(String(ctx.globalRole))) return false;
+  return normalizeScope(ctx.accountScope || ctx.session?.user?.accountScope) === "opturon_admin";
+}
+
+export function resolveOpturonAdminActorId(ctx: {
+  session?: { user?: { id?: string } } | null;
+  userId?: string;
+  globalRole?: string;
+  accountScope?: string;
+}) {
+  if (!hasOpturonAdminApiAccess(ctx)) return null;
+  return String(ctx.session?.user?.id || ctx.userId || "").trim() || null;
+}
+
 export async function requireOpsPage() {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/ops");
@@ -39,7 +65,7 @@ export async function requireOpsPage() {
 export async function requireOpturonAdminPage(callbackUrl = "/app/client-management") {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(ctx.globalRole)) redirect("/app");
+  if (!hasOpturonAdminApiAccess(ctx)) redirect("/app");
   return ctx;
 }
 
@@ -67,7 +93,7 @@ export async function requireOpsApi() {
 export async function requireOpturonAdminApi() {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(ctx.globalRole)) {
+  if (!hasOpturonAdminApiAccess(ctx)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ctx };
