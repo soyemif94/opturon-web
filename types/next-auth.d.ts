@@ -13,6 +13,7 @@ declare module "next-auth" {
       tenantRole?: TenantRole;
       partnerId?: string;
       accountScope?: string;
+      portalActorId?: string;
     };
   }
 
@@ -24,6 +25,7 @@ declare module "next-auth" {
     tenantRole?: TenantRole;
     partnerId?: string;
     accountScope?: string;
+    portalActorId?: string;
   }
 }
 
@@ -36,6 +38,7 @@ declare module "next-auth/jwt" {
     tenantRole?: TenantRole;
     partnerId?: string;
     accountScope?: string;
+    portalActorId?: string;
   }
 }
 

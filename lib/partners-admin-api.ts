@@ -12,10 +12,12 @@ type AdminContext = {
   session?: {
     user?: {
       id?: string;
+      portalActorId?: string;
       accountScope?: string;
     };
   } | null;
   userId?: string;
+  portalActorId?: string;
   globalRole?: string;
   accountScope?: string;
 };

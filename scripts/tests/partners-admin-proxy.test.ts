@@ -11,10 +11,12 @@ function makeAdminContext(overrides?: Partial<Parameters<typeof hasOpturonAdminA
     session: {
       user: {
         id: "admin-1",
+        portalActorId: "a22893ae-a579-4152-8e08-63eade48568a",
         accountScope: "opturon_admin"
       }
     },
     userId: "admin-1",
+    portalActorId: "a22893ae-a579-4152-8e08-63eade48568a",
     globalRole: "superadmin",
     accountScope: "opturon_admin",
     ...overrides
@@ -24,15 +26,23 @@ function makeAdminContext(overrides?: Partial<Parameters<typeof hasOpturonAdminA
 function testOpturonAdminGuardRequiresOpturonScope() {
   assert.equal(hasOpturonAdminApiAccess(makeAdminContext()), true);
   assert.equal(
-    hasOpturonAdminApiAccess(makeAdminContext({ accountScope: "tenant", session: { user: { id: "admin-1", accountScope: "tenant" } } })),
+    hasOpturonAdminApiAccess(
+      makeAdminContext({
+        accountScope: "tenant",
+        session: { user: { id: "admin-1", portalActorId: "a22893ae-a579-4152-8e08-63eade48568a", accountScope: "tenant" } }
+      })
+    ),
     false
   );
   assert.equal(
     hasOpturonAdminApiAccess(makeAdminContext({ globalRole: "partner" })),
     false
   );
-  assert.equal(resolveOpturonAdminActorId(makeAdminContext()), "admin-1");
-  assert.equal(resolveOpturonAdminActorId(makeAdminContext({ userId: "" })), null);
+  assert.equal(
+    resolveOpturonAdminActorId(makeAdminContext()),
+    "a22893ae-a579-4152-8e08-63eade48568a"
+  );
+  assert.equal(resolveOpturonAdminActorId(makeAdminContext({ userId: "", portalActorId: "" })), null);
 }
 
 function testRouteResolutionWhitelistsOnlyKnownBackendEndpoints() {
@@ -91,7 +101,7 @@ async function testBackendCallInjectsServerActorAndPortalKey() {
       assert.equal(String(input), "https://backend.opturon.test/api/admin/partners");
       const headers = new Headers(init?.headers || {});
       assert.equal(headers.get("x-portal-key"), "internal-secret");
-      assert.equal(headers.get("x-portal-actor-id"), "admin-1");
+      assert.equal(headers.get("x-portal-actor-id"), "a22893ae-a579-4152-8e08-63eade48568a");
       assert.equal(headers.get("x-portal-actor-role"), null);
       assert.equal(headers.get("x-partner-id"), null);
       return new Response(JSON.stringify({ success: true, data: { ok: true } }), {

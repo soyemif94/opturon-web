@@ -826,6 +826,24 @@ export async function getPortalAuthUserByEmail(email: string, tenantId?: string)
   }>(`/portal/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
 }
 
+export async function getPortalAdminActor(tenantId: string, email?: string) {
+  const params = new URLSearchParams({ tenantId });
+  if (email) params.set("email", email);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      clinicId: string;
+      name: string | null;
+      email: string | null;
+      role: string | null;
+      tenantId: string | null;
+      accountScope: "opturon_admin";
+      isAdmin: true;
+    } | null;
+  }>(`/portal/auth/admin-actor?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
+}
+
 export async function getPartnerAuthUserByEmail(email: string) {
   const params = new URLSearchParams({ email });
   return backendPortalFetch<{

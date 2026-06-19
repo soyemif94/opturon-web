@@ -1,7 +1,7 @@
 import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
-import { getPartnerAuthUserByEmail, getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPartnerUser, loginPortalUser } from "@/lib/api";
+import { getPartnerAuthUserByEmail, getPortalAdminActor, getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPartnerUser, loginPortalUser } from "@/lib/api";
 import { isStaffGlobalRole, normalizeGlobalRole, resolveAccountScopeForIdentity, type AuthGlobalRole } from "@/lib/auth-identity";
 import { normalizeTenantRole } from "@/lib/app-permissions";
 import { getLocalBootstrapAuthUserByEmail } from "@/lib/auth-store";
@@ -13,6 +13,19 @@ function isProduction() {
 
 function canUseLocalBootstrapAuth(globalRole: AuthGlobalRole) {
   return !isPersistentPortalIdentityEnabled() || isStaffGlobalRole(globalRole);
+}
+
+async function resolvePortalActorIdForAdminIdentity(input: {
+  accountScope?: string;
+  tenantId?: string;
+  email?: string;
+}) {
+  if (String(input.accountScope || "").trim().toLowerCase() !== "opturon_admin") return undefined;
+  const tenantId = String(input.tenantId || "").trim();
+  if (!tenantId) return undefined;
+
+  const response = await getPortalAdminActor(tenantId, input.email ? String(input.email).trim().toLowerCase() : undefined);
+  return response.data?.id ? String(response.data.id) : undefined;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -90,6 +103,7 @@ export const authOptions: NextAuthOptions = {
                   tenantId: tenantId || undefined,
                   tenantRole
                 }),
+                portalActorId: undefined,
                 authSource: "backend"
               };
             } catch (error) {
@@ -116,6 +130,7 @@ export const authOptions: NextAuthOptions = {
                   globalRole,
                   partnerId: backendUser.partnerId
                 }),
+                portalActorId: undefined,
                 authSource: "backend"
               };
             } catch (error) {
@@ -157,6 +172,18 @@ export const authOptions: NextAuthOptions = {
             console.warn("AUTH_LOCAL_CLIENT_FALLBACK_BLOCKED", { email });
             return null;
           }
+          const resolvedAccountScope = resolveAccountScopeForIdentity({
+            accountScope: user.accountScope,
+            authSource: "local",
+            globalRole,
+            tenantId: user.tenantId,
+            tenantRole: user.tenantRole
+          });
+          const portalActorId = await resolvePortalActorIdForAdminIdentity({
+            accountScope: resolvedAccountScope,
+            tenantId: user.tenantId,
+            email
+          });
           return {
             id: user.id,
             email: user.email,
@@ -165,13 +192,8 @@ export const authOptions: NextAuthOptions = {
             globalRole,
             tenantId: user.tenantId,
             tenantRole: user.tenantRole,
-            accountScope: resolveAccountScopeForIdentity({
-              accountScope: user.accountScope,
-              authSource: "local",
-              globalRole,
-              tenantId: user.tenantId,
-              tenantRole: user.tenantRole
-            }),
+            accountScope: resolvedAccountScope,
+            portalActorId,
             authSource: "local"
           };
         } catch (error) {
@@ -205,6 +227,7 @@ export const authOptions: NextAuthOptions = {
             tenantId: (user as any).tenantId,
             tenantRole: (user as any).tenantRole
           });
+          token.portalActorId = (user as any).portalActorId ? String((user as any).portalActorId) : undefined;
           token.authSource = (user as any).authSource || token.authSource || "local";
         }
 
@@ -233,6 +256,7 @@ export const authOptions: NextAuthOptions = {
                       globalRole: "partner",
                       partnerId: hydratedPartner.partnerId
                     });
+                    token.portalActorId = undefined;
                     token.authSource = "backend";
                     return token;
                   }
@@ -267,6 +291,7 @@ export const authOptions: NextAuthOptions = {
                   tenantId: hydratedUser.tenantId,
                   tenantRole: hydratedUser.tenantRole
                 });
+                token.portalActorId = undefined;
                 token.authSource = "backend";
               } else {
                 token.userId = undefined;
@@ -274,6 +299,7 @@ export const authOptions: NextAuthOptions = {
                 token.tenantRole = undefined;
                 token.partnerId = undefined;
                 token.accountScope = undefined;
+                token.portalActorId = undefined;
                 token.globalRole = "client";
                 token.role = "client";
               }
@@ -296,8 +322,14 @@ export const authOptions: NextAuthOptions = {
                 tenantId: hydratedUser.tenantId,
                 tenantRole: hydratedUser.tenantRole
               });
+              token.portalActorId = await resolvePortalActorIdForAdminIdentity({
+                accountScope: token.accountScope,
+                tenantId: hydratedUser.tenantId,
+                email: String(token.email || "")
+              });
+              token.authSource = token.authSource || "local";
             }
-          } else if (isPersistentPortalIdentityEnabled() && isStaffGlobalRole(tokenGlobalRole) && token.email && !token.accountScope) {
+          } else if (isPersistentPortalIdentityEnabled() && isStaffGlobalRole(tokenGlobalRole) && token.email && (!token.accountScope || !token.portalActorId)) {
             const hydratedUser = await getLocalBootstrapAuthUserByEmail(String(token.email));
             if (hydratedUser) {
               token.userId = hydratedUser.id;
@@ -312,6 +344,11 @@ export const authOptions: NextAuthOptions = {
                 globalRole: hydratedUser.globalRole || token.globalRole || token.role || "client",
                 tenantId: hydratedUser.tenantId,
                 tenantRole: hydratedUser.tenantRole
+              });
+              token.portalActorId = await resolvePortalActorIdForAdminIdentity({
+                accountScope: token.accountScope,
+                tenantId: hydratedUser.tenantId,
+                email: String(token.email || "")
               });
               token.authSource = token.authSource || "local";
             }
@@ -342,6 +379,11 @@ export const authOptions: NextAuthOptions = {
               tenantId: hydratedUser.tenantId,
               tenantRole: hydratedUser.tenantRole
             });
+            token.portalActorId = await resolvePortalActorIdForAdminIdentity({
+              accountScope: token.accountScope,
+              tenantId: hydratedUser.tenantId,
+              email: String(token.email || session.user?.email || "")
+            });
           }
         }
 
@@ -353,6 +395,7 @@ export const authOptions: NextAuthOptions = {
           session.user.tenantRole = token.tenantRole as any;
           session.user.partnerId = token.partnerId ? String(token.partnerId) : undefined;
           session.user.accountScope = token.accountScope ? String(token.accountScope) : undefined;
+          session.user.portalActorId = token.portalActorId ? String(token.portalActorId) : undefined;
         }
       } catch (error) {
         console.error("SESSION_CALLBACK_ERROR", { msg: String(error) });

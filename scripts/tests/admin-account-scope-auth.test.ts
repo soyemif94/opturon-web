@@ -18,8 +18,9 @@ function testAdminLocalBootstrapIdentityGetsOpturonAdminScope() {
   assert.equal(scope, "opturon_admin");
   assert.equal(
     hasOpturonAdminApiAccess({
-      session: { user: { id: "admin-1", accountScope: scope } },
+      session: { user: { id: "admin-1", portalActorId: "a22893ae-a579-4152-8e08-63eade48568a", accountScope: scope } },
       userId: "admin-1",
+      portalActorId: "a22893ae-a579-4152-8e08-63eade48568a",
       globalRole: "superadmin",
       accountScope: scope
     }),

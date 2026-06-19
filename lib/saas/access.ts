@@ -22,6 +22,7 @@ export async function getSessionContext() {
   return {
     session,
     userId: session?.user?.id,
+    portalActorId: session?.user?.portalActorId,
     globalRole: session?.user?.globalRole,
     tenantId: session?.user?.tenantId,
     tenantRole: session?.user?.tenantRole,
@@ -34,25 +35,28 @@ function normalizeScope(value?: string) {
 }
 
 export function hasOpturonAdminApiAccess(ctx: {
-  session?: { user?: { id?: string; accountScope?: string } } | null;
+  session?: { user?: { id?: string; portalActorId?: string; accountScope?: string } } | null;
   userId?: string;
+  portalActorId?: string;
   globalRole?: string;
   accountScope?: string;
 }) {
   if (!ctx.session) return false;
   if (!ctx.userId || !String(ctx.userId).trim()) return false;
+  if (!ctx.portalActorId && !String(ctx.session?.user?.portalActorId || "").trim()) return false;
   if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(String(ctx.globalRole))) return false;
   return normalizeScope(ctx.accountScope || ctx.session?.user?.accountScope) === "opturon_admin";
 }
 
 export function resolveOpturonAdminActorId(ctx: {
-  session?: { user?: { id?: string } } | null;
+  session?: { user?: { id?: string; portalActorId?: string } } | null;
   userId?: string;
+  portalActorId?: string;
   globalRole?: string;
   accountScope?: string;
 }) {
   if (!hasOpturonAdminApiAccess(ctx)) return null;
-  return String(ctx.session?.user?.id || ctx.userId || "").trim() || null;
+  return String(ctx.session?.user?.portalActorId || ctx.portalActorId || "").trim() || null;
 }
 
 export async function requireOpsPage() {
