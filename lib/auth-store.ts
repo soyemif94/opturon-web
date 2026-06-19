@@ -1,4 +1,5 @@
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
+import { resolveAccountScopeForIdentity } from "@/lib/auth-identity";
 import { getPasswordOverride } from "@/lib/password-reset-store";
 import { resolveSaasDataFile } from "@/lib/runtime-data";
 
@@ -10,6 +11,7 @@ export type AuthUser = {
   globalRole?: string;
   tenantId?: string;
   tenantRole?: TenantRole;
+  accountScope?: string;
 };
 
 // Local auth data is for staff/demo compatibility only.
@@ -54,7 +56,14 @@ export async function getLocalBootstrapAuthUserByEmail(email: string): Promise<A
           passwordHash: passwordOverride || envHash,
           globalRole: normalizeRole(String(matchedUser.globalRole || matchedUser.role || process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin")),
           tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
-          tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
+          tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined,
+          accountScope: resolveAccountScopeForIdentity({
+            accountScope: matchedUser.accountScope,
+            authSource: "local",
+            globalRole: matchedUser.globalRole || matchedUser.role || process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin",
+            tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
+            tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
+          })
         };
       }
     } catch (err) {
@@ -66,7 +75,11 @@ export async function getLocalBootstrapAuthUserByEmail(email: string): Promise<A
       email: String(process.env.AUTH_ADMIN_EMAIL || envEmail),
       name: process.env.AUTH_ADMIN_NAME || "Admin",
       passwordHash: passwordOverride || envHash,
-      globalRole: normalizeRole(process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin")
+      globalRole: normalizeRole(process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin"),
+      accountScope: resolveAccountScopeForIdentity({
+        authSource: "local",
+        globalRole: process.env.AUTH_ADMIN_GLOBAL_ROLE || "superadmin"
+      })
     };
   }
 
@@ -86,7 +99,14 @@ export async function getLocalBootstrapAuthUserByEmail(email: string): Promise<A
       passwordHash: passwordOverride || String(u.passwordHash),
       globalRole: normalizeRole(String(u.globalRole || u.role || "superadmin")),
       tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
-      tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
+      tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined,
+      accountScope: resolveAccountScopeForIdentity({
+        accountScope: u.accountScope,
+        authSource: "local",
+        globalRole: u.globalRole || u.role || "superadmin",
+        tenantId: membership?.tenantId ? String(membership.tenantId) : undefined,
+        tenantRole: membership?.role ? String(membership.role) as TenantRole : undefined
+      })
     };
   } catch (err) {
     console.warn("AUTH_JSON_STORE_UNAVAILABLE", String(err));

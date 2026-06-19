@@ -2,24 +2,13 @@ import { compareSync } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import { getPartnerAuthUserByEmail, getPortalAuthUserByEmail, isPersistentPortalIdentityEnabled, loginPartnerUser, loginPortalUser } from "@/lib/api";
+import { isStaffGlobalRole, normalizeGlobalRole, resolveAccountScopeForIdentity, type AuthGlobalRole } from "@/lib/auth-identity";
 import { normalizeTenantRole } from "@/lib/app-permissions";
 import { getLocalBootstrapAuthUserByEmail } from "@/lib/auth-store";
-import type { GlobalRole, TenantRole } from "@/lib/saas/types";
-
-type AuthGlobalRole = GlobalRole | "partner";
+import type { TenantRole } from "@/lib/saas/types";
 
 function isProduction() {
   return String(process.env.NODE_ENV || "").toLowerCase() === "production";
-}
-
-function normalizeGlobalRole(role?: string): AuthGlobalRole {
-  const allowed: AuthGlobalRole[] = ["superadmin", "ops_admin", "sales_rep", "support_agent", "client", "partner"];
-  if (role && allowed.includes(role as AuthGlobalRole)) return role as AuthGlobalRole;
-  return "client";
-}
-
-function isStaffGlobalRole(role?: string) {
-  return ["superadmin", "ops_admin", "sales_rep", "support_agent"].includes(String(role || ""));
 }
 
 function canUseLocalBootstrapAuth(globalRole: AuthGlobalRole) {
@@ -94,7 +83,13 @@ export const authOptions: NextAuthOptions = {
                 globalRole,
                 tenantId: tenantId || undefined,
                 tenantRole,
-                accountScope: backendUser.accountScope,
+                accountScope: resolveAccountScopeForIdentity({
+                  accountScope: backendUser.accountScope,
+                  authSource: "backend",
+                  globalRole,
+                  tenantId: tenantId || undefined,
+                  tenantRole
+                }),
                 authSource: "backend"
               };
             } catch (error) {
@@ -115,7 +110,12 @@ export const authOptions: NextAuthOptions = {
                 role: globalRole,
                 globalRole,
                 partnerId: backendUser.partnerId,
-                accountScope: backendUser.accountScope,
+                accountScope: resolveAccountScopeForIdentity({
+                  accountScope: backendUser.accountScope,
+                  authSource: "backend",
+                  globalRole,
+                  partnerId: backendUser.partnerId
+                }),
                 authSource: "backend"
               };
             } catch (error) {
@@ -165,6 +165,13 @@ export const authOptions: NextAuthOptions = {
             globalRole,
             tenantId: user.tenantId,
             tenantRole: user.tenantRole,
+            accountScope: resolveAccountScopeForIdentity({
+              accountScope: user.accountScope,
+              authSource: "local",
+              globalRole,
+              tenantId: user.tenantId,
+              tenantRole: user.tenantRole
+            }),
             authSource: "local"
           };
         } catch (error) {
@@ -190,7 +197,14 @@ export const authOptions: NextAuthOptions = {
           token.tenantId = (user as any).tenantId;
           token.tenantRole = (user as any).tenantRole;
           token.partnerId = (user as any).partnerId;
-          token.accountScope = (user as any).accountScope;
+          token.accountScope = resolveAccountScopeForIdentity({
+            accountScope: (user as any).accountScope,
+            authSource: (user as any).authSource || token.authSource || "local",
+            globalRole: (user as any).globalRole || (user as any).role,
+            partnerId: (user as any).partnerId,
+            tenantId: (user as any).tenantId,
+            tenantRole: (user as any).tenantRole
+          });
           token.authSource = (user as any).authSource || token.authSource || "local";
         }
 
@@ -213,7 +227,12 @@ export const authOptions: NextAuthOptions = {
                     token.partnerId = hydratedPartner.partnerId;
                     token.tenantId = undefined;
                     token.tenantRole = undefined;
-                    token.accountScope = hydratedPartner.accountScope;
+                    token.accountScope = resolveAccountScopeForIdentity({
+                      accountScope: hydratedPartner.accountScope,
+                      authSource: "backend",
+                      globalRole: "partner",
+                      partnerId: hydratedPartner.partnerId
+                    });
                     token.authSource = "backend";
                     return token;
                   }
@@ -241,7 +260,13 @@ export const authOptions: NextAuthOptions = {
                 token.tenantId = hydratedUser.tenantId;
                 token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
                 token.partnerId = undefined;
-                token.accountScope = hydratedUser.accountScope;
+                token.accountScope = resolveAccountScopeForIdentity({
+                  accountScope: hydratedUser.accountScope,
+                  authSource: "backend",
+                  globalRole: hydratedUser.globalRole || token.globalRole || token.role || "client",
+                  tenantId: hydratedUser.tenantId,
+                  tenantRole: hydratedUser.tenantRole
+                });
                 token.authSource = "backend";
               } else {
                 token.userId = undefined;
@@ -263,6 +288,32 @@ export const authOptions: NextAuthOptions = {
               token.role = token.globalRole;
               token.tenantId = hydratedUser.tenantId;
               token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+              token.partnerId = undefined;
+              token.accountScope = resolveAccountScopeForIdentity({
+                accountScope: hydratedUser.accountScope,
+                authSource: "local",
+                globalRole: hydratedUser.globalRole || token.globalRole || token.role || "client",
+                tenantId: hydratedUser.tenantId,
+                tenantRole: hydratedUser.tenantRole
+              });
+            }
+          } else if (isPersistentPortalIdentityEnabled() && isStaffGlobalRole(tokenGlobalRole) && token.email && !token.accountScope) {
+            const hydratedUser = await getLocalBootstrapAuthUserByEmail(String(token.email));
+            if (hydratedUser) {
+              token.userId = hydratedUser.id;
+              token.globalRole = normalizeGlobalRole(String(hydratedUser.globalRole || token.globalRole || token.role || "client"));
+              token.role = token.globalRole;
+              token.tenantId = hydratedUser.tenantId;
+              token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
+              token.partnerId = undefined;
+              token.accountScope = resolveAccountScopeForIdentity({
+                accountScope: hydratedUser.accountScope,
+                authSource: "local",
+                globalRole: hydratedUser.globalRole || token.globalRole || token.role || "client",
+                tenantId: hydratedUser.tenantId,
+                tenantRole: hydratedUser.tenantRole
+              });
+              token.authSource = token.authSource || "local";
             }
           }
         }
@@ -284,6 +335,13 @@ export const authOptions: NextAuthOptions = {
             token.tenantId = hydratedUser.tenantId;
             token.tenantRole = normalizeTenantRole(hydratedUser.tenantRole);
             token.partnerId = undefined;
+            token.accountScope = resolveAccountScopeForIdentity({
+              accountScope: hydratedUser.accountScope,
+              authSource: "local",
+              globalRole: hydratedUser.globalRole || token.globalRole || token.role || "client",
+              tenantId: hydratedUser.tenantId,
+              tenantRole: hydratedUser.tenantRole
+            });
           }
         }
 
