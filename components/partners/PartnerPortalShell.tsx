@@ -31,13 +31,13 @@ export function PartnerPortalShell({
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.12),transparent_22%),radial-gradient(circle_at_15%_20%,rgba(251,191,36,0.12),transparent_18%),linear-gradient(180deg,#04111f_0%,#07182a_52%,#081423_100%)] text-slate-100">
       <div className="pointer-events-none fixed inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(15,23,42,0.7),transparent)]" />
-      <div className="mx-auto flex min-h-screen max-w-[1600px] gap-4 px-3 py-3 md:px-4 md:py-4">
-        <aside className="hidden w-[320px] shrink-0 overflow-hidden rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(7,18,34,0.96),rgba(9,20,37,0.92))] shadow-[0_24px_80px_rgba(2,8,23,0.55)] lg:flex lg:flex-col">
+      <div className="mx-auto flex min-h-screen max-w-[1560px] gap-3 px-3 py-3 md:px-4 md:py-4">
+        <aside className="hidden w-[296px] shrink-0 overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(7,18,34,0.96),rgba(9,20,37,0.92))] shadow-[0_24px_80px_rgba(2,8,23,0.55)] lg:flex lg:flex-col xl:w-[308px]">
           <div className="relative overflow-hidden border-b border-white/10 p-6">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_28%),radial-gradient(circle_at_75%_15%,rgba(236,72,153,0.14),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]" />
             <div className="relative">
               <PartnerPortalMark />
-              <div className="mt-8 rounded-[26px] border border-white/10 bg-white/5 p-5 backdrop-blur">
+              <div className="mt-7 rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur">
                 <Badge className="border-amber-400/20 bg-amber-300/10 text-amber-100">Canal partner</Badge>
                 <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white">Portal de asesores</h1>
                 <p className="mt-3 text-sm leading-7 text-slate-300">
@@ -47,7 +47,7 @@ export function PartnerPortalShell({
             </div>
           </div>
 
-          <nav className="flex-1 space-y-2 px-4 py-5">
+          <nav className="flex-1 space-y-2 px-4 py-4">
             {PARTNER_PORTAL_NAV.map((item) => {
               const active = pathname === item.href;
               return (
@@ -69,7 +69,7 @@ export function PartnerPortalShell({
           </nav>
 
           <div className="border-t border-white/10 p-4">
-            <div className="rounded-[26px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-white">{userName}</p>
@@ -103,10 +103,10 @@ export function PartnerPortalShell({
           </div>
         </aside>
 
-        <div className="relative flex min-h-screen min-w-0 flex-1 flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,18,34,0.88),rgba(8,19,35,0.82))] shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur">
+        <div className="relative flex min-h-screen min-w-0 flex-1 flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,18,34,0.88),rgba(8,19,35,0.82))] shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.08),transparent_24%),radial-gradient(circle_at_left,rgba(244,114,182,0.08),transparent_20%)]" />
-          <header className="relative flex items-center justify-between border-b border-white/10 px-4 py-4 md:px-6 lg:px-8">
-            <div className="min-w-0">
+          <header className="relative flex min-h-[84px] items-center justify-between border-b border-white/10 px-4 py-4 md:px-6 lg:px-7 xl:px-8">
+            <div className="min-w-0 max-w-[720px]">
               <Badge className="border-white/10 bg-white/6 text-slate-200">
                 <Sparkles className="h-3.5 w-3.5" />
                 Espacio partner
@@ -143,7 +143,7 @@ export function PartnerPortalShell({
           {mobileOpen ? (
             <div className="absolute inset-0 z-20 lg:hidden">
               <button type="button" aria-label="Cerrar menu" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-              <div className="absolute inset-y-0 left-0 w-[88%] max-w-[360px] border-r border-white/10 bg-[linear-gradient(180deg,rgba(7,18,34,0.98),rgba(9,20,37,0.96))] p-4 shadow-[0_24px_80px_rgba(2,8,23,0.62)]">
+              <div className="absolute inset-y-0 left-0 w-[88%] max-w-[344px] border-r border-white/10 bg-[linear-gradient(180deg,rgba(7,18,34,0.98),rgba(9,20,37,0.96))] p-4 shadow-[0_24px_80px_rgba(2,8,23,0.62)]">
                 <div className="flex items-start justify-between gap-3">
                   <PartnerPortalMark compact />
                   <Button variant="ghost" size="sm" className="text-slate-300 hover:bg-white/10 hover:text-white" onClick={() => setMobileOpen(false)}>
@@ -193,7 +193,7 @@ export function PartnerPortalShell({
             </div>
           ) : null}
 
-          <main className="relative min-w-0 flex-1 px-4 py-5 md:px-6 lg:px-8 lg:py-8">{children}</main>
+          <main className="relative min-w-0 flex-1 px-4 py-5 md:px-6 lg:px-7 lg:py-7 xl:px-8">{children}</main>
         </div>
       </div>
     </div>

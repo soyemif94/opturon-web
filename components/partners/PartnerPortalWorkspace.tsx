@@ -91,6 +91,17 @@ const ENDPOINTS: Record<keyof WorkspaceState, string> = {
   commissionLedger: "/api/partners/me/commissions"
 };
 
+const PREMIUM_HERO_CARD =
+  "overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_24%),radial-gradient(circle_at_82%_18%,rgba(56,189,248,0.14),transparent_22%),linear-gradient(180deg,rgba(12,23,41,0.94),rgba(9,20,36,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]";
+const PREMIUM_PANEL_CARD =
+  "border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]";
+const PREMIUM_SURFACE_CARD =
+  "border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]";
+const PREMIUM_TABLE_SHELL = "hidden overflow-hidden rounded-[24px] border border-white/10 lg:block";
+const PREMIUM_EMPTY_STATE = "min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100";
+const PREMIUM_FILTER_FIELD =
+  "h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none";
+
 export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   const [state, setState] = useState<WorkspaceState>({});
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -282,7 +293,7 @@ function HomeView({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1.18fr_0.82fr]">
-        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(244,114,182,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+        <Card className={PREMIUM_HERO_CARD}>
           <CardContent className="p-6 md:p-7">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">Inicio</Badge>
@@ -300,7 +311,7 @@ function HomeView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Lectura segura</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Actividad comercial</CardTitle>
@@ -329,7 +340,7 @@ function HomeView({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">{recentClients.length} recientes</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Clientes recientes</CardTitle>
@@ -344,7 +355,7 @@ function HomeView({
                 icon={<Users2 className="h-5 w-5" />}
                 title="Todavia no tenes clientes visibles"
                 description="Cuando una atribucion quede asociada a tu cuenta, aparecera aca con su estado real."
-                className="min-h-[260px] border-white/10 bg-white/[0.03] text-slate-100"
+                className={PREMIUM_EMPTY_STATE}
               />
             ) : (
               recentClients.map((client) => (
@@ -368,7 +379,7 @@ function HomeView({
         </Card>
 
         <div className="grid gap-4">
-          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <Card className={PREMIUM_PANEL_CARD}>
             <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Rank progress</Badge>}>
               <div>
                 <CardTitle className="text-xl text-white">Progreso de carrera</CardTitle>
@@ -431,7 +442,7 @@ function HomeView({
             </CardContent>
           </Card>
 
-          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(14,23,39,0.92),rgba(12,21,37,0.86))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.32)]">
+          <Card className={PREMIUM_PANEL_CARD}>
             <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Proximamente</Badge>}>
               <div>
                 <CardTitle className="text-xl text-white">Proxima etapa</CardTitle>
@@ -558,7 +569,7 @@ function ClientsView({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
-        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_85%_20%,rgba(59,130,246,0.16),transparent_24%),linear-gradient(180deg,rgba(8,18,34,0.95),rgba(9,21,38,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+        <Card className={PREMIUM_HERO_CARD}>
           <CardContent className="p-6 md:p-7">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">Mis clientes</Badge>
@@ -576,7 +587,7 @@ function ClientsView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Lectura de cartera</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Resumen superior</CardTitle>
@@ -595,7 +606,7 @@ function ClientsView({
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_20px_65px_rgba(2,8,23,0.34)]">
+          <Card className={PREMIUM_PANEL_CARD}>
             <CardContent className={`grid gap-3 p-5 ${hasBillingStates ? "md:grid-cols-[minmax(0,1.4fr)_160px_160px_180px]" : "md:grid-cols-[minmax(0,1.4fr)_180px_180px]"}`}>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -612,7 +623,7 @@ function ClientsView({
                 <select
                   value={statusFilter}
                   onChange={(event) => onStatusFilterChange(event.target.value)}
-                  className="h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none"
+                  className={PREMIUM_FILTER_FIELD}
                 >
                   {statuses.map((currentStatus) => (
                     <option key={currentStatus} value={currentStatus} className="bg-slate-900 text-slate-100">
@@ -628,7 +639,7 @@ function ClientsView({
                   <select
                     value={paymentFilter}
                     onChange={(event) => onPaymentFilterChange(event.target.value)}
-                    className="h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none"
+                    className={PREMIUM_FILTER_FIELD}
                   >
                     {paymentStates.map((currentState) => (
                       <option key={currentState} value={currentState} className="bg-slate-900 text-slate-100">
@@ -644,7 +655,7 @@ function ClientsView({
                 <select
                   value={sortKey}
                   onChange={(event) => onSortKeyChange(event.target.value as ClientSortKey)}
-                  className="h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none"
+                  className={PREMIUM_FILTER_FIELD}
                 >
                   {hasUsableDates ? <option value="recent" className="bg-slate-900 text-slate-100">Mas recientes</option> : null}
                   {hasUsableDates ? <option value="oldest" className="bg-slate-900 text-slate-100">Mas antiguas</option> : null}
@@ -659,7 +670,7 @@ function ClientsView({
               icon={<Users2 className="h-5 w-5" />}
               title="Todavia no tenes clientes atribuidos"
               description="Cuando una atribucion quede asociada a tu cuenta, la cartera se va a completar automaticamente con su estado real."
-              className="min-h-[340px] border-white/10 bg-white/[0.04] text-slate-100"
+              className={PREMIUM_EMPTY_STATE}
             />
           ) : hasNoMatches ? (
             <EmptyState
@@ -667,11 +678,11 @@ function ClientsView({
               title="No encontramos clientes con esos filtros"
               description="Proba cambiar el texto de busqueda o volver a todos los estados para revisar la cartera completa."
               action={{ label: "Limpiar filtros", onClick: () => { onQueryChange(""); onStatusFilterChange("all"); onPaymentFilterChange("all"); } }}
-              className="min-h-[340px] border-white/10 bg-white/[0.04] text-slate-100"
+              className={PREMIUM_EMPTY_STATE}
             />
           ) : (
             <>
-              <Card className="hidden overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_20px_65px_rgba(2,8,23,0.32)] lg:block">
+              <Card className={`${PREMIUM_SURFACE_CARD} ${PREMIUM_TABLE_SHELL}`}>
                 <CardContent className="p-0">
                   {hasBillingStates ? (
                     <div className="grid grid-cols-[minmax(0,1.25fr)_110px_120px_135px_120px_135px_120px] gap-3 border-b border-white/10 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -788,7 +799,7 @@ function ClientDetailDrawer({
       <aside
         className={`${
           client ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 xl:translate-x-0 xl:opacity-100"
-        } fixed inset-y-0 right-0 z-40 w-full max-w-[420px] border-l border-white/10 bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(8,18,34,0.98))] p-4 shadow-[0_28px_90px_rgba(2,8,23,0.55)] transition-all duration-300 xl:sticky xl:top-8 xl:h-[calc(100vh-4rem)] xl:rounded-[28px] xl:border xl:bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))]`}
+        } fixed inset-y-0 right-0 z-40 w-full max-w-[400px] border-l border-white/10 bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(8,18,34,0.98))] p-4 shadow-[0_28px_90px_rgba(2,8,23,0.55)] transition-all duration-300 xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)] xl:rounded-[28px] xl:border xl:bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))]`}
       >
         {client ? (
           <div className="flex h-full flex-col">
@@ -891,7 +902,7 @@ function CareerView({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1fr_0.96fr]">
-        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.16),transparent_24%),linear-gradient(180deg,rgba(8,18,34,0.95),rgba(9,21,38,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+        <Card className={PREMIUM_HERO_CARD}>
           <CardHeader action={<Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{formatRankLabel(currentRank)}</Badge>}>
             <div>
               <CardTitle className="text-3xl text-white">Mi carrera</CardTitle>
@@ -923,7 +934,7 @@ function CareerView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Progreso principal</Badge>}>
             <div>
               <CardTitle className="text-2xl text-white">Progreso principal</CardTitle>
@@ -983,7 +994,7 @@ function CareerView({
                 description={hasEvaluation
                   ? "El backend publica rango y evaluacion, pero no hay requisitos suficientes en esta respuesta para mostrar faltantes reales."
                   : "Cuando exista una evaluacion de carrera publicada para tu cuenta, esta vista mostrara objetivos cumplidos y pendientes."}
-                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+                className={PREMIUM_EMPTY_STATE}
               />
             )}
           </CardContent>
@@ -991,7 +1002,7 @@ function CareerView({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader>
             <div>
               <CardTitle className="text-2xl text-white">Escalera de rangos</CardTitle>
@@ -1039,7 +1050,7 @@ function CareerView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(14,23,39,0.92),rgba(12,21,37,0.86))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.32)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader>
           <div>
             <CardTitle className="text-xl text-white">Aclaraciones vigentes</CardTitle>
@@ -1137,7 +1148,7 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(251,191,36,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+        <Card className={PREMIUM_HERO_CARD}>
           <CardContent className="p-6 md:p-7">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-sky-300/20 bg-sky-300/10 text-sky-100">Mi red</Badge>
@@ -1153,7 +1164,7 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Profundidad maxima 3</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Resumen de red</CardTitle>
@@ -1180,7 +1191,7 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader>
             <div>
               <CardTitle className="text-xl text-white">Vista por niveles</CardTitle>
@@ -1216,7 +1227,7 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">{summarizeNetworkDepth(selectedLevel.depth)}</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Actividad del nivel seleccionado</CardTitle>
@@ -1231,18 +1242,18 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
                 icon={<Users2 className="h-5 w-5" />}
                 title="Todavia no tenes asesores en tu red"
                 description="Cuando existan descendientes asociados por sponsor, se mostraran aca por linea comercial."
-                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+                className={PREMIUM_EMPTY_STATE}
               />
             ) : selectedLevel.partners.length === 0 ? (
               <EmptyState
                 icon={<ChevronRight className="h-5 w-5" />}
                 title={`Sin asesores en ${summarizeNetworkDepth(selectedLevel.depth).toLowerCase()}`}
                 description="Este nivel todavia no tiene asesores visibles con la informacion actual publicada."
-                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+                className={PREMIUM_EMPTY_STATE}
               />
             ) : (
               <div className="space-y-4">
-                <div className="hidden overflow-hidden rounded-[24px] border border-white/10 lg:block">
+                <div className={PREMIUM_TABLE_SHELL}>
                   <table className="min-w-full divide-y divide-white/10 text-sm">
                     <thead className="bg-white/[0.04] text-slate-400">
                       <tr>
@@ -1355,7 +1366,7 @@ function CommissionsView({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(251,191,36,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+        <Card className={PREMIUM_HERO_CARD}>
           <CardContent className="p-6 md:p-7">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">Comisiones registradas</Badge>
@@ -1371,7 +1382,7 @@ function CommissionsView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Solo lectura</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Semantica contable visible</CardTitle>
@@ -1396,7 +1407,7 @@ function CommissionsView({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader>
             <div>
               <CardTitle className="text-xl text-white">Filtros</CardTitle>
@@ -1408,7 +1419,7 @@ function CommissionsView({
           <CardContent className="grid gap-4 pt-0">
             <label className="grid gap-2 text-sm text-slate-300">
               <span>Estado</span>
-              <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as CommissionStatusFilter)} className="rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-3 text-sm text-slate-100 outline-none">
+              <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as CommissionStatusFilter)} className={PREMIUM_FILTER_FIELD}>
                 <option value="all">Todos los estados</option>
                 <option value="generated">Registradas</option>
                 <option value="reversed">Revertidas</option>
@@ -1417,7 +1428,7 @@ function CommissionsView({
 
             <label className="grid gap-2 text-sm text-slate-300">
               <span>Tipo</span>
-              <select value={typeFilter} onChange={(event) => onTypeFilterChange(event.target.value as CommissionTypeFilter)} className="rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-3 text-sm text-slate-100 outline-none">
+              <select value={typeFilter} onChange={(event) => onTypeFilterChange(event.target.value as CommissionTypeFilter)} className={PREMIUM_FILTER_FIELD}>
                 <option value="all">Todos los tipos reales</option>
                 <option value="own_signup">Alta propia</option>
                 <option value="own_recurring">Recurrente propia</option>
@@ -1427,17 +1438,17 @@ function CommissionsView({
 
             <label className="grid gap-2 text-sm text-slate-300">
               <span>Desde</span>
-              <Input type="date" value={from} onChange={(event) => onFromChange(event.target.value)} className="border-white/10 bg-slate-950/40 text-slate-100" />
+              <Input type="date" value={from} onChange={(event) => onFromChange(event.target.value)} className="border-white/10 bg-white/[0.05] text-slate-100" />
             </label>
 
             <label className="grid gap-2 text-sm text-slate-300">
               <span>Hasta</span>
-              <Input type="date" value={to} onChange={(event) => onToChange(event.target.value)} className="border-white/10 bg-slate-950/40 text-slate-100" />
+              <Input type="date" value={to} onChange={(event) => onToChange(event.target.value)} className="border-white/10 bg-white/[0.05] text-slate-100" />
             </label>
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">{hasEntries ? `${entries.length} visibles` : "Sin resultados"}</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Movimientos registrados</CardTitle>
@@ -1452,11 +1463,11 @@ function CommissionsView({
                 icon={<BriefcaseBusiness className="h-5 w-5" />}
                 title={hasActiveFilters ? "No encontramos movimientos con esos filtros" : "Todavia no tenes movimientos registrados"}
                 description={hasActiveFilters ? "Ajusta periodo, tipo o estado para volver a consultar el ledger publicado." : "Cuando existan comisiones reales registradas para tu cuenta, apareceran aca con su trazabilidad."}
-                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+                className={PREMIUM_EMPTY_STATE}
               />
             ) : (
               <div className="space-y-4">
-                <div className="hidden overflow-hidden rounded-[24px] border border-white/10 lg:block">
+                <div className={PREMIUM_TABLE_SHELL}>
                   <table className="min-w-full divide-y divide-white/10 text-sm">
                     <thead className="bg-white/[0.04] text-slate-400">
                       <tr>
@@ -1576,7 +1587,7 @@ function ProfileView({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(56,189,248,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+        <Card className={PREMIUM_HERO_CARD}>
           <CardContent className="p-6 md:p-7">
             <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
               <div className="flex items-start gap-4">
@@ -1606,7 +1617,7 @@ function ProfileView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_PANEL_CARD}>
           <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Cuenta protegida</Badge>}>
             <div>
               <CardTitle className="text-xl text-white">Seguridad</CardTitle>
@@ -1624,7 +1635,7 @@ function ProfileView({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader>
             <div>
               <CardTitle className="text-xl text-white">Informacion personal</CardTitle>
@@ -1643,7 +1654,7 @@ function ProfileView({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+        <Card className={PREMIUM_SURFACE_CARD}>
           <CardHeader>
             <div>
               <CardTitle className="text-xl text-white">Informacion comercial</CardTitle>
@@ -1691,9 +1702,9 @@ function KpiCard({
   }
 
   return (
-    <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
-      <CardContent className="p-5">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-100">{icon}</div>
+    <Card className={PREMIUM_SURFACE_CARD}>
+      <CardContent className="flex min-h-[176px] flex-col p-5">
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-100 shadow-[0_16px_32px_rgba(251,191,36,0.08)]">{icon}</div>
         <p className="mt-4 text-sm font-medium text-slate-400">{label}</p>
         <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{value}</p>
         <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
@@ -1705,11 +1716,11 @@ function KpiCard({
 function MetricStrip({ label, value, icon, dark = false }: { label: string; value: string; icon: React.ReactNode; dark?: boolean }) {
   if (dark) {
     return (
-      <div className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex min-h-[76px] items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
         <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-100">{icon}</div>
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-          <p className="mt-1 truncate text-base font-semibold text-white">{value}</p>
+          <p className="mt-1 break-words text-base font-semibold text-white">{value}</p>
         </div>
       </div>
     );
