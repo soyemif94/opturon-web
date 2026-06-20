@@ -109,6 +109,16 @@ const INITIAL_INVITE_FORM: PartnerInviteFormState = {
 const OPEN_PARTNER_INVITE_EVENT = "opturon:open-partner-invite";
 
 const DEFAULT_PREVIEW_BUNDLE = getPartnerPreviewBundle();
+const PANEL_CLASS =
+  "border-white/8 bg-[linear-gradient(180deg,rgba(19,30,45,0.96),rgba(11,18,30,0.96))] shadow-[0_24px_60px_rgba(2,8,18,0.34)]";
+const PANEL_MUTED_CLASS =
+  "border-white/8 bg-[linear-gradient(180deg,rgba(20,31,47,0.94),rgba(13,21,34,0.94))] shadow-[0_18px_46px_rgba(2,8,18,0.28)]";
+const TABLE_ROW_CLASS =
+  "border-t border-white/8 bg-[rgba(10,17,29,0.58)] transition-colors hover:bg-[rgba(176,80,0,0.08)]";
+const TOOLBAR_FIELD_CLASS =
+  "h-11 rounded-2xl border border-white/12 bg-[rgba(10,17,29,0.72)] px-3 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors placeholder:text-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+const DETAIL_PANEL_CLASS =
+  "border-white/8 bg-[linear-gradient(180deg,rgba(18,29,44,0.98),rgba(8,15,25,0.98))] shadow-[0_30px_80px_rgba(2,8,18,0.42)]";
 
 function KpiCard({
   label,
@@ -122,20 +132,20 @@ function KpiCard({
   icon: typeof Users2;
 }) {
   return (
-    <Card className="overflow-hidden bg-white/95">
+    <Card className={cn("overflow-hidden", PANEL_MUTED_CLASS)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardDescription className="text-[11px] uppercase tracking-[0.18em]">{label}</CardDescription>
-            <CardTitle className="mt-2 text-3xl font-semibold tracking-tight">{value}</CardTitle>
+            <CardDescription className="text-[11px] uppercase tracking-[0.18em] text-muted/90">{label}</CardDescription>
+            <CardTitle className="mt-2 text-3xl font-semibold tracking-tight text-white">{value}</CardTitle>
           </div>
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/20 bg-brand/10 text-brandBright">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/30 bg-brand/12 text-brandBright shadow-[0_10px_24px_rgba(176,80,0,0.12)]">
             <Icon className="h-5 w-5" />
           </span>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="text-sm leading-6 text-muted">{hint}</p>
+        <p className="text-sm leading-6 text-muted/90">{hint}</p>
       </CardContent>
     </Card>
   );
@@ -157,7 +167,7 @@ function ToolbarSelect({
       aria-label={ariaLabel}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-11 rounded-2xl border border-[color:var(--field-border)] bg-white px-3 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      className={TOOLBAR_FIELD_CLASS}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -448,7 +458,7 @@ export function PartnersAdminWorkspace({
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <Card key={`partners-kpi-skeleton-${index}`} className="bg-white/95">
+              <Card key={`partners-kpi-skeleton-${index}`} className={PANEL_MUTED_CLASS}>
                 <CardHeader>
                   <SkeletonLine className="h-3 w-24" />
                   <SkeletonLine className="h-8 w-20" />
@@ -460,7 +470,7 @@ export function PartnersAdminWorkspace({
             ))}
           </div>
 
-          <Card className="bg-white/95">
+          <Card className={PANEL_CLASS}>
             <CardHeader className="pb-3">
               <SkeletonLine className="h-10 w-full max-w-[560px]" />
             </CardHeader>
@@ -476,7 +486,7 @@ export function PartnersAdminWorkspace({
 
     if (errorStatus) {
       return (
-        <Card className="bg-white/95">
+        <Card className={PANEL_CLASS}>
           <CardContent className="p-6">
             <EmptyState
               icon={<CircleSlash />}
@@ -498,11 +508,13 @@ export function PartnersAdminWorkspace({
           <KpiCard label="Con rango asignado" value={kpis.withAssignedRank} hint="Partners que ya tienen historial o rango comercial visible." icon={Crown} />
         </div>
 
-        <Card className="overflow-hidden bg-white/95">
-          <CardHeader className="gap-4 pb-4">
+        <Card className={cn("overflow-hidden", PANEL_CLASS)}>
+          <CardHeader className="gap-4 border-b border-white/8 pb-4">
             <div>
-              <CardTitle className="text-xl">Vista operativa</CardTitle>
-              <CardDescription>Busca por nombre, email o codigo. Filtra por estado y rango sin salir del Admin.</CardDescription>
+              <CardTitle className="text-xl text-white">Vista operativa</CardTitle>
+              <CardDescription className="text-sm text-muted/90">
+                Busca por nombre, email o codigo. Filtra por estado y rango sin salir del Admin.
+              </CardDescription>
             </div>
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="grid gap-3 md:grid-cols-2 xl:flex xl:flex-1 xl:flex-wrap">
@@ -510,7 +522,7 @@ export function PartnersAdminWorkspace({
                   value={query.search}
                   onChange={(event) => setQuery((current) => ({ ...current, search: event.target.value }))}
                   placeholder="Buscar por nombre, email o codigo"
-                  className="min-w-[260px] bg-white"
+                  className={cn("min-w-[260px]", TOOLBAR_FIELD_CLASS)}
                 />
                 <ToolbarSelect
                   ariaLabel="Filtrar partners por estado"
@@ -549,8 +561,8 @@ export function PartnersAdminWorkspace({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                {previewMode ? <Badge variant="outline">Vista local</Badge> : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {previewMode ? <Badge variant="outline" className="border-white/14 bg-white/5 text-muted/90">Vista local</Badge> : null}
                 <Button
                   type="button"
                   className="rounded-2xl"
@@ -561,7 +573,13 @@ export function PartnersAdminWorkspace({
                   <UserPlus2 className="mr-2 h-4 w-4" />
                   Nuevo asesor
                 </Button>
-                <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => void loadPartners("refresh")} disabled={refreshing}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
+                  onClick={() => void loadPartners("refresh")}
+                  disabled={refreshing}
+                >
                   <RefreshCcw className={cn("mr-2 h-4 w-4", refreshing ? "animate-spin" : "")} />
                   Actualizar
                 </Button>
@@ -600,10 +618,10 @@ export function PartnersAdminWorkspace({
 
             {filteredPartners.length > 0 ? (
               <>
-                <div className="hidden overflow-hidden rounded-[24px] border border-[color:var(--border)] lg:block">
+                <div className="hidden overflow-hidden rounded-[24px] border border-white/8 bg-[rgba(8,15,25,0.56)] lg:block">
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
-                      <thead className="bg-[color:var(--surface-muted)] text-[11px] uppercase tracking-[0.16em] text-muted">
+                      <thead className="bg-[rgba(255,255,255,0.04)] text-[11px] uppercase tracking-[0.16em] text-muted/90">
                         <tr>
                           <th className="px-5 py-4">Asesor</th>
                           <th className="px-5 py-4">Codigo</th>
@@ -623,7 +641,7 @@ export function PartnersAdminWorkspace({
                           return (
                             <tr
                               key={partner.id}
-                              className="border-t border-[color:var(--border)] bg-white/90 transition-colors hover:bg-brand/5"
+                              className={TABLE_ROW_CLASS}
                             >
                               <td className="px-5 py-4">
                                 <button
@@ -643,7 +661,9 @@ export function PartnersAdminWorkspace({
                                 </button>
                               </td>
                               <td className="px-5 py-4">
-                                <Badge variant="outline">{getPartnerCode(partner)}</Badge>
+                                <Badge variant="outline" className="border-white/12 bg-white/5 text-white/82">
+                                  {getPartnerCode(partner)}
+                                </Badge>
                               </td>
                               <td className="px-5 py-4">
                                 <Badge variant={getPartnerStatusTone(partner.status)}>{getPartnerStatusLabel(partner.status)}</Badge>
@@ -651,10 +671,10 @@ export function PartnersAdminWorkspace({
                               <td className="px-5 py-4">
                                 <Badge variant={getPartnerRankTone(partner.currentRankCode)}>{getPartnerRankLabel(partner.currentRankCode)}</Badge>
                               </td>
-                              <td className="px-5 py-4 text-muted">{getPartnerSponsorLabel(partner, partnerMap)}</td>
-                              <td className="px-5 py-4 font-medium text-text">{Number(partner.activeAttributionCount || 0)}</td>
-                              <td className="px-5 py-4 text-muted">{formatPartnerDateTime(partner.lastLoginAt)}</td>
-                              <td className="px-5 py-4 text-muted">{formatPartnerDate(partner.createdAt)}</td>
+                              <td className="px-5 py-4 text-muted/90">{getPartnerSponsorLabel(partner, partnerMap)}</td>
+                              <td className="px-5 py-4 font-medium text-white">{Number(partner.activeAttributionCount || 0)}</td>
+                              <td className="px-5 py-4 text-muted/90">{formatPartnerDateTime(partner.lastLoginAt)}</td>
+                              <td className="px-5 py-4 text-muted/90">{formatPartnerDate(partner.createdAt)}</td>
                               <td className="px-5 py-4 text-right">
                                 <PartnerRowActions
                                   partner={partner}
@@ -683,7 +703,7 @@ export function PartnersAdminWorkspace({
                     const availability = getPartnerActionAvailability(partner);
                     const nextStatus = availability.nextStatus;
                     return (
-                      <Card key={partner.id} className="bg-white/95">
+                      <Card key={partner.id} className={PANEL_MUTED_CLASS}>
                         <CardContent className="space-y-4 p-4">
                           <div className="flex items-start justify-between gap-3">
                             <button type="button" onClick={() => void openPartnerDetails(partner.id)} className="flex min-w-0 items-center gap-3 text-left">
@@ -715,7 +735,9 @@ export function PartnersAdminWorkspace({
                           <div className="flex flex-wrap gap-2">
                             <Badge variant={getPartnerStatusTone(partner.status)}>{getPartnerStatusLabel(partner.status)}</Badge>
                             <Badge variant={getPartnerRankTone(partner.currentRankCode)}>{getPartnerRankLabel(partner.currentRankCode)}</Badge>
-                            <Badge variant="outline">{getPartnerCode(partner)}</Badge>
+                            <Badge variant="outline" className="border-white/12 bg-white/5 text-white/82">
+                              {getPartnerCode(partner)}
+                            </Badge>
                           </div>
 
                           <div className="grid gap-3 text-sm text-muted sm:grid-cols-2">
@@ -748,17 +770,17 @@ export function PartnersAdminWorkspace({
           if (!open) resetInviteForm();
         }}
       >
-        <DialogContent className="max-w-2xl rounded-[28px] border-[color:var(--border)] bg-[linear-gradient(180deg,#fffdf9_0%,#fff7ec_100%)]">
+        <DialogContent className={cn("max-w-2xl rounded-[28px]", DETAIL_PANEL_CLASS)}>
           <DialogHeader>
-            <DialogTitle>Nuevo asesor</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Nuevo asesor</DialogTitle>
+            <DialogDescription className="text-muted/90">
               Crea el asesor en estado seguro de invitacion y envia un acceso de un solo uso por email.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={submitPartnerInvite} className="grid gap-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm text-muted">
+              <label className="grid gap-2 text-sm text-muted/90">
                 Nombre
                 <Input
                   value={inviteForm.displayName}
@@ -767,7 +789,7 @@ export function PartnersAdminWorkspace({
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm text-muted">
+              <label className="grid gap-2 text-sm text-muted/90">
                 Email
                 <Input
                   value={inviteForm.email}
@@ -777,7 +799,7 @@ export function PartnersAdminWorkspace({
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm text-muted">
+              <label className="grid gap-2 text-sm text-muted/90">
                 Telefono opcional
                 <Input
                   value={inviteForm.phone}
@@ -785,7 +807,7 @@ export function PartnersAdminWorkspace({
                   placeholder="+54 9 ..."
                 />
               </label>
-              <label className="grid gap-2 text-sm text-muted">
+              <label className="grid gap-2 text-sm text-muted/90">
                 Codigo
                 <Input
                   value={inviteForm.code}
@@ -796,12 +818,12 @@ export function PartnersAdminWorkspace({
               </label>
             </div>
 
-            <label className="grid gap-2 text-sm text-muted">
+            <label className="grid gap-2 text-sm text-muted/90">
               Sponsor opcional
               <select
                 value={inviteForm.sponsorPartnerId}
                 onChange={(event) => setInviteForm((current) => ({ ...current, sponsorPartnerId: event.target.value }))}
-                className="h-11 rounded-2xl border border-[color:var(--field-border)] bg-white px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className={TOOLBAR_FIELD_CLASS}
               >
                 <option value="">Sin sponsor</option>
                 {partners
@@ -814,12 +836,18 @@ export function PartnersAdminWorkspace({
               </select>
             </label>
 
-            <div className="rounded-2xl border border-[color:var(--border)] bg-white/80 px-4 py-3 text-xs leading-6 text-muted">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs leading-6 text-muted/90">
               El asesor se crea sin contrasena operativa. Solo podra ingresar despues de aceptar la invitacion enviada por email.
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => setInviteDialogOpen(false)} disabled={inviteBusy}>
+              <Button
+                type="button"
+                variant="secondary"
+                className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
+                onClick={() => setInviteDialogOpen(false)}
+                disabled={inviteBusy}
+              >
                 Cancelar
               </Button>
               <Button type="submit" className="rounded-2xl" disabled={inviteBusy}>
@@ -839,11 +867,18 @@ export function PartnersAdminWorkspace({
           }
         }}
       >
-        <DialogContent className="left-auto right-0 top-0 h-screen max-w-[520px] translate-x-0 translate-y-0 overflow-y-auto rounded-none border-r-0 bg-[linear-gradient(180deg,#fffdf9_0%,#fff7ec_100%)] p-0">
-          <div className="border-b border-[color:var(--border)] px-6 py-5">
+        <DialogContent
+          className={cn(
+            "left-auto right-0 top-0 h-screen max-w-[520px] translate-x-0 translate-y-0 overflow-y-auto rounded-none border-r-0 p-0",
+            DETAIL_PANEL_CLASS
+          )}
+        >
+          <div className="border-b border-white/8 px-6 py-5">
             <DialogHeader>
-              <DialogTitle>Detalle del asesor</DialogTitle>
-              <DialogDescription>Identidad, carrera comercial y trazabilidad reciente del partner seleccionado.</DialogDescription>
+              <DialogTitle className="text-white">Detalle del asesor</DialogTitle>
+              <DialogDescription className="text-muted/90">
+                Identidad, carrera comercial y trazabilidad reciente del partner seleccionado.
+              </DialogDescription>
             </DialogHeader>
           </div>
 
@@ -856,7 +891,7 @@ export function PartnersAdminWorkspace({
               </div>
             ) : selectedPartner ? (
               <>
-                <Card className="bg-white/95">
+                <Card className={PANEL_MUTED_CLASS}>
                   <CardContent className="space-y-5 p-5">
                     <div className="flex items-start gap-4">
                       <SimpleAvatar
@@ -869,8 +904,8 @@ export function PartnersAdminWorkspace({
                           <Badge variant={getPartnerStatusTone(selectedPartner.status)}>{getPartnerStatusLabel(selectedPartner.status)}</Badge>
                           <Badge variant={getPartnerRankTone(selectedPartner.currentRankCode)}>{getPartnerRankLabel(selectedPartner.currentRankCode)}</Badge>
                         </div>
-                        <h2 className="mt-3 text-2xl font-semibold tracking-tight">{getPartnerDisplayName(selectedPartner)}</h2>
-                        <p className="mt-1 text-sm text-muted">{selectedPartner.email}</p>
+                        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">{getPartnerDisplayName(selectedPartner)}</h2>
+                        <p className="mt-1 text-sm text-muted/90">{selectedPartner.email}</p>
                       </div>
                     </div>
 
@@ -883,11 +918,13 @@ export function PartnersAdminWorkspace({
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/95">
+                <Card className={PANEL_MUTED_CLASS}>
                   <CardHeader>
                     <div>
-                      <CardTitle>Carrera</CardTitle>
-                      <CardDescription>Vista actual del sponsor, el rango visible y la cartera activa del partner.</CardDescription>
+                      <CardTitle className="text-white">Carrera</CardTitle>
+                      <CardDescription className="text-muted/90">
+                        Vista actual del sponsor, el rango visible y la cartera activa del partner.
+                      </CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="grid gap-4 pt-0 sm:grid-cols-2">
@@ -898,14 +935,14 @@ export function PartnersAdminWorkspace({
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/95">
+                <Card className={PANEL_MUTED_CLASS}>
                   <CardHeader
                     action={
                       getPartnerActionAvailability(selectedPartner).canResendInvite ? (
                         <Button
                           type="button"
                           variant="secondary"
-                          className="rounded-2xl"
+                          className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
                           onClick={() => void resendInvite(selectedPartner.id)}
                           disabled={busyPartnerId === selectedPartner.id}
                         >
@@ -934,8 +971,10 @@ export function PartnersAdminWorkspace({
                     }
                   >
                     <div>
-                      <CardTitle>Acciones</CardTitle>
-                      <CardDescription>Solo se conectan operaciones reales ya disponibles en el backend seguro.</CardDescription>
+                      <CardTitle className="text-white">Acciones</CardTitle>
+                      <CardDescription className="text-muted/90">
+                        Solo se conectan operaciones reales ya disponibles en el backend seguro.
+                      </CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="grid gap-3 pt-0">
@@ -949,11 +988,13 @@ export function PartnersAdminWorkspace({
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/95">
+                <Card className={PANEL_MUTED_CLASS}>
                   <CardHeader>
                     <div>
-                      <CardTitle>Clientes atribuidos</CardTitle>
-                      <CardDescription>Solo mostramos atribuciones reales entregadas por el endpoint admin.</CardDescription>
+                      <CardTitle className="text-white">Clientes atribuidos</CardTitle>
+                      <CardDescription className="text-muted/90">
+                        Solo mostramos atribuciones reales entregadas por el endpoint admin.
+                      </CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
@@ -972,19 +1013,21 @@ export function PartnersAdminWorkspace({
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/95">
+                <Card className={PANEL_MUTED_CLASS}>
                   <CardHeader>
                     <div>
-                      <CardTitle>Auditoria reciente</CardTitle>
-                      <CardDescription>Historial breve sin exponer tokens, UUIDs completos ni datos internos sensibles.</CardDescription>
+                      <CardTitle className="text-white">Auditoria reciente</CardTitle>
+                      <CardDescription className="text-muted/90">
+                        Historial breve sin exponer tokens, UUIDs completos ni datos internos sensibles.
+                      </CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
                     {selectedPartnerDetails?.audit && selectedPartnerDetails.audit.length > 0 ? (
                       selectedPartnerDetails.audit.slice(0, 6).map((entry) => (
-                        <div key={entry.id} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
-                          <p className="text-sm font-medium text-text">{buildAuditHeadline(entry)}</p>
-                          <p className="mt-1 text-xs text-muted">
+                        <div key={entry.id} className="rounded-2xl border border-white/8 bg-[rgba(255,255,255,0.03)] px-4 py-3">
+                          <p className="text-sm font-medium text-white">{buildAuditHeadline(entry)}</p>
+                          <p className="mt-1 text-xs text-muted/90">
                             {entry.actorType ? `Actor: ${entry.actorType}` : "Actor no informado"} · {formatPartnerDateTime(entry.createdAt)}
                           </p>
                         </div>
@@ -1048,11 +1091,17 @@ function PartnerRowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="h-10 w-10 rounded-2xl p-0" aria-label="Abrir acciones del asesor">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-10 w-10 rounded-2xl border border-white/8 bg-white/5 p-0 text-white/82 hover:bg-white/10"
+          aria-label="Abrir acciones del asesor"
+        >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-56 border-white/10 bg-[rgba(12,19,31,0.98)]">
         <DropdownMenuItem onClick={onViewDetail}>Ver detalle</DropdownMenuItem>
         <DropdownMenuItem disabled>Editar perfil · Proximamente</DropdownMenuItem>
         <DropdownMenuItem disabled>Ver clientes · Proximamente</DropdownMenuItem>
@@ -1070,20 +1119,20 @@ function PartnerRowActions({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-white/90 px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-1 text-sm font-medium text-text">{value}</p>
+    <div className="rounded-2xl border border-white/8 bg-[rgba(255,255,255,0.04)] px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted/90">{label}</p>
+      <p className="mt-1 text-sm font-medium text-white">{value}</p>
     </div>
   );
 }
 
 function AttributionCard({ attribution }: { attribution: AdminPartnerAttribution }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
+    <div className="rounded-2xl border border-white/8 bg-[rgba(255,255,255,0.04)] px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-text">{attribution.clinicName || attribution.tenantId || "Cliente atribuido"}</p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-sm font-medium text-white">{attribution.clinicName || attribution.tenantId || "Cliente atribuido"}</p>
+          <p className="mt-1 text-xs text-muted/90">
             {attribution.attributionSource ? `${attribution.attributionSource} · ` : ""}
             {formatPartnerDateTime(attribution.attributedAt)}
           </p>
@@ -1092,7 +1141,7 @@ function AttributionCard({ attribution }: { attribution: AdminPartnerAttribution
           {String(attribution.status || "").toLowerCase() === "active" ? "Activa" : "No activa"}
         </Badge>
       </div>
-      {attribution.notes ? <p className="mt-3 text-sm leading-6 text-muted">{attribution.notes}</p> : null}
+      {attribution.notes ? <p className="mt-3 text-sm leading-6 text-muted/90">{attribution.notes}</p> : null}
     </div>
   );
 }
@@ -1110,7 +1159,9 @@ function ActionHint({
     <div
       className={cn(
         "rounded-2xl border px-4 py-3",
-        disabled ? "border-dashed border-[color:var(--border)] bg-surface/60 text-muted" : "border-[color:var(--border)] bg-white text-text"
+        disabled
+          ? "border-dashed border-white/10 bg-[rgba(255,255,255,0.03)] text-muted/90"
+          : "border-white/8 bg-[rgba(255,255,255,0.05)] text-white"
       )}
     >
       <p className="text-sm font-medium">{title}</p>

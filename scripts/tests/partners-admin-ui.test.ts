@@ -89,6 +89,9 @@ function testSensitiveHeadersStayOutOfUi() {
   assert.doesNotMatch(source, /x-portal-key/i);
   assert.doesNotMatch(source, /x-portal-actor-id/i);
   assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/i);
+  assert.match(source, /bg-\[linear-gradient\(180deg,rgba\(19,30,45,0\.96\),rgba\(11,18,30,0\.96\)\)\]/);
+  assert.match(source, /bg-\[rgba\(8,15,25,0\.56\)\]/);
+  assert.doesNotMatch(source, /bg-white\/95/);
 }
 
 function run() {
