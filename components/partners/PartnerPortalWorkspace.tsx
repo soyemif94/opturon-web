@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CircleDollarSign, Loader2, Search, Sparkles, TrendingUp, Users2 } from "lucide-react";
+import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, Loader2, Search, Sparkles, Star, TrendingUp, Users2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +38,8 @@ type WorkspaceState = {
   rankHistory?: PartnerPortalRankHistoryEntry[];
 };
 
+type PreviewState = "default" | "empty" | "error";
+
 const PAGE_LOADERS: Record<PartnerPortalPage, Array<keyof WorkspaceState>> = {
   home: ["partner", "summary", "clients", "rankHistory"],
   clients: ["clients"],
@@ -61,6 +63,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const searchParams = useSearchParams();
   const previewMode = process.env.NODE_ENV !== "production" && searchParams.get("preview") === "1";
+  const previewState = (process.env.NODE_ENV !== "production" ? String(searchParams.get("previewState") || "default").trim().toLowerCase() : "default") as PreviewState;
 
   useEffect(() => {
     let cancelled = false;
@@ -71,8 +74,11 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
 
       try {
         if (previewMode) {
+          if (previewState === "error") {
+            throw new Error("No pudimos cargar la vista previa del portal partner.");
+          }
           if (cancelled) return;
-          setState(getPartnerPortalPreviewData());
+          setState(buildPartnerPreviewState(previewState));
           setStatus("ready");
           return;
         }
@@ -114,7 +120,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
     return () => {
       cancelled = true;
     };
-  }, [page, previewMode]);
+  }, [page, previewMode, previewState]);
 
   if (status === "loading") {
     return <WorkspaceLoading page={page} />;
@@ -125,9 +131,9 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
       <EmptyState
         icon={<AlertCircle className="h-5 w-5" />}
         title="No pudimos cargar esta vista"
-        description={error || "Reintentá en unos segundos para volver a consultar tus datos."}
+        description={error || "Reintenta en unos segundos para volver a consultar tus datos."}
         action={{ label: "Reintentar", onClick: () => window.location.reload() }}
-        className="min-h-[420px] border-slate-200 bg-white/85 text-slate-900"
+        className="min-h-[420px] border-white/10 bg-white/[0.04] text-slate-100"
       />
     );
   }
@@ -171,59 +177,71 @@ function HomeView({
   rankHistory: PartnerPortalRankHistoryEntry[];
 }) {
   const currentRank = resolveCurrentRank(summary, partner, rankHistory);
-  const recentClients = clients.slice(0, 4);
+  const recentClients = clients.slice(0, 5);
+  const activeClientsValue = summary?.activeClients ?? partner?.activeAttributionCount ?? null;
+  const totalClientsValue = clients.length > 0 ? clients.length : null;
+  const nextRankLabel = resolveNextRankLabel(currentRank);
+  const stepProgress = resolveCareerStepProgress(currentRank);
+  const currentIndex = PARTNER_CAREER_LADDER.findIndex((level) => level.code === String(currentRank || "").trim().toLowerCase());
+  const currentRequirements = currentIndex >= 0 ? PARTNER_CAREER_LADDER[currentIndex]?.rules || [] : [];
+  const nextRequirements = currentIndex >= 0 ? PARTNER_CAREER_LADDER[currentIndex + 1]?.rules || [] : [];
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="overflow-hidden border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_28%),radial-gradient(circle_at_78%_14%,rgba(59,130,246,0.10),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,250,249,0.96))]">
+      <section className="grid gap-4 xl:grid-cols-[1.18fr_0.82fr]">
+        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(244,114,182,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
           <CardContent className="p-6 md:p-7">
-            <Badge variant="success">Resumen ejecutivo</Badge>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 md:text-[2.4rem]">Hola, {safePartnerName(partner)}.</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">Este es el resumen de tu actividad comercial en Opturon.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">Inicio</Badge>
+              <Badge className="border-white/10 bg-white/6 text-slate-200">Datos reales</Badge>
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.6rem]">Hola, {safePartnerName(partner)}.</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+              Tu actividad comercial visible hoy en Opturon, con foco en cartera, estado de cuenta y evolucion de rango.
+            </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <Badge variant={partnerStatusVariant(partner?.status)}>{formatPartnerStatus(partner?.status)}</Badge>
-              <Badge variant="outline">{formatRankLabel(currentRank)}</Badge>
-              <Badge variant="muted">Ultimo acceso: {formatPortalDateTime(partner?.lastLoginAt)}</Badge>
+              <Badge className="border-white/10 bg-white/6 text-slate-100">{formatRankLabel(currentRank)}</Badge>
+              <Badge className="border-white/10 bg-white/6 text-slate-300">Ultimo acceso: {formatPortalDateTime(partner?.lastLoginAt)}</Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 bg-white/90">
-          <CardHeader action={<Badge variant="outline">Lectura segura</Badge>}>
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Lectura segura</Badge>}>
             <div>
-              <CardTitle className="text-xl text-slate-950">Carrera</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                La API actual expone historial de rango. Esta tarjeta muestra sólo datos reales disponibles hoy.
+              <CardTitle className="text-xl text-white">Actividad comercial</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Resumen ejecutivo del partner usando solamente datos disponibles en esta fase del backend.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
-            <MetricStrip label="Rango actual" value={formatRankLabel(currentRank)} icon={<BadgeCheck className="h-4 w-4" />} />
-            <MetricStrip label="Siguiente paso" value={resolveNextRankLabel(currentRank)} icon={<ArrowRight className="h-4 w-4" />} />
-            <MetricStrip label="Progreso visual" value={`${resolveCareerStepProgress(currentRank)}%`} icon={<TrendingUp className="h-4 w-4" />} />
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
-              El endpoint actual todavia no expone requisitos pendientes cuantificados para self-service. La escalera y las
-              reglas informativas estan visibles en <a className="font-medium text-slate-900 underline" href="/partners/career">Mi carrera</a>.
+            <MetricStrip dark label="Rango actual" value={formatRankLabel(currentRank)} icon={<BadgeCheck className="h-4 w-4" />} />
+            <MetricStrip dark label="Proximo rango" value={nextRankLabel} icon={<ArrowRight className="h-4 w-4" />} />
+            <MetricStrip dark label="Progreso visible" value={`${stepProgress}%`} icon={<TrendingUp className="h-4 w-4" />} />
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
+              Tu estado actual es <span className="font-semibold text-white">{formatPartnerStatus(partner?.status)}</span>. Si el backend publica metas cuantificadas
+              adicionales en proximas etapas, este bloque se enriquecera sin recalcular datos desde el navegador.
             </div>
           </CardContent>
         </Card>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={<Users2 className="h-4 w-4" />} label="Clientes activos" value={String(summary?.activeClients ?? partner?.activeAttributionCount ?? 0)} detail="Tomado del resumen real del partner." />
-        <KpiCard icon={<CircleDollarSign className="h-4 w-4" />} label="Comision generada" value={formatPortalMoney(summary?.generatedCommissions || null)} detail="No se recalcula en frontend." />
-        <KpiCard icon={<Sparkles className="h-4 w-4" />} label="Rango actual" value={formatRankLabel(currentRank)} detail="Segun contrato backend actual." />
-        <KpiCard icon={<BriefcaseBusiness className="h-4 w-4" />} label="Estado de cuenta" value={formatPartnerStatus(partner?.status)} detail="Acceso y operacion del partner." />
+        <KpiCard dark icon={<Users2 className="h-4 w-4" />} label="Clientes activos" value={formatMetricValue(activeClientsValue)} detail="Valor servido desde tu resumen partner actual." />
+        <KpiCard dark icon={<BriefcaseBusiness className="h-4 w-4" />} label="Cartera visible" value={formatMetricValue(totalClientsValue)} detail="Clientes atribuidos visibles hoy en el portal." />
+        <KpiCard dark icon={<Sparkles className="h-4 w-4" />} label="Rango actual" value={formatRankLabel(currentRank)} detail="Tomado del rango visible en backend o historial publicado." />
+        <KpiCard dark icon={<Star className="h-4 w-4" />} label="Progreso al proximo rango" value={`${stepProgress}%`} detail="Referencia visual segun el rango actual publicado." />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="border-slate-200/80 bg-white/90">
-          <CardHeader action={<Badge variant="muted">{recentClients.length} recientes</Badge>}>
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">{recentClients.length} recientes</Badge>}>
             <div>
-              <CardTitle className="text-xl text-slate-950">Clientes recientes</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                Tus atribuciones mas recientes, usando exclusivamente `GET /api/partners/me/clients`.
+              <CardTitle className="text-xl text-white">Clientes recientes</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Ultimas atribuciones visibles desde `GET /api/partners/me/clients`, sin exponer identificadores internos.
               </CardDescription>
             </div>
           </CardHeader>
@@ -231,23 +249,24 @@ function HomeView({
             {recentClients.length === 0 ? (
               <EmptyState
                 icon={<Users2 className="h-5 w-5" />}
-                title="Todavia no tenes clientes atribuidos"
-                description="Cuando una venta quede asociada a tu cuenta, vas a verla reflejada aca."
-                className="min-h-[220px] border-slate-200 bg-slate-50/80 text-slate-900"
+                title="Todavia no tenes clientes visibles"
+                description="Cuando una atribucion quede asociada a tu cuenta, aparecera aca con su estado real."
+                className="min-h-[260px] border-white/10 bg-white/[0.03] text-slate-100"
               />
             ) : (
               recentClients.map((client) => (
-                <div key={client.id} className="rounded-[22px] border border-slate-200/80 bg-slate-50/70 p-4">
+                <div key={client.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-950">{client.clinicName || "Cliente atribuido"}</p>
-                      <p className="mt-1 text-xs text-slate-500">Fecha de atribucion: {formatPortalDate(client.attributedAt)}</p>
+                      <p className="text-sm font-semibold text-white">{client.clinicName || "Cliente atribuido"}</p>
+                      <p className="mt-1 text-xs text-slate-400">Fecha de atribucion: {formatPortalDate(client.attributedAt)}</p>
                     </div>
                     <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1">Origen: {client.attributionSource || "No informado"}</span>
-                    {client.endedAt ? <span className="rounded-full border border-slate-200 bg-white px-3 py-1">Cierre: {formatPortalDate(client.endedAt)}</span> : null}
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
+                    <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Origen: {client.attributionSource || "No informado"}</span>
+                    {client.notes ? <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Detalle: {client.notes}</span> : null}
+                    {client.endedAt ? <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Cierre: {formatPortalDate(client.endedAt)}</span> : null}
                   </div>
                 </div>
               ))
@@ -255,25 +274,89 @@ function HomeView({
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 bg-white/90">
-          <CardHeader action={<Badge variant="warning">Proxima etapa</Badge>}>
-            <div>
-              <CardTitle className="text-xl text-slate-950">Comisiones y actividad</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                La primera version del portal no inventa movimientos que el backend todavia no publica en modo self-service.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-[24px] border border-dashed border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(241,245,249,0.92))] p-5">
-              <p className="text-base font-semibold text-slate-950">El detalle de comisiones estara disponible proximamente.</p>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Mientras tanto, mantenemos visible el total generado del resumen y dejamos preparada la vista de comisiones
-                para una fase con endpoint dedicado.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4">
+          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+            <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Rank progress</Badge>}>
+              <div>
+                <CardTitle className="text-xl text-white">Progreso de carrera</CardTitle>
+                <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                  Referencia visible desde `GET /api/partners/me/rank-progress` y rango actual publicado.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 pt-0">
+              <div className="grid gap-3 md:grid-cols-2">
+                <MetricStrip dark label="Rango actual" value={formatRankLabel(currentRank)} icon={<BadgeCheck className="h-4 w-4" />} />
+                <MetricStrip dark label="Proximo rango" value={nextRankLabel} icon={<ArrowRight className="h-4 w-4" />} />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm text-slate-400">
+                  <span>Progreso visible</span>
+                  <span className="font-medium text-slate-200">{stepProgress}%</span>
+                </div>
+                <div className="h-3 rounded-full bg-white/10">
+                  <div className="h-3 rounded-full bg-[linear-gradient(90deg,#f59e0b,#ec4899)]" style={{ width: `${stepProgress}%` }} />
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Requisitos cumplidos</p>
+                  {currentRequirements.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {currentRequirements.map((rule) => (
+                        <span key={rule} className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">
+                          {rule}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-slate-400">Todavia no hay un rango evaluado visible para marcar requisitos cumplidos.</p>
+                  )}
+                </div>
+
+                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Requisitos pendientes</p>
+                  {nextRequirements.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {nextRequirements.map((rule) => (
+                        <span key={rule} className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs text-amber-100">
+                          {rule}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-slate-400">No hay un proximo rango publicado o ya alcanzaste el nivel maximo visible.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300">
+                La evaluacion oficial y cualquier meta cuantificada siguen dependiendo del backend. Esta vista no recalcula reglas privadas ni comisiones.
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(14,23,39,0.92),rgba(12,21,37,0.86))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.32)]">
+            <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Proximamente</Badge>}>
+              <div>
+                <CardTitle className="text-xl text-white">Proxima etapa</CardTitle>
+                <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                  Hoja de ruta visible del portal partner sin adelantar datos no publicados.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.04] p-5">
+                <p className="text-base font-semibold text-white">El detalle de pagos y comisiones estara disponible en una proxima etapa.</p>
+                <p className="mt-3 text-sm leading-7 text-slate-300">
+                  Esta version prioriza visibilidad de cartera, estado y carrera usando solamente informacion real disponible hoy.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </section>
     </div>
   );
@@ -317,9 +400,9 @@ function ClientsView({
             <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Buscar por nombre" className="border-slate-200 bg-slate-50 pl-9 text-slate-900 placeholder:text-slate-400" />
           </div>
           <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none">
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status === "all" ? "Todos los estados" : summarizeAttributionStatus(status)}
+            {statuses.map((currentStatus) => (
+              <option key={currentStatus} value={currentStatus}>
+                {currentStatus === "all" ? "Todos los estados" : summarizeAttributionStatus(currentStatus)}
               </option>
             ))}
           </select>
@@ -349,7 +432,9 @@ function ClientsView({
                     <p className="truncate font-semibold text-slate-950">{client.clinicName || "Cliente atribuido"}</p>
                     <p className="mt-1 truncate text-xs text-slate-500">{client.notes || "Sin observaciones visibles"}</p>
                   </div>
-                  <div><Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge></div>
+                  <div>
+                    <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
+                  </div>
                   <div className="text-slate-600">{formatPortalDate(client.attributedAt)}</div>
                   <div className="text-slate-600">{client.attributionSource || "No informado"}</div>
                 </div>
@@ -421,8 +506,8 @@ function CareerView({
               </div>
             </div>
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
-              El endpoint actual de progreso devuelve historial de rango, pero todavia no expone requisitos pendientes ni
-              metas cuantificadas para self-service. Por eso la interfaz no inventa calculos adicionales.
+              El endpoint actual de progreso devuelve historial de rango, pero todavia no expone requisitos pendientes ni metas cuantificadas para self-service.
+              Por eso la interfaz no inventa calculos adicionales.
             </div>
           </CardContent>
         </Card>
@@ -493,8 +578,7 @@ function CommissionsView({ summary, partner }: { summary: PartnerPortalSummary |
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Resumen actual</p>
             <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{formatPortalMoney(summary?.generatedCommissions || null)}</p>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              Este importe proviene del resumen del partner. El detalle de movimientos todavia no esta publicado para
-              consulta directa del asesor.
+              Este importe proviene del resumen del partner. El detalle de movimientos todavia no esta publicado para consulta directa del asesor.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge variant={partnerStatusVariant(partner?.status)}>{formatPartnerStatus(partner?.status)}</Badge>
@@ -506,7 +590,7 @@ function CommissionsView({ summary, partner }: { summary: PartnerPortalSummary |
             <p className="text-lg font-semibold text-slate-950">El detalle de movimientos estara disponible en la proxima etapa.</p>
             <div className="mt-4 grid gap-3 text-sm leading-7 text-slate-600 md:grid-cols-2">
               <RuleCallout title="Como se genera" body="Pagos reales, acreditados y no revertidos." />
-              <RuleCallout title="Tipos previstos" body="Alta propia, recurrente propio, lineas y reversión cuando corresponda." />
+              <RuleCallout title="Tipos previstos" body="Alta propia, recurrente propio, lineas y reversion cuando corresponda." />
               <RuleCallout title="Transparencia" body="La UI no recalcula importes ni arma simulaciones en produccion." />
               <RuleCallout title="Siguiente fase" body="Cuando exista endpoint self-service, esta pantalla ya esta lista para conectarlo." />
             </div>
@@ -571,7 +655,7 @@ function ProfileView({
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
-            <RuleCallout title="Sin edición" body="Email, sponsor y rango siguen siendo de solo lectura hasta contar con endpoints dedicados." />
+            <RuleCallout title="Sin edicion" body="Email, sponsor y rango siguen siendo de solo lectura hasta contar con endpoints dedicados." />
             <RuleCallout title="Sin UUIDs expuestos" body="Los identificadores opacos del backend no se muestran como dato de negocio." />
             <RuleCallout title="Sin secretos" body="No se renderizan claves internas, actor IDs ni metadata sensible." />
           </CardContent>
@@ -581,20 +665,57 @@ function ProfileView({
   );
 }
 
-function KpiCard({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {
+function KpiCard({
+  icon,
+  label,
+  value,
+  detail,
+  dark = false
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  dark?: boolean;
+}) {
+  if (!dark) {
+    return (
+      <Card className="border-slate-200/80 bg-white/92">
+        <CardContent className="p-5">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700">{icon}</div>
+          <p className="mt-4 text-sm font-medium text-slate-500">{label}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="border-slate-200/80 bg-white/92">
+    <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
       <CardContent className="p-5">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700">{icon}</div>
-        <p className="mt-4 text-sm font-medium text-slate-500">{label}</p>
-        <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-100">{icon}</div>
+        <p className="mt-4 text-sm font-medium text-slate-400">{label}</p>
+        <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{value}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
       </CardContent>
     </Card>
   );
 }
 
-function MetricStrip({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+function MetricStrip({ label, value, icon, dark = false }: { label: string; value: string; icon: React.ReactNode; dark?: boolean }) {
+  if (dark) {
+    return (
+      <div className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-100">{icon}</div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+          <p className="mt-1 truncate text-base font-semibold text-white">{value}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50/80 p-4">
       <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700">{icon}</div>
@@ -627,21 +748,40 @@ function ProfileField({ label, value }: { label: string; value: string }) {
 function WorkspaceLoading({ page }: { page: PartnerPortalPage }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-[28px] border border-slate-200 bg-white/88 p-5">
-        <SkeletonLine className="h-4 w-28 bg-slate-200" />
-        <SkeletonLine className="mt-4 h-8 w-2/5 bg-slate-200" />
-        <SkeletonLine className="mt-3 h-4 w-4/5 bg-slate-200" />
+      <div className="rounded-[30px] border border-white/10 bg-white/[0.04] p-5">
+        <SkeletonLine className="h-4 w-28 bg-white/10" />
+        <SkeletonLine className="mt-4 h-8 w-2/5 bg-white/10" />
+        <SkeletonLine className="mt-3 h-4 w-4/5 bg-white/10" />
       </div>
       <div className={`grid gap-4 ${page === "clients" ? "lg:grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4"}`}>
-        <SkeletonCard className="border-slate-200 bg-white/90" />
-        <SkeletonCard className="border-slate-200 bg-white/90" />
-        <SkeletonCard className="border-slate-200 bg-white/90" />
-        <SkeletonCard className="border-slate-200 bg-white/90" />
+        <SkeletonCard className="border-white/10 bg-white/[0.04]" />
+        <SkeletonCard className="border-white/10 bg-white/[0.04]" />
+        <SkeletonCard className="border-white/10 bg-white/[0.04]" />
+        <SkeletonCard className="border-white/10 bg-white/[0.04]" />
       </div>
-      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-600">
+      <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
         <Loader2 className="h-4 w-4 animate-spin" />
         Cargando datos reales del portal partner...
       </div>
     </div>
   );
+}
+
+function buildPartnerPreviewState(previewState: PreviewState): WorkspaceState {
+  const base = getPartnerPortalPreviewData();
+  if (previewState === "empty") {
+    return {
+      ...base,
+      summary: {
+        ...base.summary,
+        activeClients: 0
+      },
+      clients: []
+    };
+  }
+  return base;
+}
+
+function formatMetricValue(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "Sin dato";
 }

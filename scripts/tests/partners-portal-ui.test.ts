@@ -19,8 +19,15 @@ function testPortalRoutesExist() {
 
 function testPortalShellIsIndependent() {
   const shellSource = read("components/partners/PartnerPortalShell.tsx");
+  const partnersPortalLib = read("lib/partners-portal.ts");
   assert.match(shellSource, /Portal de asesores/);
   assert.match(shellSource, /PARTNER_PORTAL_NAV/);
+  assert.match(partnersPortalLib, /label:\s*"Inicio"/);
+  assert.match(partnersPortalLib, /label:\s*"Mis clientes"/);
+  assert.match(partnersPortalLib, /label:\s*"Mi carrera"/);
+  assert.match(partnersPortalLib, /label:\s*"Comisiones"/);
+  assert.match(partnersPortalLib, /label:\s*"Perfil"/);
+  assert.match(shellSource, /lg:hidden/);
   assert.doesNotMatch(shellSource, /AppShell/);
   assert.doesNotMatch(shellSource, /Inbox/);
 }
@@ -34,6 +41,22 @@ function testPortalWorkspaceUsesSecureEndpointsOnly() {
   assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/);
   assert.doesNotMatch(source, /portalActorId/);
   assert.doesNotMatch(source, /x-partner-id/i);
+}
+
+function testHomeUsesRealDataAndStates() {
+  const source = read("components/partners/PartnerPortalWorkspace.tsx");
+  assert.match(source, /Clientes activos/);
+  assert.match(source, /Cartera visible/);
+  assert.match(source, /Progreso al proximo rango/);
+  assert.match(source, /Clientes recientes/);
+  assert.match(source, /Requisitos cumplidos/);
+  assert.match(source, /Requisitos pendientes/);
+  assert.match(source, /No pudimos cargar esta vista/);
+  assert.match(source, /Todavia no tenes clientes visibles/);
+  assert.match(source, /Cargando datos reales del portal partner/);
+  assert.match(source, /previewState/);
+  assert.match(source, /lg:hidden/);
+  assert.doesNotMatch(source, /Comision generada/);
 }
 
 function testPartnerLoginBrandingIsDedicated() {
@@ -51,6 +74,7 @@ function run() {
   testPortalRoutesExist();
   testPortalShellIsIndependent();
   testPortalWorkspaceUsesSecureEndpointsOnly();
+  testHomeUsesRealDataAndStates();
   testPartnerLoginBrandingIsDedicated();
   console.log("partners-portal-ui.test.ts: ok");
 }
