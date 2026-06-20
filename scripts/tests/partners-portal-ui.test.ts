@@ -201,6 +201,35 @@ function testCommissionsUseRegisteredLedgerSemantics() {
   assert.match(migration, /partner_commission_entries_payment_status_check CHECK \("paymentStatus" IN \('accredited'\)\)/);
 }
 
+function testProfileUsesSafeIdentityView() {
+  const source = read("components/partners/PartnerPortalWorkspace.tsx");
+  const partnersPortalLib = read("lib/partners-portal.ts");
+  const backendRepo = read("../src/repositories/partners.repository.js");
+
+  assert.match(source, /Consulta tu identidad y estado dentro de Opturon/);
+  assert.match(source, /Cuenta protegida/);
+  assert.match(source, /Informacion personal/);
+  assert.match(source, /Informacion comercial/);
+  assert.match(source, /Codigo de asesor/);
+  assert.match(source, /Fecha de ingreso/);
+  assert.match(source, /Ultimo acceso/);
+  assert.match(source, /Cerrar sesion/);
+  assert.match(source, /No informado/);
+  assert.match(source, /Sin edicion sensible/);
+  assert.match(source, /Datos protegidos/);
+  assert.match(source, /partnerInitials/);
+  assert.match(source, /profileFallback/);
+  assert.match(partnersPortalLib, /export function partnerInitials/);
+  assert.match(partnersPortalLib, /export function profileFallback/);
+  assert.match(backendRepo, /pp\.code/);
+  assert.match(backendRepo, /pp\.phone/);
+  assert.match(backendRepo, /rel\."sponsorPartnerId"/);
+  assert.match(backendRepo, /pa\."lastLoginAt"/);
+  assert.doesNotMatch(source, /passwordHash/);
+  assert.doesNotMatch(source, /actorUserId/);
+  assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/);
+}
+
 function testPartnerLoginBrandingIsDedicated() {
   const loginPage = read("app/(auth)/login/page.tsx");
   const loginScreen = read("components/auth/LoginScreen.tsx");
@@ -221,6 +250,7 @@ function run() {
   testClientsUsesRealDataAndPortfolioUx();
   testNetworkUsesSecureHierarchyView();
   testCommissionsUseRegisteredLedgerSemantics();
+  testProfileUsesSafeIdentityView();
   testPartnerLoginBrandingIsDedicated();
   console.log("partners-portal-ui.test.ts: ok");
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CalendarRange, ChevronRight, Loader2, Search, SlidersHorizontal, Sparkles, Star, TrendingUp, Users2, X } from "lucide-react";
+import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CalendarRange, ChevronRight, Loader2, LockKeyhole, Mail, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, TrendingUp, UserCircle2, Users2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +35,9 @@ import {
   isOpaqueIdentifier,
   partnerCommissionStatusVariant,
   partnerBillingVariant,
+  partnerInitials,
   partnerStatusVariant,
+  profileFallback,
   resolvePartnerCommissionClientName,
   resolvePartnerNetworkDisplayName,
   resolvePartnerClientDisplayName,
@@ -1560,57 +1562,104 @@ function ProfileView({
   summary: PartnerPortalSummary | null;
   rankHistory: PartnerPortalRankHistoryEntry[];
 }) {
-  const sponsor = partner?.sponsorPartnerId;
-  const sponsorLabel = sponsor && !isOpaqueIdentifier(sponsor) ? sponsor : sponsor ? "Asignado internamente" : "Sin sponsor visible";
   const currentRank = resolveCurrentRank(summary, partner, rankHistory);
+  const name = safePartnerName(partner, "Asesor");
+  const sponsorLabel = profileFallback(partner?.sponsorPartnerId, "No informado");
+  const phoneLabel = profileFallback(partner?.profile?.phone, "No informado");
+  const emailLabel = profileFallback(partner?.email, "No informado");
+  const codeLabel = profileFallback(partner?.profile?.code, "No informado");
+  const joinedAtLabel = partner?.createdAt ? formatPortalDate(partner.createdAt) : "No informado";
+  const lastLoginLabel = partner?.lastLoginAt ? formatPortalDateTime(partner.lastLoginAt) : "No informado";
+  const statusLabel = formatPartnerStatus(partner?.status);
+  const rankLabel = formatRankLabel(currentRank);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/90 p-5 md:flex-row md:items-end md:justify-between">
-        <div>
-          <Badge variant="outline">Perfil</Badge>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Datos de tu cuenta</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-            Vista de solo lectura usando `GET /api/partners/me`, sin editar campos que el backend no habilita.
-          </p>
-        </div>
-        <Button variant="secondary" onClick={() => window.location.assign("/api/auth/signout?callbackUrl=/login")}>
-          Cerrar sesion
-        </Button>
-      </div>
+      <section className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(56,189,248,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+          <CardContent className="p-6 md:p-7">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-[24px] border border-amber-300/20 bg-amber-300/10 text-xl font-semibold text-amber-100 shadow-[0_16px_40px_rgba(251,191,36,0.12)]">
+                  {partnerInitials(partner)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-white/10 bg-white/6 text-slate-200">Perfil</Badge>
+                    <Badge variant={partnerStatusVariant(partner?.status)}>{statusLabel}</Badge>
+                  </div>
+                  <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-[2.5rem]">{name}</h1>
+                  <p className="mt-2 text-sm leading-7 text-slate-300">
+                    Consulta tu identidad y estado dentro de Opturon desde una vista segura y de solo lectura.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Badge className="border-white/10 bg-white/6 text-slate-100">Codigo: {codeLabel}</Badge>
+                    <Badge className="border-white/10 bg-white/6 text-slate-100">Rango: {rankLabel}</Badge>
+                  </div>
+                </div>
+              </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
-        <Card className="border-slate-200/80 bg-white/92">
-          <CardContent className="grid gap-4 p-5 md:grid-cols-2">
-            <ProfileField label="Nombre" value={safePartnerName(partner)} />
-            <ProfileField label="Email" value={partner?.email || "Sin dato"} />
-            <ProfileField label="Codigo" value={partner?.profile?.code || "Sin codigo"} />
-            <ProfileField label="Telefono" value={partner?.profile?.phone || "Sin dato"} />
-            <ProfileField label="Estado" value={formatPartnerStatus(partner?.status)} />
-            <ProfileField label="Fecha de alta" value={formatPortalDate(partner?.createdAt)} />
-            <ProfileField label="Ultimo acceso" value={formatPortalDateTime(partner?.lastLoginAt)} />
-            <ProfileField label="Sponsor" value={sponsorLabel} />
-            <ProfileField label="Rango actual" value={formatRankLabel(currentRank)} />
-            <ProfileField label="Clientes activos" value={String(summary?.activeClients ?? partner?.activeAttributionCount ?? 0)} />
+              <Button variant="secondary" className="border-white/10 bg-white/[0.06] text-slate-100 hover:bg-white/10" onClick={() => window.location.assign("/api/auth/signout?callbackUrl=/login")}>
+                Cerrar sesion
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 bg-white/92">
-          <CardHeader>
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Cuenta protegida</Badge>}>
             <div>
-              <CardTitle className="text-xl text-slate-950">Notas de esta etapa</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                Cuidamos no exponer identificadores internos ni propiedades no aprobadas para el partner.
+              <CardTitle className="text-xl text-white">Seguridad</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Protegemos la cuenta del asesor manteniendo datos sensibles y acciones criticas fuera de esta fase de lectura.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
-            <RuleCallout title="Sin edicion" body="Email, sponsor y rango siguen siendo de solo lectura hasta contar con endpoints dedicados." />
-            <RuleCallout title="Sin UUIDs expuestos" body="Los identificadores opacos del backend no se muestran como dato de negocio." />
-            <RuleCallout title="Sin secretos" body="No se renderizan claves internas, actor IDs ni metadata sensible." />
+            <RuleCallout dark title="Sesion segura" body="El cierre de sesion usa el flujo actual del portal para invalidar el acceso del partner." />
+            <RuleCallout dark title="Sin edicion sensible" body="Email, sponsor, rango, estado y codigo permanecen en solo lectura hasta contar con endpoints seguros reales." />
+            <RuleCallout dark title="Datos protegidos" body="No se exponen IDs internos, hashes, actor interno ni metadata tecnica." />
           </CardContent>
         </Card>
-      </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader>
+            <div>
+              <CardTitle className="text-xl text-white">Informacion personal</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Nombre, email, telefono, fecha de ingreso y ultimo acceso usando solamente `GET /api/partners/me`.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 pt-0 md:grid-cols-2">
+            <ProfileField dark icon={<UserCircle2 className="h-4 w-4" />} label="Nombre" value={name} />
+            <ProfileField dark icon={<Mail className="h-4 w-4" />} label="Email" value={emailLabel} />
+            <ProfileField dark icon={<ShieldCheck className="h-4 w-4" />} label="Telefono" value={phoneLabel} />
+            <ProfileField dark icon={<CalendarRange className="h-4 w-4" />} label="Fecha de ingreso" value={joinedAtLabel} />
+            <ProfileField dark icon={<LockKeyhole className="h-4 w-4" />} label="Ultimo acceso" value={lastLoginLabel} />
+            <ProfileField dark icon={<BadgeCheck className="h-4 w-4" />} label="Estado de cuenta" value={statusLabel} />
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader>
+            <div>
+              <CardTitle className="text-xl text-white">Informacion comercial</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Codigo visible, sponsor, rango actual y estado del perfil, sin exponer claves tecnicas ni UUIDs.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 pt-0 md:grid-cols-2">
+            <ProfileField dark icon={<Sparkles className="h-4 w-4" />} label="Codigo de asesor" value={codeLabel} />
+            <ProfileField dark icon={<Users2 className="h-4 w-4" />} label="Sponsor" value={sponsorLabel} />
+            <ProfileField dark icon={<Star className="h-4 w-4" />} label="Rango actual" value={rankLabel} />
+            <ProfileField dark icon={<ShieldCheck className="h-4 w-4" />} label="Estado del perfil" value={statusLabel} />
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
@@ -1694,7 +1743,21 @@ function RuleCallout({ title, body, dark = false }: { title: string; body: strin
   );
 }
 
-function ProfileField({ label, value }: { label: string; value: string }) {
+function ProfileField({ label, value, icon, dark = false }: { label: string; value: string; icon?: React.ReactNode; dark?: boolean }) {
+  if (dark) {
+    return (
+      <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+        <div className="flex items-center gap-3">
+          {icon ? <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-100">{icon}</div> : null}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+            <p className="mt-1 break-words text-sm font-semibold text-white">{value}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-[20px] border border-slate-200 bg-slate-50/75 p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>

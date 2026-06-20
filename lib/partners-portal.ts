@@ -285,6 +285,25 @@ export function safePartnerName(partner?: PartnerPortalPartner | null, fallback 
   return String(partner?.profile?.displayName || "").trim() || String(partner?.profile?.legalName || "").trim() || String(partner?.email || "").trim() || fallback;
 }
 
+export function profileFallback(value?: string | null, fallback = "No informado") {
+  const normalized = String(value || "").trim();
+  if (!normalized) return fallback;
+  if (isOpaqueIdentifier(normalized)) return fallback;
+  return normalized;
+}
+
+export function partnerInitials(partner?: PartnerPortalPartner | null) {
+  const name = safePartnerName(partner, "");
+  const tokens = name
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (tokens.length === 0) return "PA";
+  const first = tokens[0]?.charAt(0) || "";
+  const second = (tokens[1]?.charAt(0) || tokens[0]?.charAt(1) || "").trim();
+  return `${first}${second}`.toUpperCase() || "PA";
+}
+
 export function isOpaqueIdentifier(value?: string | null) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || "").trim());
 }
