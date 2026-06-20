@@ -12,11 +12,15 @@ import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import {
   PARTNER_CAREER_LADDER,
   getPartnerPortalPreviewData,
+  type PartnerPortalCareerProgress,
+  type PartnerPortalCareerRequirement,
   type PartnerPortalClientAttribution,
   type PartnerPortalPage,
   type PartnerPortalPartner,
   type PartnerPortalRankHistoryEntry,
   type PartnerPortalSummary,
+  clampCareerProgress,
+  formatCareerRequirementValue,
   formatPartnerStatus,
   formatPortalDate,
   formatPortalDateTime,
@@ -32,6 +36,8 @@ import {
   resolveCurrentRank,
   resolveNextRankLabel,
   safePartnerName,
+  summarizeCareerEvaluationStatus,
+  summarizeCareerRequirementGap,
   summarizeAttributionSource,
   summarizeAttributionStatus,
   summarizePartnerBillingState,
@@ -43,15 +49,16 @@ type WorkspaceState = {
   summary?: PartnerPortalSummary | null;
   clients?: PartnerPortalClientAttribution[];
   rankHistory?: PartnerPortalRankHistoryEntry[];
+  careerProgress?: PartnerPortalCareerProgress | null;
 };
 
-type PreviewState = "default" | "empty" | "error";
+type PreviewState = "default" | "empty" | "error" | "max";
 type ClientSortKey = "recent" | "oldest" | "name";
 
 const PAGE_LOADERS: Record<PartnerPortalPage, Array<keyof WorkspaceState>> = {
   home: ["partner", "summary", "clients", "rankHistory"],
   clients: ["clients"],
-  career: ["rankHistory", "summary", "partner"],
+  career: ["careerProgress", "partner", "summary"],
   commissions: ["summary", "partner"],
   profile: ["partner", "summary", "rankHistory"]
 };
@@ -60,7 +67,8 @@ const ENDPOINTS: Record<keyof WorkspaceState, string> = {
   partner: "/api/partners/me",
   summary: "/api/partners/me/summary",
   clients: "/api/partners/me/clients",
-  rankHistory: "/api/partners/me/rank-progress"
+  rankHistory: "/api/partners/me/rank-progress",
+  careerProgress: "/api/partners/me/rank-progress"
 };
 
 export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
@@ -106,6 +114,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
             if (key === "partner") return [key, payload?.partner || null] as const;
             if (key === "summary") return [key, payload?.summary || null] as const;
             if (key === "clients") return [key, Array.isArray(payload?.clients) ? payload.clients : []] as const;
+            if (key === "careerProgress") return [key, payload || null] as const;
             return [key, Array.isArray(payload?.rankHistory) ? payload.rankHistory : []] as const;
           })
         );
@@ -168,7 +177,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   }
 
   if (page === "career") {
-    return <CareerView partner={state.partner || null} summary={state.summary || null} rankHistory={state.rankHistory || []} />;
+    return <CareerView partner={state.partner || null} summary={state.summary || null} progress={state.careerProgress || null} />;
   }
 
   if (page === "commissions") {
@@ -790,69 +799,171 @@ function DrawerField({ label, value, multiline = false }: { label: string; value
 function CareerView({
   partner,
   summary,
-  rankHistory
+  progress
 }: {
   partner: PartnerPortalPartner | null;
   summary: PartnerPortalSummary | null;
-  rankHistory: PartnerPortalRankHistoryEntry[];
+  progress: PartnerPortalCareerProgress | null;
 }) {
-  const currentRank = resolveCurrentRank(summary, partner, rankHistory);
-  const nextRank = resolveNextRankLabel(currentRank);
-  const stepProgress = resolveCareerStepProgress(currentRank);
+  const rankHistory = Array.isArray(progress?.rankHistory) ? progress?.rankHistory : [];
+  const currentRank = progress?.currentRank || resolveCurrentRank(summary, partner, rankHistory);
+  const nextRank = progress?.nextRank || null;
+  const progressPercent = clampCareerProgress(progress?.progressPercent);
+  const fallbackProgress = resolveCareerStepProgress(currentRank);
+  const visibleProgress = progressPercent ?? fallbackProgress;
+  const requirements = Array.isArray(progress?.requirements) ? progress.requirements : [];
+  const completedRequirements = requirements.filter((item) => item.completed);
+  const pendingRequirements = requirements.filter((item) => !item.completed);
+  const evaluationStatus = summarizeCareerEvaluationStatus(progress?.evaluationStatus);
+  const hasEvaluation = String(progress?.evaluationStatus || "").trim().toLowerCase() === "complete";
+  const isMaxRank = !nextRank && String(currentRank || "").trim().toLowerCase() === "emperador";
+  const evaluationWindow = progress?.windowStart && progress?.windowEnd
+    ? `${formatPortalDate(progress.windowStart)} al ${formatPortalDate(progress.windowEnd)}`
+    : null;
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="border-slate-200/80 bg-white/92">
-          <CardHeader action={<Badge variant="success">{formatRankLabel(currentRank)}</Badge>}>
+      <section className="grid gap-4 xl:grid-cols-[1fr_0.96fr]">
+        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.16),transparent_24%),linear-gradient(180deg,rgba(8,18,34,0.95),rgba(9,21,38,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+          <CardHeader action={<Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{formatRankLabel(currentRank)}</Badge>}>
             <div>
-              <CardTitle className="text-2xl text-slate-950">Mi carrera</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                Historial real de rango y lectura transparente de la escalera comercial aprobada.
+              <CardTitle className="text-3xl text-white">Mi carrera</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-7 text-slate-300">
+                Entende tu rango actual, el siguiente objetivo visible y lo que falta para avanzar usando solo la evaluacion publicada por backend.
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <MetricStrip label="Rango actual" value={formatRankLabel(currentRank)} icon={<BadgeCheck className="h-4 w-4" />} />
-            <MetricStrip label="Proximo rango" value={nextRank} icon={<ArrowRight className="h-4 w-4" />} />
-            <MetricStrip label="Fecha de obtencion" value={formatPortalDate(rankHistory[0]?.effectiveFrom)} icon={<Sparkles className="h-4 w-4" />} />
-            <div>
-              <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
-                <span>Progreso de carrera</span>
-                <span>{stepProgress}%</span>
-              </div>
-              <div className="h-3 rounded-full bg-slate-100">
-                <div className="h-3 rounded-full bg-[linear-gradient(90deg,#10b981,#3b82f6)]" style={{ width: `${stepProgress}%` }} />
-              </div>
+          <CardContent className="space-y-5 pt-0">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="border-white/10 bg-white/8 text-slate-100">{evaluationStatus}</Badge>
+              {progress?.evaluatedAt ? <Badge className="border-white/10 bg-white/8 text-slate-200">Evaluado: {formatPortalDate(progress.evaluatedAt)}</Badge> : null}
+              {evaluationWindow ? <Badge className="border-white/10 bg-white/8 text-slate-200">Ventana: {evaluationWindow}</Badge> : null}
             </div>
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
-              El endpoint actual de progreso devuelve historial de rango, pero todavia no expone requisitos pendientes ni metas cuantificadas para self-service.
-              Por eso la interfaz no inventa calculos adicionales.
+            <p className="max-w-2xl text-sm leading-7 text-slate-300">
+              {isMaxRank
+                ? "Alcanzaste el nivel mas alto de la carrera."
+                : nextRank
+                  ? `Tu proximo rango visible es ${formatRankLabel(nextRank)}. Esta vista muestra faltantes reales sin recalcular reglas en el navegador.`
+                  : hasEvaluation
+                    ? "No hay un proximo rango visible en la evaluacion actual."
+                    : "Todavia no hay una evaluacion cuantificada visible para mostrar faltantes reales."}
+            </p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <MetricStrip dark label="Rango actual" value={formatRankLabel(currentRank)} icon={<BadgeCheck className="h-4 w-4" />} />
+              <MetricStrip dark label="Proximo rango" value={nextRank ? formatRankLabel(nextRank) : (isMaxRank ? "Rango maximo" : "Sin dato")} icon={<ArrowRight className="h-4 w-4" />} />
+              <MetricStrip dark label="Progreso visible" value={visibleProgress === null ? "Sin dato" : `${visibleProgress}%`} icon={<TrendingUp className="h-4 w-4" />} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 bg-white/92">
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Progreso principal</Badge>}>
+            <div>
+              <CardTitle className="text-2xl text-white">Progreso principal</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Indicadores tomados directamente de la evaluacion partner y sus umbrales oficiales.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-0">
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm text-slate-400">
+                <span>Avance hacia el siguiente rango</span>
+                <span className="font-medium text-slate-100">{visibleProgress === null ? "Sin dato" : `${visibleProgress}%`}</span>
+              </div>
+              <div className="h-3 rounded-full bg-white/10">
+                <div className="h-3 rounded-full bg-[linear-gradient(90deg,#f59e0b,#38bdf8)]" style={{ width: `${visibleProgress ?? 6}%` }} />
+              </div>
+            </div>
+            {requirements.length > 0 ? (
+              <>
+                <div className="grid gap-3">
+                  {requirements.map((requirement) => (
+                    <CareerRequirementCard key={requirement.code} requirement={requirement} />
+                  ))}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Requisitos cumplidos</p>
+                    {completedRequirements.length > 0 ? (
+                      <div className="mt-3 grid gap-3">
+                        {completedRequirements.map((requirement) => (
+                          <RequirementPill key={requirement.code} tone="success" text={requirement.label} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-slate-400">Todavia no hay requisitos marcados como cumplidos en la ultima evaluacion visible.</p>
+                    )}
+                  </div>
+                  <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Requisitos pendientes</p>
+                    {pendingRequirements.length > 0 ? (
+                      <div className="mt-3 grid gap-3">
+                        {pendingRequirements.map((requirement) => (
+                          <RequirementPill key={requirement.code} tone="warning" text={summarizeCareerRequirementGap(requirement)} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-slate-400">{isMaxRank ? "No hay requisitos pendientes porque ya alcanzaste el rango maximo visible." : "No hay faltantes visibles en esta evaluacion."}</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <EmptyState
+                icon={<Sparkles className="h-5 w-5" />}
+                title={hasEvaluation ? "Respuesta incompleta para progreso detallado" : "Sin evaluacion cuantificada visible"}
+                description={hasEvaluation
+                  ? "El backend publica rango y evaluacion, pero no hay requisitos suficientes en esta respuesta para mostrar faltantes reales."
+                  : "Cuando exista una evaluacion de carrera publicada para tu cuenta, esta vista mostrara objetivos cumplidos y pendientes."}
+                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
           <CardHeader>
             <div>
-              <CardTitle className="text-2xl text-slate-950">Escalera aprobada</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-                Reglas informativas visibles para el partner. Los calculos y evaluaciones oficiales siguen dependiendo del backend.
+              <CardTitle className="text-2xl text-white">Escalera de rangos</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Reglas aprobadas y jerarquia visible para entender tu ubicacion actual y el proximo tramo.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
-            {PARTNER_CAREER_LADDER.map((level) => {
-              const active = String(currentRank || "").trim().toLowerCase() === level.code;
+            {PARTNER_CAREER_LADDER.map((level, index) => {
+              const normalizedLevel = level.code;
+              const currentIndex = PARTNER_CAREER_LADDER.findIndex((item) => item.code === String(currentRank || "").trim().toLowerCase());
+              const nextIndex = PARTNER_CAREER_LADDER.findIndex((item) => item.code === String(nextRank || "").trim().toLowerCase());
+              const isCurrent = normalizedLevel === String(currentRank || "").trim().toLowerCase();
+              const isNext = nextRank ? normalizedLevel === String(nextRank || "").trim().toLowerCase() : false;
+              const reached = currentIndex >= 0 && index < currentIndex;
+              const future = currentIndex >= 0 && index > currentIndex;
               return (
-                <div key={level.code} className={`rounded-[22px] border p-4 ${active ? "border-emerald-200 bg-emerald-50/80" : "border-slate-200 bg-slate-50/70"}`}>
+                <div
+                  key={level.code}
+                  className={`rounded-[24px] border p-4 ${
+                    isCurrent
+                      ? "border-emerald-300/30 bg-emerald-300/10"
+                      : isNext
+                        ? "border-amber-300/30 bg-amber-300/10"
+                        : reached
+                          ? "border-sky-300/20 bg-sky-300/10"
+                          : future || nextIndex >= 0
+                            ? "border-white/10 bg-white/[0.04]"
+                            : "border-white/10 bg-white/[0.04]"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-base font-semibold text-slate-950">{level.label}</p>
-                    {active ? <Badge variant="success">Actual</Badge> : <Badge variant="outline">Nivel</Badge>}
+                    <p className="text-base font-semibold text-white">{level.label}</p>
+                    {isCurrent ? <Badge variant="success">Actual</Badge> : isNext ? <Badge variant="warning">Siguiente</Badge> : reached ? <Badge variant="outline">Alcanzado</Badge> : <Badge variant="outline">Futuro</Badge>}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {level.rules.map((rule) => (
-                      <span key={rule} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">{rule}</span>
+                      <span key={rule} className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-xs text-slate-200">{rule}</span>
                     ))}
                   </div>
                 </div>
@@ -860,23 +971,86 @@ function CareerView({
             })}
           </CardContent>
         </Card>
-      </section>
 
-      <Card className="border-slate-200/80 bg-white/92">
-        <CardHeader>
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(14,23,39,0.92),rgba(12,21,37,0.86))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.32)]">
+          <CardHeader>
           <div>
-            <CardTitle className="text-xl text-slate-950">Aclaraciones vigentes</CardTitle>
-            <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
+            <CardTitle className="text-xl text-white">Aclaraciones vigentes</CardTitle>
+            <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
               Contenido informativo aprobado para esta fase visual del portal.
             </CardDescription>
           </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 pt-0 md:grid-cols-3">
-          <RuleCallout title="Tope recurrente" body="Tope recurrente acumulado por cliente: 15%." />
-          <RuleCallout title="Sin pago por reclutar" body="No se paga por reclutar. La comision depende de operacion real." />
-          <RuleCallout title="Evento valido" body="Solo se comisionan pagos reales acreditados y no revertidos." />
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0">
+            <RuleCallout dark title="Tope recurrente" body="Tope recurrente acumulado por cliente: 15%." />
+            <RuleCallout dark title="Sin pago por reclutar" body="No se paga por reclutar. La comision depende de operacion real." />
+            <RuleCallout dark title="Evento valido" body="Solo se comisionan pagos reales acreditados y no revertidos." />
+            <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300">
+              {isMaxRank
+                ? "Alcanzaste el nivel mas alto de la carrera."
+                : hasEvaluation
+                  ? "Los faltantes visibles dependen de la ultima evaluacion publicada. Si la respuesta cambia, esta vista se actualiza sin recalcular reglas privadas."
+                  : "Hasta que exista una evaluacion visible, solo podemos mostrar la escalera aprobada y tu rango actual publicado."}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function CareerRequirementCard({ requirement }: { requirement: PartnerPortalCareerRequirement }) {
+  const currentValue = formatCareerRequirementValue(requirement, requirement.currentValue);
+  const targetValue = formatCareerRequirementValue(requirement, requirement.targetValue);
+  const completion = requirement.completed
+    ? 100
+    : requirement.valueType === "currency"
+      ? (() => {
+          const current = Number(requirement.currentValue || 0);
+          const target = Number(requirement.targetValue || 0);
+          if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) return 0;
+          return Math.max(0, Math.min(100, Math.round((current / target) * 100)));
+        })()
+      : (() => {
+          const current = Number(requirement.currentValue || 0);
+          const target = Number(requirement.targetValue || 0);
+          if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) return 0;
+          return Math.max(0, Math.min(100, Math.round((current / target) * 100)));
+        })();
+
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">{requirement.label}</p>
+          <p className="mt-1 text-sm text-slate-300">{currentValue} de {targetValue}</p>
+        </div>
+        <Badge variant={requirement.completed ? "success" : "warning"}>
+          {requirement.completed ? "Cumplido" : "Pendiente"}
+        </Badge>
+      </div>
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+          <span>Progreso</span>
+          <span>{completion}%</span>
+        </div>
+        <div className="h-2.5 rounded-full bg-white/10">
+          <div className="h-2.5 rounded-full bg-[linear-gradient(90deg,#f59e0b,#38bdf8)]" style={{ width: `${completion}%` }} />
+        </div>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-300">{summarizeCareerRequirementGap(requirement)}</p>
+    </div>
+  );
+}
+
+function RequirementPill({ text, tone }: { text: string; tone: "success" | "warning" }) {
+  return (
+    <div className={`rounded-[18px] border px-3 py-2 text-sm ${
+      tone === "success"
+        ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
+        : "border-amber-300/20 bg-amber-300/10 text-amber-100"
+    }`}>
+      {text}
     </div>
   );
 }
@@ -1047,7 +1221,15 @@ function MetricStrip({ label, value, icon, dark = false }: { label: string; valu
   );
 }
 
-function RuleCallout({ title, body }: { title: string; body: string }) {
+function RuleCallout({ title, body, dark = false }: { title: string; body: string; dark?: boolean }) {
+  if (dark) {
+    return (
+      <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
+      </div>
+    );
+  }
   return (
     <div className="rounded-[20px] border border-slate-200 bg-slate-50/80 p-4">
       <p className="text-sm font-semibold text-slate-950">{title}</p>
@@ -1089,6 +1271,66 @@ function WorkspaceLoading({ page }: { page: PartnerPortalPage }) {
 
 function buildPartnerPreviewState(previewState: PreviewState): WorkspaceState {
   const base = getPartnerPortalPreviewData();
+  if (previewState === "max") {
+    return {
+      ...base,
+      partner: {
+        ...base.partner,
+        currentRankCode: "emperador"
+      },
+      summary: {
+        ...base.summary,
+        latestRank: "emperador"
+      },
+      careerProgress: {
+        currentRank: "emperador",
+        nextRank: null,
+        progressPercent: 100,
+        evaluationStatus: "complete",
+        evaluatedAt: "2026-06-19T12:00:00.000Z",
+        windowStart: "2026-05-20T00:00:00.000Z",
+        windowEnd: "2026-06-19T23:59:59.000Z",
+        requirements: [
+          {
+            code: "active_clients",
+            label: "Clientes activos",
+            currentValue: 12,
+            targetValue: 8,
+            remainingValue: 0,
+            completed: true,
+            valueType: "count",
+            currency: null
+          },
+          {
+            code: "generated_commission",
+            label: "Objetivo comercial acreditado",
+            currentValue: "210000.00",
+            targetValue: "150000.00",
+            remainingValue: "0.00",
+            completed: true,
+            valueType: "currency",
+            currency: "ARS"
+          }
+        ],
+        rankHistory: [
+          {
+            id: "preview-rank-max",
+            partnerId: base.partner.id,
+            rankCode: "emperador",
+            effectiveFrom: "2026-06-19T12:00:00.000Z",
+            effectiveTo: null,
+            notes: "partner_rank_evaluated",
+            createdAt: "2026-06-19T12:00:00.000Z"
+          },
+          ...base.rankHistory
+        ],
+        latestEvaluation: {
+          currentRankCode: "emperador",
+          nextRankCode: null
+        }
+      }
+    };
+  }
   if (previewState === "empty") {
     return {
       ...base,
@@ -1096,7 +1338,8 @@ function buildPartnerPreviewState(previewState: PreviewState): WorkspaceState {
         ...base.summary,
         activeClients: 0
       },
-      clients: []
+      clients: [],
+      careerProgress: null
     };
   }
   return base;

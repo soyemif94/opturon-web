@@ -59,6 +59,40 @@ function testHomeUsesRealDataAndStates() {
   assert.doesNotMatch(source, /Comision generada/);
 }
 
+function testCareerUsesPublishedProgressOnly() {
+  const source = read("components/partners/PartnerPortalWorkspace.tsx");
+  const partnersPortalLib = read("lib/partners-portal.ts");
+  const backendService = read("../src/services/partners.service.js");
+  const backendRepo = read("../src/repositories/partners.repository.js");
+
+  assert.match(source, /Mi carrera/);
+  assert.match(source, /Progreso principal/);
+  assert.match(source, /Entende tu rango actual/);
+  assert.match(source, /Requisitos cumplidos/);
+  assert.match(source, /Requisitos pendientes/);
+  assert.match(source, /Alcanzaste el nivel mas alto de la carrera/);
+  assert.match(source, /Sin evaluacion cuantificada visible/);
+  assert.match(source, /Respuesta incompleta para progreso detallado/);
+  assert.match(source, /Escalera de rangos/);
+  assert.match(source, /Actual/);
+  assert.match(source, /Siguiente/);
+  assert.match(source, /Futuro/);
+  assert.match(source, /Tope recurrente/);
+  assert.match(source, /Sin pago por reclutar/);
+  assert.match(source, /Solo se comisionan pagos reales acreditados y no revertidos/);
+  assert.match(source, /careerProgress/);
+  assert.match(partnersPortalLib, /PartnerPortalCareerProgress/);
+  assert.match(partnersPortalLib, /summarizeCareerRequirementGap/);
+  assert.match(partnersPortalLib, /Te faltan/);
+  assert.match(partnersPortalLib, /formatCareerRequirementValue/);
+  assert.match(backendService, /findLatestRankEvaluationByPartnerId/);
+  assert.match(backendService, /progressPercent/);
+  assert.match(backendService, /requirements/);
+  assert.match(backendRepo, /partner_rank_evaluations/);
+  assert.doesNotMatch(source, /partnerId=/i);
+  assert.doesNotMatch(source, /Mercado Pago/i);
+}
+
 function testClientsUsesRealDataAndPortfolioUx() {
   const source = read("components/partners/PartnerPortalWorkspace.tsx");
   const partnersPortalLib = read("lib/partners-portal.ts");
@@ -119,6 +153,7 @@ function run() {
   testPortalShellIsIndependent();
   testPortalWorkspaceUsesSecureEndpointsOnly();
   testHomeUsesRealDataAndStates();
+  testCareerUsesPublishedProgressOnly();
   testClientsUsesRealDataAndPortfolioUx();
   testPartnerLoginBrandingIsDedicated();
   console.log("partners-portal-ui.test.ts: ok");

@@ -61,6 +61,30 @@ export type PartnerPortalRankHistoryEntry = {
   createdAt?: string | null;
 };
 
+export type PartnerPortalCareerRequirement = {
+  code: string;
+  label: string;
+  currentValue: string | number | null;
+  targetValue: string | number | null;
+  remainingValue: string | number | null;
+  completed: boolean;
+  valueType?: "count" | "currency" | null;
+  currency?: string | null;
+};
+
+export type PartnerPortalCareerProgress = {
+  currentRank?: string | null;
+  nextRank?: string | null;
+  progressPercent?: number | null;
+  requirements?: PartnerPortalCareerRequirement[];
+  evaluationStatus?: string | null;
+  evaluatedAt?: string | null;
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  latestEvaluation?: Record<string, unknown> | null;
+  rankHistory?: PartnerPortalRankHistoryEntry[];
+};
+
 export const PARTNER_PORTAL_PREVIEW_HEADER = "x-opturon-partner-preview";
 
 export const PARTNER_PORTAL_NAV = [
@@ -137,6 +161,44 @@ export function resolveCareerStepProgress(rank?: string | null) {
   const currentIndex = PARTNER_CAREER_LADDER.findIndex((item) => item.code === String(rank || "").trim().toLowerCase());
   if (currentIndex < 0) return 10;
   return Math.round(((currentIndex + 1) / PARTNER_CAREER_LADDER.length) * 100);
+}
+
+export function clampCareerProgress(value?: number | null) {
+  const safe = Number(value);
+  if (!Number.isFinite(safe)) return null;
+  return Math.max(0, Math.min(100, Math.round(safe)));
+}
+
+export function summarizeCareerEvaluationStatus(status?: string | null) {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "complete" || normalized === "completed") return "Evaluacion disponible";
+  if (normalized === "missing") return "Sin evaluacion visible";
+  return "Estado de evaluacion no disponible";
+}
+
+export function formatCareerRequirementValue(
+  requirement?: Pick<PartnerPortalCareerRequirement, "valueType" | "currency" | "currentValue"> | null,
+  value?: string | number | null
+) {
+  const target = value ?? requirement?.currentValue ?? null;
+  if (target === null || target === undefined || target === "") return "Sin dato";
+  if (requirement?.valueType === "currency") {
+    return formatPortalMoney(target, requirement.currency || "ARS");
+  }
+  if (typeof target === "number") return String(target);
+  const numeric = Number(target);
+  if (Number.isFinite(numeric) && String(target).trim() !== "") {
+    return requirement?.valueType === "count" ? String(Math.round(numeric)) : String(target);
+  }
+  return String(target);
+}
+
+export function summarizeCareerRequirementGap(requirement?: PartnerPortalCareerRequirement | null) {
+  if (!requirement) return "Sin informacion disponible";
+  if (requirement.completed) return "Objetivo cumplido";
+  const remaining = formatCareerRequirementValue(requirement, requirement.remainingValue);
+  if (requirement.code === "active_clients") return `Te faltan ${remaining} clientes`;
+  return `Te faltan ${remaining}`;
 }
 
 export function formatPortalDate(value?: string | null, options?: Intl.DateTimeFormatOptions) {
@@ -366,5 +428,42 @@ export function getPartnerPortalPreviewData() {
     }
   ];
 
-  return { partner, summary, clients, rankHistory };
+  const careerProgress: PartnerPortalCareerProgress = {
+    currentRank: "lider",
+    nextRank: "coordinador",
+    progressPercent: 67,
+    evaluationStatus: "complete",
+    evaluatedAt: "2026-06-18T14:00:00.000Z",
+    windowStart: "2026-05-19T00:00:00.000Z",
+    windowEnd: "2026-06-18T23:59:59.000Z",
+    requirements: [
+      {
+        code: "active_clients",
+        label: "Clientes activos",
+        currentValue: 4,
+        targetValue: 6,
+        remainingValue: 2,
+        completed: false,
+        valueType: "count",
+        currency: null
+      },
+      {
+        code: "generated_commission",
+        label: "Objetivo comercial acreditado",
+        currentValue: "184500.00",
+        targetValue: "220000.00",
+        remainingValue: "35500.00",
+        completed: false,
+        valueType: "currency",
+        currency: "ARS"
+      }
+    ],
+    rankHistory,
+    latestEvaluation: {
+      currentRankCode: "lider",
+      nextRankCode: "coordinador"
+    }
+  };
+
+  return { partner, summary, clients, rankHistory, careerProgress };
 }
