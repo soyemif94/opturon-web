@@ -47,10 +47,12 @@ function testOpturonAdminGuardRequiresOpturonScope() {
 
 function testRouteResolutionWhitelistsOnlyKnownBackendEndpoints() {
   assert.equal(resolveAdminPartnersBackendPath("GET", []), "/api/admin/partners");
+  assert.equal(resolveAdminPartnersBackendPath("POST", ["invite"]), "/api/admin/partners/invite");
   assert.equal(
     resolveAdminPartnersBackendPath("POST", ["commission-plans", "gold-plan", "versions"]),
     "/api/admin/partners/commission-plans/gold-plan/versions"
   );
+  assert.equal(resolveAdminPartnersBackendPath("POST", ["partner-1", "resend-invite"]), "/api/admin/partners/partner-1/resend-invite");
   assert.equal(
     resolveAdminPartnersBackendPath("POST", ["partner-1", "rank", "evaluate"]),
     "/api/admin/partners/partner-1/rank/evaluate"

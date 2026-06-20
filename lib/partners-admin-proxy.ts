@@ -39,6 +39,10 @@ export function resolveAdminPartnersBackendPath(method: string, slug: string[] =
     throw new Error("unsupported_admin_partners_route");
   }
 
+  if (segments.length === 1 && segments[0] === "invite" && normalizedMethod === "POST") {
+    return withSearch("/api/admin/partners/invite", searchParams);
+  }
+
   if (segments[0] === "commission-plans") {
     if (segments.length === 1 && (normalizedMethod === "GET" || normalizedMethod === "POST")) {
       return withSearch("/api/admin/partners/commission-plans", searchParams);
@@ -68,6 +72,10 @@ export function resolveAdminPartnersBackendPath(method: string, slug: string[] =
 
   if (segments.length === 2 && normalizedMethod === "PATCH" && segments[1] === "status") {
     return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}/status`, searchParams);
+  }
+
+  if (segments.length === 2 && normalizedMethod === "POST" && segments[1] === "resend-invite") {
+    return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}/resend-invite`, searchParams);
   }
 
   if (segments.length === 2 && normalizedMethod === "POST" && (segments[1] === "sponsor" || segments[1] === "attributions")) {

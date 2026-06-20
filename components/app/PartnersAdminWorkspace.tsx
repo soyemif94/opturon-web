@@ -69,12 +69,44 @@ type PartnerDetailsResponse = {
   error?: string;
 };
 
+type PartnerMutationResponse = {
+  success?: boolean;
+  data?: {
+    partner?: AdminPartner;
+    invitation?: {
+      status?: string | null;
+      expiresAt?: string | null;
+      sentAt?: string | null;
+    } | null;
+  };
+  error?: string;
+  detail?: string;
+};
+
+type PartnerInviteFormState = {
+  displayName: string;
+  email: string;
+  phone: string;
+  code: string;
+  sponsorPartnerId: string;
+};
+
 const INITIAL_QUERY: PartnerQueryState = {
   search: "",
   status: "all",
   rank: "all",
   sort: "recent"
 };
+
+const INITIAL_INVITE_FORM: PartnerInviteFormState = {
+  displayName: "",
+  email: "",
+  phone: "",
+  code: "",
+  sponsorPartnerId: ""
+};
+
+const OPEN_PARTNER_INVITE_EVENT = "opturon:open-partner-invite";
 
 const DEFAULT_PREVIEW_BUNDLE = getPartnerPreviewBundle();
 
@@ -171,6 +203,9 @@ export function PartnersAdminWorkspace({
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [statusDialog, setStatusDialog] = useState<{ partnerId: string; nextStatus: "active" | "suspended" } | null>(null);
   const [busyPartnerId, setBusyPartnerId] = useState<string | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState<PartnerInviteFormState>(INITIAL_INVITE_FORM);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   const partnerMap = useMemo(() => new Map(partners.map((partner) => [partner.id, partner])), [partners]);
   const filteredPartners = useMemo(
@@ -259,6 +294,95 @@ export function PartnersAdminWorkspace({
     }
   }
 
+  function resetInviteForm() {
+    setInviteForm(INITIAL_INVITE_FORM);
+  }
+
+  async function submitPartnerInvite(event: React.FormEvent) {
+    event.preventDefault();
+    if (inviteBusy) return;
+
+    const payload = {
+      displayName: inviteForm.displayName.trim(),
+      email: inviteForm.email.trim().toLowerCase(),
+      phone: inviteForm.phone.trim() || undefined,
+      code: inviteForm.code.trim(),
+      sponsorPartnerId: inviteForm.sponsorPartnerId || undefined
+    };
+
+    if (!payload.displayName || !payload.email || !payload.code) {
+      toast.error("Nombre, email y codigo son obligatorios.");
+      return;
+    }
+
+    if (!payload.email.includes("@")) {
+      toast.error("Ingresa un email valido.");
+      return;
+    }
+
+    setInviteBusy(true);
+    try {
+      const response = await fetch("/api/app/admin/partners/invite", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const body = (await readJsonSafe(response)) as PartnerMutationResponse | null;
+      if (!response.ok || !body?.data?.partner) {
+        throw new Error(readErrorMessage(body, "No se pudo enviar la invitacion del asesor."));
+      }
+
+      setPartners((current) => [body.data!.partner!, ...current.filter((partner) => partner.id !== body.data!.partner!.id)]);
+      setInviteDialogOpen(false);
+      resetInviteForm();
+      toast.success("Invitacion enviada");
+      await loadPartners("refresh");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo enviar la invitacion del asesor.");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function resendInvite(partnerId: string) {
+    if (previewMode) {
+      toast.error("La vista local no ejecuta cambios reales.");
+      return;
+    }
+
+    setBusyPartnerId(partnerId);
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}/resend-invite`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const body = (await readJsonSafe(response)) as PartnerMutationResponse | null;
+      if (!response.ok || !body?.data?.partner) {
+        throw new Error(readErrorMessage(body, "No se pudo reenviar la invitacion."));
+      }
+
+      setPartners((current) => current.map((partner) => (partner.id === body.data!.partner!.id ? body.data!.partner! : partner)));
+      setSelectedPartnerDetails((current) =>
+        current && current.partner.id === body.data!.partner!.id
+          ? {
+              ...current,
+              partner: body.data!.partner!
+            }
+          : current
+      );
+      toast.success("Invitacion reenviada");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reenviar la invitacion.");
+    } finally {
+      setBusyPartnerId(null);
+    }
+  }
+
   async function changePartnerStatus(partnerId: string, nextStatus: "active" | "suspended") {
     if (previewMode) {
       toast.error("La vista local no ejecuta cambios reales.");
@@ -307,6 +431,15 @@ export function PartnersAdminWorkspace({
 
   useEffect(() => {
     void loadPartners("initial");
+  }, []);
+
+  useEffect(() => {
+    function onOpenInvite() {
+      setInviteDialogOpen(true);
+    }
+
+    window.addEventListener(OPEN_PARTNER_INVITE_EVENT, onOpenInvite);
+    return () => window.removeEventListener(OPEN_PARTNER_INVITE_EVENT, onOpenInvite);
   }, []);
 
   function renderMainState() {
@@ -418,6 +551,16 @@ export function PartnersAdminWorkspace({
 
               <div className="flex items-center gap-2">
                 {previewMode ? <Badge variant="outline">Vista local</Badge> : null}
+                <Button
+                  type="button"
+                  className="rounded-2xl"
+                  onClick={() => setInviteDialogOpen(true)}
+                  disabled={!PARTNERS_ADMIN_CREATE_ENABLED}
+                  title={PARTNERS_ADMIN_CREATE_TOOLTIP}
+                >
+                  <UserPlus2 className="mr-2 h-4 w-4" />
+                  Nuevo asesor
+                </Button>
                 <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => void loadPartners("refresh")} disabled={refreshing}>
                   <RefreshCcw className={cn("mr-2 h-4 w-4", refreshing ? "animate-spin" : "")} />
                   Actualizar
@@ -439,7 +582,14 @@ export function PartnersAdminWorkspace({
                 />
                 {partners.length === 0 ? (
                   <div className="flex justify-center">
-                    <Button type="button" variant="secondary" className="rounded-2xl" disabled title={PARTNERS_ADMIN_CREATE_TOOLTIP}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="rounded-2xl"
+                      onClick={() => setInviteDialogOpen(true)}
+                      disabled={!PARTNERS_ADMIN_CREATE_ENABLED}
+                      title={PARTNERS_ADMIN_CREATE_TOOLTIP}
+                    >
                       <UserPlus2 className="mr-2 h-4 w-4" />
                       Crear primer asesor
                     </Button>
@@ -510,6 +660,9 @@ export function PartnersAdminWorkspace({
                                   partner={partner}
                                   busy={busyPartnerId === partner.id}
                                   onViewDetail={() => void openPartnerDetails(partner.id)}
+                                  onResendInvite={
+                                    availability.canResendInvite ? () => void resendInvite(partner.id) : undefined
+                                  }
                                   onToggleStatus={
                                     availability.canChangeStatus && nextStatus
                                       ? () => setStatusDialog({ partnerId: partner.id, nextStatus })
@@ -548,6 +701,9 @@ export function PartnersAdminWorkspace({
                               partner={partner}
                               busy={busyPartnerId === partner.id}
                               onViewDetail={() => void openPartnerDetails(partner.id)}
+                              onResendInvite={
+                                availability.canResendInvite ? () => void resendInvite(partner.id) : undefined
+                              }
                               onToggleStatus={
                                 availability.canChangeStatus && nextStatus
                                   ? () => setStatusDialog({ partnerId: partner.id, nextStatus })
@@ -584,6 +740,95 @@ export function PartnersAdminWorkspace({
   return (
     <>
       {renderMainState()}
+
+      <Dialog
+        open={inviteDialogOpen}
+        onOpenChange={(open) => {
+          setInviteDialogOpen(open);
+          if (!open) resetInviteForm();
+        }}
+      >
+        <DialogContent className="max-w-2xl rounded-[28px] border-[color:var(--border)] bg-[linear-gradient(180deg,#fffdf9_0%,#fff7ec_100%)]">
+          <DialogHeader>
+            <DialogTitle>Nuevo asesor</DialogTitle>
+            <DialogDescription>
+              Crea el asesor en estado seguro de invitacion y envia un acceso de un solo uso por email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={submitPartnerInvite} className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm text-muted">
+                Nombre
+                <Input
+                  value={inviteForm.displayName}
+                  onChange={(event) => setInviteForm((current) => ({ ...current, displayName: event.target.value }))}
+                  placeholder="Nombre del asesor"
+                  required
+                />
+              </label>
+              <label className="grid gap-2 text-sm text-muted">
+                Email
+                <Input
+                  value={inviteForm.email}
+                  onChange={(event) => setInviteForm((current) => ({ ...current, email: event.target.value }))}
+                  placeholder="asesor@opturon.com"
+                  type="email"
+                  required
+                />
+              </label>
+              <label className="grid gap-2 text-sm text-muted">
+                Telefono opcional
+                <Input
+                  value={inviteForm.phone}
+                  onChange={(event) => setInviteForm((current) => ({ ...current, phone: event.target.value }))}
+                  placeholder="+54 9 ..."
+                />
+              </label>
+              <label className="grid gap-2 text-sm text-muted">
+                Codigo
+                <Input
+                  value={inviteForm.code}
+                  onChange={(event) => setInviteForm((current) => ({ ...current, code: event.target.value }))}
+                  placeholder="ASESOR-CENTRO"
+                  required
+                />
+              </label>
+            </div>
+
+            <label className="grid gap-2 text-sm text-muted">
+              Sponsor opcional
+              <select
+                value={inviteForm.sponsorPartnerId}
+                onChange={(event) => setInviteForm((current) => ({ ...current, sponsorPartnerId: event.target.value }))}
+                className="h-11 rounded-2xl border border-[color:var(--field-border)] bg-white px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <option value="">Sin sponsor</option>
+                {partners
+                  .filter((partner) => String(partner.status || "").toLowerCase() === "active")
+                  .map((partner) => (
+                    <option key={partner.id} value={partner.id}>
+                      {getPartnerDisplayName(partner)} · {getPartnerCode(partner)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <div className="rounded-2xl border border-[color:var(--border)] bg-white/80 px-4 py-3 text-xs leading-6 text-muted">
+              El asesor se crea sin contrasena operativa. Solo podra ingresar despues de aceptar la invitacion enviada por email.
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => setInviteDialogOpen(false)} disabled={inviteBusy}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="rounded-2xl" disabled={inviteBusy}>
+                {inviteBusy ? "Enviando..." : "Crear y enviar invitacion"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(selectedPartnerId)}
@@ -656,7 +901,17 @@ export function PartnersAdminWorkspace({
                 <Card className="bg-white/95">
                   <CardHeader
                     action={
-                      getPartnerActionAvailability(selectedPartner).canChangeStatus && getPartnerActionAvailability(selectedPartner).nextStatus ? (
+                      getPartnerActionAvailability(selectedPartner).canResendInvite ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="rounded-2xl"
+                          onClick={() => void resendInvite(selectedPartner.id)}
+                          disabled={busyPartnerId === selectedPartner.id}
+                        >
+                          {busyPartnerId === selectedPartner.id ? "Enviando..." : "Reenviar invitacion"}
+                        </Button>
+                      ) : getPartnerActionAvailability(selectedPartner).canChangeStatus && getPartnerActionAvailability(selectedPartner).nextStatus ? (
                         <Button
                           type="button"
                           variant={getPartnerActionAvailability(selectedPartner).nextStatus === "active" ? "primary" : "secondary"}
@@ -685,6 +940,9 @@ export function PartnersAdminWorkspace({
                   </CardHeader>
                   <CardContent className="grid gap-3 pt-0">
                     <ActionHint title="Editar perfil" description="Proximamente" disabled />
+                    {getPartnerActionAvailability(selectedPartner).canResendInvite ? (
+                      <ActionHint title="Invitacion pendiente" description="Puedes reenviar el acceso seguro sin exponer token ni contrasena." />
+                    ) : null}
                     <ActionHint title="Ver clientes atribuidos" description="Visible en la seccion de atribuciones de este panel." />
                     <ActionHint title="Ver jerarquia" description="Proximamente" disabled />
                     <ActionHint title="Ver auditoria" description="Visible en la trazabilidad reciente del asesor." />
@@ -775,11 +1033,13 @@ function PartnerRowActions({
   partner,
   busy,
   onViewDetail,
+  onResendInvite,
   onToggleStatus
 }: {
   partner: AdminPartner;
   busy?: boolean;
   onViewDetail: () => void;
+  onResendInvite?: () => void;
   onToggleStatus?: () => void;
 }) {
   const availability = getPartnerActionAvailability(partner);
@@ -797,6 +1057,9 @@ function PartnerRowActions({
         <DropdownMenuItem disabled>Editar perfil · Proximamente</DropdownMenuItem>
         <DropdownMenuItem disabled>Ver clientes · Proximamente</DropdownMenuItem>
         <DropdownMenuItem disabled>Ver jerarquia · Proximamente</DropdownMenuItem>
+        <DropdownMenuItem disabled={!availability.canResendInvite || busy} onClick={onResendInvite}>
+          {busy ? "Procesando..." : "Reenviar invitacion"}
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={!availability.canChangeStatus || busy} onClick={onToggleStatus}>
           {busy ? "Procesando..." : `${toggleLabel} asesor`}
         </DropdownMenuItem>
@@ -858,7 +1121,13 @@ function ActionHint({
 
 export function PartnersAdminPrimaryAction() {
   return (
-    <Button type="button" className="rounded-2xl" disabled={!PARTNERS_ADMIN_CREATE_ENABLED} title={PARTNERS_ADMIN_CREATE_TOOLTIP}>
+    <Button
+      type="button"
+      className="rounded-2xl"
+      disabled={!PARTNERS_ADMIN_CREATE_ENABLED}
+      title={PARTNERS_ADMIN_CREATE_TOOLTIP}
+      onClick={() => window.dispatchEvent(new Event(OPEN_PARTNER_INVITE_EVENT))}
+    >
       <UserPlus2 className="mr-2 h-4 w-4" />
       Nuevo asesor
     </Button>

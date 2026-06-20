@@ -75,13 +75,17 @@ function testKpisAndFiltering() {
 
 function testPresentationRules() {
   assert.equal(PARTNERS_ADMIN_ROUTE, "/app/partners");
-  assert.equal(PARTNERS_ADMIN_CREATE_ENABLED, false);
+  assert.equal(PARTNERS_ADMIN_CREATE_ENABLED, true);
   assert.equal(getPartnerStatusLabel("disabled"), "Inactivo");
+  assert.equal(getPartnerStatusLabel("invited"), "Invitacion pendiente");
   assert.equal(buildAuditHeadline({ id: "a1", action: "partner_status_changed", reason: "suspended" }), "partner status changed · suspended");
 }
 
 function testSensitiveHeadersStayOutOfUi() {
   const source = read("components/app/PartnersAdminWorkspace.tsx");
+  assert.match(source, /Crear y enviar invitacion/);
+  assert.match(source, /Reenviar invitacion/);
+  assert.match(source, /estado seguro de invitacion/);
   assert.doesNotMatch(source, /x-portal-key/i);
   assert.doesNotMatch(source, /x-portal-actor-id/i);
   assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/i);

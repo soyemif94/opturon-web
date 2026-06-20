@@ -22,6 +22,11 @@ export type AdminPartner = {
   sponsorPartnerId?: string | null;
   activeAttributionCount?: number | null;
   currentRankCode?: string | null;
+  invitation?: {
+    status?: string | null;
+    expiresAt?: string | null;
+    sentAt?: string | null;
+  } | null;
 };
 
 export type AdminPartnerAttribution = {
@@ -71,8 +76,8 @@ export type PartnerPreviewBundle = {
 };
 
 export const PARTNERS_ADMIN_ROUTE = "/app/partners";
-export const PARTNERS_ADMIN_CREATE_ENABLED = false;
-export const PARTNERS_ADMIN_CREATE_TOOLTIP = "Disponible en la proxima etapa";
+export const PARTNERS_ADMIN_CREATE_ENABLED = true;
+export const PARTNERS_ADMIN_CREATE_TOOLTIP = "Crea un asesor y envia una invitacion segura por email";
 
 function normalizeText(value?: string | null) {
   return String(value || "").trim();
@@ -109,7 +114,7 @@ export function getPartnerStatusLabel(status?: string | null) {
   const normalized = normalizePartnerStatus(status);
   if (normalized === "active") return "Activo";
   if (normalized === "suspended") return "Suspendido";
-  if (normalized === "invited") return "Invitado";
+  if (normalized === "invited") return "Invitacion pendiente";
   if (normalized === "disabled") return "Inactivo";
   return "Sin estado";
 }
@@ -248,6 +253,7 @@ export function getPartnerActionAvailability(partner: AdminPartner) {
     normalizedStatus === "active" ? "suspended" : normalizedStatus === "suspended" ? "active" : null;
   return {
     canViewDetail: true,
+    canResendInvite: normalizedStatus === "invited",
     canChangeStatus: normalizedStatus === "active" || normalizedStatus === "suspended",
     nextStatus
   };

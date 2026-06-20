@@ -961,6 +961,36 @@ export async function getPartnerMeCommissions(
   });
 }
 
+export type PartnerInvitationSummary = {
+  partnerId: string;
+  email: string;
+  displayName: string | null;
+  code: string | null;
+  phone: string | null;
+  sponsorDisplayName: string | null;
+  expiresAt: string;
+};
+
+export async function validatePartnerInvitation(token: string) {
+  return backendFetch<{
+    success: boolean;
+    data: PartnerInvitationSummary;
+  }>(`/api/partners/invitations/validate?token=${encodeURIComponent(token)}`, undefined, false);
+}
+
+export async function acceptPartnerInvitation(token: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+    };
+  }>('/api/partners/invitations/accept', {
+    method: 'POST',
+    body: JSON.stringify({ token, password })
+  });
+}
+
 export async function patchPortalUser(
   tenantId: string,
   userId: string,
