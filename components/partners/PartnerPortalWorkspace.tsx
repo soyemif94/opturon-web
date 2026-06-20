@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, Loader2, Search, Sparkles, Star, TrendingUp, Users2 } from "lucide-react";
+import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CalendarRange, ChevronRight, Loader2, Search, SlidersHorizontal, Sparkles, Star, TrendingUp, Users2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +24,12 @@ import {
   formatRankLabel,
   isOpaqueIdentifier,
   partnerStatusVariant,
+  resolvePartnerClientDisplayName,
   resolveCareerStepProgress,
   resolveCurrentRank,
   resolveNextRankLabel,
   safePartnerName,
+  summarizeAttributionSource,
   summarizeAttributionStatus
 } from "@/lib/partners-portal";
 
@@ -39,6 +41,7 @@ type WorkspaceState = {
 };
 
 type PreviewState = "default" | "empty" | "error";
+type ClientSortKey = "recent" | "oldest" | "name";
 
 const PAGE_LOADERS: Record<PartnerPortalPage, Array<keyof WorkspaceState>> = {
   home: ["partner", "summary", "clients", "rankHistory"],
@@ -61,6 +64,8 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortKey, setSortKey] = useState<ClientSortKey>("recent");
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const previewMode = process.env.NODE_ENV !== "production" && searchParams.get("preview") === "1";
   const previewState = (process.env.NODE_ENV !== "production" ? String(searchParams.get("previewState") || "default").trim().toLowerCase() : "default") as PreviewState;
@@ -144,8 +149,12 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
         clients={state.clients || []}
         query={query}
         statusFilter={statusFilter}
+        sortKey={sortKey}
+        selectedClientId={selectedClientId}
         onQueryChange={setQuery}
         onStatusFilterChange={setStatusFilter}
+        onSortKeyChange={setSortKey}
+        onSelectedClientChange={setSelectedClientId}
       />
     );
   }
@@ -366,103 +375,321 @@ function ClientsView({
   clients,
   query,
   statusFilter,
+  sortKey,
+  selectedClientId,
   onQueryChange,
-  onStatusFilterChange
+  onStatusFilterChange,
+  onSortKeyChange,
+  onSelectedClientChange
 }: {
   clients: PartnerPortalClientAttribution[];
   query: string;
   statusFilter: string;
+  sortKey: ClientSortKey;
+  selectedClientId: string | null;
   onQueryChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
+  onSortKeyChange: (value: ClientSortKey) => void;
+  onSelectedClientChange: (value: string | null) => void;
 }) {
-  const statuses = useMemo(() => ["all", ...Array.from(new Set(clients.map((item) => String(item.status || "").trim()).filter(Boolean)))], [clients]);
+  const statuses = useMemo(() => ["all", ...Array.from(new Set(clients.map((item) => String(item.status || "").trim().toLowerCase()).filter(Boolean)))], [clients]);
+  const normalizedQuery = query.trim().toLowerCase();
+  const hasUsableDates = clients.some((item) => Boolean(item.attributedAt));
+  const hasVisibleNames = clients.some((item) => Boolean(String(item.clinicName || "").trim()));
   const filtered = useMemo(() => {
-    return clients.filter((item) => {
-      const matchesQuery = !query || `${item.clinicName || ""}`.toLowerCase().includes(query.toLowerCase());
-      const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+    const visible = clients.filter((item, index) => {
+      const displayName = resolvePartnerClientDisplayName(item, index).toLowerCase();
+      const extraDetails = [item.notes, item.attributionSource].map((value) => String(value || "").toLowerCase()).join(" ");
+      const matchesQuery = !normalizedQuery || displayName.includes(normalizedQuery) || extraDetails.includes(normalizedQuery);
+      const matchesStatus = statusFilter === "all" || String(item.status || "").trim().toLowerCase() === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [clients, query, statusFilter]);
+
+    return visible.sort((left, right) => {
+      if (sortKey === "name") {
+        return resolvePartnerClientDisplayName(left).localeCompare(resolvePartnerClientDisplayName(right), "es");
+      }
+
+      const leftTime = left.attributedAt ? new Date(left.attributedAt).getTime() : 0;
+      const rightTime = right.attributedAt ? new Date(right.attributedAt).getTime() : 0;
+      if (sortKey === "oldest") return leftTime - rightTime;
+      return rightTime - leftTime;
+    });
+  }, [clients, normalizedQuery, sortKey, statusFilter]);
+
+  const selectedClient = filtered.find((item) => item.id === selectedClientId) || null;
+  const activeClients = clients.filter((item) => String(item.status || "").trim().toLowerCase() === "active").length;
+  const recentClients = hasUsableDates
+    ? clients.filter((item) => {
+        if (!item.attributedAt) return false;
+        const attributedTime = new Date(item.attributedAt).getTime();
+        if (!Number.isFinite(attributedTime)) return false;
+        return Date.now() - attributedTime <= 1000 * 60 * 60 * 24 * 30;
+      }).length
+    : null;
+
+  useEffect(() => {
+    if (selectedClientId && !filtered.some((item) => item.id === selectedClientId)) {
+      onSelectedClientChange(null);
+    }
+  }, [filtered, onSelectedClientChange, selectedClientId]);
+
+  useEffect(() => {
+    const sortOptions: ClientSortKey[] = [];
+    if (hasUsableDates) {
+      sortOptions.push("recent", "oldest");
+    }
+    if (hasVisibleNames) {
+      sortOptions.push("name");
+    }
+    if (sortOptions.length > 0 && !sortOptions.includes(sortKey)) {
+      onSortKeyChange(sortOptions[0]);
+    }
+  }, [hasUsableDates, hasVisibleNames, onSortKeyChange, sortKey]);
+
+  const isTrueEmpty = clients.length === 0;
+  const hasNoMatches = !isTrueEmpty && filtered.length === 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/88 p-5 md:flex-row md:items-end md:justify-between">
-        <div>
-          <Badge variant="outline">Mis clientes</Badge>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Clientes atribuidos</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-            Seguimiento de tus clientes visibles en el contrato actual, sin exponer datos internos innecesarios.
-          </p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Buscar por nombre" className="border-slate-200 bg-slate-50 pl-9 text-slate-900 placeholder:text-slate-400" />
-          </div>
-          <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none">
-            {statuses.map((currentStatus) => (
-              <option key={currentStatus} value={currentStatus}>
-                {currentStatus === "all" ? "Todos los estados" : summarizeAttributionStatus(currentStatus)}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <section className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
+        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_24%),radial-gradient(circle_at_85%_20%,rgba(59,130,246,0.16),transparent_24%),linear-gradient(180deg,rgba(8,18,34,0.95),rgba(9,21,38,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+          <CardContent className="p-6 md:p-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">Mis clientes</Badge>
+              <Badge className="border-white/10 bg-white/6 text-slate-200">Contrato real</Badge>
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.45rem]">Cartera del asesor</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+              Vista comercial de tus atribuciones activas e historicas usando unicamente los campos reales del endpoint partner.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2 text-xs text-slate-300">
+              <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Total visible: {clients.length}</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Estados reales: {statuses.length - 1 || 0}</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Sin UUIDs expuestos</span>
+            </div>
+          </CardContent>
+        </Card>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={<Users2 className="h-5 w-5" />}
-          title="Todavia no tenes clientes atribuidos"
-          description="Cuando una venta quede asociada a tu cuenta, vas a verla reflejada aca."
-          className="min-h-[340px] border-slate-200 bg-white/88 text-slate-900"
-        />
-      ) : (
-        <>
-          <Card className="hidden overflow-hidden border-slate-200/80 bg-white/90 lg:block">
-            <CardContent className="p-0">
-              <div className="grid grid-cols-[minmax(0,1.6fr)_160px_170px_180px] gap-3 border-b border-slate-200/80 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                <span>Cliente</span>
-                <span>Estado</span>
-                <span>Fecha</span>
-                <span>Origen</span>
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Lectura de cartera</Badge>}>
+            <div>
+              <CardTitle className="text-xl text-white">Resumen superior</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Derivado de atribuciones reales, sin plan, pagos ni comisiones inventadas.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0 md:grid-cols-3 xl:grid-cols-1">
+            <MetricStrip dark label="Clientes totales" value={String(clients.length)} icon={<Users2 className="h-4 w-4" />} />
+            <MetricStrip dark label="Clientes activos" value={String(activeClients)} icon={<BadgeCheck className="h-4 w-4" />} />
+            <MetricStrip dark label="Incorporados recientemente" value={recentClients === null ? "Sin dato" : String(recentClients)} icon={<CalendarRange className="h-4 w-4" />} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_20px_65px_rgba(2,8,23,0.34)]">
+            <CardContent className="grid gap-3 p-5 md:grid-cols-[minmax(0,1.4fr)_180px_180px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Input
+                  value={query}
+                  onChange={(event) => onQueryChange(event.target.value)}
+                  placeholder="Buscar por nombre, nota u origen"
+                  className="border-white/10 bg-white/[0.05] pl-9 text-slate-100 placeholder:text-slate-500"
+                />
               </div>
-              {filtered.map((client) => (
-                <div key={client.id} className="grid grid-cols-[minmax(0,1.6fr)_160px_170px_180px] gap-3 border-b border-slate-200/70 px-5 py-4 text-sm last:border-b-0">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-950">{client.clinicName || "Cliente atribuido"}</p>
-                    <p className="mt-1 truncate text-xs text-slate-500">{client.notes || "Sin observaciones visibles"}</p>
-                  </div>
-                  <div>
-                    <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
-                  </div>
-                  <div className="text-slate-600">{formatPortalDate(client.attributedAt)}</div>
-                  <div className="text-slate-600">{client.attributionSource || "No informado"}</div>
-                </div>
-              ))}
+
+              <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                Estado
+                <select
+                  value={statusFilter}
+                  onChange={(event) => onStatusFilterChange(event.target.value)}
+                  className="h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none"
+                >
+                  {statuses.map((currentStatus) => (
+                    <option key={currentStatus} value={currentStatus} className="bg-slate-900 text-slate-100">
+                      {currentStatus === "all" ? "Todos los estados" : summarizeAttributionStatus(currentStatus)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                Orden
+                <select
+                  value={sortKey}
+                  onChange={(event) => onSortKeyChange(event.target.value as ClientSortKey)}
+                  className="h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none"
+                >
+                  {hasUsableDates ? <option value="recent" className="bg-slate-900 text-slate-100">Mas recientes</option> : null}
+                  {hasUsableDates ? <option value="oldest" className="bg-slate-900 text-slate-100">Mas antiguas</option> : null}
+                  {hasVisibleNames ? <option value="name" className="bg-slate-900 text-slate-100">Nombre A-Z</option> : null}
+                </select>
+              </label>
             </CardContent>
           </Card>
 
-          <div className="grid gap-3 lg:hidden">
-            {filtered.map((client) => (
-              <Card key={client.id} className="border-slate-200/80 bg-white/92">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-semibold text-slate-950">{client.clinicName || "Cliente atribuido"}</p>
-                      <p className="mt-1 text-xs text-slate-500">{formatPortalDate(client.attributedAt)}</p>
-                    </div>
-                    <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
+          {isTrueEmpty ? (
+            <EmptyState
+              icon={<Users2 className="h-5 w-5" />}
+              title="Todavia no tenes clientes atribuidos"
+              description="Cuando una atribucion quede asociada a tu cuenta, la cartera se va a completar automaticamente con su estado real."
+              className="min-h-[340px] border-white/10 bg-white/[0.04] text-slate-100"
+            />
+          ) : hasNoMatches ? (
+            <EmptyState
+              icon={<Search className="h-5 w-5" />}
+              title="No encontramos clientes con esos filtros"
+              description="Proba cambiar el texto de busqueda o volver a todos los estados para revisar la cartera completa."
+              action={{ label: "Limpiar filtros", onClick: () => { onQueryChange(""); onStatusFilterChange("all"); } }}
+              className="min-h-[340px] border-white/10 bg-white/[0.04] text-slate-100"
+            />
+          ) : (
+            <>
+              <Card className="hidden overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_20px_65px_rgba(2,8,23,0.32)] lg:block">
+                <CardContent className="p-0">
+                  <div className="grid grid-cols-[minmax(0,1.8fr)_150px_160px_160px_160px] gap-3 border-b border-white/10 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <span>Cliente o negocio</span>
+                    <span>Estado</span>
+                    <span>Atribucion</span>
+                    <span>Origen</span>
+                    <span>Vinculo</span>
                   </div>
-                  <div className="mt-4 grid gap-2 text-sm text-slate-600">
-                    <p>Origen: {client.attributionSource || "No informado"}</p>
-                    {client.endedAt ? <p>Cierre: {formatPortalDate(client.endedAt)}</p> : null}
-                  </div>
+                  {filtered.map((client, index) => {
+                    const selected = client.id === selectedClientId;
+                    return (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => onSelectedClientChange(client.id)}
+                        className={`grid w-full grid-cols-[minmax(0,1.8fr)_150px_160px_160px_160px] gap-3 border-b border-white/10 px-5 py-4 text-left text-sm transition-colors last:border-b-0 ${
+                          selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-white">{resolvePartnerClientDisplayName(client, index)}</p>
+                          <p className="mt-1 truncate text-xs text-slate-400">{client.notes || "Informacion adicional no publicada"}</p>
+                        </div>
+                        <div>
+                          <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
+                        </div>
+                        <div className="text-slate-300">{formatPortalDate(client.attributedAt)}</div>
+                        <div className="text-slate-300">{summarizeAttributionSource(client.attributionSource)}</div>
+                        <div className="text-slate-300">{client.endedAt ? "Vinculo finalizado" : "Vinculo vigente"}</div>
+                      </button>
+                    );
+                  })}
                 </CardContent>
               </Card>
-            ))}
+
+              <div className="grid gap-3 lg:hidden">
+                {filtered.map((client, index) => (
+                  <button key={client.id} type="button" onClick={() => onSelectedClientChange(client.id)} className="text-left">
+                    <Card className={`border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.94),rgba(9,18,33,0.86))] text-slate-100 ${client.id === selectedClientId ? "ring-1 ring-amber-300/35" : ""}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-semibold text-white">{resolvePartnerClientDisplayName(client, index)}</p>
+                            <p className="mt-1 text-xs text-slate-400">{formatPortalDate(client.attributedAt)}</p>
+                          </div>
+                          <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
+                        </div>
+                        <div className="mt-4 grid gap-2 text-sm text-slate-300">
+                          <p>Origen: {summarizeAttributionSource(client.attributionSource)}</p>
+                          <p>Vinculo: {client.endedAt ? "Finalizado" : "Vigente"}</p>
+                          <p>{client.notes || "Sin observaciones comerciales publicadas"}</p>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-xs font-medium text-amber-100">
+                          <SlidersHorizontal className="h-3.5 w-3.5" />
+                          Ver detalle
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <ClientDetailDrawer client={selectedClient} onClose={() => onSelectedClientChange(null)} />
+      </section>
+    </div>
+  );
+}
+
+function ClientDetailDrawer({
+  client,
+  onClose
+}: {
+  client: PartnerPortalClientAttribution | null;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      {client ? <button type="button" aria-label="Cerrar detalle" className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-sm xl:hidden" onClick={onClose} /> : null}
+      <aside
+        className={`${
+          client ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 xl:translate-x-0 xl:opacity-100"
+        } fixed inset-y-0 right-0 z-40 w-full max-w-[420px] border-l border-white/10 bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(8,18,34,0.98))] p-4 shadow-[0_28px_90px_rgba(2,8,23,0.55)] transition-all duration-300 xl:sticky xl:top-8 xl:h-[calc(100vh-4rem)] xl:rounded-[28px] xl:border xl:bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.84))]`}
+      >
+        {client ? (
+          <div className="flex h-full flex-col">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">Detalle</Badge>
+                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">{resolvePartnerClientDisplayName(client)}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Ficha comercial de solo lectura preparada para sumar pagos y suscripcion cuando exista contrato backend.</p>
+              </div>
+              <Button variant="ghost" size="sm" className="text-slate-300 hover:bg-white/10 hover:text-white" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <MetricStrip dark label="Estado" value={summarizeAttributionStatus(client.status)} icon={<BadgeCheck className="h-4 w-4" />} />
+              <MetricStrip dark label="Fecha de atribucion" value={formatPortalDate(client.attributedAt)} icon={<CalendarRange className="h-4 w-4" />} />
+              <MetricStrip dark label="Origen de atribucion" value={summarizeAttributionSource(client.attributionSource)} icon={<ChevronRight className="h-4 w-4" />} />
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              <DrawerField label="Estado del vinculo" value={client.endedAt ? "Finalizado" : "Vigente"} />
+              {client.endedAt ? <DrawerField label="Fecha de cierre" value={formatPortalDate(client.endedAt)} /> : null}
+              <DrawerField label="Informacion adicional" value={client.notes || "Sin observaciones comerciales publicadas"} multiline />
+              <DrawerField label="Preparado para proxima etapa" value="Suscripcion, ultimo pago, proximo vencimiento y comision generada se incorporaran cuando existan campos reales." multiline />
+            </div>
+
+            <div className="mt-auto rounded-[24px] border border-dashed border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
+              Todavia no existe informacion de pagos en esta vista. Cuando el backend publique ese contrato, el panel ya esta listo para conectarlo.
+            </div>
           </div>
-        </>
-      )}
+        ) : (
+          <div className="flex h-full flex-col justify-between rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] p-5 text-slate-100">
+            <div>
+              <Badge className="border-white/10 bg-white/6 text-slate-200">Panel de detalle</Badge>
+              <h2 className="mt-4 text-xl font-semibold text-white">Selecciona un cliente</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-400">
+                Al abrir una ficha vas a ver identidad visible, estado, fecha de atribucion, origen y observaciones reales de la cartera.
+              </p>
+            </div>
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
+              Este lateral queda preparado para mostrar suscripcion, pagos y comision generada apenas exista contrato publicado.
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+
+function DrawerField({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
+  return (
+    <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className={`mt-2 text-sm font-medium text-slate-100 ${multiline ? "leading-7" : ""}`}>{value}</p>
     </div>
   );
 }

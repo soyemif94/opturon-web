@@ -166,6 +166,33 @@ export function summarizeAttributionStatus(status?: string | null) {
   return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Sin estado";
 }
 
+export function summarizeAttributionSource(source?: string | null) {
+  const normalized = String(source || "").trim().toLowerCase();
+  if (normalized === "manual_admin") return "Asignacion manual";
+  if (normalized === "sales_event") return "Evento comercial";
+  if (normalized === "migration") return "Migracion";
+  if (normalized === "referral") return "Referido";
+  if (!normalized) return "No informado";
+  return normalized
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+}
+
+export function resolvePartnerClientDisplayName(client?: PartnerPortalClientAttribution | null, index = 0) {
+  const clinicName = String(client?.clinicName || "").trim();
+  if (clinicName) return clinicName;
+
+  const source = String(client?.attributionSource || "").trim();
+  if (source && !isOpaqueIdentifier(source)) {
+    return `Cliente por ${summarizeAttributionSource(source).toLowerCase()}`;
+  }
+
+  const fallbackNumber = Number.isFinite(index) ? index + 1 : null;
+  return fallbackNumber ? `Cliente atribuido ${fallbackNumber}` : "Cliente atribuido";
+}
+
 export function getPartnerPortalPreviewData() {
   const partner: PartnerPortalPartner = {
     id: "preview-partner",

@@ -59,6 +59,40 @@ function testHomeUsesRealDataAndStates() {
   assert.doesNotMatch(source, /Comision generada/);
 }
 
+function testClientsUsesRealDataAndPortfolioUx() {
+  const source = read("components/partners/PartnerPortalWorkspace.tsx");
+  const partnersPortalLib = read("lib/partners-portal.ts");
+  const backendRepo = read("../src/repositories/partners.repository.js");
+
+  assert.match(source, /Cartera del asesor/);
+  assert.match(source, /Resumen superior/);
+  assert.match(source, /Clientes totales/);
+  assert.match(source, /Clientes activos/);
+  assert.match(source, /Incorporados recientemente/);
+  assert.match(source, /Buscar por nombre, nota u origen/);
+  assert.match(source, /Todos los estados/);
+  assert.match(source, /Mas recientes/);
+  assert.match(source, /Nombre A-Z/);
+  assert.match(source, /No encontramos clientes con esos filtros/);
+  assert.match(source, /Panel de detalle/);
+  assert.match(source, /Todavia no existe informacion de pagos en esta vista/);
+  assert.match(source, /lg:hidden/);
+  assert.match(source, /xl:grid-cols-\[minmax\(0,1fr\)_320px\]/);
+  assert.match(source, /resolvePartnerClientDisplayName/);
+  assert.match(source, /summarizeAttributionSource/);
+  assert.match(source, /selectedClientId/);
+  assert.match(source, /sortKey/);
+  assert.match(partnersPortalLib, /resolvePartnerClientDisplayName/);
+  assert.match(partnersPortalLib, /summarizeAttributionSource/);
+  assert.match(backendRepo, /pca\."attributionSource"/);
+  assert.match(backendRepo, /pca\."attributedAt"/);
+  assert.match(backendRepo, /pca\."endedAt"/);
+  assert.match(backendRepo, /c\.name AS "clinicName"/);
+  assert.doesNotMatch(source, /proximo cobro/i);
+  assert.doesNotMatch(source, /clientes pagando/i);
+  assert.doesNotMatch(source, /deuda/i);
+}
+
 function testPartnerLoginBrandingIsDedicated() {
   const loginPage = read("app/(auth)/login/page.tsx");
   const loginScreen = read("components/auth/LoginScreen.tsx");
@@ -75,6 +109,7 @@ function run() {
   testPortalShellIsIndependent();
   testPortalWorkspaceUsesSecureEndpointsOnly();
   testHomeUsesRealDataAndStates();
+  testClientsUsesRealDataAndPortfolioUx();
   testPartnerLoginBrandingIsDedicated();
   console.log("partners-portal-ui.test.ts: ok");
 }
