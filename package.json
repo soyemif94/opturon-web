@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/write-build-meta.mjs",
     "build": "next build",
     "postbuild": "node scripts/verify-public-assets.mjs && node scripts/verify-ga4-build.mjs",
     "verify:ga": "node scripts/verify-ga-runtime.mjs",
