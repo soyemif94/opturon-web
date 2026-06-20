@@ -67,30 +67,40 @@ function testClientsUsesRealDataAndPortfolioUx() {
   assert.match(source, /Cartera del asesor/);
   assert.match(source, /Resumen superior/);
   assert.match(source, /Clientes totales/);
-  assert.match(source, /Clientes activos/);
-  assert.match(source, /Incorporados recientemente/);
+  assert.match(source, /Al dia/);
+  assert.match(source, /Pendientes o vencidos/);
   assert.match(source, /Buscar por nombre, nota u origen/);
   assert.match(source, /Todos los estados/);
+  assert.match(source, /Todos los estados de pago/);
   assert.match(source, /Mas recientes/);
   assert.match(source, /Nombre A-Z/);
   assert.match(source, /No encontramos clientes con esos filtros/);
   assert.match(source, /Panel de detalle/);
-  assert.match(source, /Todavia no existe informacion de pagos en esta vista/);
+  assert.match(source, /Estado de pago/);
+  assert.match(source, /Al dia/);
+  assert.match(source, /Pendientes o vencidos/);
+  assert.match(source, /Sin informacion confiable de pagos publicada para este cliente/);
   assert.match(source, /lg:hidden/);
   assert.match(source, /xl:grid-cols-\[minmax\(0,1fr\)_320px\]/);
   assert.match(source, /resolvePartnerClientDisplayName/);
   assert.match(source, /summarizeAttributionSource/);
+  assert.match(source, /resolvePartnerClientPaymentState/);
+  assert.match(partnersPortalLib, /summarizePartnerBillingState/);
+  assert.match(partnersPortalLib, /partnerBillingVariant/);
   assert.match(source, /selectedClientId/);
   assert.match(source, /sortKey/);
   assert.match(partnersPortalLib, /resolvePartnerClientDisplayName/);
   assert.match(partnersPortalLib, /summarizeAttributionSource/);
+  assert.match(backendRepo, /LEFT JOIN LATERAL/);
+  assert.match(backendRepo, /ss\."externalTenantId" = pca\."tenantId"/);
+  assert.match(backendRepo, /billingNextPaymentAt/);
   assert.match(backendRepo, /pca\."attributionSource"/);
   assert.match(backendRepo, /pca\."attributedAt"/);
   assert.match(backendRepo, /pca\."endedAt"/);
   assert.match(backendRepo, /c\.name AS "clinicName"/);
-  assert.doesNotMatch(source, /proximo cobro/i);
-  assert.doesNotMatch(source, /clientes pagando/i);
+  assert.doesNotMatch(source, /comision generada/i);
   assert.doesNotMatch(source, /deuda/i);
+  assert.doesNotMatch(source, /mercadoPagoPreapprovalId/);
 }
 
 function testPartnerLoginBrandingIsDedicated() {

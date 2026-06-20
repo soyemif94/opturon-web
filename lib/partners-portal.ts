@@ -26,6 +26,14 @@ export type PartnerPortalSummary = {
   latestRank?: string | null;
 };
 
+export type PartnerPortalClientBilling = {
+  subscriptionStatus: string | null;
+  paymentStatus: string | null;
+  planName: string | null;
+  lastAccreditedPaymentAt: string | null;
+  nextPaymentAt: string | null;
+};
+
 export type PartnerPortalClientAttribution = {
   id: string;
   partnerId: string;
@@ -39,6 +47,7 @@ export type PartnerPortalClientAttribution = {
   clinicName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  billing?: PartnerPortalClientBilling | null;
 };
 
 export type PartnerPortalRankHistoryEntry = {
@@ -180,6 +189,65 @@ export function summarizeAttributionSource(source?: string | null) {
     .join(" ");
 }
 
+export function normalizePartnerBillingState(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function resolvePartnerClientPaymentState(client?: PartnerPortalClientAttribution | null) {
+  const paymentStatus = normalizePartnerBillingState(client?.billing?.paymentStatus);
+  if (paymentStatus === "current" || paymentStatus === "pending" || paymentStatus === "overdue" || paymentStatus === "canceled") {
+    return paymentStatus;
+  }
+
+  const subscriptionStatus = normalizePartnerBillingState(client?.billing?.subscriptionStatus);
+  if (subscriptionStatus === "active") return "current";
+  if (subscriptionStatus === "pending" || subscriptionStatus === "paused") return "pending";
+  if (subscriptionStatus === "payment_failed") return "overdue";
+  if (subscriptionStatus === "canceled" || subscriptionStatus === "cancelled" || subscriptionStatus === "suspended") return "canceled";
+  return "unknown";
+}
+
+export function summarizePartnerBillingState(state?: string | null) {
+  const normalized = normalizePartnerBillingState(state);
+  if (normalized === "current") return "Al dia";
+  if (normalized === "pending") return "Pendiente";
+  if (normalized === "overdue") return "Vencido";
+  if (normalized === "canceled") return "Cancelado";
+  return "Sin informacion";
+}
+
+export function summarizePartnerSubscriptionStatus(status?: string | null) {
+  const normalized = normalizePartnerBillingState(status);
+  if (normalized === "active") return "Suscripcion activa";
+  if (normalized === "pending") return "Suscripcion pendiente";
+  if (normalized === "paused") return "Suscripcion pausada";
+  if (normalized === "payment_failed") return "Pago rechazado";
+  if (normalized === "suspended") return "Suscripcion suspendida";
+  if (normalized === "canceled" || normalized === "cancelled") return "Suscripcion cancelada";
+  return "Sin informacion";
+}
+
+export function partnerBillingVariant(state?: string | null) {
+  const normalized = normalizePartnerBillingState(state);
+  if (normalized === "current") return "success" as const;
+  if (normalized === "pending") return "warning" as const;
+  if (normalized === "overdue" || normalized === "canceled") return "danger" as const;
+  return "muted" as const;
+}
+
+export function hasPartnerClientBilling(client?: PartnerPortalClientAttribution | null) {
+  return Boolean(
+    client?.billing
+    && (
+      client.billing.paymentStatus
+      || client.billing.subscriptionStatus
+      || client.billing.planName
+      || client.billing.lastAccreditedPaymentAt
+      || client.billing.nextPaymentAt
+    )
+  );
+}
+
 export function resolvePartnerClientDisplayName(client?: PartnerPortalClientAttribution | null, index = 0) {
   const clinicName = String(client?.clinicName || "").trim();
   if (clinicName) return clinicName;
@@ -229,7 +297,14 @@ export function getPartnerPortalPreviewData() {
       attributionSource: "manual_admin",
       attributedAt: "2026-06-18T09:00:00.000Z",
       clinicName: "Clinica Delta",
-      notes: "Onboarding comercial completo"
+      notes: "Onboarding comercial completo",
+      billing: {
+        subscriptionStatus: "active",
+        paymentStatus: "current",
+        planName: "Plan Crecimiento",
+        lastAccreditedPaymentAt: "2026-06-12T13:10:00.000Z",
+        nextPaymentAt: "2026-07-12T13:10:00.000Z"
+      }
     },
     {
       id: "preview-client-2",
@@ -240,7 +315,14 @@ export function getPartnerPortalPreviewData() {
       attributionSource: "manual_admin",
       attributedAt: "2026-06-14T16:00:00.000Z",
       clinicName: "Estudio Nexo",
-      notes: "Implementacion inicial coordinada"
+      notes: "Implementacion inicial coordinada",
+      billing: {
+        subscriptionStatus: "pending",
+        paymentStatus: "pending",
+        planName: "Plan Inicial",
+        lastAccreditedPaymentAt: null,
+        nextPaymentAt: "2026-06-26T10:00:00.000Z"
+      }
     },
     {
       id: "preview-client-3",
@@ -252,7 +334,14 @@ export function getPartnerPortalPreviewData() {
       attributedAt: "2026-05-20T11:30:00.000Z",
       endedAt: "2026-06-10T17:30:00.000Z",
       clinicName: "Consultora Boreal",
-      notes: "Atribucion cerrada"
+      notes: "Atribucion cerrada",
+      billing: {
+        subscriptionStatus: "canceled",
+        paymentStatus: "canceled",
+        planName: "Plan Empresa",
+        lastAccreditedPaymentAt: "2026-05-28T17:30:00.000Z",
+        nextPaymentAt: null
+      }
     }
   ];
 
