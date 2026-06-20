@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import buildMeta from "@/generated/build-meta.json";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,21 @@ function noStore(response: NextResponse) {
   return response;
 }
 
+async function readBuildMeta() {
+  try {
+    const file = await readFile(join(process.cwd(), "generated", "build-meta.json"), "utf8");
+    const parsed = JSON.parse(file);
+    return {
+      sha: typeof parsed?.sha === "string" ? parsed.sha : null,
+      branch: typeof parsed?.branch === "string" ? parsed.branch : null
+    };
+  } catch {
+    return { sha: null, branch: null };
+  }
+}
+
 export async function GET(req: Request) {
+  const buildMeta = await readBuildMeta();
   const sha = process.env.VERCEL_GIT_COMMIT_SHA ?? buildMeta.sha ?? null;
   const deploymentId = process.env.VERCEL_DEPLOYMENT_ID ?? null;
   const buildMarker = process.env.NEXT_PUBLIC_APP_BUILD_MARKER ?? (sha ? sha.slice(0, 7) : deploymentId || "local-dev");
