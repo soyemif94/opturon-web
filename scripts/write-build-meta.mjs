@@ -35,8 +35,8 @@ function readExistingBuildMeta() {
 }
 
 const existing = readExistingBuildMeta();
-const sha = String(process.env.VERCEL_GIT_COMMIT_SHA || safeGit(["rev-parse", "HEAD"]) || existing.sha || "").trim() || null;
-const branch = String(process.env.VERCEL_GIT_COMMIT_REF || resolveFallbackBranch(sha || "") || existing.branch || "").trim() || null;
+const sha = String(process.env.APP_GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || safeGit(["rev-parse", "HEAD"]) || existing.sha || "").trim() || null;
+const branch = String(process.env.APP_GIT_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || resolveFallbackBranch(sha || "") || existing.branch || "").trim() || null;
 
 mkdirSync(dirname(outputPath), { recursive: true });
 writeFileSync(
