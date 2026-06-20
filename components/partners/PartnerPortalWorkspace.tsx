@@ -12,6 +12,8 @@ import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import {
   PARTNER_CAREER_LADDER,
   getPartnerPortalPreviewData,
+  type PartnerPortalCommissionEntry,
+  type PartnerPortalCommissionLedger,
   type PartnerPortalCareerProgress,
   type PartnerPortalCareerRequirement,
   type PartnerPortalClientAttribution,
@@ -31,8 +33,10 @@ import {
   formatRankLabel,
   hasPartnerClientBilling,
   isOpaqueIdentifier,
+  partnerCommissionStatusVariant,
   partnerBillingVariant,
   partnerStatusVariant,
+  resolvePartnerCommissionClientName,
   resolvePartnerNetworkDisplayName,
   resolvePartnerClientDisplayName,
   resolvePartnerClientPaymentState,
@@ -40,6 +44,8 @@ import {
   resolveCurrentRank,
   resolveNextRankLabel,
   safePartnerName,
+  summarizePartnerCommissionStatus,
+  summarizePartnerCommissionType,
   summarizeNetworkDepth,
   summarizeCareerEvaluationStatus,
   summarizeCareerRequirementGap,
@@ -56,17 +62,20 @@ type WorkspaceState = {
   rankHistory?: PartnerPortalRankHistoryEntry[];
   careerProgress?: PartnerPortalCareerProgress | null;
   network?: PartnerPortalNetwork | null;
+  commissionLedger?: PartnerPortalCommissionLedger | null;
 };
 
 type PreviewState = "default" | "empty" | "error" | "max";
 type ClientSortKey = "recent" | "oldest" | "name";
+type CommissionStatusFilter = "all" | "generated" | "reversed";
+type CommissionTypeFilter = "all" | "own_signup" | "own_recurring" | "line_recurring_rebate";
 
 const PAGE_LOADERS: Record<PartnerPortalPage, Array<keyof WorkspaceState>> = {
   home: ["partner", "summary", "clients", "rankHistory"],
   clients: ["clients"],
   career: ["careerProgress", "partner", "summary"],
   network: ["network"],
-  commissions: ["summary", "partner"],
+  commissions: ["commissionLedger"],
   profile: ["partner", "summary", "rankHistory"]
 };
 
@@ -76,7 +85,8 @@ const ENDPOINTS: Record<keyof WorkspaceState, string> = {
   clients: "/api/partners/me/clients",
   rankHistory: "/api/partners/me/rank-progress",
   careerProgress: "/api/partners/me/rank-progress",
-  network: "/api/partners/me/network"
+  network: "/api/partners/me/network",
+  commissionLedger: "/api/partners/me/commissions"
 };
 
 export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
@@ -88,6 +98,11 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [sortKey, setSortKey] = useState<ClientSortKey>("recent");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [commissionStatusFilter, setCommissionStatusFilter] = useState<CommissionStatusFilter>("all");
+  const [commissionTypeFilter, setCommissionTypeFilter] = useState<CommissionTypeFilter>("all");
+  const [commissionFrom, setCommissionFrom] = useState("");
+  const [commissionTo, setCommissionTo] = useState("");
+  const [commissionPage, setCommissionPage] = useState(1);
   const searchParams = useSearchParams();
   const previewMode = process.env.NODE_ENV !== "production" && searchParams.get("preview") === "1";
   const previewState = (process.env.NODE_ENV !== "production" ? String(searchParams.get("previewState") || "default").trim().toLowerCase() : "default") as PreviewState;
@@ -113,7 +128,18 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
         const keys = PAGE_LOADERS[page];
         const entries = await Promise.all(
           keys.map(async (key) => {
-            const response = await fetch(ENDPOINTS[key], { cache: "no-store" });
+            const response = await fetch(
+              key === "commissionLedger"
+                ? buildPartnerCommissionLedgerEndpoint({
+                    status: commissionStatusFilter,
+                    type: commissionTypeFilter,
+                    from: commissionFrom,
+                    to: commissionTo,
+                    page: commissionPage
+                  })
+                : ENDPOINTS[key],
+              { cache: "no-store" }
+            );
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
               throw new Error(String(payload?.detail || payload?.error || "No se pudo cargar el portal partner."));
@@ -124,6 +150,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
             if (key === "clients") return [key, Array.isArray(payload?.clients) ? payload.clients : []] as const;
             if (key === "careerProgress") return [key, payload || null] as const;
             if (key === "network") return [key, payload || null] as const;
+            if (key === "commissionLedger") return [key, payload || null] as const;
             return [key, Array.isArray(payload?.rankHistory) ? payload.rankHistory : []] as const;
           })
         );
@@ -149,7 +176,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
     return () => {
       cancelled = true;
     };
-  }, [page, previewMode, previewState]);
+  }, [page, previewMode, previewState, commissionStatusFilter, commissionTypeFilter, commissionFrom, commissionTo, commissionPage]);
 
   if (status === "loading") {
     return <WorkspaceLoading page={page} />;
@@ -194,7 +221,32 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   }
 
   if (page === "commissions") {
-    return <CommissionsView summary={state.summary || null} partner={state.partner || null} />;
+    return (
+      <CommissionsView
+        ledger={state.commissionLedger || null}
+        statusFilter={commissionStatusFilter}
+        typeFilter={commissionTypeFilter}
+        from={commissionFrom}
+        to={commissionTo}
+        onStatusFilterChange={(value) => {
+          setCommissionStatusFilter(value);
+          setCommissionPage(1);
+        }}
+        onTypeFilterChange={(value) => {
+          setCommissionTypeFilter(value);
+          setCommissionPage(1);
+        }}
+        onFromChange={(value) => {
+          setCommissionFrom(value);
+          setCommissionPage(1);
+        }}
+        onToChange={(value) => {
+          setCommissionTo(value);
+          setCommissionPage(1);
+        }}
+        onPageChange={setCommissionPage}
+      />
+    );
   }
 
   if (page === "profile") {
@@ -1263,42 +1315,238 @@ function NetworkCard({ member, index }: { member: PartnerPortalNetworkMember; in
   );
 }
 
-function CommissionsView({ summary, partner }: { summary: PartnerPortalSummary | null; partner: PartnerPortalPartner | null }) {
+function CommissionsView({
+  ledger,
+  statusFilter,
+  typeFilter,
+  from,
+  to,
+  onStatusFilterChange,
+  onTypeFilterChange,
+  onFromChange,
+  onToChange,
+  onPageChange
+}: {
+  ledger: PartnerPortalCommissionLedger | null;
+  statusFilter: CommissionStatusFilter;
+  typeFilter: CommissionTypeFilter;
+  from: string;
+  to: string;
+  onStatusFilterChange: (value: CommissionStatusFilter) => void;
+  onTypeFilterChange: (value: CommissionTypeFilter) => void;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
+  onPageChange: (value: number) => void;
+}) {
+  const entries = Array.isArray(ledger?.entries) ? ledger.entries : [];
+  const summary = ledger?.summary || {
+    totalGenerated: "0.00",
+    totalReversed: "0.00",
+    netAmount: "0.00",
+    currency: null
+  };
+  const pagination = ledger?.pagination || { page: 1, pageSize: 20, total: 0, totalPages: 0 };
+  const currency = summary.currency || entries.find((entry) => entry.currency)?.currency || "ARS";
+  const hasEntries = entries.length > 0;
+  const hasActiveFilters = statusFilter !== "all" || typeFilter !== "all" || Boolean(from) || Boolean(to);
+
   return (
     <div className="space-y-6">
-      <Card className="border-slate-200/80 bg-white/92">
-        <CardHeader action={<Badge variant="warning">Proximamente</Badge>}>
-          <div>
-            <CardTitle className="text-3xl text-slate-950">Comisiones</CardTitle>
-            <CardDescription className="mt-2 text-sm leading-6 text-slate-600">
-              La vista queda preparada para self-service, pero esta etapa no crea ni finge un endpoint nuevo.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 pt-0 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Resumen actual</p>
-            <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{formatPortalMoney(summary?.generatedCommissions || null)}</p>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              Este importe proviene del resumen del partner. El detalle de movimientos todavia no esta publicado para consulta directa del asesor.
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(251,191,36,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+          <CardContent className="p-6 md:p-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">Comisiones registradas</Badge>
+              <Badge className="border-white/10 bg-white/6 text-slate-200">Datos reales</Badge>
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.6rem]">Movimientos del asesor</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+              Consulta tus altas propias, recurrentes y lineas comerciales con trazabilidad sobre registros persistidos.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Badge variant={partnerStatusVariant(partner?.status)}>{formatPartnerStatus(partner?.status)}</Badge>
-              <Badge variant="outline">{formatRankLabel(summary?.latestRank || partner?.currentRankCode)}</Badge>
+            <div className="mt-5 rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300">
+              Solo se registran pagos reales, acreditados y no revertidos. Las reversiones quedan visibles para mantener la trazabilidad.
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="rounded-[24px] border border-dashed border-slate-200 bg-white p-5">
-            <p className="text-lg font-semibold text-slate-950">El detalle de movimientos estara disponible en la proxima etapa.</p>
-            <div className="mt-4 grid gap-3 text-sm leading-7 text-slate-600 md:grid-cols-2">
-              <RuleCallout title="Como se genera" body="Pagos reales, acreditados y no revertidos." />
-              <RuleCallout title="Tipos previstos" body="Alta propia, recurrente propio, lineas y reversion cuando corresponda." />
-              <RuleCallout title="Transparencia" body="La UI no recalcula importes ni arma simulaciones en produccion." />
-              <RuleCallout title="Siguiente fase" body="Cuando exista endpoint self-service, esta pantalla ya esta lista para conectarlo." />
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Solo lectura</Badge>}>
+            <div>
+              <CardTitle className="text-xl text-white">Semantica contable visible</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Esta vista muestra comisiones registradas, reversiones y neto registrado, sin suponer liquidaciones financieras no publicadas.
+              </CardDescription>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0">
+            <RuleCallout dark title="Sin estados de cobro" body="No se usa 'Pagado', 'Cobrado' ni 'Disponible para retirar' porque no existe esa fuente en este modelo." />
+            <RuleCallout dark title="Sin recalculo" body="Base, porcentaje e importe provienen del snapshot persistido en el ledger." />
+            <RuleCallout dark title="Sin acciones" body="El portal no genera, aprueba, revierte ni liquida movimientos desde esta pantalla." />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard dark icon={<TrendingUp className="h-4 w-4" />} label="Comisiones generadas" value={formatPortalMoney(summary.totalGenerated, currency)} detail="Suma de entries con estado real `generated`." />
+        <KpiCard dark icon={<ArrowRight className="h-4 w-4" />} label="Reversiones" value={formatPortalMoney(summary.totalReversed, currency)} detail="Importe revertido visible en el ledger publicado." />
+        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Neto registrado" value={formatPortalMoney(summary.netAmount, currency)} detail="Generadas menos reversiones registradas." />
+        <KpiCard dark icon={<BriefcaseBusiness className="h-4 w-4" />} label="Movimientos" value={String(pagination.total || 0)} detail="Cantidad total de registros segun los filtros aplicados." />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader>
+            <div>
+              <CardTitle className="text-xl text-white">Filtros</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Periodo, tipo real y estado real de la entry.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 pt-0">
+            <label className="grid gap-2 text-sm text-slate-300">
+              <span>Estado</span>
+              <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as CommissionStatusFilter)} className="rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-3 text-sm text-slate-100 outline-none">
+                <option value="all">Todos los estados</option>
+                <option value="generated">Registradas</option>
+                <option value="reversed">Revertidas</option>
+              </select>
+            </label>
+
+            <label className="grid gap-2 text-sm text-slate-300">
+              <span>Tipo</span>
+              <select value={typeFilter} onChange={(event) => onTypeFilterChange(event.target.value as CommissionTypeFilter)} className="rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-3 text-sm text-slate-100 outline-none">
+                <option value="all">Todos los tipos reales</option>
+                <option value="own_signup">Alta propia</option>
+                <option value="own_recurring">Recurrente propia</option>
+                <option value="line_recurring_rebate">Linea comercial</option>
+              </select>
+            </label>
+
+            <label className="grid gap-2 text-sm text-slate-300">
+              <span>Desde</span>
+              <Input type="date" value={from} onChange={(event) => onFromChange(event.target.value)} className="border-white/10 bg-slate-950/40 text-slate-100" />
+            </label>
+
+            <label className="grid gap-2 text-sm text-slate-300">
+              <span>Hasta</span>
+              <Input type="date" value={to} onChange={(event) => onToChange(event.target.value)} className="border-white/10 bg-slate-950/40 text-slate-100" />
+            </label>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">{hasEntries ? `${entries.length} visibles` : "Sin resultados"}</Badge>}>
+            <div>
+              <CardTitle className="text-xl text-white">Movimientos registrados</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Fecha, cliente, concepto, base, porcentaje, importe y estado, sin exponer IDs internos ni metadata sensible.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {!hasEntries ? (
+              <EmptyState
+                icon={<BriefcaseBusiness className="h-5 w-5" />}
+                title={hasActiveFilters ? "No encontramos movimientos con esos filtros" : "Todavia no tenes movimientos registrados"}
+                description={hasActiveFilters ? "Ajusta periodo, tipo o estado para volver a consultar el ledger publicado." : "Cuando existan comisiones reales registradas para tu cuenta, apareceran aca con su trazabilidad."}
+                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="hidden overflow-hidden rounded-[24px] border border-white/10 lg:block">
+                  <table className="min-w-full divide-y divide-white/10 text-sm">
+                    <thead className="bg-white/[0.04] text-slate-400">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">Fecha</th>
+                        <th className="px-4 py-3 text-left font-medium">Cliente</th>
+                        <th className="px-4 py-3 text-left font-medium">Concepto</th>
+                        <th className="px-4 py-3 text-left font-medium">Base</th>
+                        <th className="px-4 py-3 text-left font-medium">Porcentaje</th>
+                        <th className="px-4 py-3 text-left font-medium">Importe</th>
+                        <th className="px-4 py-3 text-left font-medium">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {entries.map((entry, index) => (
+                        <CommissionTableRow key={`${entry.eventAt || "entry"}-${index}`} entry={entry} index={index} currency={currency} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid gap-3 lg:hidden">
+                  {entries.map((entry, index) => (
+                    <CommissionCard key={`${entry.eventAt || "entry"}-${index}`} entry={entry} index={index} currency={currency} />
+                  ))}
+                </div>
+
+                {pagination.totalPages && pagination.totalPages > 1 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3">
+                    <p className="text-sm text-slate-300">
+                      Pagina {pagination.page} de {pagination.totalPages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" disabled={pagination.page <= 1} className="border-white/10 bg-white/[0.06] text-slate-100 hover:bg-white/10" onClick={() => onPageChange(Math.max(1, pagination.page - 1))}>
+                        Anterior
+                      </Button>
+                      <Button variant="secondary" disabled={pagination.page >= (pagination.totalPages || 1)} className="border-white/10 bg-white/[0.06] text-slate-100 hover:bg-white/10" onClick={() => onPageChange(Math.min(pagination.totalPages || pagination.page, pagination.page + 1))}>
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function CommissionTableRow({ entry, index, currency }: { entry: PartnerPortalCommissionEntry; index: number; currency: string }) {
+  return (
+    <tr className="bg-white/[0.02] text-slate-200">
+      <td className="px-4 py-4">{formatPortalDateTime(entry.eventAt)}</td>
+      <td className="px-4 py-4">{resolvePartnerCommissionClientName(entry, index)}</td>
+      <td className="px-4 py-4">{summarizePartnerCommissionType(entry.type, entry.depthLevel)}</td>
+      <td className="px-4 py-4">{formatPortalMoney(entry.basisAmount, entry.currency || currency)}</td>
+      <td className="px-4 py-4">{entry.rate}%</td>
+      <td className="px-4 py-4">{formatPortalMoney(entry.amount, entry.currency || currency)}</td>
+      <td className="px-4 py-4">
+        <Badge variant={partnerCommissionStatusVariant(entry.status)}>{summarizePartnerCommissionStatus(entry.status)}</Badge>
+      </td>
+    </tr>
+  );
+}
+
+function CommissionCard({ entry, index, currency }: { entry: PartnerPortalCommissionEntry; index: number; currency: string }) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">{resolvePartnerCommissionClientName(entry, index)}</p>
+          <p className="mt-1 text-xs text-slate-400">{formatPortalDateTime(entry.eventAt)}</p>
+        </div>
+        <Badge variant={partnerCommissionStatusVariant(entry.status)}>{summarizePartnerCommissionStatus(entry.status)}</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <MetricStrip dark label="Concepto" value={summarizePartnerCommissionType(entry.type, entry.depthLevel)} icon={<BriefcaseBusiness className="h-4 w-4" />} />
+        <MetricStrip dark label="Importe" value={formatPortalMoney(entry.amount, entry.currency || currency)} icon={<TrendingUp className="h-4 w-4" />} />
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <MetricStrip dark label="Base" value={formatPortalMoney(entry.basisAmount, entry.currency || currency)} icon={<CalendarRange className="h-4 w-4" />} />
+        <MetricStrip dark label="Porcentaje" value={`${entry.rate}%`} icon={<BadgeCheck className="h-4 w-4" />} />
+      </div>
+
+      {entry.reversed ? (
+        <div className="mt-4 rounded-[18px] border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+          Reversion visible para mantener la trazabilidad.
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1477,6 +1725,23 @@ function WorkspaceLoading({ page }: { page: PartnerPortalPage }) {
   );
 }
 
+function buildPartnerCommissionLedgerEndpoint(filters: {
+  status: CommissionStatusFilter;
+  type: CommissionTypeFilter;
+  from: string;
+  to: string;
+  page: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters.status !== "all") params.set("status", filters.status);
+  if (filters.type !== "all") params.set("type", filters.type);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  if (filters.page > 1) params.set("page", String(filters.page));
+  const suffix = params.toString();
+  return suffix ? `/api/partners/me/commissions?${suffix}` : "/api/partners/me/commissions";
+}
+
 function buildPartnerPreviewState(previewState: PreviewState): WorkspaceState {
   const base = getPartnerPortalPreviewData();
   if (previewState === "max") {
@@ -1548,6 +1813,21 @@ function buildPartnerPreviewState(previewState: PreviewState): WorkspaceState {
       },
       clients: [],
       careerProgress: null,
+      commissionLedger: {
+        summary: {
+          totalGenerated: "0.00",
+          totalReversed: "0.00",
+          netAmount: "0.00",
+          currency: "ARS"
+        },
+        entries: [],
+        pagination: {
+          page: 1,
+          pageSize: 20,
+          total: 0,
+          totalPages: 0
+        }
+      },
       network: {
         summary: {
           firstLineCount: 0,

@@ -15,6 +15,7 @@ function testPortalRoutesExist() {
   assert.match(read("app/partners/career/page.tsx"), /page="career"/);
   assert.match(read("app/partners/network/page.tsx"), /page="network"/);
   assert.match(read("app/partners/commissions/page.tsx"), /page="commissions"/);
+  assert.match(read("app/api/partners/me/commissions/route.ts"), /requirePartnerApi/);
   assert.match(read("app/partners/profile/page.tsx"), /page="profile"/);
 }
 
@@ -41,6 +42,7 @@ function testPortalWorkspaceUsesSecureEndpointsOnly() {
   assert.match(source, /\/api\/partners\/me\/clients/);
   assert.match(source, /\/api\/partners\/me\/rank-progress/);
   assert.match(source, /\/api\/partners\/me\/network/);
+  assert.match(source, /\/api\/partners\/me\/commissions/);
   assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/);
   assert.doesNotMatch(source, /portalActorId/);
   assert.doesNotMatch(source, /x-partner-id/i);
@@ -165,6 +167,40 @@ function testNetworkUsesSecureHierarchyView() {
   assert.match(backendRepo, /network\.depth < \$2/);
 }
 
+function testCommissionsUseRegisteredLedgerSemantics() {
+  const source = read("components/partners/PartnerPortalWorkspace.tsx");
+  const partnersPortalLib = read("lib/partners-portal.ts");
+  const backendService = read("../src/services/partners.service.js");
+  const backendRepo = read("../src/repositories/partners.repository.js");
+  const migration = read("../db/migrations/051_partners_foundation_phase1.sql");
+
+  assert.match(source, /Comisiones registradas/);
+  assert.match(source, /Movimientos del asesor/);
+  assert.match(source, /Semantica contable visible/);
+  assert.match(source, /Comisiones generadas/);
+  assert.match(source, /Reversiones/);
+  assert.match(source, /Neto registrado/);
+  assert.match(source, /Todos los estados/);
+  assert.match(source, /Todos los tipos reales/);
+  assert.match(source, /Movimientos registrados/);
+  assert.match(source, /No encontramos movimientos con esos filtros/);
+  assert.match(source, /Todavia no tenes movimientos registrados/);
+  assert.match(source, /Reversion visible para mantener la trazabilidad/);
+  assert.match(source, /Solo se registran pagos reales, acreditados y no revertidos/);
+  assert.match(source, /No se usa 'Pagado', 'Cobrado' ni 'Disponible para retirar'/);
+  assert.match(partnersPortalLib, /PartnerPortalCommissionLedger/);
+  assert.match(partnersPortalLib, /summarizePartnerCommissionType/);
+  assert.match(partnersPortalLib, /summarizePartnerCommissionStatus/);
+  assert.match(backendService, /getPartnerCommissionLedger/);
+  assert.match(backendService, /invalid_partner_commission_query/);
+  assert.match(backendRepo, /listPartnerCommissionLedger/);
+  assert.match(backendRepo, /COALESCE\(SUM\(CASE WHEN pce\.status = 'generated'/);
+  assert.match(backendRepo, /ABS\(pce\."commissionAmount"\)/);
+  assert.match(backendRepo, /partner_client_attributions pca/);
+  assert.match(migration, /partner_commission_entries_status_check CHECK \(status IN \('simulated', 'generated', 'reversed'\)\)/);
+  assert.match(migration, /partner_commission_entries_payment_status_check CHECK \("paymentStatus" IN \('accredited'\)\)/);
+}
+
 function testPartnerLoginBrandingIsDedicated() {
   const loginPage = read("app/(auth)/login/page.tsx");
   const loginScreen = read("components/auth/LoginScreen.tsx");
@@ -184,6 +220,7 @@ function run() {
   testCareerUsesPublishedProgressOnly();
   testClientsUsesRealDataAndPortfolioUx();
   testNetworkUsesSecureHierarchyView();
+  testCommissionsUseRegisteredLedgerSemantics();
   testPartnerLoginBrandingIsDedicated();
   console.log("partners-portal-ui.test.ts: ok");
 }

@@ -935,6 +935,32 @@ export async function getPartnerMeNetwork(partnerId: string) {
   });
 }
 
+export async function getPartnerMeCommissions(
+  partnerId: string,
+  searchParams?: Record<string, string | number | null | undefined>
+) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams || {})) {
+    if (value === null || value === undefined || value === "") continue;
+    params.set(key, String(value));
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      summary: Record<string, unknown>;
+      entries: Array<Record<string, unknown>>;
+      pagination: Record<string, unknown>;
+    };
+  }>(`/api/partners/me/commissions${suffix}`, {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
 export async function patchPortalUser(
   tenantId: string,
   userId: string,

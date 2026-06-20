@@ -40,17 +40,20 @@ function testPartnerApiRoutesRequirePartnerGuard() {
   const clientsRoute = read('app/api/partners/me/clients/route.ts');
   const rankRoute = read('app/api/partners/me/rank-progress/route.ts');
   const networkRoute = read('app/api/partners/me/network/route.ts');
+  const commissionsRoute = read('app/api/partners/me/commissions/route.ts');
   const meRoute = read('app/api/partners/me/route.ts');
 
   assert.match(summaryRoute, /requirePartnerApi/);
   assert.match(clientsRoute, /requirePartnerApi/);
   assert.match(rankRoute, /requirePartnerApi/);
   assert.match(networkRoute, /requirePartnerApi/);
+  assert.match(commissionsRoute, /requirePartnerApi/);
   assert.match(meRoute, /session\?\.\s*user\?\.partnerId/);
   assert.match(summaryRoute, /session\?\.\s*user\?\.partnerId/);
   assert.match(clientsRoute, /session\?\.\s*user\?\.partnerId/);
   assert.match(rankRoute, /session\?\.\s*user\?\.partnerId/);
   assert.match(networkRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.match(commissionsRoute, /session\?\.\s*user\?\.partnerId/);
 }
 
 function run() {

@@ -110,6 +110,40 @@ export type PartnerPortalNetwork = {
   levels: PartnerPortalNetworkLevel[];
 };
 
+export type PartnerPortalCommissionEntry = {
+  type: string | null;
+  status: string | null;
+  paymentStatus?: string | null;
+  clientName: string | null;
+  basisAmount: string;
+  rate: string;
+  amount: string;
+  currency: string | null;
+  eventAt: string | null;
+  eventType?: string | null;
+  sourceType?: string | null;
+  depthLevel?: number | null;
+  reversed: boolean;
+};
+
+export type PartnerPortalCommissionSummary = {
+  totalGenerated: string;
+  totalReversed: string;
+  netAmount: string;
+  currency: string | null;
+};
+
+export type PartnerPortalCommissionLedger = {
+  summary: PartnerPortalCommissionSummary;
+  entries: PartnerPortalCommissionEntry[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages?: number;
+  };
+};
+
 export const PARTNER_PORTAL_PREVIEW_HEADER = "x-opturon-partner-preview";
 
 export const PARTNER_PORTAL_NAV = [
@@ -326,6 +360,39 @@ export function resolvePartnerNetworkDisplayName(member?: PartnerPortalNetworkMe
   const displayName = String(member?.displayName || "").trim();
   if (displayName && !isOpaqueIdentifier(displayName)) return displayName;
   return `Asesor de red ${index + 1}`;
+}
+
+export function summarizePartnerCommissionType(type?: string | null, depthLevel?: number | null) {
+  const normalized = String(type || "").trim().toLowerCase();
+  if (normalized === "own_signup") return "Alta propia";
+  if (normalized === "own_recurring") return "Recurrente propia";
+  if (normalized === "line_recurring_rebate") {
+    if (depthLevel === 1) return "Primera linea";
+    if (depthLevel === 2) return "Segunda linea";
+    if (depthLevel === 3) return "Tercera linea";
+    return "Linea comercial";
+  }
+  return "Movimiento registrado";
+}
+
+export function summarizePartnerCommissionStatus(status?: string | null) {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "generated") return "Registrada";
+  if (normalized === "reversed") return "Revertida";
+  return "Sin estado";
+}
+
+export function partnerCommissionStatusVariant(status?: string | null) {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "generated") return "success" as const;
+  if (normalized === "reversed") return "warning" as const;
+  return "muted" as const;
+}
+
+export function resolvePartnerCommissionClientName(entry?: PartnerPortalCommissionEntry | null, index = 0) {
+  const clientName = String(entry?.clientName || "").trim();
+  if (clientName && !isOpaqueIdentifier(clientName)) return clientName;
+  return index >= 0 ? `Cliente asociado ${index + 1}` : "Cliente asociado";
 }
 
 export function partnerBillingVariant(state?: string | null) {
@@ -558,5 +625,67 @@ export function getPartnerPortalPreviewData() {
     ]
   };
 
-  return { partner, summary, clients, rankHistory, careerProgress, network };
+  const commissionLedger: PartnerPortalCommissionLedger = {
+    summary: {
+      totalGenerated: "184500.00",
+      totalReversed: "24500.00",
+      netAmount: "160000.00",
+      currency: "ARS"
+    },
+    entries: [
+      {
+        type: "own_signup",
+        status: "generated",
+        paymentStatus: "accredited",
+        clientName: "Clinica Delta",
+        basisAmount: "60000.00",
+        rate: "27.50",
+        amount: "16500.00",
+        currency: "ARS",
+        eventAt: "2026-06-18T13:10:00.000Z",
+        eventType: "subscription_signup_accredited",
+        sourceType: "subscription",
+        depthLevel: 0,
+        reversed: false
+      },
+      {
+        type: "own_recurring",
+        status: "generated",
+        paymentStatus: "accredited",
+        clientName: "Estudio Nexo",
+        basisAmount: "90000.00",
+        rate: "11.00",
+        amount: "9900.00",
+        currency: "ARS",
+        eventAt: "2026-06-16T10:00:00.000Z",
+        eventType: "subscription_recurring_accredited",
+        sourceType: "subscription",
+        depthLevel: 0,
+        reversed: false
+      },
+      {
+        type: "line_recurring_rebate",
+        status: "reversed",
+        paymentStatus: "accredited",
+        clientName: null,
+        basisAmount: "200000.00",
+        rate: "2.00",
+        amount: "-4000.00",
+        currency: "ARS",
+        eventAt: "2026-06-12T09:00:00.000Z",
+        eventType: "subscription_recurring_accredited_reversal",
+        sourceType: "subscription",
+        depthLevel: 1,
+        reversed: true
+      }
+    ],
+    pagination: {
+      page: 1,
+      pageSize: 20,
+      total: 3,
+      totalPages: 1
+    }
+  };
+
+  return { partner, summary, clients, rankHistory, careerProgress, network, commissionLedger };
 }
