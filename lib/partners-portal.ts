@@ -1,4 +1,4 @@
-export type PartnerPortalPage = "home" | "clients" | "career" | "commissions" | "profile";
+export type PartnerPortalPage = "home" | "clients" | "career" | "network" | "commissions" | "profile";
 
 export type PartnerPortalPartner = {
   id: string;
@@ -85,12 +85,38 @@ export type PartnerPortalCareerProgress = {
   rankHistory?: PartnerPortalRankHistoryEntry[];
 };
 
+export type PartnerPortalNetworkMember = {
+  displayName: string;
+  status: string;
+  rankCode?: string | null;
+  activeClientCount: number;
+  joinedAt?: string | null;
+};
+
+export type PartnerPortalNetworkLevel = {
+  depth: 1 | 2 | 3;
+  partners: PartnerPortalNetworkMember[];
+};
+
+export type PartnerPortalNetworkSummary = {
+  firstLineCount: number;
+  secondLineCount: number;
+  thirdLineCount: number;
+  activeNetworkCount: number;
+};
+
+export type PartnerPortalNetwork = {
+  summary: PartnerPortalNetworkSummary;
+  levels: PartnerPortalNetworkLevel[];
+};
+
 export const PARTNER_PORTAL_PREVIEW_HEADER = "x-opturon-partner-preview";
 
 export const PARTNER_PORTAL_NAV = [
   { href: "/partners", label: "Inicio", page: "home" as const },
   { href: "/partners/clients", label: "Mis clientes", page: "clients" as const },
   { href: "/partners/career", label: "Mi carrera", page: "career" as const },
+  { href: "/partners/network", label: "Mi red", page: "network" as const },
   { href: "/partners/commissions", label: "Comisiones", page: "commissions" as const },
   { href: "/partners/profile", label: "Perfil", page: "profile" as const }
 ];
@@ -289,6 +315,19 @@ export function summarizePartnerSubscriptionStatus(status?: string | null) {
   return "Sin informacion";
 }
 
+export function summarizeNetworkDepth(depth?: number | null) {
+  if (depth === 1) return "Primera linea";
+  if (depth === 2) return "Segunda linea";
+  if (depth === 3) return "Tercera linea";
+  return "Linea";
+}
+
+export function resolvePartnerNetworkDisplayName(member?: PartnerPortalNetworkMember | null, index = 0) {
+  const displayName = String(member?.displayName || "").trim();
+  if (displayName && !isOpaqueIdentifier(displayName)) return displayName;
+  return `Asesor de red ${index + 1}`;
+}
+
 export function partnerBillingVariant(state?: string | null) {
   const normalized = normalizePartnerBillingState(state);
   if (normalized === "current") return "success" as const;
@@ -465,5 +504,59 @@ export function getPartnerPortalPreviewData() {
     }
   };
 
-  return { partner, summary, clients, rankHistory, careerProgress };
+  const network: PartnerPortalNetwork = {
+    summary: {
+      firstLineCount: 2,
+      secondLineCount: 1,
+      thirdLineCount: 1,
+      activeNetworkCount: 3
+    },
+    levels: [
+      {
+        depth: 1,
+        partners: [
+          {
+            displayName: "Matias Costa",
+            status: "active",
+            rankCode: "asesor",
+            activeClientCount: 3,
+            joinedAt: "2026-03-08T12:00:00.000Z"
+          },
+          {
+            displayName: "Carla Nunez",
+            status: "suspended",
+            rankCode: "lider",
+            activeClientCount: 1,
+            joinedAt: "2026-04-11T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        depth: 2,
+        partners: [
+          {
+            displayName: "Joaquin Vera",
+            status: "active",
+            rankCode: "asesor",
+            activeClientCount: 2,
+            joinedAt: "2026-05-02T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        depth: 3,
+        partners: [
+          {
+            displayName: "Marina Solis",
+            status: "active",
+            rankCode: null,
+            activeClientCount: 0,
+            joinedAt: "2026-05-29T12:00:00.000Z"
+          }
+        ]
+      }
+    ]
+  };
+
+  return { partner, summary, clients, rankHistory, careerProgress, network };
 }

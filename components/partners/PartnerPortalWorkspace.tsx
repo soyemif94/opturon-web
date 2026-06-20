@@ -15,6 +15,9 @@ import {
   type PartnerPortalCareerProgress,
   type PartnerPortalCareerRequirement,
   type PartnerPortalClientAttribution,
+  type PartnerPortalNetwork,
+  type PartnerPortalNetworkLevel,
+  type PartnerPortalNetworkMember,
   type PartnerPortalPage,
   type PartnerPortalPartner,
   type PartnerPortalRankHistoryEntry,
@@ -30,12 +33,14 @@ import {
   isOpaqueIdentifier,
   partnerBillingVariant,
   partnerStatusVariant,
+  resolvePartnerNetworkDisplayName,
   resolvePartnerClientDisplayName,
   resolvePartnerClientPaymentState,
   resolveCareerStepProgress,
   resolveCurrentRank,
   resolveNextRankLabel,
   safePartnerName,
+  summarizeNetworkDepth,
   summarizeCareerEvaluationStatus,
   summarizeCareerRequirementGap,
   summarizeAttributionSource,
@@ -50,6 +55,7 @@ type WorkspaceState = {
   clients?: PartnerPortalClientAttribution[];
   rankHistory?: PartnerPortalRankHistoryEntry[];
   careerProgress?: PartnerPortalCareerProgress | null;
+  network?: PartnerPortalNetwork | null;
 };
 
 type PreviewState = "default" | "empty" | "error" | "max";
@@ -59,6 +65,7 @@ const PAGE_LOADERS: Record<PartnerPortalPage, Array<keyof WorkspaceState>> = {
   home: ["partner", "summary", "clients", "rankHistory"],
   clients: ["clients"],
   career: ["careerProgress", "partner", "summary"],
+  network: ["network"],
   commissions: ["summary", "partner"],
   profile: ["partner", "summary", "rankHistory"]
 };
@@ -68,7 +75,8 @@ const ENDPOINTS: Record<keyof WorkspaceState, string> = {
   summary: "/api/partners/me/summary",
   clients: "/api/partners/me/clients",
   rankHistory: "/api/partners/me/rank-progress",
-  careerProgress: "/api/partners/me/rank-progress"
+  careerProgress: "/api/partners/me/rank-progress",
+  network: "/api/partners/me/network"
 };
 
 export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
@@ -115,6 +123,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
             if (key === "summary") return [key, payload?.summary || null] as const;
             if (key === "clients") return [key, Array.isArray(payload?.clients) ? payload.clients : []] as const;
             if (key === "careerProgress") return [key, payload || null] as const;
+            if (key === "network") return [key, payload || null] as const;
             return [key, Array.isArray(payload?.rankHistory) ? payload.rankHistory : []] as const;
           })
         );
@@ -178,6 +187,10 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
 
   if (page === "career") {
     return <CareerView partner={state.partner || null} summary={state.summary || null} progress={state.careerProgress || null} />;
+  }
+
+  if (page === "network") {
+    return <NetworkView network={state.network || null} />;
   }
 
   if (page === "commissions") {
@@ -1055,6 +1068,201 @@ function RequirementPill({ text, tone }: { text: string; tone: "success" | "warn
   );
 }
 
+function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
+  const [selectedDepth, setSelectedDepth] = useState<1 | 2 | 3>(1);
+  const levels = Array.isArray(network?.levels) ? network.levels : [];
+  const summary = network?.summary || {
+    firstLineCount: 0,
+    secondLineCount: 0,
+    thirdLineCount: 0,
+    activeNetworkCount: 0
+  };
+  const selectedLevel = levels.find((level) => level.depth === selectedDepth) || { depth: selectedDepth, partners: [] };
+  const hasNetwork = levels.some((level) => level.partners.length > 0);
+
+  return (
+    <div className="space-y-6">
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(251,191,36,0.14),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.78))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.42)]">
+          <CardContent className="p-6 md:p-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-sky-300/20 bg-sky-300/10 text-sky-100">Mi red</Badge>
+              <Badge className="border-white/10 bg-white/6 text-slate-200">Datos reales</Badge>
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.6rem]">Mi red</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+              Conoce el crecimiento y la actividad comercial de tu equipo.
+            </p>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">
+              Solo se muestran descendientes propios de hasta tercera linea, con estado, rango visible, clientes activos y fecha de incorporacion.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(9,19,34,0.92),rgba(10,23,40,0.82))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">Profundidad maxima 3</Badge>}>
+            <div>
+              <CardTitle className="text-xl text-white">Resumen de red</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Vista self-service aislada, sin exponer datos personales, IDs internos ni montos comerciales.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            <MetricStrip dark label="Asesores visibles" value={String(summary.firstLineCount + summary.secondLineCount + summary.thirdLineCount)} icon={<Users2 className="h-4 w-4" />} />
+            <MetricStrip dark label="Red activa total" value={String(summary.activeNetworkCount)} icon={<BadgeCheck className="h-4 w-4" />} />
+            <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300">
+              Cada nivel mantiene aislamiento por sponsor. No se muestran sponsors, ramas hermanas ni nodos fuera de alcance.
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard dark icon={<Users2 className="h-4 w-4" />} label="Primera linea" value={String(summary.firstLineCount)} detail="Asesores patrocinados directamente por tu cuenta." />
+        <KpiCard dark icon={<ChevronRight className="h-4 w-4" />} label="Segunda linea" value={String(summary.secondLineCount)} detail="Descendientes visibles de la primera linea." />
+        <KpiCard dark icon={<ArrowRight className="h-4 w-4" />} label="Tercera linea" value={String(summary.thirdLineCount)} detail="Solo se muestra cuando existe dentro del alcance aprobado." />
+        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Red activa total" value={String(summary.activeNetworkCount)} detail="Cantidad de asesores en estado activo dentro de tu red visible." />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader>
+            <div>
+              <CardTitle className="text-xl text-white">Vista por niveles</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Cambia entre primera, segunda y tercera linea segun la informacion real publicada.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-2 pt-0">
+            {[1, 2, 3].map((depth) => {
+              const level = levels.find((item) => item.depth === depth);
+              const active = selectedDepth === depth;
+              return (
+                <button
+                  key={depth}
+                  type="button"
+                  onClick={() => setSelectedDepth(depth as 1 | 2 | 3)}
+                  className={`rounded-[22px] border px-4 py-3 text-left transition-colors ${
+                    active
+                      ? "border-amber-300/25 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(56,189,248,0.10))] text-white"
+                      : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold">{summarizeNetworkDepth(depth)}</span>
+                    <Badge className={active ? "border-white/10 bg-white/10 text-white" : "border-white/10 bg-white/6 text-slate-300"}>
+                      {level?.partners.length || 0}
+                    </Badge>
+                  </div>
+                </button>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]">
+          <CardHeader action={<Badge className="border-white/10 bg-white/6 text-slate-200">{summarizeNetworkDepth(selectedLevel.depth)}</Badge>}>
+            <div>
+              <CardTitle className="text-xl text-white">Actividad del nivel seleccionado</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Nombre, estado, rango, clientes activos y fecha de incorporacion, sin comisiones ni informacion sensible.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {!hasNetwork ? (
+              <EmptyState
+                icon={<Users2 className="h-5 w-5" />}
+                title="Todavia no tenes asesores en tu red"
+                description="Cuando existan descendientes asociados por sponsor, se mostraran aca por linea comercial."
+                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+              />
+            ) : selectedLevel.partners.length === 0 ? (
+              <EmptyState
+                icon={<ChevronRight className="h-5 w-5" />}
+                title={`Sin asesores en ${summarizeNetworkDepth(selectedLevel.depth).toLowerCase()}`}
+                description="Este nivel todavia no tiene asesores visibles con la informacion actual publicada."
+                className="min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100"
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="hidden overflow-hidden rounded-[24px] border border-white/10 lg:block">
+                  <table className="min-w-full divide-y divide-white/10 text-sm">
+                    <thead className="bg-white/[0.04] text-slate-400">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">Asesor</th>
+                        <th className="px-4 py-3 text-left font-medium">Estado</th>
+                        <th className="px-4 py-3 text-left font-medium">Rango</th>
+                        <th className="px-4 py-3 text-left font-medium">Clientes activos</th>
+                        <th className="px-4 py-3 text-left font-medium">Incorporacion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {selectedLevel.partners.map((member, index) => (
+                        <NetworkTableRow key={`${selectedLevel.depth}-${index}`} member={member} index={index} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid gap-3 lg:hidden">
+                  {selectedLevel.partners.map((member, index) => (
+                    <NetworkCard key={`${selectedLevel.depth}-${index}`} member={member} index={index} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function NetworkTableRow({ member, index }: { member: PartnerPortalNetworkMember; index: number }) {
+  const displayName = resolvePartnerNetworkDisplayName(member, index);
+  return (
+    <tr className="bg-white/[0.02] text-slate-200">
+      <td className="px-4 py-4">
+        <div>
+          <p className="font-semibold text-white">{displayName}</p>
+          {!member.rankCode || !member.joinedAt ? <p className="mt-1 text-xs text-slate-500">Datos incompletos visibles para este asesor.</p> : null}
+        </div>
+      </td>
+      <td className="px-4 py-4"><Badge variant={partnerStatusVariant(member.status)}>{formatPartnerStatus(member.status)}</Badge></td>
+      <td className="px-4 py-4">{formatRankLabel(member.rankCode)}</td>
+      <td className="px-4 py-4">{String(member.activeClientCount)}</td>
+      <td className="px-4 py-4">{formatPortalDate(member.joinedAt)}</td>
+    </tr>
+  );
+}
+
+function NetworkCard({ member, index }: { member: PartnerPortalNetworkMember; index: number }) {
+  const displayName = resolvePartnerNetworkDisplayName(member, index);
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">{displayName}</p>
+          <p className="mt-1 text-xs text-slate-400">Fecha de incorporacion: {formatPortalDate(member.joinedAt)}</p>
+        </div>
+        <Badge variant={partnerStatusVariant(member.status)}>{formatPartnerStatus(member.status)}</Badge>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <MetricStrip dark label="Rango" value={formatRankLabel(member.rankCode)} icon={<Star className="h-4 w-4" />} />
+        <MetricStrip dark label="Clientes activos" value={String(member.activeClientCount)} icon={<Users2 className="h-4 w-4" />} />
+      </div>
+      {!member.rankCode || !member.joinedAt ? (
+        <div className="mt-4 rounded-[18px] border border-dashed border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-slate-400">
+          Datos incompletos visibles para este asesor.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CommissionsView({ summary, partner }: { summary: PartnerPortalSummary | null; partner: PartnerPortalPartner | null }) {
   return (
     <div className="space-y-6">
@@ -1339,7 +1547,20 @@ function buildPartnerPreviewState(previewState: PreviewState): WorkspaceState {
         activeClients: 0
       },
       clients: [],
-      careerProgress: null
+      careerProgress: null,
+      network: {
+        summary: {
+          firstLineCount: 0,
+          secondLineCount: 0,
+          thirdLineCount: 0,
+          activeNetworkCount: 0
+        },
+        levels: [
+          { depth: 1, partners: [] },
+          { depth: 2, partners: [] },
+          { depth: 3, partners: [] }
+        ]
+      }
     };
   }
   return base;

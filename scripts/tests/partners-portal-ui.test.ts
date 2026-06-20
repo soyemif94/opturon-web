@@ -13,6 +13,7 @@ function testPortalRoutesExist() {
   assert.match(read("app/partners/page.tsx"), /PartnerPortalWorkspace/);
   assert.match(read("app/partners/clients/page.tsx"), /page="clients"/);
   assert.match(read("app/partners/career/page.tsx"), /page="career"/);
+  assert.match(read("app/partners/network/page.tsx"), /page="network"/);
   assert.match(read("app/partners/commissions/page.tsx"), /page="commissions"/);
   assert.match(read("app/partners/profile/page.tsx"), /page="profile"/);
 }
@@ -25,6 +26,7 @@ function testPortalShellIsIndependent() {
   assert.match(partnersPortalLib, /label:\s*"Inicio"/);
   assert.match(partnersPortalLib, /label:\s*"Mis clientes"/);
   assert.match(partnersPortalLib, /label:\s*"Mi carrera"/);
+  assert.match(partnersPortalLib, /label:\s*"Mi red"/);
   assert.match(partnersPortalLib, /label:\s*"Comisiones"/);
   assert.match(partnersPortalLib, /label:\s*"Perfil"/);
   assert.match(shellSource, /lg:hidden/);
@@ -38,6 +40,7 @@ function testPortalWorkspaceUsesSecureEndpointsOnly() {
   assert.match(source, /\/api\/partners\/me\/summary/);
   assert.match(source, /\/api\/partners\/me\/clients/);
   assert.match(source, /\/api\/partners\/me\/rank-progress/);
+  assert.match(source, /\/api\/partners\/me\/network/);
   assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/);
   assert.doesNotMatch(source, /portalActorId/);
   assert.doesNotMatch(source, /x-partner-id/i);
@@ -137,6 +140,31 @@ function testClientsUsesRealDataAndPortfolioUx() {
   assert.doesNotMatch(source, /mercadoPagoPreapprovalId/);
 }
 
+function testNetworkUsesSecureHierarchyView() {
+  const source = read("components/partners/PartnerPortalWorkspace.tsx");
+  const partnersPortalLib = read("lib/partners-portal.ts");
+  const backendService = read("../src/services/partners.service.js");
+  const backendRepo = read("../src/repositories/partners.repository.js");
+
+  assert.match(source, /Mi red/);
+  assert.match(source, /Conoce el crecimiento y la actividad comercial de tu equipo/);
+  assert.match(source, /Primera linea/);
+  assert.match(source, /Segunda linea/);
+  assert.match(source, /Tercera linea/);
+  assert.match(source, /Red activa total/);
+  assert.match(source, /Actividad del nivel seleccionado/);
+  assert.match(source, /Todavia no tenes asesores en tu red/);
+  assert.match(source, /Datos incompletos visibles para este asesor/);
+  assert.match(source, /lg:hidden/);
+  assert.match(source, /resolvePartnerNetworkDisplayName/);
+  assert.match(partnersPortalLib, /PartnerPortalNetwork/);
+  assert.match(partnersPortalLib, /summarizeNetworkDepth/);
+  assert.match(backendService, /getPartnerNetwork/);
+  assert.match(backendService, /listPartnerNetworkNodes/);
+  assert.match(backendRepo, /WITH RECURSIVE partner_network/);
+  assert.match(backendRepo, /network\.depth < \$2/);
+}
+
 function testPartnerLoginBrandingIsDedicated() {
   const loginPage = read("app/(auth)/login/page.tsx");
   const loginScreen = read("components/auth/LoginScreen.tsx");
@@ -155,6 +183,7 @@ function run() {
   testHomeUsesRealDataAndStates();
   testCareerUsesPublishedProgressOnly();
   testClientsUsesRealDataAndPortfolioUx();
+  testNetworkUsesSecureHierarchyView();
   testPartnerLoginBrandingIsDedicated();
   console.log("partners-portal-ui.test.ts: ok");
 }

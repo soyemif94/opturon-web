@@ -919,6 +919,22 @@ export async function getPartnerMeRankProgress(partnerId: string) {
   });
 }
 
+export async function getPartnerMeNetwork(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      summary: Record<string, unknown>;
+      levels: Array<Record<string, unknown>>;
+    };
+  }>("/api/partners/me/network", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
 export async function patchPortalUser(
   tenantId: string,
   userId: string,
