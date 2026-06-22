@@ -1,5 +1,5 @@
-export type PartnerStatus = "active" | "suspended" | "disabled" | "invited" | "unknown";
-export type PartnerStatusFilter = "all" | "active" | "suspended" | "inactive";
+export type PartnerStatus = "active" | "suspended" | "disabled" | "invited" | "invitation_canceled" | "unknown";
+export type PartnerStatusFilter = "all" | "active" | "invited" | "suspended" | "disabled" | "invitation_canceled";
 export type PartnerRankFilter = "all" | "sin_rango" | "asesor" | "lider" | "coordinador" | "emperador";
 export type PartnerSort = "recent" | "oldest" | "name" | "last_login";
 
@@ -54,6 +54,16 @@ export type AdminPartnerDetails = {
   attributions?: AdminPartnerAttribution[];
   rankHistory?: Array<{ rankCode?: string | null; effectiveFrom?: string | null; effectiveTo?: string | null }>;
   audit?: AdminPartnerAuditEntry[];
+  lifecycle?: {
+    activeClients?: number;
+    activeAttributions?: number;
+    totalAttributions?: number;
+    directDescendants?: number;
+    commissionEntries?: number;
+    pendingInvitations?: number;
+    rankHistoryEntries?: number;
+    blockers?: string[];
+  };
 };
 
 export type PartnerKpis = {
@@ -100,14 +110,18 @@ export function normalizePartnerStatus(status?: string | null): PartnerStatus {
   if (normalized === "suspended") return "suspended";
   if (normalized === "disabled") return "disabled";
   if (normalized === "invited") return "invited";
+  if (normalized === "invitation_canceled") return "invitation_canceled";
   return "unknown";
 }
 
 export function normalizePartnerStatusFilterValue(status?: string | null): Exclude<PartnerStatusFilter, "all"> {
   const normalized = normalizePartnerStatus(status);
   if (normalized === "active") return "active";
+  if (normalized === "invited") return "invited";
   if (normalized === "suspended") return "suspended";
-  return "inactive";
+  if (normalized === "disabled") return "disabled";
+  if (normalized === "invitation_canceled") return "invitation_canceled";
+  return "disabled";
 }
 
 export function getPartnerStatusLabel(status?: string | null) {
@@ -115,7 +129,8 @@ export function getPartnerStatusLabel(status?: string | null) {
   if (normalized === "active") return "Activo";
   if (normalized === "suspended") return "Suspendido";
   if (normalized === "invited") return "Invitacion pendiente";
-  if (normalized === "disabled") return "Inactivo";
+  if (normalized === "disabled") return "Dado de baja";
+  if (normalized === "invitation_canceled") return "Invitacion cancelada";
   return "Sin estado";
 }
 
@@ -123,7 +138,8 @@ export function getPartnerStatusTone(status?: string | null) {
   const normalized = normalizePartnerStatus(status);
   if (normalized === "active") return "success" as const;
   if (normalized === "suspended") return "warning" as const;
-  if (normalized === "disabled") return "muted" as const;
+  if (normalized === "disabled") return "danger" as const;
+  if (normalized === "invitation_canceled") return "muted" as const;
   if (normalized === "invited") return "outline" as const;
   return "muted" as const;
 }
@@ -254,7 +270,9 @@ export function getPartnerActionAvailability(partner: AdminPartner) {
   return {
     canViewDetail: true,
     canResendInvite: normalizedStatus === "invited",
+    canCancelInvitation: normalizedStatus === "invited",
     canChangeStatus: normalizedStatus === "active" || normalizedStatus === "suspended",
+    canDeactivate: normalizedStatus === "active" || normalizedStatus === "suspended",
     nextStatus
   };
 }

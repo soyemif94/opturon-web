@@ -78,6 +78,10 @@ export function resolveAdminPartnersBackendPath(method: string, slug: string[] =
     return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}/resend-invite`, searchParams);
   }
 
+  if (segments.length === 2 && normalizedMethod === "POST" && (segments[1] === "cancel-invitation" || segments[1] === "deactivate")) {
+    return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}/${encodePathSegment(segments[1])}`, searchParams);
+  }
+
   if (segments.length === 2 && normalizedMethod === "POST" && (segments[1] === "sponsor" || segments[1] === "attributions")) {
     return withSearch(
       `/api/admin/partners/${encodePathSegment(segments[0])}/${encodePathSegment(segments[1])}`,

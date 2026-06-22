@@ -73,6 +73,7 @@ type PartnerMutationResponse = {
   success?: boolean;
   data?: {
     partner?: AdminPartner;
+    lifecycle?: AdminPartnerDetails["lifecycle"];
     invitation?: {
       status?: string | null;
       expiresAt?: string | null;
@@ -90,6 +91,19 @@ type PartnerInviteFormState = {
   code: string;
   sponsorPartnerId: string;
 };
+
+type StatusDialogState = {
+  partnerId: string;
+  nextStatus: "active" | "suspended";
+} | null;
+
+type CancelInvitationDialogState = {
+  partnerId: string;
+} | null;
+
+type DeactivateDialogState = {
+  partnerId: string;
+} | null;
 
 const INITIAL_QUERY: PartnerQueryState = {
   search: "",
@@ -211,11 +225,15 @@ export function PartnersAdminWorkspace({
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [selectedPartnerDetails, setSelectedPartnerDetails] = useState<AdminPartnerDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [statusDialog, setStatusDialog] = useState<{ partnerId: string; nextStatus: "active" | "suspended" } | null>(null);
+  const [statusDialog, setStatusDialog] = useState<StatusDialogState>(null);
+  const [cancelInvitationDialog, setCancelInvitationDialog] = useState<CancelInvitationDialogState>(null);
+  const [deactivateDialog, setDeactivateDialog] = useState<DeactivateDialogState>(null);
   const [busyPartnerId, setBusyPartnerId] = useState<string | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<PartnerInviteFormState>(INITIAL_INVITE_FORM);
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [deactivationReason, setDeactivationReason] = useState("");
+  const [deactivateDetails, setDeactivateDetails] = useState<AdminPartnerDetails | null>(null);
 
   const partnerMap = useMemo(() => new Map(partners.map((partner) => [partner.id, partner])), [partners]);
   const filteredPartners = useMemo(
@@ -304,8 +322,50 @@ export function PartnersAdminWorkspace({
     }
   }
 
+  async function openDeactivateDialog(partnerId: string) {
+    setDeactivateDialog({ partnerId });
+    setDeactivateDetails(null);
+
+    if (previewMode) {
+      setDeactivateDetails(previewBundle.detailsById[partnerId] || null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = (await readJsonSafe(response)) as PartnerDetailsResponse | null;
+      if (!response.ok || !payload?.data) {
+        throw new Error(readErrorMessage(payload, "No pudimos cargar el resumen para la baja."));
+      }
+      setDeactivateDetails(payload.data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No pudimos cargar el resumen para la baja.");
+    }
+  }
+
   function resetInviteForm() {
     setInviteForm(INITIAL_INVITE_FORM);
+  }
+
+  function applyPartnerMutationResult(body: PartnerMutationResponse | null) {
+    const nextPartner = body?.data?.partner;
+    if (!nextPartner) return false;
+
+    setPartners((current) => current.map((partner) => (partner.id === nextPartner.id ? nextPartner : partner)));
+    setSelectedPartnerDetails((current) =>
+      current && current.partner.id === nextPartner.id
+        ? {
+            ...current,
+            partner: nextPartner,
+            lifecycle: body?.data?.lifecycle || current.lifecycle
+          }
+        : current
+    );
+    return true;
   }
 
   async function submitPartnerInvite(event: React.FormEvent) {
@@ -393,6 +453,38 @@ export function PartnersAdminWorkspace({
     }
   }
 
+  async function cancelInvitation(partnerId: string) {
+    if (previewMode) {
+      toast.error("La vista local no ejecuta cambios reales.");
+      return;
+    }
+
+    setBusyPartnerId(partnerId);
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}/cancel-invitation`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ reason: "admin_invitation_cancellation" })
+      });
+      const body = (await readJsonSafe(response)) as PartnerMutationResponse | null;
+      if (!response.ok) {
+        throw new Error(readErrorMessage(body, "No se pudo cancelar la invitacion."));
+      }
+
+      applyPartnerMutationResult(body);
+      toast.success("Invitacion cancelada");
+      setCancelInvitationDialog(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cancelar la invitacion.");
+    } finally {
+      setBusyPartnerId(null);
+    }
+  }
+
   async function changePartnerStatus(partnerId: string, nextStatus: "active" | "suspended") {
     if (previewMode) {
       toast.error("La vista local no ejecuta cambios reales.");
@@ -415,18 +507,7 @@ export function PartnersAdminWorkspace({
         throw new Error(readErrorMessage(payload, "No se pudo actualizar el estado del asesor."));
       }
 
-      const nextPartner = payload?.data?.partner;
-      if (nextPartner) {
-        setPartners((current) => current.map((partner) => (partner.id === nextPartner.id ? nextPartner : partner)));
-        setSelectedPartnerDetails((current) =>
-          current && current.partner.id === nextPartner.id
-            ? {
-                ...current,
-                partner: nextPartner
-              }
-            : current
-        );
-      } else {
+      if (!applyPartnerMutationResult(payload as PartnerMutationResponse | null)) {
         await loadPartners("refresh");
       }
 
@@ -436,6 +517,46 @@ export function PartnersAdminWorkspace({
     } finally {
       setBusyPartnerId(null);
       setStatusDialog(null);
+    }
+  }
+
+  async function deactivatePartnerAccount(partnerId: string) {
+    if (previewMode) {
+      toast.error("La vista local no ejecuta cambios reales.");
+      return;
+    }
+
+    const reason = deactivationReason.trim();
+    if (!reason) {
+      toast.error("El motivo de la baja es obligatorio.");
+      return;
+    }
+
+    setBusyPartnerId(partnerId);
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}/deactivate`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ reason })
+      });
+      const body = (await readJsonSafe(response)) as PartnerMutationResponse | null;
+      if (!response.ok) {
+        throw new Error(readErrorMessage(body, "No se pudo dar de baja al asesor."));
+      }
+
+      applyPartnerMutationResult(body);
+      setDeactivationReason("");
+      setDeactivateDialog(null);
+      setDeactivateDetails(null);
+      toast.success("Asesor dado de baja");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo dar de baja al asesor.");
+    } finally {
+      setBusyPartnerId(null);
     }
   }
 
@@ -529,10 +650,12 @@ export function PartnersAdminWorkspace({
                   value={query.status}
                   onChange={(nextValue) => setQuery((current) => ({ ...current, status: nextValue as PartnerQueryState["status"] }))}
                   options={[
-                    { value: "all", label: "Todos los estados" },
-                    { value: "active", label: "Activo" },
-                    { value: "suspended", label: "Suspendido" },
-                    { value: "inactive", label: "Inactivo" }
+                    { value: "all", label: "Todos" },
+                    { value: "active", label: "Activos" },
+                    { value: "invited", label: "Invitaciones pendientes" },
+                    { value: "suspended", label: "Suspendidos" },
+                    { value: "disabled", label: "Dados de baja" },
+                    { value: "invitation_canceled", label: "Invitaciones canceladas" }
                   ]}
                 />
                 <ToolbarSelect
@@ -683,10 +806,16 @@ export function PartnersAdminWorkspace({
                                   onResendInvite={
                                     availability.canResendInvite ? () => void resendInvite(partner.id) : undefined
                                   }
+                                  onCancelInvite={
+                                    availability.canCancelInvitation ? () => setCancelInvitationDialog({ partnerId: partner.id }) : undefined
+                                  }
                                   onToggleStatus={
                                     availability.canChangeStatus && nextStatus
                                       ? () => setStatusDialog({ partnerId: partner.id, nextStatus })
                                       : undefined
+                                  }
+                                  onDeactivate={
+                                    availability.canDeactivate ? () => void openDeactivateDialog(partner.id) : undefined
                                   }
                                 />
                               </td>
@@ -724,10 +853,16 @@ export function PartnersAdminWorkspace({
                               onResendInvite={
                                 availability.canResendInvite ? () => void resendInvite(partner.id) : undefined
                               }
+                              onCancelInvite={
+                                availability.canCancelInvitation ? () => setCancelInvitationDialog({ partnerId: partner.id }) : undefined
+                              }
                               onToggleStatus={
                                 availability.canChangeStatus && nextStatus
                                   ? () => setStatusDialog({ partnerId: partner.id, nextStatus })
                                   : undefined
+                              }
+                              onDeactivate={
+                                availability.canDeactivate ? () => void openDeactivateDialog(partner.id) : undefined
                               }
                             />
                           </div>
@@ -932,42 +1067,69 @@ export function PartnersAdminWorkspace({
                     <InfoRow label="Sponsor" value={getPartnerSponsorLabel(selectedPartner, partnerMap)} />
                     <InfoRow label="Clientes activos" value={String(Number(selectedPartner.activeAttributionCount || 0))} />
                     <InfoRow label="Notas" value={selectedPartner.profile?.notes || "Sin notas visibles"} />
+                    <InfoRow label="Comisiones registradas" value={String(Number(selectedPartnerDetails?.lifecycle?.commissionEntries || 0))} />
+                    <InfoRow label="Descendientes directos" value={String(Number(selectedPartnerDetails?.lifecycle?.directDescendants || 0))} />
                   </CardContent>
                 </Card>
 
                 <Card className={PANEL_MUTED_CLASS}>
                   <CardHeader
                     action={
-                      getPartnerActionAvailability(selectedPartner).canResendInvite ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
-                          onClick={() => void resendInvite(selectedPartner.id)}
-                          disabled={busyPartnerId === selectedPartner.id}
-                        >
-                          {busyPartnerId === selectedPartner.id ? "Enviando..." : "Reenviar invitacion"}
-                        </Button>
-                      ) : getPartnerActionAvailability(selectedPartner).canChangeStatus && getPartnerActionAvailability(selectedPartner).nextStatus ? (
-                        <Button
-                          type="button"
-                          variant={getPartnerActionAvailability(selectedPartner).nextStatus === "active" ? "primary" : "secondary"}
-                          className="rounded-2xl"
-                          onClick={() =>
-                            setStatusDialog({
-                              partnerId: selectedPartner.id,
-                              nextStatus: getPartnerActionAvailability(selectedPartner).nextStatus as "active" | "suspended"
-                            })
-                          }
-                          disabled={busyPartnerId === selectedPartner.id}
-                        >
-                          {busyPartnerId === selectedPartner.id
-                            ? "Guardando..."
-                            : getPartnerActionAvailability(selectedPartner).nextStatus === "active"
-                              ? "Activar"
-                              : "Suspender"}
-                        </Button>
-                      ) : null
+                      <div className="flex flex-wrap gap-2">
+                        {getPartnerActionAvailability(selectedPartner).canResendInvite ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
+                            onClick={() => void resendInvite(selectedPartner.id)}
+                            disabled={busyPartnerId === selectedPartner.id}
+                          >
+                            {busyPartnerId === selectedPartner.id ? "Enviando..." : "Reenviar invitacion"}
+                          </Button>
+                        ) : null}
+                        {getPartnerActionAvailability(selectedPartner).canCancelInvitation ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
+                            onClick={() => setCancelInvitationDialog({ partnerId: selectedPartner.id })}
+                            disabled={busyPartnerId === selectedPartner.id}
+                          >
+                            Cancelar invitacion
+                          </Button>
+                        ) : null}
+                        {getPartnerActionAvailability(selectedPartner).canChangeStatus && getPartnerActionAvailability(selectedPartner).nextStatus ? (
+                          <Button
+                            type="button"
+                            variant={getPartnerActionAvailability(selectedPartner).nextStatus === "active" ? "primary" : "secondary"}
+                            className="rounded-2xl"
+                            onClick={() =>
+                              setStatusDialog({
+                                partnerId: selectedPartner.id,
+                                nextStatus: getPartnerActionAvailability(selectedPartner).nextStatus as "active" | "suspended"
+                              })
+                            }
+                            disabled={busyPartnerId === selectedPartner.id}
+                          >
+                            {busyPartnerId === selectedPartner.id
+                              ? "Guardando..."
+                              : getPartnerActionAvailability(selectedPartner).nextStatus === "active"
+                                ? "Activar"
+                                : "Suspender"}
+                          </Button>
+                        ) : null}
+                        {getPartnerActionAvailability(selectedPartner).canDeactivate ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="rounded-2xl"
+                            onClick={() => void openDeactivateDialog(selectedPartner.id)}
+                            disabled={busyPartnerId === selectedPartner.id}
+                          >
+                            Dar de baja asesor
+                          </Button>
+                        ) : null}
+                      </div>
                     }
                   >
                     <div>
@@ -981,6 +1143,12 @@ export function PartnersAdminWorkspace({
                     <ActionHint title="Editar perfil" description="Proximamente" disabled />
                     {getPartnerActionAvailability(selectedPartner).canResendInvite ? (
                       <ActionHint title="Invitacion pendiente" description="Puedes reenviar el acceso seguro sin exponer token ni contrasena." />
+                    ) : null}
+                    {getPartnerActionAvailability(selectedPartner).canCancelInvitation ? (
+                      <ActionHint title="Cancelar invitacion" description="El enlace deja de funcionar y la cuenta pendiente sale de la vista operativa." />
+                    ) : null}
+                    {getPartnerActionAvailability(selectedPartner).canDeactivate ? (
+                      <ActionHint title="Dar de baja asesor" description="Bloquea acceso futuro, conserva historial y exige revisar dependencias activas antes de confirmar." />
                     ) : null}
                     <ActionHint title="Ver clientes atribuidos" description="Visible en la seccion de atribuciones de este panel." />
                     <ActionHint title="Ver jerarquia" description="Proximamente" disabled />
@@ -1055,6 +1223,17 @@ export function PartnersAdminWorkspace({
       </Dialog>
 
       <ConfirmDialog
+        open={Boolean(cancelInvitationDialog)}
+        onOpenChange={(open) => (!open ? setCancelInvitationDialog(null) : null)}
+        title="Cancelar invitacion"
+        description="El enlace enviado dejara de funcionar y esta cuenta pendiente sera retirada del listado operativo."
+        confirmText="Cancelar invitacion"
+        onConfirm={() =>
+          cancelInvitationDialog ? cancelInvitation(cancelInvitationDialog.partnerId) : Promise.resolve()
+        }
+      />
+
+      <ConfirmDialog
         open={Boolean(statusDialog)}
         onOpenChange={(open) => (!open ? setStatusDialog(null) : null)}
         title={statusDialog?.nextStatus === "active" ? "Activar asesor" : "Suspender asesor"}
@@ -1068,6 +1247,75 @@ export function PartnersAdminWorkspace({
           statusDialog ? changePartnerStatus(statusDialog.partnerId, statusDialog.nextStatus) : Promise.resolve()
         }
       />
+
+      <Dialog
+        open={Boolean(deactivateDialog)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivateDialog(null);
+            setDeactivationReason("");
+            setDeactivateDetails(null);
+          }
+        }}
+      >
+        <DialogContent className={cn("max-w-2xl rounded-[28px]", DETAIL_PANEL_CLASS)}>
+          <DialogHeader>
+            <DialogTitle className="text-white">Dar de baja asesor</DialogTitle>
+            <DialogDescription className="text-muted/90">
+              Conserva auditoria, comisiones y relaciones historicas. El acceso quedara bloqueado de forma definitiva.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoRow
+                label="Nombre"
+                value={deactivateDialog ? getPartnerDisplayName(partnerMap.get(deactivateDialog.partnerId) || { id: "", email: "", profile: null }) : "Sin registro"}
+              />
+              <InfoRow label="Email" value={deactivateDialog ? partnerMap.get(deactivateDialog.partnerId)?.email || "Sin registro" : "Sin registro"} />
+              <InfoRow label="Clientes activos" value={String(Number(deactivateDetails?.lifecycle?.activeClients || 0))} />
+              <InfoRow label="Descendientes directos" value={String(Number(deactivateDetails?.lifecycle?.directDescendants || 0))} />
+              <InfoRow label="Comisiones registradas" value={String(Number(deactivateDetails?.lifecycle?.commissionEntries || 0))} />
+              <InfoRow label="Atribuciones vigentes" value={String(Number(deactivateDetails?.lifecycle?.activeAttributions || 0))} />
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-muted/90">
+              Si existen clientes activos o asesores asociados, la baja se bloquea hasta resolver esas dependencias de forma explicita.
+            </div>
+            <label className="grid gap-2 text-sm text-muted/90">
+              Motivo de la baja
+              <Input
+                value={deactivationReason}
+                onChange={(event) => setDeactivationReason(event.target.value)}
+                placeholder="Ej. Cierre comercial definitivo"
+                required
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
+                onClick={() => {
+                  setDeactivateDialog(null);
+                  setDeactivationReason("");
+                  setDeactivateDetails(null);
+                }}
+                disabled={busyPartnerId === deactivateDialog?.partnerId}
+              >
+                Volver
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="rounded-2xl"
+                onClick={() => (deactivateDialog ? deactivatePartnerAccount(deactivateDialog.partnerId) : Promise.resolve())}
+                disabled={busyPartnerId === deactivateDialog?.partnerId || !deactivationReason.trim()}
+              >
+                {busyPartnerId === deactivateDialog?.partnerId ? "Guardando..." : "Dar de baja asesor"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -1077,13 +1325,17 @@ function PartnerRowActions({
   busy,
   onViewDetail,
   onResendInvite,
-  onToggleStatus
+  onCancelInvite,
+  onToggleStatus,
+  onDeactivate
 }: {
   partner: AdminPartner;
   busy?: boolean;
   onViewDetail: () => void;
   onResendInvite?: () => void;
+  onCancelInvite?: () => void;
   onToggleStatus?: () => void;
+  onDeactivate?: () => void;
 }) {
   const availability = getPartnerActionAvailability(partner);
   const toggleLabel = availability.nextStatus === "active" ? "Activar" : "Suspender";
@@ -1109,8 +1361,14 @@ function PartnerRowActions({
         <DropdownMenuItem disabled={!availability.canResendInvite || busy} onClick={onResendInvite}>
           {busy ? "Procesando..." : "Reenviar invitacion"}
         </DropdownMenuItem>
+        <DropdownMenuItem disabled={!availability.canCancelInvitation || busy} onClick={onCancelInvite}>
+          {busy ? "Procesando..." : "Cancelar invitacion"}
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={!availability.canChangeStatus || busy} onClick={onToggleStatus}>
           {busy ? "Procesando..." : `${toggleLabel} asesor`}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!availability.canDeactivate || busy} onClick={onDeactivate}>
+          {busy ? "Procesando..." : "Dar de baja asesor"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
