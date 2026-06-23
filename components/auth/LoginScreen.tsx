@@ -1,18 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LoginForm } from "@/components/login-form";
+import { isPartnerPortalHost, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 
-function isPartnerCallback(callbackUrl: string | null) {
-  return String(callbackUrl || "").startsWith("/partners");
+function isPartnerCallback(callbackUrl: string | null, partnerHost: boolean) {
+  const value = String(callbackUrl || "").trim();
+  return value.startsWith("/partners") || (partnerHost && (value === "" || value === "/" || value.startsWith("/?")));
 }
 
 export function LoginScreen() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl");
-  const partnerMode = isPartnerCallback(callbackUrl);
+  const [host, setHost] = useState("");
+  const partnerHost = isPartnerPortalHost(host);
+  const partnerMode = isPartnerCallback(callbackUrl, partnerHost);
+  const partnerCallbackUrl = partnerLoginCallbackForHost(host);
+
+  useEffect(() => {
+    setHost(window.location.host);
+  }, []);
 
   if (!partnerMode) {
     return (
@@ -57,11 +67,11 @@ export function LoginScreen() {
             </Badge>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Portal de asesores</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Ingresá con tu email y contraseña para entrar directamente a `/partners`.
+              Ingresá con tu email y contraseña para entrar directamente al portal.
             </p>
             <div className="mt-6">
               <LoginForm
-                defaultCallbackUrl="/partners"
+                defaultCallbackUrl={partnerCallbackUrl}
                 emailPlaceholder="asesor@opturon.com"
                 submitLabel="Entrar al portal"
                 forgotPasswordHref="/forgot-password"

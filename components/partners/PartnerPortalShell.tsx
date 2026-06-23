@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, LogOut, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatPartnerStatus, formatRankLabel, PARTNER_PORTAL_NAV } from "@/lib/partners-portal";
+import {
+  formatPartnerStatus,
+  formatRankLabel,
+  isPartnerPortalHost,
+  PARTNER_PORTAL_NAV,
+  partnerHrefForHost,
+  partnerPublicPathForInternalPath
+} from "@/lib/partners-portal";
 import { cn } from "@/lib/ui/cn";
 
 export function PartnerPortalShell({
@@ -15,18 +22,31 @@ export function PartnerPortalShell({
   userEmail,
   currentRank,
   accountStatus,
+  requestHost,
   children
 }: {
   userName: string;
   userEmail?: string | null;
   currentRank?: string | null;
   accountStatus?: string | null;
+  requestHost?: string | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [host, setHost] = useState(requestHost || "");
   const rankLabel = formatRankLabel(currentRank);
   const statusLabel = formatPartnerStatus(accountStatus);
+  const partnerHost = isPartnerPortalHost(host);
+  const signOutCallbackUrl = partnerHost ? "/login" : "/login?callbackUrl=/partners";
+
+  useEffect(() => {
+    setHost(window.location.host);
+  }, []);
+
+  function isActivePartnerNav(item: (typeof PARTNER_PORTAL_NAV)[number]) {
+    return pathname === item.legacyHref || partnerPublicPathForInternalPath(pathname) === item.path;
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(244,114,182,0.12),transparent_22%),radial-gradient(circle_at_15%_20%,rgba(251,191,36,0.12),transparent_18%),linear-gradient(180deg,#04111f_0%,#07182a_52%,#081423_100%)] text-slate-100">
@@ -49,11 +69,12 @@ export function PartnerPortalShell({
 
           <nav className="flex-1 space-y-2 px-4 py-4">
             {PARTNER_PORTAL_NAV.map((item) => {
-              const active = pathname === item.href;
+              const href = partnerHrefForHost(item.legacyHref, host);
+              const active = isActivePartnerNav(item);
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={item.legacyHref}
+                  href={href}
                   className={cn(
                     "group flex items-center justify-between rounded-[22px] border px-4 py-3 text-sm font-medium transition-all",
                     active
@@ -94,7 +115,7 @@ export function PartnerPortalShell({
               <Button
                 variant="secondary"
                 className="mt-4 w-full justify-start border-white/10 bg-white/6 text-slate-100 hover:bg-white/10"
-                onClick={() => void signOut({ callbackUrl: "/login" })}
+                onClick={() => void signOut({ callbackUrl: signOutCallbackUrl })}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Cerrar sesion
@@ -132,7 +153,7 @@ export function PartnerPortalShell({
                 variant="ghost"
                 size="sm"
                 className="hidden text-slate-300 hover:bg-white/10 hover:text-white lg:inline-flex"
-                onClick={() => void signOut({ callbackUrl: "/login" })}
+                onClick={() => void signOut({ callbackUrl: signOutCallbackUrl })}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Salir
@@ -162,11 +183,12 @@ export function PartnerPortalShell({
 
                 <nav className="mt-5 grid gap-2">
                   {PARTNER_PORTAL_NAV.map((item) => {
-                    const active = pathname === item.href;
+                    const href = partnerHrefForHost(item.legacyHref, host);
+                    const active = isActivePartnerNav(item);
                     return (
                       <Link
-                        key={item.href}
-                        href={item.href}
+                        key={item.legacyHref}
+                        href={href}
                         onClick={() => setMobileOpen(false)}
                         className={cn(
                           "rounded-[22px] border px-4 py-3 text-sm font-medium transition-colors",
@@ -184,7 +206,7 @@ export function PartnerPortalShell({
                 <Button
                   variant="secondary"
                   className="mt-5 w-full justify-start border-white/10 bg-white/[0.06] text-slate-100 hover:bg-white/10"
-                  onClick={() => void signOut({ callbackUrl: "/login" })}
+                  onClick={() => void signOut({ callbackUrl: signOutCallbackUrl })}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar sesion

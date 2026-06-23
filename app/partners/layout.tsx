@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { PartnerPortalShell } from "@/components/partners/PartnerPortalShell";
 import { getPartnerMe, getPartnerMeRankProgress } from "@/lib/api";
 import { resolveCurrentRank } from "@/lib/partners-portal";
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 
 export default async function PartnersLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requirePartnerPage();
+  const requestHost = (await headers()).get("host");
   const user = ctx.session?.user;
   const previewMode = Boolean((ctx as any).previewMode);
   const partnerId = String(user?.partnerId || "").trim();
@@ -36,6 +38,7 @@ export default async function PartnersLayout({ children }: { children: React.Rea
       userEmail={user?.email || null}
       currentRank={currentRank}
       accountStatus={accountStatus}
+      requestHost={requestHost}
     >
       {previewMode ? (
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

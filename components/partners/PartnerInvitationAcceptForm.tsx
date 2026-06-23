@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { partnerLoginCallbackForHost } from "@/lib/partners-portal";
 
 type PartnerInvitationSummary = {
   partnerId: string;
@@ -33,6 +34,12 @@ export function PartnerInvitationAcceptForm({ token }: { token?: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<PartnerInvitationSummary | null>(null);
+  const [host, setHost] = useState("");
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(partnerLoginCallbackForHost(host))}`;
+
+  useEffect(() => {
+    setHost(window.location.host);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +128,7 @@ export function PartnerInvitationAcceptForm({ token }: { token?: string }) {
       <div className="space-y-4">
         {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
         {!message ? <p className="text-sm text-rose-600">{error || "El enlace es invalido o ya expiro."}</p> : null}
-        <Link href="/login?callbackUrl=/partners" className="text-sm font-medium text-amber-700 hover:text-amber-800">
+        <Link href={loginHref} className="text-sm font-medium text-amber-700 hover:text-amber-800">
           Ir al login partner
         </Link>
       </div>

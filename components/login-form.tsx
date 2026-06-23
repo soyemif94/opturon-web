@@ -7,6 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
+function safeCallbackUrl(value: string | null, fallback: string) {
+  const candidate = String(value || "").trim();
+  if (!candidate) return fallback;
+  if (candidate.startsWith("/") && !candidate.startsWith("//")) return candidate;
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
+}
+
 export function LoginForm({
   defaultCallbackUrl = "/app",
   emailPlaceholder = "admin@opturon.com",
@@ -41,7 +58,7 @@ export function LoginForm({
     let didTimeout = false;
 
     try {
-      const callbackUrl = params.get("callbackUrl") || defaultCallbackUrl;
+      const callbackUrl = safeCallbackUrl(params.get("callbackUrl"), defaultCallbackUrl);
       timeoutId = setTimeout(() => {
         didTimeout = true;
         setLoading(false);

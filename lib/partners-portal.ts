@@ -145,15 +145,68 @@ export type PartnerPortalCommissionLedger = {
 };
 
 export const PARTNER_PORTAL_PREVIEW_HEADER = "x-opturon-partner-preview";
+export const PARTNER_PORTAL_HOST = "partners.opturon.com";
 
 export const PARTNER_PORTAL_NAV = [
-  { href: "/partners", label: "Inicio", page: "home" as const },
-  { href: "/partners/clients", label: "Mis clientes", page: "clients" as const },
-  { href: "/partners/career", label: "Mi carrera", page: "career" as const },
-  { href: "/partners/network", label: "Mi red", page: "network" as const },
-  { href: "/partners/commissions", label: "Comisiones", page: "commissions" as const },
-  { href: "/partners/profile", label: "Perfil", page: "profile" as const }
+  { path: "/", legacyHref: "/partners", label: "Inicio", page: "home" as const },
+  { path: "/clients", legacyHref: "/partners/clients", label: "Mis clientes", page: "clients" as const },
+  { path: "/career", legacyHref: "/partners/career", label: "Mi carrera", page: "career" as const },
+  { path: "/network", legacyHref: "/partners/network", label: "Mi red", page: "network" as const },
+  { path: "/commissions", legacyHref: "/partners/commissions", label: "Comisiones", page: "commissions" as const },
+  { path: "/profile", legacyHref: "/partners/profile", label: "Perfil", page: "profile" as const }
 ];
+
+export const PARTNER_PORTAL_PUBLIC_PATHS = new Set(["/partners/invite", "/invite"]);
+
+export function normalizePartnerHost(host?: string | null) {
+  return String(host || "")
+    .split(":")[0]
+    .trim()
+    .toLowerCase();
+}
+
+export function isPartnerPortalHost(host?: string | null) {
+  return normalizePartnerHost(host) === PARTNER_PORTAL_HOST;
+}
+
+export function isPartnerPublicPath(pathname: string) {
+  const normalized = normalizePartnerPathname(pathname);
+  return PARTNER_PORTAL_PUBLIC_PATHS.has(normalized);
+}
+
+export function normalizePartnerPathname(pathname: string) {
+  const normalized = String(pathname || "/").trim() || "/";
+  if (!normalized.startsWith("/")) return `/${normalized}`;
+  return normalized.replace(/\/+$/, "") || "/";
+}
+
+export function partnerInternalPathForHostPath(pathname: string) {
+  const normalized = normalizePartnerPathname(pathname);
+  if (normalized === "/") return "/partners";
+  if (normalized === "/invite") return "/partners/invite";
+  if (normalized === "/login") return "/login";
+  if (normalized.startsWith("/partners")) return normalized;
+  return `/partners${normalized}`;
+}
+
+export function partnerPublicPathForInternalPath(pathname: string) {
+  const normalized = normalizePartnerPathname(pathname);
+  if (normalized === "/partners") return "/";
+  if (normalized.startsWith("/partners/")) return normalizePartnerPathname(normalized.slice("/partners".length));
+  return normalized;
+}
+
+export function partnerHrefForHost(pathname: string, host?: string | null) {
+  return isPartnerPortalHost(host) ? partnerPublicPathForInternalPath(pathname) : normalizePartnerPathname(pathname);
+}
+
+export function partnerLoginCallbackForHost(host?: string | null) {
+  return isPartnerPortalHost(host) ? "/" : "/partners";
+}
+
+export function partnerInvitePathForHost(host?: string | null) {
+  return isPartnerPortalHost(host) ? "/invite" : "/partners/invite";
+}
 
 export const PARTNER_CAREER_LADDER = [
   {

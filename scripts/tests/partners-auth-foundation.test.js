@@ -19,6 +19,9 @@ function testAuthIncludesPartnerLoginAndHydration() {
 function testMiddlewareProtectsPartnersRoute() {
   const source = read('middleware.ts');
   assert.match(source, /path\.startsWith\("\/partners"\)/);
+  assert.match(source, /isPartnerPortalHost/);
+  assert.match(source, /partnerInternalPathForHostPath/);
+  assert.match(source, /NextResponse\.rewrite/);
   assert.match(source, /globalRole !== "partner"/);
   assert.match(source, /globalRole === "partner"/);
   assert.match(source, /matcher: \[.*\/partners\/:path\*/s);

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasAppPermission, isStaffRole, type AppPermission } from "@/lib/app-permissions";
 import { authOptions } from "@/lib/auth";
-import { PARTNER_PORTAL_PREVIEW_HEADER } from "@/lib/partners-portal";
+import { isPartnerPortalHost, PARTNER_PORTAL_PREVIEW_HEADER, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
 
@@ -124,15 +124,18 @@ export async function requireAppApi(options?: { permission?: AppPermission }) {
 export async function requirePartnerPage() {
   const ctx = await getSessionContext();
   const requestHeaders = await headers();
+  const partnerCallbackUrl = partnerLoginCallbackForHost(requestHeaders.get("host"));
   const previewMode =
     process.env.NODE_ENV !== "production" &&
     requestHeaders.get(PARTNER_PORTAL_PREVIEW_HEADER) === "1" &&
     Boolean(ctx.globalRole && STAFF_ROLES.has(ctx.globalRole));
-  if (!ctx.session) redirect("/login?callbackUrl=/partners");
+  if (!ctx.session) redirect(`/login?callbackUrl=${encodeURIComponent(partnerCallbackUrl)}`);
   if (previewMode) {
     return { ...ctx, previewMode: true };
   }
-  if (ctx.globalRole !== PARTNER_ROLE || !ctx.session.user?.partnerId) redirect("/app");
+  if (ctx.globalRole !== PARTNER_ROLE || !ctx.session.user?.partnerId) {
+    redirect(isPartnerPortalHost(requestHeaders.get("host")) ? "https://www.opturon.com/app" : "/app");
+  }
   return { ...ctx, previewMode: false };
 }
 

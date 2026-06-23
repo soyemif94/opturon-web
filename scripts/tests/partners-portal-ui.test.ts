@@ -17,6 +17,7 @@ function testPortalRoutesExist() {
   assert.match(read("app/partners/commissions/page.tsx"), /page="commissions"/);
   assert.match(read("app/api/partners/me/commissions/route.ts"), /requirePartnerApi/);
   assert.match(read("app/partners/profile/page.tsx"), /page="profile"/);
+  assert.match(read("app/(partners-public)/partners/invite/page.tsx"), /PartnerInvitationAcceptForm/);
 }
 
 function testPortalShellIsIndependent() {
@@ -24,6 +25,7 @@ function testPortalShellIsIndependent() {
   const partnersPortalLib = read("lib/partners-portal.ts");
   assert.match(shellSource, /Portal de asesores/);
   assert.match(shellSource, /PARTNER_PORTAL_NAV/);
+  assert.match(shellSource, /partnerHrefForHost/);
   assert.match(partnersPortalLib, /label:\s*"Inicio"/);
   assert.match(partnersPortalLib, /label:\s*"Mis clientes"/);
   assert.match(partnersPortalLib, /label:\s*"Mi carrera"/);
@@ -237,8 +239,30 @@ function testPartnerLoginBrandingIsDedicated() {
 
   assert.match(loginPage, /LoginScreen/);
   assert.match(loginScreen, /Portal de asesores/);
-  assert.match(loginScreen, /defaultCallbackUrl="\/partners"/);
+  assert.match(loginScreen, /partnerLoginCallbackForHost/);
   assert.match(loginForm, /defaultCallbackUrl/);
+  assert.match(loginForm, /safeCallbackUrl/);
+}
+
+function testPartnerCustomDomainRoutingIsCentralized() {
+  const middleware = read("middleware.ts");
+  const partnersPortalLib = read("lib/partners-portal.ts");
+  const inviteForm = read("components/partners/PartnerInvitationAcceptForm.tsx");
+  const backendInvitationEmail = read("../src/services/partner-invitations-email.service.js");
+
+  assert.match(partnersPortalLib, /PARTNER_PORTAL_HOST = "partners\.opturon\.com"/);
+  assert.match(partnersPortalLib, /partnerInternalPathForHostPath/);
+  assert.match(partnersPortalLib, /partnerPublicPathForInternalPath/);
+  assert.match(partnersPortalLib, /legacyHref: "\/partners\/clients"/);
+  assert.match(partnersPortalLib, /path: "\/clients"/);
+  assert.match(middleware, /isPartnerHost && path\.startsWith\("\/partners"\)/);
+  assert.match(middleware, /partnerInternalPathForHostPath\(path\)/);
+  assert.match(middleware, /isPartnerPublicPath\(path\)/);
+  assert.match(middleware, /"\/clients"/);
+  assert.match(inviteForm, /partnerLoginCallbackForHost/);
+  assert.match(backendInvitationEmail, /https:\/\/partners\.opturon\.com/);
+  assert.match(backendInvitationEmail, /invitationPath/);
+  assert.match(backendInvitationEmail, /encodeURIComponent\(token\)/);
 }
 
 function run() {
@@ -252,6 +276,7 @@ function run() {
   testCommissionsUseRegisteredLedgerSemantics();
   testProfileUsesSafeIdentityView();
   testPartnerLoginBrandingIsDedicated();
+  testPartnerCustomDomainRoutingIsCentralized();
   console.log("partners-portal-ui.test.ts: ok");
 }
 
