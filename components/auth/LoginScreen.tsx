@@ -8,6 +8,7 @@ import { LoginForm } from "@/components/login-form";
 import { isPartnerPortalHost, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 
 function isPartnerCallback(callbackUrl: string | null, partnerHost: boolean) {
+  if (partnerHost) return true;
   const value = String(callbackUrl || "").trim();
   return value.startsWith("/partners") || (partnerHost && (value === "" || value === "/" || value.startsWith("/?")));
 }

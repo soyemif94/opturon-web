@@ -17,6 +17,7 @@ function testPartnerLoginDoesNotUseClientResolver() {
   assert.match(loginForm, /signIn\("credentials"/);
   assert.match(loginForm, /Esta cuenta no tiene acceso al Portal de asesores/);
   assert.match(loginScreen, /authIntent="partner"/);
+  assert.match(loginScreen, /if \(partnerHost\) return true/);
   assert.match(auth, /if \(authIntent === "partner"\)/);
   assert.match(auth, /loginPartnerUser\(email, password\)/);
   assert.match(auth, /return normalizePartnerAuthUser\(response\.data\)/);
