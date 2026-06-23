@@ -14,6 +14,7 @@ declare module "next-auth" {
       partnerId?: string;
       accountScope?: string;
       portalActorId?: string;
+      authSource?: string;
     };
   }
 
@@ -26,6 +27,7 @@ declare module "next-auth" {
     partnerId?: string;
     accountScope?: string;
     portalActorId?: string;
+    authSource?: string;
   }
 }
 
@@ -39,6 +41,7 @@ declare module "next-auth/jwt" {
     partnerId?: string;
     accountScope?: string;
     portalActorId?: string;
+    authSource?: string;
   }
 }
 

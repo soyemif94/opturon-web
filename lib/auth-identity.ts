@@ -10,6 +10,7 @@ export type AuthIdentityInput = {
   partnerId?: string | null;
   tenantId?: string | null;
   tenantRole?: TenantRole | string | null;
+  clinicId?: string | null;
 };
 
 const STAFF_GLOBAL_ROLES = new Set<AuthGlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
@@ -53,4 +54,23 @@ export function resolveAccountScopeForIdentity(input: AuthIdentityInput): AuthAc
   }
 
   return undefined;
+}
+
+export function isStrictPartnerIdentity(input: AuthIdentityInput) {
+  return (
+    normalizeAccountScope(input.accountScope) === "partner" &&
+    normalizeGlobalRole(input.globalRole) === "partner" &&
+    Boolean(String(input.partnerId || "").trim()) &&
+    !String(input.tenantId || "").trim() &&
+    !String(input.tenantRole || "").trim() &&
+    !String(input.clinicId || "").trim()
+  );
+}
+
+export function isPartnerLikeIdentity(input: AuthIdentityInput) {
+  return (
+    normalizeAccountScope(input.accountScope) === "partner" ||
+    normalizeGlobalRole(input.globalRole) === "partner" ||
+    Boolean(String(input.partnerId || "").trim())
+  );
 }

@@ -74,6 +74,7 @@ export function LoginScreen() {
                 defaultCallbackUrl={partnerCallbackUrl}
                 emailPlaceholder="asesor@opturon.com"
                 submitLabel="Entrar al portal"
+                authIntent="partner"
                 forgotPasswordHref="/forgot-password"
                 forgotPasswordLabel="¿Olvidaste tu contraseña?"
               />

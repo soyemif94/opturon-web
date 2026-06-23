@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
-function safeCallbackUrl(value: string | null, fallback: string) {
+const PARTNER_CALLBACK_PATHS = new Set(["/", "/clients", "/career", "/network", "/commissions", "/profile", "/invite"]);
+
+function normalizeSafeCallbackUrl(value: string | null, fallback: string) {
   const candidate = String(value || "").trim();
   if (!candidate) return fallback;
   if (candidate.startsWith("/") && !candidate.startsWith("//")) return candidate;
@@ -24,18 +26,36 @@ function safeCallbackUrl(value: string | null, fallback: string) {
   return fallback;
 }
 
+function safeCallbackUrl(value: string | null, fallback: string, authIntent: "portal" | "partner") {
+  const candidate = normalizeSafeCallbackUrl(value, fallback);
+  if (authIntent !== "partner") return candidate;
+
+  const pathname = candidate.split(/[?#]/)[0] || "/";
+  if (PARTNER_CALLBACK_PATHS.has(pathname)) return candidate;
+  if (pathname === "/partners") return "/";
+  if (pathname.startsWith("/partners/")) {
+    const publicPath = pathname.slice("/partners".length) || "/";
+    if (PARTNER_CALLBACK_PATHS.has(publicPath)) {
+      return candidate.replace(pathname, publicPath);
+    }
+  }
+  return fallback;
+}
+
 export function LoginForm({
   defaultCallbackUrl = "/app",
   emailPlaceholder = "admin@opturon.com",
   submitLabel = "Ingresar",
   forgotPasswordHref = "/forgot-password",
-  forgotPasswordLabel = "¿Olvidaste tu contraseña?"
+  forgotPasswordLabel = "Olvidaste tu contrasena?",
+  authIntent = "portal"
 }: {
   defaultCallbackUrl?: string;
   emailPlaceholder?: string;
   submitLabel?: string;
   forgotPasswordHref?: string;
   forgotPasswordLabel?: string;
+  authIntent?: "portal" | "partner";
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +78,7 @@ export function LoginForm({
     let didTimeout = false;
 
     try {
-      const callbackUrl = safeCallbackUrl(params.get("callbackUrl"), defaultCallbackUrl);
+      const callbackUrl = safeCallbackUrl(params.get("callbackUrl"), defaultCallbackUrl, authIntent);
       timeoutId = setTimeout(() => {
         didTimeout = true;
         setLoading(false);
@@ -71,6 +91,7 @@ export function LoginForm({
         signIn("credentials", {
           email,
           password,
+          authIntent,
           redirect: false,
           callbackUrl
         }),
@@ -87,11 +108,9 @@ export function LoginForm({
           toast.error("Login bloqueado", message);
           return;
         }
-        if (result?.error) {
-          toast.error(`Auth error: ${result.error}`);
-        }
-        setError("Credenciales invalidas.");
-        toast.error("Credenciales invalidas");
+        const invalidMessage = authIntent === "partner" ? "Esta cuenta no tiene acceso al Portal de asesores." : "Credenciales invalidas.";
+        setError(invalidMessage);
+        toast.error(invalidMessage);
         return;
       }
 
@@ -138,7 +157,7 @@ export function LoginForm({
         <a href={forgotPasswordHref} className="hover:text-foreground">
           {forgotPasswordLabel}
         </a>
-        <p className="mt-1 text-xs">Te enviaremos un enlace temporal para crear una nueva contraseña.</p>
+        <p className="mt-1 text-xs">Te enviaremos un enlace temporal para crear una nueva contrasena.</p>
       </div>
       {isDev ? <p className="text-xs text-muted-foreground">Debug status: {debugStatus}</p> : null}
     </form>

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasAppPermission, isStaffRole, type AppPermission } from "@/lib/app-permissions";
 import { authOptions } from "@/lib/auth";
+import { isPartnerLikeIdentity, isStrictPartnerIdentity } from "@/lib/auth-identity";
 import { isPartnerPortalHost, PARTNER_PORTAL_PREVIEW_HEADER, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
@@ -78,7 +79,7 @@ export async function requireOpturonAdminPage(callbackUrl = "/app/client-managem
 export async function requireAppPage(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
-  if (ctx.globalRole === PARTNER_ROLE) redirect("/partners");
+  if (isPartnerLikeIdentity({ accountScope: ctx.accountScope, globalRole: ctx.globalRole, partnerId: ctx.session.user?.partnerId })) redirect("/partners");
   const permission = options?.permission || "view_workspace";
   if (!hasAppPermission(ctx, permission)) {
     if (!hasAppPermission(ctx, "view_workspace")) redirect("/login?callbackUrl=/app");
@@ -108,7 +109,7 @@ export async function requireOpturonAdminApi() {
 export async function requireAppApi(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (ctx.globalRole === PARTNER_ROLE) {
+  if (isPartnerLikeIdentity({ accountScope: ctx.accountScope, globalRole: ctx.globalRole, partnerId: ctx.session.user?.partnerId })) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   if (!ctx.tenantId && !isStaffRole(ctx.globalRole)) {
@@ -133,8 +134,14 @@ export async function requirePartnerPage() {
   if (previewMode) {
     return { ...ctx, previewMode: true };
   }
-  if (ctx.globalRole !== PARTNER_ROLE || !ctx.session.user?.partnerId) {
-    redirect(isPartnerPortalHost(requestHeaders.get("host")) ? "https://www.opturon.com/app" : "/app");
+  if (!isStrictPartnerIdentity({
+    accountScope: ctx.accountScope,
+    globalRole: ctx.globalRole,
+    partnerId: ctx.session.user?.partnerId,
+    tenantId: ctx.tenantId,
+    tenantRole: ctx.tenantRole
+  })) {
+    redirect(isPartnerPortalHost(requestHeaders.get("host")) ? `/login?callbackUrl=${encodeURIComponent(partnerCallbackUrl)}` : "/app");
   }
   return { ...ctx, previewMode: false };
 }
@@ -142,7 +149,13 @@ export async function requirePartnerPage() {
 export async function requirePartnerApi() {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (ctx.globalRole !== PARTNER_ROLE || !ctx.session.user?.partnerId) {
+  if (!isStrictPartnerIdentity({
+    accountScope: ctx.accountScope,
+    globalRole: ctx.globalRole,
+    partnerId: ctx.session.user?.partnerId,
+    tenantId: ctx.tenantId,
+    tenantRole: ctx.tenantRole
+  })) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ctx };
@@ -156,6 +169,9 @@ export async function resolveAppTenant(options?: {
 }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (isPartnerLikeIdentity({ accountScope: ctx.accountScope, globalRole: ctx.globalRole, partnerId: ctx.session.user?.partnerId })) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
 
   const isStaff = Boolean(ctx.globalRole && STAFF_ROLES.has(ctx.globalRole));
   const requested = options?.requestedTenantId;

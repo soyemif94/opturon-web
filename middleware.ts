@@ -7,12 +7,45 @@ import {
   partnerInternalPathForHostPath,
   partnerPublicPathForInternalPath
 } from "@/lib/partners-portal";
+import { isStrictPartnerIdentity } from "@/lib/auth-identity";
 
 const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+const AUTH_COOKIE_NAMES = [
+  "__Secure-next-auth.session-token",
+  "next-auth.session-token",
+  "__Host-next-auth.csrf-token",
+  "next-auth.csrf-token",
+  "__Secure-next-auth.callback-url",
+  "next-auth.callback-url"
+];
 
 function mainAppUrl(pathname = "/app") {
   const configured = String(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://www.opturon.com").replace(/\/+$/, "");
   return new URL(pathname, `${configured}/`);
+}
+
+function isStrictPartnerToken(token: any) {
+  return isStrictPartnerIdentity({
+    accountScope: token?.accountScope,
+    globalRole: token?.globalRole || token?.role,
+    partnerId: token?.partnerId,
+    tenantId: token?.tenantId,
+    tenantRole: token?.tenantRole
+  });
+}
+
+function clearAuthCookies(response: NextResponse) {
+  for (const name of AUTH_COOKIE_NAMES) {
+    response.cookies.set(name, "", { path: "/", maxAge: 0 });
+    response.cookies.set(name, "", { path: "/", domain: ".opturon.com", maxAge: 0 });
+  }
+  return response;
+}
+
+function partnerLoginRedirect(request: NextRequest, callbackPath = request.nextUrl.pathname) {
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("callbackUrl", `${callbackPath}${request.nextUrl.search}`);
+  return loginUrl;
 }
 
 export async function middleware(request: NextRequest) {
@@ -51,12 +84,18 @@ export async function middleware(request: NextRequest) {
     if (!token) {
       return NextResponse.next();
     }
-    const globalRole = String(token.globalRole || "");
-    return globalRole === "partner" ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.redirect(mainAppUrl("/app"));
+    if (isStrictPartnerToken(token)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return clearAuthCookies(NextResponse.next());
   }
 
   if (isPartnerHost && (isOps || isApp || isBot)) {
-    return NextResponse.redirect(mainAppUrl(path));
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    if (isStrictPartnerToken(token)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return clearAuthCookies(NextResponse.redirect(partnerLoginRedirect(request, "/")));
   }
 
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -79,7 +118,10 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set(PARTNER_PORTAL_PREVIEW_HEADER, "1");
       return NextResponse.next({ request: { headers: requestHeaders } });
     }
-    if (globalRole !== "partner") {
+    if (!isStrictPartnerToken(token)) {
+      if (isPartnerHost) {
+        return clearAuthCookies(NextResponse.redirect(partnerLoginRedirect(request, path)));
+      }
       return NextResponse.redirect(new URL("/app", request.url));
     }
     if (isPartnerHost) {

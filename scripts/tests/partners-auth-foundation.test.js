@@ -12,8 +12,11 @@ function testAuthIncludesPartnerLoginAndHydration() {
   const source = read('lib/auth.ts');
   assert.match(source, /loginPartnerUser/);
   assert.match(source, /getPartnerAuthUserByEmail/);
+  assert.match(source, /normalizePartnerAuthUser/);
+  assert.match(source, /authIntent === "partner"/);
   assert.match(source, /partnerId/);
-  assert.match(source, /tokenGlobalRole === "partner"/);
+  assert.match(source, /isPartnerLikeIdentity/);
+  assert.match(source, /tenantId = undefined/);
 }
 
 function testMiddlewareProtectsPartnersRoute() {
@@ -22,8 +25,8 @@ function testMiddlewareProtectsPartnersRoute() {
   assert.match(source, /isPartnerPortalHost/);
   assert.match(source, /partnerInternalPathForHostPath/);
   assert.match(source, /NextResponse\.rewrite/);
-  assert.match(source, /globalRole !== "partner"/);
-  assert.match(source, /globalRole === "partner"/);
+  assert.match(source, /isStrictPartnerToken/);
+  assert.match(source, /clearAuthCookies/);
   assert.match(source, /matcher: \[.*\/partners\/:path\*/s);
 }
 
@@ -38,6 +41,7 @@ function testPartnerPageExists() {
 function testPartnerApiRoutesRequirePartnerGuard() {
   const accessSource = read('lib/saas/access.ts');
   assert.match(accessSource, /export async function requirePartnerApi/);
+  assert.match(accessSource, /isStrictPartnerIdentity/);
 
   const summaryRoute = read('app/api/partners/me/summary/route.ts');
   const clientsRoute = read('app/api/partners/me/clients/route.ts');
