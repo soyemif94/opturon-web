@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: { params: Promise<{ reques
   try {
     const backend = await fetchClientRequestReceipt(
       `/api/partners/me/client-requests/${encodeURIComponent(requestId)}/receipt`,
-      { partnerId: String(guard.ctx.session?.user?.partnerId || "") }
+      { partnerId: guard.partnerId }
     );
     const headers = new Headers();
     headers.set("Content-Type", backend.headers.get("content-type") || "application/octet-stream");

@@ -30,7 +30,7 @@ function errorResponse(error: unknown) {
 export async function GET(request: NextRequest) {
   const guard = await requirePartnerApi();
   if (guard.error) return noStore(guard.error);
-  const partnerId = String(guard.ctx.session?.user?.partnerId || "");
+  const partnerId = guard.partnerId;
   try {
     const suffix = request.nextUrl.searchParams.toString();
     const result = await callClientRequestBackend(
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const guard = await requirePartnerApi();
   if (guard.error) return noStore(guard.error);
-  const partnerId = String(guard.ctx.session?.user?.partnerId || "");
+  const partnerId = guard.partnerId;
   try {
     const result = await callClientRequestBackend(
       "/api/partners/me/client-requests",

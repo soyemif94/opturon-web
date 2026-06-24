@@ -41,6 +41,7 @@ function testPartnerPageExists() {
 function testPartnerApiRoutesRequirePartnerGuard() {
   const accessSource = read('lib/saas/access.ts');
   assert.match(accessSource, /export async function requirePartnerApi/);
+  assert.match(accessSource, /export function resolveAuthenticatedPartner/);
   assert.match(accessSource, /isStrictPartnerIdentity/);
 
   const summaryRoute = read('app/api/partners/me/summary/route.ts');
@@ -55,12 +56,18 @@ function testPartnerApiRoutesRequirePartnerGuard() {
   assert.match(rankRoute, /requirePartnerApi/);
   assert.match(networkRoute, /requirePartnerApi/);
   assert.match(commissionsRoute, /requirePartnerApi/);
-  assert.match(meRoute, /session\?\.\s*user\?\.partnerId/);
-  assert.match(summaryRoute, /session\?\.\s*user\?\.partnerId/);
-  assert.match(clientsRoute, /session\?\.\s*user\?\.partnerId/);
-  assert.match(rankRoute, /session\?\.\s*user\?\.partnerId/);
-  assert.match(networkRoute, /session\?\.\s*user\?\.partnerId/);
-  assert.match(commissionsRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.match(meRoute, /guard\.partnerId/);
+  assert.match(summaryRoute, /guard\.partnerId/);
+  assert.match(clientsRoute, /guard\.partnerId/);
+  assert.match(rankRoute, /guard\.partnerId/);
+  assert.match(networkRoute, /guard\.partnerId/);
+  assert.match(commissionsRoute, /guard\.partnerId/);
+  assert.doesNotMatch(meRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.doesNotMatch(summaryRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.doesNotMatch(clientsRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.doesNotMatch(rankRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.doesNotMatch(networkRoute, /session\?\.\s*user\?\.partnerId/);
+  assert.doesNotMatch(commissionsRoute, /session\?\.\s*user\?\.partnerId/);
 }
 
 function run() {

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   if (guard.error) return guard.error;
 
   try {
-    const result = await getPartnerMeCommissions(String(guard.ctx.session?.user?.partnerId || ""), {
+    const result = await getPartnerMeCommissions(guard.partnerId, {
       status: request.nextUrl.searchParams.get("status"),
       type: request.nextUrl.searchParams.get("type"),
       from: request.nextUrl.searchParams.get("from"),

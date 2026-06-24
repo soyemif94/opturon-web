@@ -23,7 +23,7 @@ export async function POST(_request: Request, context: { params: Promise<{ reque
     const result = await callClientRequestBackend(
       `/api/partners/me/client-requests/${encodeURIComponent(requestId)}/cancel`,
       { method: "POST", body: "{}" },
-      { partnerId: String(guard.ctx.session?.user?.partnerId || "") }
+      { partnerId: guard.partnerId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {

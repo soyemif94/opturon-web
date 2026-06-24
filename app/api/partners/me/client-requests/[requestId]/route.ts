@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ re
     const result = await callClientRequestBackend(
       `/api/partners/me/client-requests/${encodeURIComponent(requestId)}`,
       { method: "GET" },
-      { partnerId: String(guard.ctx.session?.user?.partnerId || "") }
+      { partnerId: guard.partnerId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ r
     const result = await callClientRequestBackend(
       `/api/partners/me/client-requests/${encodeURIComponent(requestId)}`,
       { method: "PATCH", body: await request.formData() },
-      { partnerId: String(guard.ctx.session?.user?.partnerId || "") }
+      { partnerId: guard.partnerId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {

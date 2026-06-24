@@ -29,7 +29,8 @@ export async function getSessionContext() {
     globalRole: session?.user?.globalRole,
     tenantId: session?.user?.tenantId,
     tenantRole: session?.user?.tenantRole,
-    accountScope: session?.user?.accountScope
+    accountScope: session?.user?.accountScope,
+    partnerId: session?.user?.partnerId
   };
 }
 
@@ -60,6 +61,32 @@ export function resolveOpturonAdminActorId(ctx: {
 }) {
   if (!hasOpturonAdminApiAccess(ctx)) return null;
   return String(ctx.session?.user?.portalActorId || ctx.portalActorId || "").trim() || null;
+}
+
+export function resolveAuthenticatedPartner(ctx: {
+  session?: { user?: { partnerId?: string; accountScope?: string } } | null;
+  globalRole?: string;
+  accountScope?: string;
+  partnerId?: string;
+  tenantId?: string;
+  tenantRole?: string;
+}) {
+  const partnerId = String(ctx.partnerId || ctx.session?.user?.partnerId || "").trim();
+  const accountScope = normalizeScope(ctx.accountScope || ctx.session?.user?.accountScope);
+  if (!isStrictPartnerIdentity({
+    accountScope,
+    globalRole: ctx.globalRole,
+    partnerId,
+    tenantId: ctx.tenantId,
+    tenantRole: ctx.tenantRole
+  })) {
+    return null;
+  }
+  return {
+    accountScope: PARTNER_ROLE,
+    partnerId,
+    partner: { id: partnerId }
+  };
 }
 
 export async function requireOpsPage() {
@@ -134,31 +161,21 @@ export async function requirePartnerPage() {
   if (previewMode) {
     return { ...ctx, previewMode: true };
   }
-  if (!isStrictPartnerIdentity({
-    accountScope: ctx.accountScope,
-    globalRole: ctx.globalRole,
-    partnerId: ctx.session.user?.partnerId,
-    tenantId: ctx.tenantId,
-    tenantRole: ctx.tenantRole
-  })) {
+  const partner = resolveAuthenticatedPartner(ctx);
+  if (!partner) {
     redirect(isPartnerPortalHost(requestHeaders.get("host")) ? `/login?callbackUrl=${encodeURIComponent(partnerCallbackUrl)}` : "/app");
   }
-  return { ...ctx, previewMode: false };
+  return { ...ctx, previewMode: false, partnerId: partner.partnerId, partner: partner.partner };
 }
 
 export async function requirePartnerApi() {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!isStrictPartnerIdentity({
-    accountScope: ctx.accountScope,
-    globalRole: ctx.globalRole,
-    partnerId: ctx.session.user?.partnerId,
-    tenantId: ctx.tenantId,
-    tenantRole: ctx.tenantRole
-  })) {
+  const partner = resolveAuthenticatedPartner(ctx);
+  if (!partner) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
-  return { ctx };
+  return { ctx, partnerId: partner.partnerId, partner: partner.partner };
 }
 
 export async function resolveAppTenant(options?: {

@@ -16,7 +16,7 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
-    const result = await getPartnerMeNetwork(String(guard.ctx.session?.user?.partnerId || ""));
+    const result = await getPartnerMeNetwork(guard.partnerId);
     return noStore(NextResponse.json(result.data));
   } catch (error) {
     return noStore(
