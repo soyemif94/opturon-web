@@ -2,8 +2,10 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   isPartnerPortalHost,
+  isLegacyPartnerPortalHost,
   isPartnerPublicPath,
   PARTNER_PORTAL_PREVIEW_HEADER,
+  partnerCanonicalUrlForLegacyHost,
   partnerInternalPathForHostPath,
   partnerPublicPathForInternalPath
 } from "@/lib/partners-portal";
@@ -51,10 +53,15 @@ function partnerLoginRedirect(request: NextRequest, callbackPath = request.nextU
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPartnerHost = isPartnerPortalHost(request.headers.get("host"));
+  const isLegacyPartnerHost = isLegacyPartnerPortalHost(request.headers.get("host"));
   const isOps = path.startsWith("/ops");
   const isApp = path.startsWith("/app");
   const isBot = path.startsWith("/bot");
   const isPartners = path.startsWith("/partners") || isPartnerHost;
+
+  if (isLegacyPartnerHost) {
+    return NextResponse.redirect(partnerCanonicalUrlForLegacyHost(request.nextUrl), 307);
+  }
 
   if (isPartnerHost && path.startsWith("/partners")) {
     const url = request.nextUrl.clone();

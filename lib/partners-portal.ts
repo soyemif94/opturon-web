@@ -145,7 +145,8 @@ export type PartnerPortalCommissionLedger = {
 };
 
 export const PARTNER_PORTAL_PREVIEW_HEADER = "x-opturon-partner-preview";
-export const PARTNER_PORTAL_HOST = "partners.opturon.com";
+export const PARTNER_PORTAL_HOST = "asesores.opturon.com";
+export const PARTNER_PORTAL_LEGACY_HOST = "partners.opturon.com";
 
 export const PARTNER_PORTAL_NAV = [
   { path: "/", legacyHref: "/partners", label: "Inicio", page: "home" as const },
@@ -166,7 +167,18 @@ export function normalizePartnerHost(host?: string | null) {
 }
 
 export function isPartnerPortalHost(host?: string | null) {
-  return normalizePartnerHost(host) === PARTNER_PORTAL_HOST;
+  const normalized = normalizePartnerHost(host);
+  return normalized === PARTNER_PORTAL_HOST || normalized === PARTNER_PORTAL_LEGACY_HOST;
+}
+
+export function isLegacyPartnerPortalHost(host?: string | null) {
+  return normalizePartnerHost(host) === PARTNER_PORTAL_LEGACY_HOST;
+}
+
+export function partnerCanonicalUrlForLegacyHost(inputUrl: URL) {
+  const url = new URL(inputUrl.toString());
+  url.hostname = PARTNER_PORTAL_HOST;
+  return url;
 }
 
 export function isPartnerPublicPath(pathname: string) {

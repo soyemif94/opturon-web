@@ -58,7 +58,7 @@ export function PartnerPortalShell({
             <div className="relative">
               <PartnerPortalMark />
               <div className="mt-7 rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur">
-                <Badge className="border-amber-400/20 bg-amber-300/10 text-amber-100">Canal partner</Badge>
+                <Badge className="border-amber-400/20 bg-amber-300/10 text-amber-100">Canal de asesores</Badge>
                 <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white">Portal de asesores</h1>
                 <p className="mt-3 text-sm leading-7 text-slate-300">
                   Seguimiento comercial, cartera visible y evolución profesional en una experiencia separada del CRM.
@@ -94,7 +94,7 @@ export function PartnerPortalShell({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-white">{userName}</p>
-                  <p className="mt-1 truncate text-xs text-slate-400">{userEmail || "Cuenta partner"}</p>
+                  <p className="mt-1 truncate text-xs text-slate-400">{userEmail || "Cuenta de asesor"}</p>
                 </div>
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-100">
                   <ShieldCheck className="h-4 w-4" />
@@ -130,9 +130,9 @@ export function PartnerPortalShell({
             <div className="min-w-0 max-w-[720px]">
               <Badge className="border-white/10 bg-white/6 text-slate-200">
                 <Sparkles className="h-3.5 w-3.5" />
-                Espacio partner
+                Espacio de asesores
               </Badge>
-              <p className="mt-3 truncate text-sm text-slate-400">Experiencia premium, comercial y aislada del workspace interno de Opturon.</p>
+              <p className="mt-3 truncate text-sm text-slate-400">Experiencia premium, comercial y aislada del CRM interno de Opturon.</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 lg:flex">
@@ -174,7 +174,7 @@ export function PartnerPortalShell({
 
                 <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
                   <p className="truncate text-sm font-semibold text-white">{userName}</p>
-                  <p className="mt-1 truncate text-xs text-slate-400">{userEmail || "Cuenta partner"}</p>
+                  <p className="mt-1 truncate text-xs text-slate-400">{userEmail || "Cuenta de asesor"}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Badge className="border-white/10 bg-white/6 text-slate-200">{rankLabel}</Badge>
                     <Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{statusLabel}</Badge>

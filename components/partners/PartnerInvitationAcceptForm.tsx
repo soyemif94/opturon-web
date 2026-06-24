@@ -129,7 +129,7 @@ export function PartnerInvitationAcceptForm({ token }: { token?: string }) {
         {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
         {!message ? <p className="text-sm text-rose-600">{error || "El enlace es invalido o ya expiro."}</p> : null}
         <Link href={loginHref} className="text-sm font-medium text-amber-700 hover:text-amber-800">
-          Ir al login partner
+          Ir al acceso de asesores
         </Link>
       </div>
     );

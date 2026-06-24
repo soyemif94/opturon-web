@@ -7,7 +7,7 @@ import { requirePartnerPage } from "@/lib/saas/access";
 
 export const metadata: Metadata = {
   title: "Opturon | Portal de asesores",
-  description: "Portal independiente para asesores de Opturon."
+  description: "Portal comercial independiente para asesores de Opturon."
 };
 
 export default async function PartnersLayout({ children }: { children: React.ReactNode }) {
@@ -42,7 +42,7 @@ export default async function PartnersLayout({ children }: { children: React.Rea
     >
       {previewMode ? (
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Preview local de desarrollo para validar el portal partner sin credenciales productivas.
+          Preview local de desarrollo para validar el portal de asesores sin credenciales productivas.
         </div>
       ) : null}
       {children}

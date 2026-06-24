@@ -60,7 +60,7 @@ function testHomeUsesRealDataAndStates() {
   assert.match(source, /Requisitos pendientes/);
   assert.match(source, /No pudimos cargar esta vista/);
   assert.match(source, /Todavia no tenes clientes visibles/);
-  assert.match(source, /Cargando datos reales del portal partner/);
+  assert.match(source, /Cargando datos reales del portal de asesores/);
   assert.match(source, /previewState/);
   assert.match(source, /lg:hidden/);
   assert.doesNotMatch(source, /Comision generada/);
@@ -250,17 +250,21 @@ function testPartnerCustomDomainRoutingIsCentralized() {
   const inviteForm = read("components/partners/PartnerInvitationAcceptForm.tsx");
   const backendInvitationEmail = read("../src/services/partner-invitations-email.service.js");
 
-  assert.match(partnersPortalLib, /PARTNER_PORTAL_HOST = "partners\.opturon\.com"/);
+  assert.match(partnersPortalLib, /PARTNER_PORTAL_HOST = "asesores\.opturon\.com"/);
+  assert.match(partnersPortalLib, /PARTNER_PORTAL_LEGACY_HOST = "partners\.opturon\.com"/);
+  assert.match(partnersPortalLib, /partnerCanonicalUrlForLegacyHost/);
   assert.match(partnersPortalLib, /partnerInternalPathForHostPath/);
   assert.match(partnersPortalLib, /partnerPublicPathForInternalPath/);
   assert.match(partnersPortalLib, /legacyHref: "\/partners\/clients"/);
   assert.match(partnersPortalLib, /path: "\/clients"/);
+  assert.match(middleware, /isLegacyPartnerHost/);
+  assert.match(middleware, /NextResponse\.redirect\(partnerCanonicalUrlForLegacyHost\(request\.nextUrl\), 307\)/);
   assert.match(middleware, /isPartnerHost && path\.startsWith\("\/partners"\)/);
   assert.match(middleware, /partnerInternalPathForHostPath\(path\)/);
   assert.match(middleware, /isPartnerPublicPath\(path\)/);
   assert.match(middleware, /"\/clients"/);
   assert.match(inviteForm, /partnerLoginCallbackForHost/);
-  assert.match(backendInvitationEmail, /https:\/\/partners\.opturon\.com/);
+  assert.match(backendInvitationEmail, /https:\/\/asesores\.opturon\.com/);
   assert.match(backendInvitationEmail, /invitationPath/);
   assert.match(backendInvitationEmail, /encodeURIComponent\(token\)/);
 }

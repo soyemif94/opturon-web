@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CalendarRange, ChevronRight, Loader2, LockKeyhole, Mail, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, TrendingUp, UserCircle2, Users2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +100,19 @@ const PREMIUM_SURFACE_CARD =
 const PREMIUM_TABLE_SHELL = "hidden overflow-hidden rounded-[24px] border border-white/10 lg:block";
 const PREMIUM_EMPTY_STATE = "min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100";
 const PREMIUM_FILTER_FIELD =
-  "h-10 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm normal-case tracking-normal text-slate-100 outline-none";
+  "h-10 rounded-xl border border-white/10 bg-slate-950/55 px-3 text-sm normal-case tracking-normal text-slate-100 outline-none transition focus:border-amber-300/45 focus:ring-2 focus:ring-amber-300/20 disabled:cursor-not-allowed disabled:opacity-55";
+const PREMIUM_SELECT_TRIGGER =
+  "flex h-10 w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/70 px-3 text-left text-sm normal-case tracking-normal text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition hover:border-white/20 hover:bg-slate-900/80 focus:border-amber-300/45 focus:ring-2 focus:ring-amber-300/20 disabled:cursor-not-allowed disabled:opacity-55";
+const PREMIUM_SELECT_PANEL =
+  "absolute z-[80] mt-2 max-h-64 min-w-full overflow-y-auto rounded-2xl border border-amber-200/15 bg-[linear-gradient(180deg,rgba(7,16,30,0.98),rgba(10,23,41,0.98))] p-1.5 text-slate-100 shadow-[0_24px_70px_rgba(2,8,23,0.62)] backdrop-blur";
+const PREMIUM_SELECT_OPTION =
+  "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-100 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.10] disabled:cursor-not-allowed disabled:text-slate-500 data-[selected=true]:bg-amber-300/12 data-[selected=true]:text-amber-100";
+
+type PartnerSelectOption<T extends string> = {
+  value: T;
+  label: string;
+  disabled?: boolean;
+};
 
 export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   const [state, setState] = useState<WorkspaceState>({});
@@ -130,7 +142,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
       try {
         if (previewMode) {
           if (previewState === "error") {
-            throw new Error("No pudimos cargar la vista previa del portal partner.");
+            throw new Error("No pudimos cargar la vista previa del portal de asesores.");
           }
           if (cancelled) return;
           setState(buildPartnerPreviewState(previewState));
@@ -155,7 +167,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
             );
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-              throw new Error(String(payload?.detail || payload?.error || "No se pudo cargar el portal partner."));
+              throw new Error(String(payload?.detail || payload?.error || "No se pudo cargar el portal de asesores."));
             }
 
             if (key === "partner") return [key, payload?.partner || null] as const;
@@ -180,7 +192,7 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
         setStatus("ready");
       } catch (loadError) {
         if (cancelled) return;
-        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar el portal partner.");
+        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar el portal de asesores.");
         setStatus("error");
       }
     }
@@ -269,6 +281,120 @@ export function PartnerPortalWorkspace({ page }: { page: PartnerPortalPage }) {
   return <HomeView partner={state.partner || null} summary={state.summary || null} clients={state.clients || []} rankHistory={state.rankHistory || []} />;
 }
 
+function PartnerPortalSelect<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  disabled = false
+}: {
+  value: T;
+  options: PartnerSelectOption<T>[];
+  onChange: (value: T) => void;
+  ariaLabel: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(() => Math.max(0, options.findIndex((option) => option.value === value)));
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.value === value) || options[0] || null;
+  const enabledOptions = options.filter((option) => !option.disabled);
+
+  useEffect(() => {
+    setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
+  }, [options, value]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as Node | null;
+      if (!rootRef.current || (target && rootRef.current.contains(target))) return;
+      setOpen(false);
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  function choose(option: PartnerSelectOption<T>) {
+    if (option.disabled) return;
+    onChange(option.value);
+    setOpen(false);
+  }
+
+  function moveActive(delta: number) {
+    if (enabledOptions.length === 0) return;
+    const currentOption = options[activeIndex] || selected || enabledOptions[0];
+    const currentEnabledIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === currentOption?.value));
+    const nextEnabledIndex = (currentEnabledIndex + delta + enabledOptions.length) % enabledOptions.length;
+    const nextOption = enabledOptions[nextEnabledIndex];
+    setActiveIndex(Math.max(0, options.findIndex((option) => option.value === nextOption.value)));
+  }
+
+  return (
+    <div ref={rootRef} className="relative" data-partner-portal-select>
+      <button
+        type="button"
+        className={PREMIUM_SELECT_TRIGGER}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        disabled={disabled || options.length === 0}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (!open) setOpen(true);
+            moveActive(event.key === "ArrowDown" ? 1 : -1);
+          }
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (open) {
+              const option = options[activeIndex] || selected;
+              if (option) choose(option);
+            } else {
+              setOpen(true);
+            }
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setOpen(false);
+          }
+        }}
+      >
+        <span className="min-w-0 truncate">{selected?.label || "Seleccionar"}</span>
+        <ChevronRight className={`h-4 w-4 shrink-0 text-amber-100/80 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {open ? (
+        <div className={PREMIUM_SELECT_PANEL} role="listbox" aria-label={ariaLabel} data-partner-portal-select-panel>
+          {options.map((option, index) => {
+            const isSelected = option.value === value;
+            const isActive = index === activeIndex;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                disabled={option.disabled}
+                data-selected={isSelected ? "true" : "false"}
+                className={`${PREMIUM_SELECT_OPTION} ${isActive ? "bg-white/[0.10]" : ""}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => choose(option)}
+              >
+                <span className="min-w-0 truncate">{option.label}</span>
+                {isSelected ? <BadgeCheck className="h-4 w-4 shrink-0 text-amber-200" /> : <span className="h-4 w-4 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function HomeView({
   partner,
   summary,
@@ -316,7 +442,7 @@ function HomeView({
             <div>
               <CardTitle className="text-xl text-white">Actividad comercial</CardTitle>
               <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                Resumen ejecutivo del partner usando solamente datos disponibles en esta fase del backend.
+                Resumen ejecutivo del asesor usando solamente datos disponibles en esta fase del backend.
               </CardDescription>
             </div>
           </CardHeader>
@@ -333,7 +459,7 @@ function HomeView({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard dark icon={<Users2 className="h-4 w-4" />} label="Clientes activos" value={formatMetricValue(activeClientsValue)} detail="Valor servido desde tu resumen partner actual." />
+        <KpiCard dark icon={<Users2 className="h-4 w-4" />} label="Clientes activos" value={formatMetricValue(activeClientsValue)} detail="Valor servido desde tu resumen de asesor actual." />
         <KpiCard dark icon={<BriefcaseBusiness className="h-4 w-4" />} label="Cartera visible" value={formatMetricValue(totalClientsValue)} detail="Clientes atribuidos visibles hoy en el portal." />
         <KpiCard dark icon={<Sparkles className="h-4 w-4" />} label="Rango actual" value={formatRankLabel(currentRank)} detail="Tomado del rango visible en backend o historial publicado." />
         <KpiCard dark icon={<Star className="h-4 w-4" />} label="Progreso al proximo rango" value={`${stepProgress}%`} detail="Referencia visual segun el rango actual publicado." />
@@ -447,7 +573,7 @@ function HomeView({
               <div>
                 <CardTitle className="text-xl text-white">Proxima etapa</CardTitle>
                 <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                  Hoja de ruta visible del portal partner sin adelantar datos no publicados.
+                  Hoja de ruta visible del portal de asesores sin adelantar datos no publicados.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -502,6 +628,18 @@ function ClientsView({
   const hasUsableDates = clients.some((item) => Boolean(item.attributedAt));
   const hasVisibleNames = clients.some((item) => Boolean(String(item.clinicName || "").trim()));
   const hasBillingStates = paymentStates.length > 0;
+  const statusOptions = statuses.map((currentStatus) => ({
+    value: currentStatus,
+    label: currentStatus === "all" ? "Todos los estados" : summarizeAttributionStatus(currentStatus)
+  }));
+  const paymentOptions = paymentStates.map((currentState) => ({
+    value: currentState,
+    label: currentState === "all" ? "Todos los estados de pago" : summarizePartnerBillingState(currentState)
+  }));
+  const sortOptions = [
+    ...(hasUsableDates ? [{ value: "recent" as const, label: "Mas recientes" }, { value: "oldest" as const, label: "Mas antiguas" }] : []),
+    ...(hasVisibleNames ? [{ value: "name" as const, label: "Nombre A-Z" }] : [])
+  ];
   const filtered = useMemo(() => {
     const visible = clients.filter((item, index) => {
       const displayName = resolvePartnerClientDisplayName(item, index).toLowerCase();
@@ -577,7 +715,7 @@ function ClientsView({
             </div>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.45rem]">Cartera del asesor</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-              Vista comercial de tus atribuciones activas e historicas usando unicamente los campos reales del endpoint partner.
+              Vista comercial de tus atribuciones activas e historicas usando unicamente los campos reales del endpoint de asesores.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-slate-300">
               <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Total visible: {clients.length}</span>
@@ -620,47 +758,34 @@ function ClientsView({
 
               <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
                 Estado
-                <select
+                <PartnerPortalSelect
+                  ariaLabel="Filtrar clientes por estado"
                   value={statusFilter}
-                  onChange={(event) => onStatusFilterChange(event.target.value)}
-                  className={PREMIUM_FILTER_FIELD}
-                >
-                  {statuses.map((currentStatus) => (
-                    <option key={currentStatus} value={currentStatus} className="bg-slate-900 text-slate-100">
-                      {currentStatus === "all" ? "Todos los estados" : summarizeAttributionStatus(currentStatus)}
-                    </option>
-                  ))}
-                </select>
+                  options={statusOptions}
+                  onChange={onStatusFilterChange}
+                />
               </label>
 
               {hasBillingStates ? (
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
                   Pago
-                  <select
+                  <PartnerPortalSelect
+                    ariaLabel="Filtrar clientes por estado de pago"
                     value={paymentFilter}
-                    onChange={(event) => onPaymentFilterChange(event.target.value)}
-                    className={PREMIUM_FILTER_FIELD}
-                  >
-                    {paymentStates.map((currentState) => (
-                      <option key={currentState} value={currentState} className="bg-slate-900 text-slate-100">
-                        {currentState === "all" ? "Todos los estados de pago" : summarizePartnerBillingState(currentState)}
-                      </option>
-                    ))}
-                  </select>
+                    options={paymentOptions}
+                    onChange={onPaymentFilterChange}
+                  />
                 </label>
               ) : null}
 
               <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
                 Orden
-                <select
+                <PartnerPortalSelect<ClientSortKey>
+                  ariaLabel="Ordenar clientes"
                   value={sortKey}
-                  onChange={(event) => onSortKeyChange(event.target.value as ClientSortKey)}
-                  className={PREMIUM_FILTER_FIELD}
-                >
-                  {hasUsableDates ? <option value="recent" className="bg-slate-900 text-slate-100">Mas recientes</option> : null}
-                  {hasUsableDates ? <option value="oldest" className="bg-slate-900 text-slate-100">Mas antiguas</option> : null}
-                  {hasVisibleNames ? <option value="name" className="bg-slate-900 text-slate-100">Nombre A-Z</option> : null}
-                </select>
+                  options={sortOptions}
+                  onChange={onSortKeyChange}
+                />
               </label>
             </CardContent>
           </Card>
@@ -939,7 +1064,7 @@ function CareerView({
             <div>
               <CardTitle className="text-2xl text-white">Progreso principal</CardTitle>
               <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                Indicadores tomados directamente de la evaluacion partner y sus umbrales oficiales.
+                Indicadores tomados directamente de la evaluacion de asesor y sus umbrales oficiales.
               </CardDescription>
             </div>
           </CardHeader>
@@ -1362,6 +1487,17 @@ function CommissionsView({
   const currency = summary.currency || entries.find((entry) => entry.currency)?.currency || "ARS";
   const hasEntries = entries.length > 0;
   const hasActiveFilters = statusFilter !== "all" || typeFilter !== "all" || Boolean(from) || Boolean(to);
+  const statusOptions: PartnerSelectOption<CommissionStatusFilter>[] = [
+    { value: "all", label: "Todos los estados" },
+    { value: "generated", label: "Registradas" },
+    { value: "reversed", label: "Revertidas" }
+  ];
+  const typeOptions: PartnerSelectOption<CommissionTypeFilter>[] = [
+    { value: "all", label: "Todos los tipos reales" },
+    { value: "own_signup", label: "Alta propia" },
+    { value: "own_recurring", label: "Recurrente propia" },
+    { value: "line_recurring_rebate", label: "Linea comercial" }
+  ];
 
   return (
     <div className="space-y-6">
@@ -1419,21 +1555,22 @@ function CommissionsView({
           <CardContent className="grid gap-4 pt-0">
             <label className="grid gap-2 text-sm text-slate-300">
               <span>Estado</span>
-              <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as CommissionStatusFilter)} className={PREMIUM_FILTER_FIELD}>
-                <option value="all">Todos los estados</option>
-                <option value="generated">Registradas</option>
-                <option value="reversed">Revertidas</option>
-              </select>
+              <PartnerPortalSelect
+                ariaLabel="Filtrar comisiones por estado"
+                value={statusFilter}
+                options={statusOptions}
+                onChange={onStatusFilterChange}
+              />
             </label>
 
             <label className="grid gap-2 text-sm text-slate-300">
               <span>Tipo</span>
-              <select value={typeFilter} onChange={(event) => onTypeFilterChange(event.target.value as CommissionTypeFilter)} className={PREMIUM_FILTER_FIELD}>
-                <option value="all">Todos los tipos reales</option>
-                <option value="own_signup">Alta propia</option>
-                <option value="own_recurring">Recurrente propia</option>
-                <option value="line_recurring_rebate">Linea comercial</option>
-              </select>
+              <PartnerPortalSelect
+                ariaLabel="Filtrar comisiones por tipo"
+                value={typeFilter}
+                options={typeOptions}
+                onChange={onTypeFilterChange}
+              />
             </label>
 
             <label className="grid gap-2 text-sm text-slate-300">
@@ -1627,7 +1764,7 @@ function ProfileView({
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
-            <RuleCallout dark title="Sesion segura" body="El cierre de sesion usa el flujo actual del portal para invalidar el acceso del partner." />
+            <RuleCallout dark title="Sesion segura" body="El cierre de sesion usa el flujo actual del portal para invalidar el acceso del asesor." />
             <RuleCallout dark title="Sin edicion sensible" body="Email, sponsor, rango, estado y codigo permanecen en solo lectura hasta contar con endpoints seguros reales." />
             <RuleCallout dark title="Datos protegidos" body="No se exponen IDs internos, hashes, actor interno ni metadata tecnica." />
           </CardContent>
@@ -1793,7 +1930,7 @@ function WorkspaceLoading({ page }: { page: PartnerPortalPage }) {
       </div>
       <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Cargando datos reales del portal partner...
+        Cargando datos reales del portal de asesores...
       </div>
     </div>
   );

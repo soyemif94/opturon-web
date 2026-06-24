@@ -64,7 +64,7 @@ export function LoginScreen() {
         <Card className="flex items-center border-white/60 bg-white/95 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.12)] md:p-8">
           <div className="w-full">
             <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">
-              Login partner
+              Acceso de asesores
             </Badge>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Portal de asesores</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
