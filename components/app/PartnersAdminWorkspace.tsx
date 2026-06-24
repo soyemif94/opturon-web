@@ -104,6 +104,25 @@ type AdminClientRequest = {
   createdAt?: string | null;
   submittedAt?: string | null;
   updatedAt?: string | null;
+  processingStatus?: "not_processed" | "processing" | "processed" | "processing_failed";
+  linkedTenantId?: string | null;
+  linkedExternalTenantId?: string | null;
+  attributionId?: string | null;
+  commissionEntryId?: string | null;
+  processedAt?: string | null;
+  paymentConfirmation?: {
+    amount?: string | null;
+    currency?: string | null;
+    method?: string | null;
+    reference?: string | null;
+  };
+  commissionSnapshot?: {
+    baseAmount?: string | null;
+    currency?: string | null;
+    rate?: string | null;
+    amount?: string | null;
+    ruleCode?: string | null;
+  };
   receipt?: {
     originalName?: string | null;
     mimeType?: string | null;
@@ -124,6 +143,7 @@ type AdminClientRequestsResponse = {
     requests?: AdminClientRequest[];
     request?: AdminClientRequest;
     duplicateWarnings?: string[];
+    alreadyProcessed?: boolean;
   };
   error?: string;
 };
@@ -420,6 +440,52 @@ export function PartnersAdminWorkspace({
       await loadClientRequests();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No pudimos resolver la solicitud.");
+    } finally {
+      setClientRequestBusyId(null);
+    }
+  }
+
+  async function processClientRequest(request: AdminClientRequest) {
+    if (request.status !== "approved" || request.processingStatus === "processed") return;
+    const confirmedAmount = window.prompt("Importe acreditado", request.reportedAmount || "");
+    if (!confirmedAmount) return;
+    const estimatedCommission = estimateClientActivationCommission(confirmedAmount, "25.00");
+    const confirmed = window.confirm(
+      [
+        "Confirmar pago y procesar alta",
+        `Cliente: ${request.clientName}`,
+        `Asesor: ${request.partner?.displayName || request.partner?.email || "Sin dato"}`,
+        `Importe acreditado: ${request.reportedCurrency} ${confirmedAmount}`,
+        "Porcentaje de alta: 25%",
+        `Comision estimada: ${request.reportedCurrency} ${estimatedCommission}`,
+        "Esta accion creara/vinculara cliente, atribucion comercial y un movimiento financiero."
+      ].join("\n")
+    );
+    if (!confirmed) return;
+    setClientRequestBusyId(request.id);
+    try {
+      const response = await fetch(`/api/app/admin/partners/client-requests/${encodeURIComponent(request.id)}/process`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentConfirmed: true,
+          tenantMode: "new",
+          confirmedAmount,
+          confirmedCurrency: request.reportedCurrency,
+          paymentMethod: request.paymentMethod || "manual_admin",
+          paymentReference: request.paymentReference || undefined,
+          paymentNotes: "Procesado desde Admin"
+        })
+      });
+      const payload = (await readJsonSafe(response)) as AdminClientRequestsResponse | null;
+      if (!response.ok) throw new Error(readErrorMessage(payload, "No pudimos procesar el alta."));
+      toast.success(payload?.data?.alreadyProcessed ? "La solicitud ya estaba procesada" : "Alta procesada y comision generada");
+      setSelectedClientRequest(payload?.data?.request || null);
+      await loadClientRequests();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No pudimos procesar el alta.");
     } finally {
       setClientRequestBusyId(null);
     }
@@ -848,6 +914,10 @@ export function PartnersAdminWorkspace({
                     <InfoRow label="Telefono" value={selectedClientRequest.phone} />
                     <InfoRow label="Plan" value={selectedClientRequest.planCode || "Sin plan"} />
                     <InfoRow label="Importe" value={`${selectedClientRequest.reportedCurrency} ${selectedClientRequest.reportedAmount}`} />
+                    <InfoRow label="Procesamiento" value={formatClientRequestProcessingStatus(selectedClientRequest)} />
+                    <InfoRow label="Tenant vinculado" value={selectedClientRequest.linkedExternalTenantId || selectedClientRequest.linkedTenantId || "Sin procesar"} />
+                    <InfoRow label="Atribucion" value={selectedClientRequest.attributionId || "Sin procesar"} />
+                    <InfoRow label="Comision" value={selectedClientRequest.commissionSnapshot?.amount ? `${selectedClientRequest.commissionSnapshot.currency || selectedClientRequest.reportedCurrency} ${selectedClientRequest.commissionSnapshot.amount}` : "Sin generar"} />
                     <InfoRow label="Metodo" value={selectedClientRequest.paymentMethod} />
                     <InfoRow label="Referencia" value={selectedClientRequest.paymentReference || "Sin referencia"} />
                     <InfoRow label="Observaciones asesor" value={selectedClientRequest.notes || "Sin observaciones"} />
@@ -870,6 +940,9 @@ export function PartnersAdminWorkspace({
                   <div className="grid gap-2">
                     <Button type="button" className="rounded-2xl" onClick={() => reviewClientRequest(selectedClientRequest.id, "approve")} disabled={clientRequestBusyId === selectedClientRequest.id || selectedClientRequest.status !== "pending_review"}>
                       Aprobar solicitud
+                    </Button>
+                    <Button type="button" className="rounded-2xl" onClick={() => processClientRequest(selectedClientRequest)} disabled={clientRequestBusyId === selectedClientRequest.id || selectedClientRequest.status !== "approved" || selectedClientRequest.processingStatus === "processed"}>
+                      Confirmar pago y procesar alta
                     </Button>
                     <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => reviewClientRequest(selectedClientRequest.id, "request_changes")} disabled={clientRequestBusyId === selectedClientRequest.id || selectedClientRequest.status !== "pending_review"}>
                       Solicitar correccion
@@ -1643,6 +1716,32 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-sm font-medium text-white">{value}</p>
     </div>
   );
+}
+
+function parseAdminMoneyToCents(value: string) {
+  const normalized = String(value || "").trim().replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const [whole, decimal = ""] = normalized.split(".");
+  return Number(whole) * 100 + Number((decimal + "00").slice(0, 2));
+}
+
+function formatAdminCents(cents: number) {
+  const safe = Math.max(0, Math.round(cents));
+  return `${Math.floor(safe / 100)}.${String(safe % 100).padStart(2, "0")}`;
+}
+
+function estimateClientActivationCommission(amount: string, ratePercent: string) {
+  const amountCents = parseAdminMoneyToCents(amount);
+  const rateBasisPoints = parseAdminMoneyToCents(ratePercent);
+  if (amountCents === null || rateBasisPoints === null) return "0.00";
+  return formatAdminCents(Math.round((amountCents * rateBasisPoints) / 10000));
+}
+
+function formatClientRequestProcessingStatus(request: AdminClientRequest) {
+  if (request.processingStatus === "processed") return `Procesada${request.processedAt ? ` - ${formatPartnerDateTime(request.processedAt)}` : ""}`;
+  if (request.processingStatus === "processing_failed") return "Error de procesamiento";
+  if (request.processingStatus === "processing") return "Procesando";
+  return request.status === "approved" ? "Aprobada sin procesar" : "No procesada";
 }
 
 function AttributionCard({ attribution }: { attribution: AdminPartnerAttribution }) {

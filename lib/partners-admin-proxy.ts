@@ -74,7 +74,7 @@ export function resolveAdminPartnersBackendPath(method: string, slug: string[] =
       return withSearch(`/api/admin/partners/client-requests/${encodePathSegment(segments[1])}`, searchParams);
     }
     if (segments.length === 3 && normalizedMethod === "POST") {
-      const allowedActions = new Set(["approve", "reject", "request_changes"]);
+      const allowedActions = new Set(["approve", "reject", "request_changes", "process"]);
       if (allowedActions.has(segments[2])) {
         return withSearch(
           `/api/admin/partners/client-requests/${encodePathSegment(segments[1])}/${encodePathSegment(segments[2])}`,
