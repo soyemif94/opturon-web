@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CalendarRange, ChevronRight, Loader2, LockKeyhole, Mail, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, TrendingUp, UserCircle2, Users2, X } from "lucide-react";
+import { AlertCircle, ArrowRight, BadgeCheck, BriefcaseBusiness, CalendarRange, ChevronRight, FileText, Loader2, LockKeyhole, Mail, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, TrendingUp, UploadCloud, UserCircle2, Users2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +71,35 @@ type PreviewState = "default" | "empty" | "error" | "max";
 type ClientSortKey = "recent" | "oldest" | "name";
 type CommissionStatusFilter = "all" | "generated" | "reversed";
 type CommissionTypeFilter = "all" | "own_signup" | "own_recurring" | "line_recurring_rebate";
+type ClientRequestStatus = "draft" | "pending_review" | "changes_requested" | "approved" | "rejected" | "cancelled";
+type ClientRequestPaymentMethod = "transfer" | "mercado_pago" | "cash" | "card" | "other";
+type ClientRequestCurrency = "ARS" | "USD";
+
+type PartnerClientRequest = {
+  id: string;
+  status: ClientRequestStatus;
+  clientName: string;
+  businessName?: string | null;
+  email: string;
+  phone: string;
+  taxId?: string | null;
+  planCode?: string | null;
+  paymentMethod: ClientRequestPaymentMethod;
+  reportedAmount: string;
+  reportedCurrency: ClientRequestCurrency;
+  reportedPaymentDate: string;
+  paymentReference?: string | null;
+  notes?: string | null;
+  adminNotes?: string | null;
+  submittedAt?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+  receipt?: {
+    originalName?: string | null;
+    mimeType?: string | null;
+    sizeBytes?: number | null;
+  };
+};
 
 const PAGE_LOADERS: Record<PartnerPortalPage, Array<keyof WorkspaceState>> = {
   home: ["partner", "summary", "clients", "rankHistory"],
@@ -617,6 +646,153 @@ function ClientsView({
   onSortKeyChange: (value: ClientSortKey) => void;
   onSelectedClientChange: (value: string | null) => void;
 }) {
+  const [requestStatusFilter, setRequestStatusFilter] = useState("all");
+  const [clientRequests, setClientRequests] = useState<PartnerClientRequest[]>([]);
+  const [clientRequestsLoading, setClientRequestsLoading] = useState(false);
+  const [clientRequestBusyId, setClientRequestBusyId] = useState<string | null>(null);
+  const [clientRequestMessage, setClientRequestMessage] = useState<string | null>(null);
+  const [clientRequestError, setClientRequestError] = useState<string | null>(null);
+  const [clientRequestFormOpen, setClientRequestFormOpen] = useState(false);
+  const [clientRequestFile, setClientRequestFile] = useState<File | null>(null);
+  const [clientRequestForm, setClientRequestForm] = useState({
+    clientName: "",
+    businessName: "",
+    email: "",
+    phone: "",
+    taxId: "",
+    planCode: "",
+    paymentMethod: "transfer" as ClientRequestPaymentMethod,
+    reportedAmount: "",
+    reportedCurrency: "ARS" as ClientRequestCurrency,
+    reportedPaymentDate: "",
+    paymentReference: "",
+    notes: ""
+  });
+
+  async function loadClientRequests() {
+    setClientRequestsLoading(true);
+    setClientRequestError(null);
+    try {
+      const suffix = requestStatusFilter !== "all" ? `?status=${encodeURIComponent(requestStatusFilter)}` : "";
+      const response = await fetch(`/api/partners/me/client-requests${suffix}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = await readPartnerPortalJson(response);
+      if (!response.ok) throw new Error(readPartnerPortalError(payload, "No pudimos cargar tus solicitudes."));
+      setClientRequests(Array.isArray(payload?.data?.requests) ? payload.data.requests : []);
+    } catch (error) {
+      setClientRequests([]);
+      setClientRequestError(error instanceof Error ? error.message : "No pudimos cargar tus solicitudes.");
+    } finally {
+      setClientRequestsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadClientRequests();
+  }, [requestStatusFilter]);
+
+  function updateClientRequestField(field: keyof typeof clientRequestForm, value: string) {
+    setClientRequestForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function submitClientRequest(requestId: string, source = "manual") {
+    setClientRequestBusyId(requestId);
+    setClientRequestError(null);
+    setClientRequestMessage(null);
+    try {
+      const response = await fetch(`/api/partners/me/client-requests/${encodeURIComponent(requestId)}/submit`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = await readPartnerPortalJson(response);
+      if (!response.ok) throw new Error(readPartnerPortalError(payload, "No pudimos enviar la solicitud a revision."));
+      setClientRequestMessage(source === "create" ? "Solicitud creada y enviada a revision." : "Solicitud enviada a revision.");
+      await loadClientRequests();
+    } catch (error) {
+      setClientRequestError(error instanceof Error ? error.message : "No pudimos enviar la solicitud a revision.");
+    } finally {
+      setClientRequestBusyId(null);
+    }
+  }
+
+  async function submitClientRequestForm(event: React.FormEvent) {
+    event.preventDefault();
+    setClientRequestError(null);
+    setClientRequestMessage(null);
+    if (!clientRequestFile) {
+      setClientRequestError("El comprobante es obligatorio para guardar la solicitud.");
+      return;
+    }
+    const required = ["clientName", "email", "phone", "paymentMethod", "reportedAmount", "reportedCurrency", "reportedPaymentDate"] as const;
+    if (required.some((field) => !String(clientRequestForm[field] || "").trim())) {
+      setClientRequestError("Completa los campos obligatorios antes de guardar.");
+      return;
+    }
+
+    const formData = new FormData();
+    Object.entries(clientRequestForm).forEach(([key, value]) => formData.set(key, String(value || "")));
+    formData.set("receipt", clientRequestFile, clientRequestFile.name);
+    setClientRequestBusyId("create");
+    try {
+      const response = await fetch("/api/partners/me/client-requests", {
+        method: "POST",
+        body: formData,
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = await readPartnerPortalJson(response);
+      if (!response.ok) throw new Error(readPartnerPortalError(payload, "No pudimos guardar la solicitud."));
+      const request = payload?.data?.request as PartnerClientRequest | undefined;
+      if (request?.id) await submitClientRequest(request.id, "create");
+      setClientRequestFormOpen(false);
+      setClientRequestFile(null);
+      setClientRequestForm({
+        clientName: "",
+        businessName: "",
+        email: "",
+        phone: "",
+        taxId: "",
+        planCode: "",
+        paymentMethod: "transfer",
+        reportedAmount: "",
+        reportedCurrency: "ARS",
+        reportedPaymentDate: "",
+        paymentReference: "",
+        notes: ""
+      });
+      await loadClientRequests();
+    } catch (error) {
+      setClientRequestError(error instanceof Error ? error.message : "No pudimos guardar la solicitud.");
+    } finally {
+      setClientRequestBusyId(null);
+    }
+  }
+
+  async function cancelClientRequest(requestId: string) {
+    setClientRequestBusyId(requestId);
+    setClientRequestError(null);
+    setClientRequestMessage(null);
+    try {
+      const response = await fetch(`/api/partners/me/client-requests/${encodeURIComponent(requestId)}/cancel`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = await readPartnerPortalJson(response);
+      if (!response.ok) throw new Error(readPartnerPortalError(payload, "No pudimos cancelar la solicitud."));
+      setClientRequestMessage("Solicitud cancelada.");
+      await loadClientRequests();
+    } catch (error) {
+      setClientRequestError(error instanceof Error ? error.message : "No pudimos cancelar la solicitud.");
+    } finally {
+      setClientRequestBusyId(null);
+    }
+  }
+
   const statuses = useMemo(() => ["all", ...Array.from(new Set(clients.map((item) => String(item.status || "").trim().toLowerCase()).filter(Boolean)))], [clients]);
   const paymentStates = useMemo(() => {
     const states = clients
@@ -738,6 +914,144 @@ function ClientsView({
             <MetricStrip dark label="Clientes totales" value={String(clients.length)} icon={<Users2 className="h-4 w-4" />} />
             <MetricStrip dark label="Al dia" value={hasBillingStates ? String(currentPaymentClients) : "Sin dato"} icon={<BadgeCheck className="h-4 w-4" />} />
             <MetricStrip dark label="Pendientes o vencidos" value={hasBillingStates ? String(pendingOrOverdueClients) : "Sin dato"} icon={<CalendarRange className="h-4 w-4" />} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card className={PREMIUM_PANEL_CARD}>
+          <CardHeader
+            action={
+              <Button type="button" className="rounded-2xl" onClick={() => setClientRequestFormOpen((current) => !current)}>
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Registrar nuevo cliente
+              </Button>
+            }
+          >
+            <div>
+              <CardTitle className="text-2xl text-white">Solicitudes de alta</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Presenta nuevos clientes con comprobante. Quedan pendientes de revision; no se crean tenants, comisiones ni carrera en esta fase.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          {clientRequestFormOpen ? (
+            <CardContent className="pt-0">
+              <form className="grid gap-4" onSubmit={submitClientRequestForm}>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <ClientRequestField label="Nombre y apellido *" value={clientRequestForm.clientName} onChange={(value) => updateClientRequestField("clientName", value)} />
+                  <ClientRequestField label="Negocio o razon social" value={clientRequestForm.businessName} onChange={(value) => updateClientRequestField("businessName", value)} />
+                  <ClientRequestField label="Email *" type="email" value={clientRequestForm.email} onChange={(value) => updateClientRequestField("email", value)} />
+                  <ClientRequestField label="Telefono *" value={clientRequestForm.phone} onChange={(value) => updateClientRequestField("phone", value)} />
+                  <ClientRequestField label="CUIT/DNI" value={clientRequestForm.taxId} onChange={(value) => updateClientRequestField("taxId", value)} />
+                  <ClientRequestField label="Plan" value={clientRequestForm.planCode} onChange={(value) => updateClientRequestField("planCode", value)} />
+                </div>
+                <div className="grid gap-3 md:grid-cols-4">
+                  <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                    Metodo *
+                    <PartnerPortalSelect<ClientRequestPaymentMethod>
+                      ariaLabel="Metodo de pago informado"
+                      value={clientRequestForm.paymentMethod}
+                      options={CLIENT_REQUEST_PAYMENT_OPTIONS}
+                      onChange={(value) => updateClientRequestField("paymentMethod", value)}
+                    />
+                  </label>
+                  <ClientRequestField label="Importe *" type="number" value={clientRequestForm.reportedAmount} onChange={(value) => updateClientRequestField("reportedAmount", value)} />
+                  <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                    Moneda *
+                    <PartnerPortalSelect<ClientRequestCurrency>
+                      ariaLabel="Moneda informada"
+                      value={clientRequestForm.reportedCurrency}
+                      options={CLIENT_REQUEST_CURRENCY_OPTIONS}
+                      onChange={(value) => updateClientRequestField("reportedCurrency", value)}
+                    />
+                  </label>
+                  <ClientRequestField label="Fecha de pago *" type="date" value={clientRequestForm.reportedPaymentDate} onChange={(value) => updateClientRequestField("reportedPaymentDate", value)} />
+                </div>
+                <ClientRequestField label="Referencia de pago" value={clientRequestForm.paymentReference} onChange={(value) => updateClientRequestField("paymentReference", value)} />
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                  Observaciones
+                  <textarea
+                    value={clientRequestForm.notes}
+                    onChange={(event) => updateClientRequestField("notes", event.target.value)}
+                    className="min-h-24 rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-amber-300/45 focus:ring-2 focus:ring-amber-300/20"
+                    placeholder="Contexto comercial, condiciones conversadas o aclaraciones para Admin."
+                  />
+                </label>
+                <label className="grid gap-2 rounded-2xl border border-dashed border-amber-200/20 bg-amber-200/[0.04] p-4 text-sm text-slate-300">
+                  <span className="flex items-center gap-2 font-medium text-amber-100">
+                    <FileText className="h-4 w-4" />
+                    Comprobante obligatorio
+                  </span>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                    className="text-sm text-slate-300 file:mr-3 file:rounded-xl file:border-0 file:bg-amber-300/15 file:px-3 file:py-2 file:text-amber-100"
+                    onChange={(event) => setClientRequestFile(event.target.files?.[0] || null)}
+                  />
+                  <span className="text-xs text-slate-500">PDF, JPG, PNG o WEBP hasta 10 MB. No se publica por URL permanente.</span>
+                  {clientRequestFile ? <span className="text-xs text-emerald-200">Seleccionado: {clientRequestFile.name}</span> : null}
+                </label>
+                {clientRequestError ? <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">{clientRequestError}</p> : null}
+                {clientRequestMessage ? <p className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-100">{clientRequestMessage}</p> : null}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => setClientRequestFormOpen(false)}>
+                    Cerrar
+                  </Button>
+                  <Button type="submit" className="rounded-2xl" disabled={clientRequestBusyId === "create"}>
+                    {clientRequestBusyId === "create" ? "Subiendo y enviando..." : "Guardar y enviar a revision"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          ) : (
+            <CardContent className="pt-0">
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 text-sm leading-7 text-slate-300">
+                Usa el CTA para cargar datos, metodo de pago e evidencia. Admin revisa y resuelve; una solicitud aprobada no aparece como cliente activo automaticamente.
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        <Card className={PREMIUM_PANEL_CARD}>
+          <CardHeader
+            action={
+              <PartnerPortalSelect
+                ariaLabel="Filtrar solicitudes por estado"
+                value={requestStatusFilter}
+                options={CLIENT_REQUEST_STATUS_OPTIONS}
+                onChange={setRequestStatusFilter}
+              />
+            }
+          >
+            <div>
+              <CardTitle className="text-2xl text-white">Bandeja de solicitudes</CardTitle>
+              <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+                Clientes aprobados y solicitudes de alta se mantienen separados para no confundir atribuciones activas con revisiones pendientes.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0">
+            {clientRequestsLoading ? (
+              <SkeletonLine className="h-24 w-full" />
+            ) : clientRequests.length === 0 ? (
+              <EmptyState
+                icon={<FileText className="h-5 w-5" />}
+                title="Sin solicitudes visibles"
+                description="Cuando registres un cliente, la solicitud aparecera aca con su estado de revision."
+                className="min-h-[180px] border-white/10 bg-white/[0.03] text-slate-100"
+              />
+            ) : (
+              clientRequests.map((request) => (
+                <ClientRequestCard
+                  key={request.id}
+                  request={request}
+                  busy={clientRequestBusyId === request.id}
+                  onSubmit={() => submitClientRequest(request.id)}
+                  onCancel={() => cancelClientRequest(request.id)}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
       </section>
@@ -988,6 +1302,153 @@ function ClientDetailDrawer({
       </aside>
     </>
   );
+}
+
+const CLIENT_REQUEST_STATUS_LABELS: Record<string, string> = {
+  draft: "Borrador",
+  pending_review: "Pendiente de revision",
+  changes_requested: "Correccion solicitada",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  cancelled: "Cancelada"
+};
+
+const CLIENT_REQUEST_STATUS_OPTIONS = [
+  { value: "all", label: "Todos los estados" },
+  { value: "draft", label: "Borrador" },
+  { value: "pending_review", label: "Pendiente de revision" },
+  { value: "changes_requested", label: "Correccion solicitada" },
+  { value: "approved", label: "Aprobada" },
+  { value: "rejected", label: "Rechazada" },
+  { value: "cancelled", label: "Cancelada" }
+];
+
+const CLIENT_REQUEST_PAYMENT_OPTIONS: Array<PartnerSelectOption<ClientRequestPaymentMethod>> = [
+  { value: "transfer", label: "Transferencia" },
+  { value: "mercado_pago", label: "Mercado Pago" },
+  { value: "cash", label: "Efectivo" },
+  { value: "card", label: "Tarjeta" },
+  { value: "other", label: "Otro" }
+];
+
+const CLIENT_REQUEST_CURRENCY_OPTIONS: Array<PartnerSelectOption<ClientRequestCurrency>> = [
+  { value: "ARS", label: "ARS" },
+  { value: "USD", label: "USD" }
+];
+
+function ClientRequestField({
+  label,
+  value,
+  onChange,
+  type = "text"
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+      {label}
+      <Input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="border-white/10 bg-slate-950/55 text-slate-100 placeholder:text-slate-500 focus-visible:ring-amber-300/20"
+      />
+    </label>
+  );
+}
+
+function ClientRequestCard({
+  request,
+  busy,
+  onSubmit,
+  onCancel
+}: {
+  request: PartnerClientRequest;
+  busy: boolean;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const canSubmit = request.status === "draft" || request.status === "changes_requested";
+  const canCancel = request.status === "draft" || request.status === "pending_review" || request.status === "changes_requested";
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-white">{request.clientName}</p>
+          <p className="mt-1 text-sm text-slate-400">{request.businessName || request.email}</p>
+        </div>
+        <Badge variant={clientRequestStatusVariant(request.status)}>{CLIENT_REQUEST_STATUS_LABELS[request.status] || request.status}</Badge>
+      </div>
+      <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-2">
+        <span>Presentacion: {request.submittedAt ? formatPortalDate(request.submittedAt) : "Sin enviar"}</span>
+        <span>Importe: {request.reportedCurrency} {request.reportedAmount}</span>
+        <span>Metodo: {CLIENT_REQUEST_PAYMENT_OPTIONS.find((item) => item.value === request.paymentMethod)?.label || request.paymentMethod}</span>
+        <span>Actualizada: {formatPortalDateTime(request.updatedAt)}</span>
+      </div>
+      {request.adminNotes ? (
+        <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-50">
+          Observacion Admin: {request.adminNotes}
+        </div>
+      ) : null}
+      {request.status === "approved" ? (
+        <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm leading-6 text-emerald-50">
+          Solicitud aprobada. La activacion del cliente sera procesada por Opturon.
+        </div>
+      ) : null}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <a
+          href={`/api/partners/me/client-requests/${encodeURIComponent(request.id)}/receipt`}
+          className="inline-flex items-center gap-2 text-sm font-medium text-amber-100 hover:text-amber-50"
+        >
+          <FileText className="h-4 w-4" />
+          Ver comprobante
+        </a>
+        <div className="flex flex-wrap gap-2">
+          {canSubmit ? (
+            <Button type="button" size="sm" className="rounded-2xl" onClick={onSubmit} disabled={busy}>
+              {busy ? "Enviando..." : request.status === "changes_requested" ? "Reenviar" : "Enviar a revision"}
+            </Button>
+          ) : null}
+          {canCancel ? (
+            <Button type="button" size="sm" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={onCancel} disabled={busy}>
+              Cancelar
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function clientRequestStatusVariant(status: string) {
+  if (status === "approved") return "success";
+  if (status === "pending_review") return "warning";
+  if (status === "changes_requested") return "outline";
+  if (status === "rejected" || status === "cancelled") return "danger";
+  return "muted";
+}
+
+async function readPartnerPortalJson(response: Response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function readPartnerPortalError(payload: unknown, fallback: string) {
+  if (payload && typeof payload === "object") {
+    const detail = String((payload as Record<string, unknown>).detail || "").trim();
+    const error = String((payload as Record<string, unknown>).error || "").trim();
+    if (detail) return detail;
+    if (error) return error;
+  }
+  return fallback;
 }
 
 function DrawerField({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {

@@ -66,6 +66,25 @@ export function resolveAdminPartnersBackendPath(method: string, slug: string[] =
     throw new Error("unsupported_admin_partners_route");
   }
 
+  if (segments[0] === "client-requests") {
+    if (segments.length === 1 && normalizedMethod === "GET") {
+      return withSearch("/api/admin/partners/client-requests", searchParams);
+    }
+    if (segments.length === 2 && normalizedMethod === "GET") {
+      return withSearch(`/api/admin/partners/client-requests/${encodePathSegment(segments[1])}`, searchParams);
+    }
+    if (segments.length === 3 && normalizedMethod === "POST") {
+      const allowedActions = new Set(["approve", "reject", "request_changes"]);
+      if (allowedActions.has(segments[2])) {
+        return withSearch(
+          `/api/admin/partners/client-requests/${encodePathSegment(segments[1])}/${encodePathSegment(segments[2])}`,
+          searchParams
+        );
+      }
+    }
+    throw new Error("unsupported_admin_partners_route");
+  }
+
   if (segments.length === 1 && normalizedMethod === "GET") {
     return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}`, searchParams);
   }

@@ -97,7 +97,6 @@ function testCareerUsesPublishedProgressOnly() {
   assert.match(backendService, /requirements/);
   assert.match(backendRepo, /partner_rank_evaluations/);
   assert.doesNotMatch(source, /partnerId=/i);
-  assert.doesNotMatch(source, /Mercado Pago/i);
 }
 
 function testClientsUsesRealDataAndPortfolioUx() {

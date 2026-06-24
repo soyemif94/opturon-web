@@ -84,6 +84,50 @@ type PartnerMutationResponse = {
   detail?: string;
 };
 
+type AdminClientRequestStatus = "draft" | "pending_review" | "changes_requested" | "approved" | "rejected" | "cancelled";
+
+type AdminClientRequest = {
+  id: string;
+  status: AdminClientRequestStatus;
+  clientName: string;
+  businessName?: string | null;
+  email: string;
+  phone: string;
+  planCode?: string | null;
+  paymentMethod: string;
+  reportedAmount: string;
+  reportedCurrency: string;
+  reportedPaymentDate?: string | null;
+  paymentReference?: string | null;
+  notes?: string | null;
+  adminNotes?: string | null;
+  createdAt?: string | null;
+  submittedAt?: string | null;
+  updatedAt?: string | null;
+  receipt?: {
+    originalName?: string | null;
+    mimeType?: string | null;
+    sizeBytes?: number | null;
+  };
+  partner?: {
+    id: string;
+    displayName?: string | null;
+    email?: string | null;
+    code?: string | null;
+  };
+};
+
+type AdminClientRequestsResponse = {
+  success?: boolean;
+  data?: {
+    ok?: boolean;
+    requests?: AdminClientRequest[];
+    request?: AdminClientRequest;
+    duplicateWarnings?: string[];
+  };
+  error?: string;
+};
+
 type PartnerInviteFormState = {
   displayName: string;
   email: string;
@@ -192,6 +236,33 @@ function ToolbarSelect({
   );
 }
 
+const ADMIN_CLIENT_REQUEST_STATUS_LABELS: Record<string, string> = {
+  draft: "Borrador",
+  pending_review: "Pendiente de revision",
+  changes_requested: "Correccion solicitada",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  cancelled: "Cancelada"
+};
+
+const ADMIN_CLIENT_REQUEST_STATUS_OPTIONS = [
+  { value: "all", label: "Todos los estados" },
+  { value: "pending_review", label: "Pendiente de revision" },
+  { value: "changes_requested", label: "Correccion solicitada" },
+  { value: "approved", label: "Aprobada" },
+  { value: "rejected", label: "Rechazada" },
+  { value: "cancelled", label: "Cancelada" },
+  { value: "draft", label: "Borrador" }
+];
+
+function adminClientRequestStatusVariant(status: string) {
+  if (status === "approved") return "success";
+  if (status === "pending_review") return "warning";
+  if (status === "rejected" || status === "cancelled") return "danger";
+  if (status === "changes_requested") return "outline";
+  return "muted";
+}
+
 function readErrorMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === "object") {
     const detail = String((payload as Record<string, unknown>).detail || "").trim();
@@ -234,6 +305,13 @@ export function PartnersAdminWorkspace({
   const [inviteBusy, setInviteBusy] = useState(false);
   const [deactivationReason, setDeactivationReason] = useState("");
   const [deactivateDetails, setDeactivateDetails] = useState<AdminPartnerDetails | null>(null);
+  const [clientRequests, setClientRequests] = useState<AdminClientRequest[]>([]);
+  const [clientRequestsLoading, setClientRequestsLoading] = useState(!previewMode);
+  const [clientRequestsStatus, setClientRequestsStatus] = useState("pending_review");
+  const [clientRequestsSearch, setClientRequestsSearch] = useState("");
+  const [selectedClientRequest, setSelectedClientRequest] = useState<AdminClientRequest | null>(null);
+  const [clientRequestAdminNotes, setClientRequestAdminNotes] = useState("");
+  const [clientRequestBusyId, setClientRequestBusyId] = useState<string | null>(null);
 
   const partnerMap = useMemo(() => new Map(partners.map((partner) => [partner.id, partner])), [partners]);
   const filteredPartners = useMemo(
@@ -289,6 +367,61 @@ export function PartnersAdminWorkspace({
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }
+
+  async function loadClientRequests() {
+    if (previewMode) {
+      setClientRequests([]);
+      setClientRequestsLoading(false);
+      return;
+    }
+    setClientRequestsLoading(true);
+    const params = new URLSearchParams();
+    if (clientRequestsStatus !== "all") params.set("status", clientRequestsStatus);
+    if (clientRequestsSearch.trim()) params.set("search", clientRequestsSearch.trim());
+    try {
+      const response = await fetch(`/api/app/admin/partners/client-requests?${params.toString()}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const payload = (await readJsonSafe(response)) as AdminClientRequestsResponse | null;
+      if (!response.ok) throw new Error(readErrorMessage(payload, "No pudimos cargar solicitudes de clientes."));
+      setClientRequests(Array.isArray(payload?.data?.requests) ? payload.data.requests : []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No pudimos cargar solicitudes de clientes.");
+      setClientRequests([]);
+    } finally {
+      setClientRequestsLoading(false);
+    }
+  }
+
+  async function reviewClientRequest(requestId: string, action: "approve" | "reject" | "request_changes") {
+    const notes = clientRequestAdminNotes.trim();
+    if ((action === "reject" || action === "request_changes") && !notes) {
+      toast.error("La observacion administrativa es obligatoria para rechazar o solicitar correccion.");
+      return;
+    }
+    setClientRequestBusyId(requestId);
+    try {
+      const response = await fetch(`/api/app/admin/partners/client-requests/${encodeURIComponent(requestId)}/${action}`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminNotes: notes || undefined })
+      });
+      const payload = (await readJsonSafe(response)) as AdminClientRequestsResponse | null;
+      if (!response.ok) throw new Error(readErrorMessage(payload, "No pudimos resolver la solicitud."));
+      toast.success(action === "approve" ? "Solicitud aprobada" : action === "reject" ? "Solicitud rechazada" : "Correccion solicitada");
+      setSelectedClientRequest(payload?.data?.request || null);
+      setClientRequestAdminNotes("");
+      await loadClientRequests();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No pudimos resolver la solicitud.");
+    } finally {
+      setClientRequestBusyId(null);
     }
   }
 
@@ -565,6 +698,10 @@ export function PartnersAdminWorkspace({
   }, []);
 
   useEffect(() => {
+    void loadClientRequests();
+  }, [clientRequestsStatus]);
+
+  useEffect(() => {
     function onOpenInvite() {
       setInviteDialogOpen(true);
     }
@@ -628,6 +765,130 @@ export function PartnersAdminWorkspace({
           <KpiCard label="Clientes atribuidos" value={kpis.attributedClients} hint="Suma real de atribuciones activas informadas por el backend." icon={ArrowUpRight} />
           <KpiCard label="Con rango asignado" value={kpis.withAssignedRank} hint="Partners que ya tienen historial o rango comercial visible." icon={Crown} />
         </div>
+
+        <Card className={cn("overflow-hidden", PANEL_CLASS)}>
+          <CardHeader className="gap-4 border-b border-white/8 pb-4">
+            <div>
+              <CardTitle className="text-xl text-white">Solicitudes de clientes</CardTitle>
+              <CardDescription className="text-sm text-muted/90">
+                Bandeja de revision administrativa. Aprobar no crea tenant, comision, rango ni suscripcion.
+              </CardDescription>
+            </div>
+            <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
+              <ToolbarSelect
+                ariaLabel="Filtrar solicitudes por estado"
+                value={clientRequestsStatus}
+                onChange={setClientRequestsStatus}
+                options={ADMIN_CLIENT_REQUEST_STATUS_OPTIONS}
+              />
+              <Input
+                value={clientRequestsSearch}
+                onChange={(event) => setClientRequestsSearch(event.target.value)}
+                placeholder="Buscar cliente, email, negocio o asesor"
+                className={TOOLBAR_FIELD_CLASS}
+              />
+              <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => void loadClientRequests()} disabled={clientRequestsLoading}>
+                <RefreshCcw className={cn("mr-2 h-4 w-4", clientRequestsLoading ? "animate-spin" : "")} />
+                Actualizar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 pt-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="space-y-3">
+              {clientRequestsLoading ? (
+                <SkeletonLine className="h-24 w-full" />
+              ) : clientRequests.length === 0 ? (
+                <EmptyState
+                  icon={<BadgeCheck />}
+                  title="Sin solicitudes para revisar"
+                  description="Cuando un asesor envie un alta con comprobante, aparecera en esta bandeja."
+                />
+              ) : (
+                clientRequests.map((request) => (
+                  <button
+                    key={request.id}
+                    type="button"
+                    className={cn(
+                      "w-full rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-left transition hover:bg-white/[0.07]",
+                      selectedClientRequest?.id === request.id ? "ring-1 ring-brand/50" : ""
+                    )}
+                    onClick={() => {
+                      setSelectedClientRequest(request);
+                      setClientRequestAdminNotes(request.adminNotes || "");
+                    }}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{request.clientName}</p>
+                        <p className="mt-1 text-xs text-muted/90">{request.businessName || request.email}</p>
+                      </div>
+                      <Badge variant={adminClientRequestStatusVariant(request.status)}>{ADMIN_CLIENT_REQUEST_STATUS_LABELS[request.status] || request.status}</Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-muted/90 md:grid-cols-3">
+                      <span>Asesor: {request.partner?.displayName || request.partner?.email || "Sin dato"}</span>
+                      <span>{request.reportedCurrency} {request.reportedAmount}</span>
+                      <span>{formatPartnerDateTime(request.submittedAt || request.createdAt)}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="rounded-[24px] border border-white/8 bg-[rgba(255,255,255,0.04)] p-4">
+              {selectedClientRequest ? (
+                <div className="grid gap-4">
+                  <div>
+                    <Badge variant={adminClientRequestStatusVariant(selectedClientRequest.status)}>{ADMIN_CLIENT_REQUEST_STATUS_LABELS[selectedClientRequest.status] || selectedClientRequest.status}</Badge>
+                    <h3 className="mt-3 text-lg font-semibold text-white">{selectedClientRequest.clientName}</h3>
+                    <p className="mt-1 text-sm text-muted/90">{selectedClientRequest.businessName || "Sin razon social"}</p>
+                  </div>
+                  <div className="grid gap-2 text-sm text-muted/90">
+                    <InfoRow label="Asesor" value={selectedClientRequest.partner?.displayName || selectedClientRequest.partner?.email || "Sin dato"} />
+                    <InfoRow label="Email" value={selectedClientRequest.email} />
+                    <InfoRow label="Telefono" value={selectedClientRequest.phone} />
+                    <InfoRow label="Plan" value={selectedClientRequest.planCode || "Sin plan"} />
+                    <InfoRow label="Importe" value={`${selectedClientRequest.reportedCurrency} ${selectedClientRequest.reportedAmount}`} />
+                    <InfoRow label="Metodo" value={selectedClientRequest.paymentMethod} />
+                    <InfoRow label="Referencia" value={selectedClientRequest.paymentReference || "Sin referencia"} />
+                    <InfoRow label="Observaciones asesor" value={selectedClientRequest.notes || "Sin observaciones"} />
+                  </div>
+                  <a
+                    href={`/api/app/admin/partners/client-requests/${encodeURIComponent(selectedClientRequest.id)}/receipt`}
+                    className="inline-flex items-center justify-center rounded-2xl border border-white/12 bg-white/6 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+                  >
+                    Ver o descargar comprobante
+                  </a>
+                  <label className="grid gap-2 text-sm text-muted/90">
+                    Observacion administrativa
+                    <textarea
+                      value={clientRequestAdminNotes}
+                      onChange={(event) => setClientRequestAdminNotes(event.target.value)}
+                      className="min-h-24 rounded-2xl border border-white/12 bg-[rgba(10,17,29,0.72)] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-brand"
+                      placeholder="Obligatoria para rechazar o solicitar correccion."
+                    />
+                  </label>
+                  <div className="grid gap-2">
+                    <Button type="button" className="rounded-2xl" onClick={() => reviewClientRequest(selectedClientRequest.id, "approve")} disabled={clientRequestBusyId === selectedClientRequest.id || selectedClientRequest.status !== "pending_review"}>
+                      Aprobar solicitud
+                    </Button>
+                    <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => reviewClientRequest(selectedClientRequest.id, "request_changes")} disabled={clientRequestBusyId === selectedClientRequest.id || selectedClientRequest.status !== "pending_review"}>
+                      Solicitar correccion
+                    </Button>
+                    <Button type="button" variant="destructive" className="rounded-2xl" onClick={() => reviewClientRequest(selectedClientRequest.id, "reject")} disabled={clientRequestBusyId === selectedClientRequest.id || selectedClientRequest.status !== "pending_review"}>
+                      Rechazar solicitud
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<ShieldCheck />}
+                  title="Selecciona una solicitud"
+                  description="Aca vas a ver datos completos, comprobante y acciones de revision."
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className={cn("overflow-hidden", PANEL_CLASS)}>
           <CardHeader className="gap-4 border-b border-white/8 pb-4">
