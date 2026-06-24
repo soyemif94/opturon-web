@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import {
   callClientRequestBackend,
   getClientRequestBackendErrorBody,
@@ -24,15 +25,39 @@ function errorResponse(error: unknown) {
   );
 }
 
-export async function GET(_request: NextRequest, context: { params: Promise<{ requestId: string }> }) {
+function logPartnerIdentityTrace(input: {
+  traceId: string;
+  requestPath: string;
+  authUserId?: string | null;
+  sessionPartnerId?: string | null;
+  resolvedPartnerId?: string | null;
+  forwardedPartnerId?: string | null;
+}) {
+  console.info("partner_identity_trace", {
+    event: "partner_identity_trace",
+    layer: "next_proxy",
+    ...input
+  });
+}
+
+export async function GET(request: NextRequest, context: { params: Promise<{ requestId: string }> }) {
   const guard = await requirePartnerApi();
   if (guard.error) return noStore(guard.error);
+  const traceId = randomUUID();
+  logPartnerIdentityTrace({
+    traceId,
+    requestPath: request.nextUrl.pathname,
+    authUserId: guard.ctx.session?.user?.id || null,
+    sessionPartnerId: guard.ctx.session?.user?.partnerId || null,
+    resolvedPartnerId: guard.partnerId,
+    forwardedPartnerId: guard.partnerId
+  });
   const { requestId } = await context.params;
   try {
     const result = await callClientRequestBackend(
       `/api/partners/me/client-requests/${encodeURIComponent(requestId)}`,
       { method: "GET" },
-      { partnerId: guard.partnerId }
+      { partnerId: guard.partnerId, traceId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {
@@ -43,12 +68,21 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ re
 export async function PATCH(request: NextRequest, context: { params: Promise<{ requestId: string }> }) {
   const guard = await requirePartnerApi();
   if (guard.error) return noStore(guard.error);
+  const traceId = randomUUID();
+  logPartnerIdentityTrace({
+    traceId,
+    requestPath: request.nextUrl.pathname,
+    authUserId: guard.ctx.session?.user?.id || null,
+    sessionPartnerId: guard.ctx.session?.user?.partnerId || null,
+    resolvedPartnerId: guard.partnerId,
+    forwardedPartnerId: guard.partnerId
+  });
   const { requestId } = await context.params;
   try {
     const result = await callClientRequestBackend(
       `/api/partners/me/client-requests/${encodeURIComponent(requestId)}`,
       { method: "PATCH", body: await request.formData() },
-      { partnerId: guard.partnerId }
+      { partnerId: guard.partnerId, traceId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {

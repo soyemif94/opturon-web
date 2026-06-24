@@ -10,6 +10,7 @@ type BackendError = Error & {
 type BackendActor = {
   partnerId?: string | null;
   adminActorId?: string | null;
+  traceId?: string | null;
 };
 
 function getPortalInternalKey() {
@@ -54,6 +55,7 @@ export async function callClientRequestBackend<T>(
   headers.set("x-portal-key", portalKey);
   if (actor.partnerId) headers.set("x-partner-id", actor.partnerId);
   if (actor.adminActorId) headers.set("x-portal-actor-id", actor.adminActorId);
+  if (actor.traceId) headers.set("x-partner-identity-trace-id", actor.traceId);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
@@ -90,6 +92,7 @@ export async function fetchClientRequestReceipt(path: string, actor: BackendActo
   headers.set("x-portal-key", portalKey);
   if (actor.partnerId) headers.set("x-partner-id", actor.partnerId);
   if (actor.adminActorId) headers.set("x-portal-actor-id", actor.adminActorId);
+  if (actor.traceId) headers.set("x-partner-identity-trace-id", actor.traceId);
 
   const response = await fetch(`${apiBase}${path}`, {
     method: "GET",

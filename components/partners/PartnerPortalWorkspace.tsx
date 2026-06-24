@@ -1445,7 +1445,7 @@ function readPartnerPortalError(payload: unknown, fallback: string) {
   if (payload && typeof payload === "object") {
     const detail = String((payload as Record<string, unknown>).detail || "").trim();
     const error = String((payload as Record<string, unknown>).error || "").trim();
-    if (["partner_not_found", "partner_inactive", "partner_forbidden", "partner_unauthorized"].includes(error)) {
+    if (["partner_not_found", "partner_identity_invalid", "partner_inactive", "partner_forbidden", "partner_unauthorized"].includes(error)) {
       return "No pudimos identificar tu cuenta de asesor. Cerra sesion e ingresa nuevamente. Si continua, contacta a Administracion.";
     }
     if (detail) return detail;

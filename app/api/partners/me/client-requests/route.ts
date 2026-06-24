@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import {
   callClientRequestBackend,
   getClientRequestBackendErrorBody,
@@ -27,16 +28,40 @@ function errorResponse(error: unknown) {
   );
 }
 
+function logPartnerIdentityTrace(input: {
+  traceId: string;
+  requestPath: string;
+  authUserId?: string | null;
+  sessionPartnerId?: string | null;
+  resolvedPartnerId?: string | null;
+  forwardedPartnerId?: string | null;
+}) {
+  console.info("partner_identity_trace", {
+    event: "partner_identity_trace",
+    layer: "next_proxy",
+    ...input
+  });
+}
+
 export async function GET(request: NextRequest) {
   const guard = await requirePartnerApi();
   if (guard.error) return noStore(guard.error);
   const partnerId = guard.partnerId;
+  const traceId = randomUUID();
+  logPartnerIdentityTrace({
+    traceId,
+    requestPath: request.nextUrl.pathname,
+    authUserId: guard.ctx.session?.user?.id || null,
+    sessionPartnerId: guard.ctx.session?.user?.partnerId || null,
+    resolvedPartnerId: guard.partnerId,
+    forwardedPartnerId: partnerId
+  });
   try {
     const suffix = request.nextUrl.searchParams.toString();
     const result = await callClientRequestBackend(
       `/api/partners/me/client-requests${suffix ? `?${suffix}` : ""}`,
       { method: "GET" },
-      { partnerId }
+      { partnerId, traceId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {
@@ -48,11 +73,20 @@ export async function POST(request: NextRequest) {
   const guard = await requirePartnerApi();
   if (guard.error) return noStore(guard.error);
   const partnerId = guard.partnerId;
+  const traceId = randomUUID();
+  logPartnerIdentityTrace({
+    traceId,
+    requestPath: request.nextUrl.pathname,
+    authUserId: guard.ctx.session?.user?.id || null,
+    sessionPartnerId: guard.ctx.session?.user?.partnerId || null,
+    resolvedPartnerId: guard.partnerId,
+    forwardedPartnerId: partnerId
+  });
   try {
     const result = await callClientRequestBackend(
       "/api/partners/me/client-requests",
       { method: "POST", body: await request.formData() },
-      { partnerId }
+      { partnerId, traceId }
     );
     return noStore(NextResponse.json(result));
   } catch (error) {
