@@ -969,6 +969,7 @@ export type PartnerInvitationSummary = {
   phone: string | null;
   sponsorDisplayName: string | null;
   expiresAt: string;
+  sourceType?: string | null;
 };
 
 export async function validatePartnerInvitation(token: string) {

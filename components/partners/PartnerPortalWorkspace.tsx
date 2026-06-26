@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { PartnerRecruitmentPanel } from "@/components/partners/PartnerRecruitmentPanel";
 import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import {
   PARTNER_CAREER_LADDER,
@@ -1871,6 +1872,8 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
           </CardContent>
         </Card>
       </section>
+
+      <PartnerRecruitmentPanel />
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { PartnerRecruitmentAdminPanel } from "@/components/app/PartnerRecruitmentAdminPanel";
 import { cn } from "@/lib/ui/cn";
 import {
   type AdminPartner,
@@ -831,6 +832,8 @@ export function PartnersAdminWorkspace({
           <KpiCard label="Clientes atribuidos" value={kpis.attributedClients} hint="Suma real de atribuciones activas informadas por el backend." icon={ArrowUpRight} />
           <KpiCard label="Con rango asignado" value={kpis.withAssignedRank} hint="Partners que ya tienen historial o rango comercial visible." icon={Crown} />
         </div>
+
+        <PartnerRecruitmentAdminPanel panelClass={PANEL_CLASS} toolbarFieldClass={TOOLBAR_FIELD_CLASS} />
 
         <Card className={cn("overflow-hidden", PANEL_CLASS)}>
           <CardHeader className="gap-4 border-b border-white/8 pb-4">

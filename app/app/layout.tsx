@@ -31,6 +31,7 @@ export default async function ClientPortalLayout({ children }: { children: React
       process.env.VERCEL_URL?.replace(/\.vercel\.app$/i, "") ||
       undefined
     : undefined;
+  const appGlobalRole = ctx.globalRole === "partner" ? undefined : ctx.globalRole;
   const whatsappStatus = buildWhatsAppConnectionStatus({
     fallbackReason: ctx.tenantId
       ? "portal_status_pending_client_refresh"
@@ -56,7 +57,7 @@ export default async function ClientPortalLayout({ children }: { children: React
           buildMarker={buildMarker}
           buildEnv={buildEnv}
           deploymentId={deploymentId}
-          globalRole={ctx.globalRole}
+          globalRole={appGlobalRole}
           tenantRole={ctx.tenantRole}
           accountScope={ctx.accountScope}
           whatsappStatus={whatsappStatus}

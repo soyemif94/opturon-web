@@ -14,6 +14,7 @@ type PartnerInvitationSummary = {
   phone: string | null;
   sponsorDisplayName: string | null;
   expiresAt: string;
+  sourceType?: string | null;
 };
 
 function formatDateTime(value: string) {
@@ -153,6 +154,12 @@ export function PartnerInvitationAcceptForm({ token }: { token?: string }) {
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Sponsor</p>
               <p className="mt-1 text-slate-900">{invitation.sponsorDisplayName || "Sin sponsor asignado"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Tipo</p>
+              <p className="mt-1 text-slate-900">
+                {invitation.sourceType === "partner_recruitment_application" ? "Postulacion patrocinada" : "Invitacion directa"}
+              </p>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Vence</p>
