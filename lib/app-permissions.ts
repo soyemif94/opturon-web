@@ -24,7 +24,7 @@ export type AppModule =
   | "users";
 
 type AccessContext = {
-  globalRole?: GlobalRole;
+  globalRole?: GlobalRole | "partner";
   tenantRole?: TenantRole;
 };
 
@@ -76,8 +76,8 @@ export function normalizeTenantRole(role?: string): TenantRole | undefined {
   return undefined;
 }
 
-export function isStaffRole(role?: GlobalRole) {
-  return Boolean(role && STAFF_ROLES.has(role));
+export function isStaffRole(role?: GlobalRole | "partner") {
+  return Boolean(role && role !== "partner" && STAFF_ROLES.has(role));
 }
 
 export function hasAppPermission(context: AccessContext, permission: AppPermission) {

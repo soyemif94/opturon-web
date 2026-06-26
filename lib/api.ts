@@ -61,6 +61,10 @@ function getApiBase() {
   return "";
 }
 
+export function getApiBaseUrl() {
+  return getApiBase();
+}
+
 export function isBackendConfigured() {
   return Boolean(getApiBase());
 }
@@ -490,6 +494,9 @@ export type PortalUser = {
   email: string;
   role: string;
   active: boolean;
+  invitationStatus?: "active" | "invited" | "pending" | "expired";
+  invitationExpiresAt?: string | null;
+  invitationSentAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -530,6 +537,7 @@ export async function loginPortalUser(email: string, password: string) {
       tenantId: string;
       tenantRole: TenantRole;
       globalRole: string;
+      accountScope?: string;
     };
   }>(
     "/portal/auth/login",
@@ -542,7 +550,9 @@ export async function loginPortalUser(email: string, password: string) {
   );
 }
 
-export async function getPortalAuthUserByEmail(email: string) {
+export async function getPortalAuthUserByEmail(email: string, tenantId?: string) {
+  const params = new URLSearchParams({ email });
+  if (tenantId) params.set("tenantId", tenantId);
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -552,8 +562,166 @@ export async function getPortalAuthUserByEmail(email: string) {
       tenantId: string;
       tenantRole: TenantRole;
       globalRole: GlobalRole;
+      accountScope?: string;
     } | null;
-  }>(`/portal/auth/users/by-email?email=${encodeURIComponent(email)}`, undefined, AUTH_API_TIMEOUT_MS);
+  }>(`/portal/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
+}
+
+export async function getPortalAdminActor(tenantId: string, email?: string) {
+  const params = new URLSearchParams({ tenantId });
+  if (email) params.set("email", email);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      clinicId: string;
+      name: string | null;
+      email: string | null;
+      role: string | null;
+      tenantId: string | null;
+      accountScope: "opturon_admin";
+      isAdmin: true;
+    } | null;
+  }>(`/portal/auth/admin-actor?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
+}
+
+export async function loginPartnerUser(email: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      email: string;
+      name: string;
+      globalRole: "partner";
+      accountScope: "partner";
+      partnerId: string;
+    };
+  }>(
+    "/api/partners/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    },
+    false,
+    AUTH_API_TIMEOUT_MS
+  );
+}
+
+export async function getPartnerAuthUserByEmail(email: string) {
+  const params = new URLSearchParams({ email });
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      id: string;
+      email: string;
+      name: string;
+      globalRole: "partner";
+      accountScope: "partner";
+      partnerId: string;
+    } | null;
+  }>(`/api/partners/auth/users/by-email?${params.toString()}`, undefined, AUTH_API_TIMEOUT_MS);
+}
+
+export async function getPartnerMe(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+    };
+  }>("/api/partners/me", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeSummary(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      summary: Record<string, unknown>;
+    };
+  }>("/api/partners/me/summary", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeClients(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      clients: Array<Record<string, unknown>>;
+    };
+  }>("/api/partners/me/clients", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeRankProgress(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      rankHistory: Array<Record<string, unknown>>;
+      latestEvaluation: Record<string, unknown> | null;
+    };
+  }>("/api/partners/me/rank-progress", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeNetwork(partnerId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      summary: Record<string, unknown>;
+      levels: Array<Record<string, unknown>>;
+    };
+  }>("/api/partners/me/network", {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
+}
+
+export async function getPartnerMeCommissions(
+  partnerId: string,
+  searchParams?: Record<string, string | number | null | undefined>
+) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams || {})) {
+    if (value === null || value === undefined || value === "") continue;
+    params.set(key, String(value));
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      summary: Record<string, unknown>;
+      entries: Array<Record<string, unknown>>;
+      pagination: Record<string, unknown>;
+    };
+  }>(`/api/partners/me/commissions${suffix}`, {
+    headers: {
+      "x-partner-id": partnerId
+    }
+  });
 }
 
 export async function patchPortalUserRole(tenantId: string, userId: string, role: TenantRole) {
@@ -580,6 +748,38 @@ export async function deletePortalUser(tenantId: string, userId: string, current
   }>(`/portal/tenants/${tenantId}/users/${userId}`, {
     method: "DELETE",
     headers
+  });
+}
+
+export type PartnerInvitationSummary = {
+  partnerId: string;
+  email: string;
+  displayName: string | null;
+  code: string | null;
+  phone: string | null;
+  sponsorDisplayName: string | null;
+  expiresAt: string;
+  sourceType?: string | null;
+};
+
+export async function validatePartnerInvitation(token: string) {
+  return backendFetch<{
+    success: boolean;
+    data: PartnerInvitationSummary;
+  }>(`/api/partners/invitations/validate?token=${encodeURIComponent(token)}`, undefined, false);
+}
+
+export async function acceptPartnerInvitation(token: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      partner: Record<string, unknown>;
+      recruitmentApplication?: Record<string, unknown> | null;
+    };
+  }>("/api/partners/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify({ token, password })
   });
 }
 

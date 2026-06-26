@@ -33,7 +33,7 @@ type RuntimeContext = CommandPaletteContextValue & {
   scope: PaletteScope;
   isStaff: boolean;
   userId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: GlobalRole | "partner";
   tenantRole?: TenantRole;
 };
 
@@ -148,7 +148,7 @@ export function CommandPaletteProvider({
   tenantId?: string;
   isStaff?: boolean;
   userId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: GlobalRole | "partner";
   tenantRole?: TenantRole;
 }) {
   const [open, setOpen] = useState(false);
@@ -211,7 +211,7 @@ export function CommandPalette({
   scope: PaletteScope;
   isStaff: boolean;
   userId?: string;
-  globalRole?: GlobalRole;
+  globalRole?: GlobalRole | "partner";
   tenantRole?: TenantRole;
 }) {
   const { open, setOpen, context } = useProviderCtx();

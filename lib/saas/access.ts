@@ -1,13 +1,17 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasAppPermission, isStaffRole, type AppPermission } from "@/lib/app-permissions";
 import { authOptions } from "@/lib/auth";
+import { isPartnerLikeIdentity, isStrictPartnerIdentity } from "@/lib/auth-identity";
+import { isPartnerPortalHost, PARTNER_PORTAL_PREVIEW_HEADER, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
 
-const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
-const OPTURON_ADMIN_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin"]);
+const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
+const OPTURON_ADMIN_ROLES = new Set(["superadmin", "ops_admin"]);
+const PARTNER_ROLE = "partner";
 
 function resolveDemoTenantId(requestedTenantId?: string) {
   if (requestedTenantId) return requestedTenantId;
@@ -21,9 +25,67 @@ export async function getSessionContext() {
   return {
     session,
     userId: session?.user?.id,
+    portalActorId: session?.user?.portalActorId,
     globalRole: session?.user?.globalRole,
     tenantId: session?.user?.tenantId,
-    tenantRole: session?.user?.tenantRole
+    tenantRole: session?.user?.tenantRole,
+    accountScope: session?.user?.accountScope,
+    partnerId: session?.user?.partnerId
+  };
+}
+
+function normalizeScope(value?: string) {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function hasOpturonAdminApiAccess(ctx: {
+  session?: { user?: { id?: string; portalActorId?: string; accountScope?: string } } | null;
+  userId?: string;
+  portalActorId?: string;
+  globalRole?: string;
+  accountScope?: string;
+}) {
+  if (!ctx.session) return false;
+  if (!ctx.userId || !String(ctx.userId).trim()) return false;
+  if (!ctx.portalActorId && !String(ctx.session?.user?.portalActorId || "").trim()) return false;
+  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(String(ctx.globalRole))) return false;
+  return normalizeScope(ctx.accountScope || ctx.session?.user?.accountScope) === "opturon_admin";
+}
+
+export function resolveOpturonAdminActorId(ctx: {
+  session?: { user?: { id?: string; portalActorId?: string } } | null;
+  userId?: string;
+  portalActorId?: string;
+  globalRole?: string;
+  accountScope?: string;
+}) {
+  if (!hasOpturonAdminApiAccess(ctx)) return null;
+  return String(ctx.session?.user?.portalActorId || ctx.portalActorId || "").trim() || null;
+}
+
+export function resolveAuthenticatedPartner(ctx: {
+  session?: { user?: { partnerId?: string; accountScope?: string } } | null;
+  globalRole?: string;
+  accountScope?: string;
+  partnerId?: string;
+  tenantId?: string;
+  tenantRole?: string;
+}) {
+  const partnerId = String(ctx.partnerId || ctx.session?.user?.partnerId || "").trim();
+  const accountScope = normalizeScope(ctx.accountScope || ctx.session?.user?.accountScope);
+  if (!isStrictPartnerIdentity({
+    accountScope,
+    globalRole: ctx.globalRole,
+    partnerId,
+    tenantId: ctx.tenantId,
+    tenantRole: ctx.tenantRole
+  })) {
+    return null;
+  }
+  return {
+    accountScope: PARTNER_ROLE,
+    partnerId,
+    partner: { id: partnerId }
   };
 }
 
@@ -37,13 +99,14 @@ export async function requireOpsPage() {
 export async function requireOpturonAdminPage(callbackUrl = "/app/client-management") {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(ctx.globalRole)) redirect("/app");
+  if (!hasOpturonAdminApiAccess(ctx)) redirect("/app");
   return ctx;
 }
 
 export async function requireAppPage(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) redirect("/login?callbackUrl=/app");
+  if (isPartnerLikeIdentity({ accountScope: ctx.accountScope, globalRole: ctx.globalRole, partnerId: ctx.session.user?.partnerId })) redirect("/partners");
   const permission = options?.permission || "view_workspace";
   if (!hasAppPermission(ctx, permission)) {
     if (!hasAppPermission(ctx, "view_workspace")) redirect("/login?callbackUrl=/app");
@@ -64,7 +127,7 @@ export async function requireOpsApi() {
 export async function requireOpturonAdminApi() {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!ctx.globalRole || !OPTURON_ADMIN_ROLES.has(ctx.globalRole)) {
+  if (!hasOpturonAdminApiAccess(ctx)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ctx };
@@ -73,6 +136,9 @@ export async function requireOpturonAdminApi() {
 export async function requireAppApi(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (isPartnerLikeIdentity({ accountScope: ctx.accountScope, globalRole: ctx.globalRole, partnerId: ctx.session.user?.partnerId })) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
   if (!ctx.tenantId && !isStaffRole(ctx.globalRole)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
@@ -83,6 +149,35 @@ export async function requireAppApi(options?: { permission?: AppPermission }) {
   return { ctx };
 }
 
+export async function requirePartnerPage() {
+  const ctx = await getSessionContext();
+  const requestHeaders = await headers();
+  const partnerCallbackUrl = partnerLoginCallbackForHost(requestHeaders.get("host"));
+  const previewMode =
+    process.env.NODE_ENV !== "production" &&
+    requestHeaders.get(PARTNER_PORTAL_PREVIEW_HEADER) === "1" &&
+    Boolean(ctx.globalRole && STAFF_ROLES.has(ctx.globalRole));
+  if (!ctx.session) redirect(`/login?callbackUrl=${encodeURIComponent(partnerCallbackUrl)}`);
+  if (previewMode) {
+    return { ...ctx, previewMode: true };
+  }
+  const partner = resolveAuthenticatedPartner(ctx);
+  if (!partner) {
+    redirect(isPartnerPortalHost(requestHeaders.get("host")) ? `/login?callbackUrl=${encodeURIComponent(partnerCallbackUrl)}` : "/app");
+  }
+  return { ...ctx, previewMode: false, partnerId: partner.partnerId, partner: partner.partner };
+}
+
+export async function requirePartnerApi() {
+  const ctx = await getSessionContext();
+  if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  const partner = resolveAuthenticatedPartner(ctx);
+  if (!partner) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  return { ctx, partnerId: partner.partnerId, partner: partner.partner };
+}
+
 export async function resolveAppTenant(options?: {
   requestedTenantId?: string;
   demo?: boolean;
@@ -91,6 +186,9 @@ export async function resolveAppTenant(options?: {
 }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (isPartnerLikeIdentity({ accountScope: ctx.accountScope, globalRole: ctx.globalRole, partnerId: ctx.session.user?.partnerId })) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
 
   const isStaff = Boolean(ctx.globalRole && STAFF_ROLES.has(ctx.globalRole));
   const requested = options?.requestedTenantId;

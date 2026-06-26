@@ -10,6 +10,7 @@ export type AuthUser = {
   globalRole?: string;
   tenantId?: string;
   tenantRole?: TenantRole;
+  accountScope?: string;
 };
 
 // Local auth data is for staff/demo compatibility only.
