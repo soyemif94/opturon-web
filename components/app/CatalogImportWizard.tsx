@@ -1,0 +1,709 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { AlertTriangle, Download, FileSpreadsheet, LoaderCircle, Upload } from "lucide-react";
+import type { PortalCatalogImport } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
+
+const STEP_LABELS = ["Archivo", "Hoja y formato", "Mapeo", "Vista previa", "Confirmación", "Resultado"] as const;
+const IMPORT_FIELDS = [
+  { value: "", label: "No importar" },
+  { value: "name", label: "Nombre" },
+  { value: "description", label: "Descripción" },
+  { value: "categoryName", label: "Categoría" },
+  { value: "price", label: "Precio" },
+  { value: "stock", label: "Stock" },
+  { value: "sku", label: "SKU" },
+  { value: "active", label: "Activo" },
+  { value: "currency", label: "Moneda" },
+  { value: "imageUrl", label: "Imagen URL" }
+];
+
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
+
+type Props = {
+  disabled?: boolean;
+  onImported?: () => Promise<void> | void;
+};
+
+export function CatalogImportWizard({ disabled = false, onImported }: Props) {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<Step>(1);
+  const [file, setFile] = useState<File | null>(null);
+  const [sheetName, setSheetName] = useState("");
+  const [delimiter, setDelimiter] = useState("");
+  const [hasHeaders, setHasHeaders] = useState(true);
+  const [duplicatePolicy, setDuplicatePolicy] = useState<"skip" | "update" | "cancel">("skip");
+  const [categoryPolicy, setCategoryPolicy] = useState<"reject_missing" | "create_missing">("reject_missing");
+  const [importPolicy, setImportPolicy] = useState<"valid_only" | "fail_on_error">("valid_only");
+  const [mapping, setMapping] = useState<Record<string, string | null>>({});
+  const [importSession, setImportSession] = useState<PortalCatalogImport | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [message, setMessage] = useState<{ tone: "info" | "success" | "warning"; text: string } | null>(null);
+
+  const columns = importSession?.analysis?.columns || [];
+  const previewRows = importSession?.analysis?.previewRows || [];
+  const stats = importSession?.analysis?.stats;
+  const resultSummary = importSession?.result?.summary;
+  const resultRows = importSession?.result?.rows || [];
+  const sheetOptions = importSession?.config?.sheets || [];
+  const previewStatusCount = useMemo(() => {
+    return previewRows.reduce(
+      (accumulator, row) => {
+        accumulator[row.status] = (accumulator[row.status] || 0) + 1;
+        return accumulator;
+      },
+      {} as Record<string, number>
+    );
+  }, [previewRows]);
+
+  function resetState() {
+    setStep(1);
+    setFile(null);
+    setSheetName("");
+    setDelimiter("");
+    setHasHeaders(true);
+    setDuplicatePolicy("skip");
+    setCategoryPolicy("reject_missing");
+    setImportPolicy("valid_only");
+    setMapping({});
+    setImportSession(null);
+    setAnalyzing(false);
+    setConfirming(false);
+    setMessage(null);
+  }
+
+  function closeModal(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      resetState();
+    }
+  }
+
+  function updateMapping(columnKey: string, value: string) {
+    setMapping((current) => {
+      const next = { ...current };
+      const normalized = value || null;
+      Object.keys(next).forEach((key) => {
+        if (key !== columnKey && next[key] === normalized && normalized) {
+          next[key] = null;
+        }
+      });
+      next[columnKey] = normalized;
+      return next;
+    });
+  }
+
+  async function runAnalyze(targetStep: Step = 4) {
+    if (!file) {
+      setMessage({ tone: "warning", text: "Selecciona un archivo antes de analizar." });
+      setStep(1);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("hasHeaders", String(hasHeaders));
+    formData.append("duplicatePolicy", duplicatePolicy);
+    formData.append("categoryPolicy", categoryPolicy);
+    formData.append("importPolicy", importPolicy);
+    if (sheetName) formData.append("sheetName", sheetName);
+    if (delimiter) formData.append("delimiter", delimiter);
+    formData.append("mapping", JSON.stringify(mapping));
+
+    setAnalyzing(true);
+    setMessage({ tone: "info", text: "Todavía no se modificó el catálogo. Estamos analizando el archivo." });
+
+    try {
+      const response = await fetch("/api/app/catalog/imports/analyze", {
+        method: "POST",
+        body: formData
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "No pudimos analizar el archivo."));
+      }
+
+      const nextImport = json?.import as PortalCatalogImport;
+      setImportSession(nextImport);
+      setSheetName(nextImport?.config?.sheetName || "");
+      setDelimiter(nextImport?.config?.delimiter || "");
+      setHasHeaders(nextImport?.config?.hasHeaders !== false);
+      setMapping(nextImport?.analysis?.mapping || {});
+      setStep(targetStep);
+      setMessage({
+        tone: "info",
+        text: "Análisis listo. Todavía no se modificó el catálogo."
+      });
+    } catch (error) {
+      setMessage({
+        tone: "warning",
+        text: error instanceof Error ? humanizeImportError(error.message) : "No pudimos analizar el archivo."
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function handleConfirm() {
+    if (!importSession?.importId) return;
+    setConfirming(true);
+    try {
+      const response = await fetch(`/api/app/catalog/imports/${importSession.importId}/confirm`, {
+        method: "POST"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "No pudimos confirmar la importación."));
+      }
+
+      setImportSession(json?.import || null);
+      setStep(6);
+      setMessage({
+        tone: "success",
+        text: json?.import?.idempotent
+          ? "La importación ya había sido confirmada. Te mostramos el mismo resultado para evitar duplicados."
+          : "La importación ya fue confirmada."
+      });
+      toast.success("Importación confirmada");
+      await onImported?.();
+    } catch (error) {
+      setMessage({
+        tone: "warning",
+        text: error instanceof Error ? humanizeImportError(error.message) : "No pudimos confirmar la importación."
+      });
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  async function downloadTemplate() {
+    setDownloadingTemplate(true);
+    try {
+      const response = await fetch("/api/app/catalog/imports/template", { cache: "no-store" });
+      if (!response.ok) throw new Error("No pudimos descargar la plantilla.");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "catalog-import-template.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage({
+        tone: "warning",
+        text: error instanceof Error ? error.message : "No pudimos descargar la plantilla."
+      });
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  }
+
+  function downloadErrors() {
+    if (!importSession?.importId) return;
+    window.open(`/api/app/catalog/imports/${importSession.importId}/errors`, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <>
+      <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={() => setOpen(true)}>
+        <Upload className="mr-2 h-4 w-4" />
+        Importar productos
+      </Button>
+
+      <Dialog open={open} onOpenChange={closeModal}>
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(15,24,38,0.98),rgba(8,14,24,0.98))] p-0">
+          <div className="border-b border-white/10 px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="text-xl text-white">Importación masiva de catálogo</DialogTitle>
+              <DialogDescription className="text-sm text-slate-300">
+                Subimos archivo, analizamos, mostramos vista previa y recién después confirmas. No escribimos nada en el catálogo hasta el último paso.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-6">
+              {STEP_LABELS.map((label, index) => {
+                const stepNumber = (index + 1) as Step;
+                const active = step === stepNumber;
+                const enabled =
+                  stepNumber === 1 ||
+                  (stepNumber === 2 && file) ||
+                  (stepNumber === 3 && importSession) ||
+                  (stepNumber === 4 && importSession) ||
+                  (stepNumber === 5 && importSession) ||
+                  (stepNumber === 6 && importSession?.result?.summary);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    disabled={!enabled}
+                    onClick={() => enabled && setStep(stepNumber)}
+                    className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+                      active
+                        ? "border-amber-400/40 bg-amber-400/12 text-white"
+                        : "border-white/10 bg-white/[0.03] text-slate-300"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Paso {stepNumber}</p>
+                    <p className="mt-1 text-sm font-medium">{label}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-6 px-6 py-6">
+            {message ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                <Badge variant={message.tone === "success" ? "success" : message.tone === "warning" ? "warning" : "muted"}>
+                  {message.text}
+                </Badge>
+              </div>
+            ) : null}
+
+            {step === 1 ? (
+              <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <p className="text-sm font-semibold text-white">1. Seleccionar archivo</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Admitimos `.xlsx`, `.csv` y `.txt` delimitado. Límite inicial: hasta 10 MB, 10.000 filas y 100 columnas.
+                  </p>
+                  <label className="mt-5 flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(245,158,11,0.06))] px-6 text-center">
+                    <FileSpreadsheet className="h-10 w-10 text-amber-300" />
+                    <span className="mt-4 text-base font-medium text-white">
+                      {file ? file.name : "Haz clic para elegir el archivo"}
+                    </span>
+                    <span className="mt-2 text-sm text-slate-300">
+                      Si vuelves a analizar, reutilizamos este mismo archivo local y seguimos sin tocar el catálogo.
+                    </span>
+                    <Input
+                      type="file"
+                      accept=".xlsx,.csv,.txt"
+                      className="hidden"
+                      onChange={(event) => {
+                        const nextFile = event.target.files?.[0] || null;
+                        setFile(nextFile);
+                        setImportSession(null);
+                        setMapping({});
+                        setMessage(null);
+                        if (nextFile) setStep(2);
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <p className="text-sm font-semibold text-white">Plantilla recomendada</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Descarga una base compatible con encabezados sugeridos. Las dos filas de ejemplo están marcadas para borrarlas antes de volver a subir la plantilla.
+                  </p>
+                  <Button type="button" variant="secondary" className="mt-5 w-full rounded-2xl" onClick={downloadTemplate} disabled={downloadingTemplate}>
+                    {downloadingTemplate ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Descargar plantilla
+                  </Button>
+                </div>
+              </section>
+            ) : null}
+
+            {step === 2 ? (
+              <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <p className="text-sm font-semibold text-white">2. Hoja y formato</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Puedes elegir hoja, indicar si la primera fila trae encabezados y forzar delimitador si tu CSV o TXT vino raro.
+                  </p>
+
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <FieldBlock label="Archivo actual">
+                      <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-200">
+                        {file?.name || "Sin archivo"}
+                      </div>
+                    </FieldBlock>
+
+                    <FieldBlock label="Primera fila con encabezados">
+                      <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-200">
+                        <input type="checkbox" checked={hasHeaders} onChange={(event) => setHasHeaders(event.target.checked)} />
+                        Detectar encabezados en la primera fila
+                      </label>
+                    </FieldBlock>
+
+                    <FieldBlock label="Hoja (solo Excel)">
+                      <select
+                        value={sheetName}
+                        onChange={(event) => setSheetName(event.target.value)}
+                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
+                      >
+                        <option value="">Primera hoja detectada</option>
+                        {sheetOptions.map((sheet) => (
+                          <option key={sheet.name} value={sheet.name}>
+                            {sheet.name} · {sheet.rowCount} filas
+                          </option>
+                        ))}
+                      </select>
+                    </FieldBlock>
+
+                    <FieldBlock label="Delimitador (CSV/TXT)">
+                      <select
+                        value={delimiter}
+                        onChange={(event) => setDelimiter(event.target.value)}
+                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
+                      >
+                        <option value="">Detectar automáticamente</option>
+                        <option value=";">Punto y coma (;)</option>
+                        <option value=",">Coma (,)</option>
+                        <option value={"	"}>Tabulación</option>
+                        <option value="|">Barra vertical (|)</option>
+                      </select>
+                    </FieldBlock>
+                  </div>
+                </div>
+
+                <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(255,255,255,0.03))] p-5">
+                  <p className="text-sm font-semibold text-white">Antes de analizar</p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+                    <li>Rechazamos archivos corruptos o sin estructura tabular.</li>
+                    <li>No ejecutamos fórmulas de Excel.</li>
+                    <li>No guardamos el archivo en una carpeta pública.</li>
+                  </ul>
+                  <Button type="button" className="mt-6 w-full rounded-2xl" onClick={() => void runAnalyze(3)} disabled={!file || analyzing}>
+                    {analyzing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                    Analizar archivo
+                  </Button>
+                </div>
+              </section>
+            ) : null}
+
+            {step === 3 ? (
+              <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">3. Mapeo manual</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      Sugerimos columnas por alias, pero tú decides qué entra y qué queda fuera.
+                    </p>
+                  </div>
+                  <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => void runAnalyze(4)} disabled={analyzing}>
+                    {analyzing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Actualizar vista previa
+                  </Button>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {columns.map((column) => (
+                    <div key={column.key} className="grid gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 md:grid-cols-[1fr_0.95fr]">
+                      <div>
+                        <p className="text-sm font-medium text-white">{column.label}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">Columna {column.index + 1}</p>
+                      </div>
+                      <select
+                        value={mapping[column.key] || ""}
+                        onChange={(event) => updateMapping(column.key, event.target.value)}
+                        className="h-11 rounded-2xl border border-white/10 bg-black/20 px-3 text-sm text-slate-100"
+                      >
+                        {IMPORT_FIELDS.map((field) => (
+                          <option key={field.value || "none"} value={field.value}>
+                            {field.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {step === 4 ? (
+              <section className="space-y-5">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="muted">{stats?.totalRows || 0} filas detectadas</Badge>
+                    <Badge variant="success">{stats?.validRows || 0} válidas</Badge>
+                    <Badge variant={stats?.warningRows ? "warning" : "muted"}>{stats?.warningRows || 0} con advertencias</Badge>
+                    <Badge variant={stats?.errorRows ? "danger" : "muted"}>{stats?.errorRows || 0} con errores</Badge>
+                    <Badge variant={stats?.duplicateRows ? "warning" : "muted"}>{stats?.duplicateRows || 0} duplicadas</Badge>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">
+                    Todavía no se modificó el catálogo. Esta vista previa ya usa tu mapeo, la política de duplicados y la política de categorías seleccionadas.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                    <p className="text-sm font-semibold text-white">Primeras filas normalizadas</p>
+                    <div className="mt-4 space-y-3">
+                      {previewRows.map((row) => (
+                        <div key={`${row.sourceRowNumber}-${row.status}`} className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={badgeForPreviewStatus(row.status)}>{labelForPreviewStatus(row.status)}</Badge>
+                            <span className="text-sm text-slate-300">Fila {row.sourceRowNumber}</span>
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <PreviewValue label="Nombre" value={String(row.values?.name || "Sin nombre")} />
+                            <PreviewValue label="SKU" value={String(row.values?.sku || "Sin SKU")} />
+                            <PreviewValue label="Precio" value={String(row.values?.price ?? "-")} />
+                            <PreviewValue label="Stock" value={String(row.values?.stock ?? "-")} />
+                            <PreviewValue label="Categoría" value={String(row.values?.categoryName || "Sin categoría")} />
+                            <PreviewValue label="Estado" value={String(row.values?.status || "active")} />
+                          </div>
+                          {row.warnings?.length ? <p className="mt-3 text-sm text-amber-200">{row.warnings.join(" ")}</p> : null}
+                          {row.errors?.length ? <p className="mt-3 text-sm text-rose-200">{row.errors[0]?.message}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                    <p className="text-sm font-semibold text-white">Qué vemos hasta ahora</p>
+                    <div className="mt-4 space-y-3 text-sm text-slate-300">
+                      <SummaryLine label="Válidas" value={String(previewStatusCount.valid || 0)} />
+                      <SummaryLine label="Advertencias" value={String(previewStatusCount.warning || 0)} />
+                      <SummaryLine label="Errores" value={String(previewStatusCount.error || 0)} />
+                      <SummaryLine label="Duplicadas" value={String(previewStatusCount.duplicated || 0)} />
+                      <SummaryLine label="Ignoradas" value={String(previewStatusCount.ignored || 0)} />
+                    </div>
+                    <Button type="button" variant="secondary" className="mt-5 w-full rounded-2xl" onClick={downloadErrors}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Descargar errores
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {step === 5 ? (
+              <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <p className="text-sm font-semibold text-white">5. Confirmación</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Aquí eliges cómo tratar duplicados y categorías faltantes. Si cambias una política, vuelve a analizar para refrescar la vista previa antes de importar.
+                  </p>
+
+                  <div className="mt-5 grid gap-4">
+                    <FieldBlock label="Duplicados">
+                      <select
+                        value={duplicatePolicy}
+                        onChange={(event) => setDuplicatePolicy(event.target.value as "skip" | "update" | "cancel")}
+                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
+                      >
+                        <option value="skip">Omitir duplicados</option>
+                        <option value="update">Actualizar productos existentes</option>
+                        <option value="cancel">Cancelar si hay duplicados</option>
+                      </select>
+                    </FieldBlock>
+
+                    <FieldBlock label="Categorías faltantes">
+                      <select
+                        value={categoryPolicy}
+                        onChange={(event) => setCategoryPolicy(event.target.value as "reject_missing" | "create_missing")}
+                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
+                      >
+                        <option value="reject_missing">No crear y marcar error</option>
+                        <option value="create_missing">Crear categorías faltantes</option>
+                      </select>
+                    </FieldBlock>
+
+                    <FieldBlock label="Errores de fila">
+                      <select
+                        value={importPolicy}
+                        onChange={(event) => setImportPolicy(event.target.value as "valid_only" | "fail_on_error")}
+                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
+                      >
+                        <option value="valid_only">Importar solo filas válidas</option>
+                        <option value="fail_on_error">Cancelar toda la importación si hay errores</option>
+                      </select>
+                    </FieldBlock>
+                  </div>
+                </div>
+
+                <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(255,255,255,0.03))] p-5">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-300" />
+                    <div>
+                      <p className="text-sm font-semibold text-white">Checklist antes de confirmar</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">
+                        {stats?.errorRows
+                          ? `Hay ${stats.errorRows} fila(s) con error. Si sigues con “Importar solo filas válidas”, esas filas no entrarán.`
+                          : "No detectamos errores bloqueantes en la vista previa actual."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button type="button" variant="secondary" className="mt-5 w-full rounded-2xl" onClick={() => void runAnalyze(5)} disabled={analyzing}>
+                    {analyzing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Reanalizar con estas políticas
+                  </Button>
+                  <Button type="button" className="mt-3 w-full rounded-2xl" onClick={() => void handleConfirm()} disabled={confirming || analyzing}>
+                    {confirming ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                    Confirmar importación
+                  </Button>
+                </div>
+              </section>
+            ) : null}
+
+            {step === 6 ? (
+              <section className="space-y-5">
+                <div className="rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 p-5">
+                  <Badge variant="success">Resultado final</Badge>
+                  <p className="mt-3 text-sm leading-6 text-slate-100">La importación ya fue confirmada. Si reintentas la confirmación, devolvemos el mismo resultado para evitar duplicados.</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ResultCard label="Productos creados" value={String(resultSummary?.created || 0)} />
+                  <ResultCard label="Productos actualizados" value={String(resultSummary?.updated || 0)} />
+                  <ResultCard label="Duplicados omitidos" value={String(resultSummary?.skippedDuplicates || 0)} />
+                  <ResultCard label="Filas con error" value={String(resultSummary?.errors || 0)} />
+                  <ResultCard label="Categorías creadas" value={String(resultSummary?.createdCategories || 0)} />
+                  <ResultCard label="Tiempo" value={formatProcessingTime(resultSummary?.processingTimeMs || 0)} />
+                </div>
+
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <p className="text-sm font-semibold text-white">Detalle del lote</p>
+                  <div className="mt-4 space-y-2">
+                    {resultRows.slice(0, 20).map((row) => (
+                      <div key={`${row.sourceRowNumber}-${row.status}-${row.productId || row.code || "row"}`} className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                        <Badge variant={row.status === "created" || row.status === "updated" ? "success" : row.status === "skipped" ? "warning" : "danger"}>
+                          Fila {row.sourceRowNumber}
+                        </Badge>
+                        <span>{humanizeResultRow(row)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+          </div>
+
+          <DialogFooter className="border-t border-white/10 px-6 py-4">
+            {step > 1 && step < 6 ? (
+              <Button type="button" variant="secondary" onClick={() => setStep((Math.max(1, step - 1) as Step))}>
+                Volver
+              </Button>
+            ) : null}
+            {step === 6 ? (
+              <Button type="button" variant="secondary" onClick={downloadErrors}>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar errores
+              </Button>
+            ) : null}
+            <Button type="button" variant="secondary" onClick={() => closeModal(false)}>
+              {step === 6 ? "Cerrar" : "Cancelar"}
+            </Button>
+            {step === 3 ? (
+              <Button type="button" onClick={() => setStep(4)}>
+                Seguir a vista previa
+              </Button>
+            ) : null}
+            {step === 4 ? (
+              <Button type="button" onClick={() => setStep(5)}>
+                Seguir a confirmación
+              </Button>
+            ) : null}
+            {step === 6 ? (
+              <Button type="button" onClick={() => closeModal(false)}>
+                Importar otro archivo
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function PreviewValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm text-slate-100">{value}</p>
+    </div>
+  );
+}
+
+function SummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+      <span>{label}</span>
+      <span className="font-medium text-white">{value}</span>
+    </div>
+  );
+}
+
+function ResultCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function badgeForPreviewStatus(status: string) {
+  if (status === "valid") return "success";
+  if (status === "warning" || status === "duplicated") return "warning";
+  if (status === "ignored") return "muted";
+  return "danger";
+}
+
+function labelForPreviewStatus(status: string) {
+  if (status === "valid") return "Válida";
+  if (status === "warning") return "Con advertencias";
+  if (status === "duplicated") return "Duplicada";
+  if (status === "ignored") return "Ignorada";
+  return "Con errores";
+}
+
+function humanizeImportError(code: string) {
+  switch (code) {
+    case "unsupported_catalog_import_file_type":
+      return "Ese formato no está habilitado. Usa XLSX, CSV o TXT delimitado.";
+    case "catalog_import_file_too_large":
+      return "El archivo supera el tamaño máximo permitido para esta primera fase.";
+    case "catalog_import_unstructured_text":
+      return "No pudimos detectar columnas en este archivo. Probá con CSV, Excel o un TXT delimitado.";
+    case "catalog_import_too_many_rows":
+      return "El archivo supera el máximo de filas permitido.";
+    case "catalog_import_too_many_columns":
+      return "El archivo tiene demasiadas columnas para esta fase.";
+    case "catalog_import_blocked_by_errors":
+      return "La política actual cancela toda la importación cuando existen errores.";
+    case "catalog_import_cancelled":
+      return "Esta importación ya fue cancelada.";
+    default:
+      return code;
+  }
+}
+
+function humanizeResultRow(row: { status: string; productId?: string; code?: string; message?: string }) {
+  if (row.status === "created") return `Producto creado${row.productId ? ` (${row.productId})` : ""}.`;
+  if (row.status === "updated") return `Producto actualizado${row.productId ? ` (${row.productId})` : ""}.`;
+  if (row.status === "skipped") return row.code === "duplicate_existing" ? "Duplicado omitido." : "Fila omitida.";
+  return row.message || row.code || "Fila con error.";
+}
+
+function formatProcessingTime(value: number) {
+  if (!value) return "0 s";
+  if (value < 1000) return `${value} ms`;
+  return `${(value / 1000).toFixed(1)} s`;
+}

@@ -1857,6 +1857,94 @@ export type PortalProductCategory = {
   updatedAt: string | null;
 };
 
+export type PortalCatalogImportRow = {
+  sourceRowNumber: number;
+  status: "valid" | "warning" | "error" | "duplicated" | "ignored";
+  action: "create" | "update" | "skip_duplicate" | "error" | "ignore";
+  warnings: string[];
+  errors: Array<{
+    rowNumber: number;
+    field: string;
+    value: string;
+    code: string;
+    message: string;
+  }>;
+  duplicateProductId?: string | null;
+  values: Record<string, unknown>;
+};
+
+export type PortalCatalogImport = {
+  importId: string;
+  status: string;
+  file: {
+    name: string;
+    type: string;
+    mimeType: string | null;
+    sizeBytes: number;
+  };
+  config: {
+    sheetName?: string | null;
+    delimiter?: string | null;
+    hasHeaders?: boolean;
+    duplicatePolicy?: "skip" | "update" | "cancel";
+    categoryPolicy?: "reject_missing" | "create_missing";
+    importPolicy?: "valid_only" | "fail_on_error";
+    sheets?: Array<{
+      name: string;
+      rowCount: number;
+      columns: number;
+    }>;
+    mapping?: Record<string, string | null>;
+  };
+  analysis: {
+    hasHeaders?: boolean;
+    columns?: Array<{
+      index: number;
+      key: string;
+      label: string;
+    }>;
+    mapping?: Record<string, string | null>;
+    errors?: Array<{
+      rowNumber: number;
+      field: string;
+      value: string;
+      code: string;
+      message: string;
+    }>;
+    normalizedRows?: PortalCatalogImportRow[];
+    previewRows?: PortalCatalogImportRow[];
+    stats?: {
+      totalRows: number;
+      validRows: number;
+      warningRows: number;
+      errorRows: number;
+      duplicateRows: number;
+      ignoredRows: number;
+    };
+  };
+  result: {
+    summary?: {
+      created: number;
+      updated: number;
+      skippedDuplicates: number;
+      errors: number;
+      ignored: number;
+      createdCategories: number;
+      processingTimeMs: number;
+    };
+    rows?: Array<{
+      sourceRowNumber: number;
+      status: string;
+      productId?: string;
+      code?: string;
+      message?: string;
+    }>;
+  };
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PortalAutomationActionMetricEvent = {
   id: string;
   clinicId: string;
@@ -3408,6 +3496,107 @@ export async function createPortalProductsBulk(
     },
     false
   );
+}
+
+export async function analyzePortalCatalogImport(
+  tenantId: string,
+  formData: FormData,
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(`/portal/tenants/${tenantId}/catalog-imports/analyze`, {
+    method: "POST",
+    headers,
+    body: formData
+  });
+}
+
+export async function getPortalCatalogImport(tenantId: string, importId: string) {
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(
+    `/portal/tenants/${tenantId}/catalog-imports/${importId}`
+  );
+}
+
+export async function confirmPortalCatalogImport(
+  tenantId: string,
+  importId: string,
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogImport & { idempotent?: boolean } }>(
+    `/portal/tenants/${tenantId}/catalog-imports/${importId}/confirm`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({})
+    }
+  );
+}
+
+export async function cancelPortalCatalogImport(
+  tenantId: string,
+  importId: string,
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(
+    `/portal/tenants/${tenantId}/catalog-imports/${importId}/cancel`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({})
+    }
+  );
+}
+
+export async function downloadPortalCatalogImportErrors(tenantId: string, importId: string) {
+  const apiBase = getApiBase();
+  const portalKey = getPortalInternalKey();
+  if (!apiBase) throw new Error("API base URL is not configured");
+  if (!portalKey) throw new Error("PORTAL_INTERNAL_KEY is not configured");
+
+  const response = await fetch(`${apiBase}/portal/tenants/${tenantId}/catalog-imports/${importId}/errors`, {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      "x-portal-key": portalKey
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `API request failed (${response.status})`);
+  }
+
+  return response.arrayBuffer();
+}
+
+export async function downloadPortalCatalogImportTemplate(tenantId: string) {
+  const apiBase = getApiBase();
+  const portalKey = getPortalInternalKey();
+  if (!apiBase) throw new Error("API base URL is not configured");
+  if (!portalKey) throw new Error("PORTAL_INTERNAL_KEY is not configured");
+
+  const response = await fetch(`${apiBase}/portal/tenants/${tenantId}/catalog-imports/template`, {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      "x-portal-key": portalKey
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `API request failed (${response.status})`);
+  }
+
+  return response.arrayBuffer();
 }
 
 export async function getDebugInbox(limit = 50) {

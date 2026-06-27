@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CatalogImportWizard } from "@/components/app/CatalogImportWizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1917,6 +1918,12 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               <Download className="mr-2 h-4 w-4" />
               Exportar Excel
             </Button>
+            <CatalogImportWizard
+              disabled={readOnly}
+              onImported={async () => {
+                await reloadProducts(selectedId);
+              }}
+            />
             <Button type="button" variant="secondary" size="sm" onClick={() => scrollToSection("catalog-categories")}>
               <FolderCog className="mr-2 h-4 w-4" />
               Configuración
