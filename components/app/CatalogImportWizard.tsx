@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type SelectHTMLAttributes } from "react";
 import { AlertTriangle, Download, FileSpreadsheet, LoaderCircle, Upload } from "lucide-react";
 import type { PortalCatalogImport } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,8 @@ const IMPORT_FIELDS = [
   { value: "currency", label: "Moneda" },
   { value: "imageUrl", label: "Imagen URL" }
 ];
+const SELECT_CLASS_NAME =
+  "h-11 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-3 text-sm text-slate-100 shadow-inner shadow-black/20 outline-none transition focus:border-amber-300/60 focus:ring-2 focus:ring-amber-300/25 [color-scheme:dark]";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -107,7 +109,14 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
     });
   }
 
-  async function runAnalyze(targetStep: Step = 4) {
+  async function runAnalyze(
+    targetStep: Step = 4,
+    overrides?: Partial<{
+      duplicatePolicy: "skip" | "update" | "cancel";
+      categoryPolicy: "reject_missing" | "create_missing";
+      importPolicy: "valid_only" | "fail_on_error";
+    }>
+  ) {
     if (!file) {
       setMessage({ tone: "warning", text: "Selecciona un archivo antes de analizar." });
       setStep(1);
@@ -115,11 +124,14 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
     }
 
     const formData = new FormData();
+    const nextDuplicatePolicy = overrides?.duplicatePolicy || duplicatePolicy;
+    const nextCategoryPolicy = overrides?.categoryPolicy || categoryPolicy;
+    const nextImportPolicy = overrides?.importPolicy || importPolicy;
     formData.append("file", file);
     formData.append("hasHeaders", String(hasHeaders));
-    formData.append("duplicatePolicy", duplicatePolicy);
-    formData.append("categoryPolicy", categoryPolicy);
-    formData.append("importPolicy", importPolicy);
+    formData.append("duplicatePolicy", nextDuplicatePolicy);
+    formData.append("categoryPolicy", nextCategoryPolicy);
+    formData.append("importPolicy", nextImportPolicy);
     if (sheetName) formData.append("sheetName", sheetName);
     if (delimiter) formData.append("delimiter", delimiter);
     formData.append("mapping", JSON.stringify(mapping));
@@ -142,6 +154,9 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
       setSheetName(nextImport?.config?.sheetName || "");
       setDelimiter(nextImport?.config?.delimiter || "");
       setHasHeaders(nextImport?.config?.hasHeaders !== false);
+      setDuplicatePolicy(nextImport?.config?.duplicatePolicy || nextDuplicatePolicy);
+      setCategoryPolicy(nextImport?.config?.categoryPolicy || nextCategoryPolicy);
+      setImportPolicy(nextImport?.config?.importPolicy || nextImportPolicy);
       setMapping(nextImport?.analysis?.mapping || {});
       setStep(targetStep);
       setMessage({
@@ -156,6 +171,14 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  async function handleCategoryPolicyChange(nextPolicy: "reject_missing" | "create_missing", targetStep: Step = 4) {
+    setCategoryPolicy(nextPolicy);
+    if (!importSession || !file || nextPolicy === categoryPolicy) {
+      return;
+    }
+    await runAnalyze(targetStep, { categoryPolicy: nextPolicy });
   }
 
   async function handleConfirm() {
@@ -341,32 +364,34 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                     </FieldBlock>
 
                     <FieldBlock label="Hoja (solo Excel)">
-                      <select
-                        value={sheetName}
-                        onChange={(event) => setSheetName(event.target.value)}
-                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
-                      >
+                      <DarkSelect value={sheetName} onChange={(event) => setSheetName(event.target.value)}>
                         <option value="">Primera hoja detectada</option>
                         {sheetOptions.map((sheet) => (
                           <option key={sheet.name} value={sheet.name}>
                             {sheet.name} · {sheet.rowCount} filas
                           </option>
                         ))}
-                      </select>
+                      </DarkSelect>
                     </FieldBlock>
 
                     <FieldBlock label="Delimitador (CSV/TXT)">
-                      <select
-                        value={delimiter}
-                        onChange={(event) => setDelimiter(event.target.value)}
-                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
-                      >
+                      <DarkSelect value={delimiter} onChange={(event) => setDelimiter(event.target.value)}>
                         <option value="">Detectar automáticamente</option>
                         <option value=";">Punto y coma (;)</option>
                         <option value=",">Coma (,)</option>
                         <option value={"	"}>Tabulación</option>
                         <option value="|">Barra vertical (|)</option>
-                      </select>
+                      </DarkSelect>
+                    </FieldBlock>
+
+                    <FieldBlock label="CategorÃ­as faltantes">
+                      <DarkSelect
+                        value={categoryPolicy}
+                        onChange={(event) => setCategoryPolicy(event.target.value as "reject_missing" | "create_missing")}
+                      >
+                        <option value="reject_missing">No crear y marcar error</option>
+                        <option value="create_missing">Crear categorÃ­as faltantes</option>
+                      </DarkSelect>
                     </FieldBlock>
                   </div>
                 </div>
@@ -408,17 +433,13 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                         <p className="text-sm font-medium text-white">{column.label}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">Columna {column.index + 1}</p>
                       </div>
-                      <select
-                        value={mapping[column.key] || ""}
-                        onChange={(event) => updateMapping(column.key, event.target.value)}
-                        className="h-11 rounded-2xl border border-white/10 bg-black/20 px-3 text-sm text-slate-100"
-                      >
+                      <DarkSelect value={mapping[column.key] || ""} onChange={(event) => updateMapping(column.key, event.target.value)}>
                         {IMPORT_FIELDS.map((field) => (
                           <option key={field.value || "none"} value={field.value}>
                             {field.label}
                           </option>
                         ))}
-                      </select>
+                      </DarkSelect>
                     </div>
                   ))}
                 </div>
@@ -438,6 +459,21 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                   <p className="mt-3 text-sm leading-6 text-slate-300">
                     Todavía no se modificó el catálogo. Esta vista previa ya usa tu mapeo, la política de duplicados y la política de categorías seleccionadas.
                   </p>
+                  <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                    <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-300">
+                      Si cambias esta polÃ­tica, recalculamos la vista previa con el mismo archivo antes de confirmar.
+                    </div>
+                    <FieldBlock label="CategorÃ­as faltantes">
+                      <DarkSelect
+                        value={categoryPolicy}
+                        disabled={analyzing}
+                        onChange={(event) => void handleCategoryPolicyChange(event.target.value as "reject_missing" | "create_missing", 4)}
+                      >
+                        <option value="reject_missing">No crear y marcar error</option>
+                        <option value="create_missing">Crear categorÃ­as faltantes</option>
+                      </DarkSelect>
+                    </FieldBlock>
+                  </div>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -493,37 +529,29 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
 
                   <div className="mt-5 grid gap-4">
                     <FieldBlock label="Duplicados">
-                      <select
-                        value={duplicatePolicy}
-                        onChange={(event) => setDuplicatePolicy(event.target.value as "skip" | "update" | "cancel")}
-                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
-                      >
+                      <DarkSelect value={duplicatePolicy} onChange={(event) => setDuplicatePolicy(event.target.value as "skip" | "update" | "cancel")}>
                         <option value="skip">Omitir duplicados</option>
                         <option value="update">Actualizar productos existentes</option>
                         <option value="cancel">Cancelar si hay duplicados</option>
-                      </select>
+                      </DarkSelect>
                     </FieldBlock>
 
                     <FieldBlock label="Categorías faltantes">
-                      <select
+                      <DarkSelect
                         value={categoryPolicy}
-                        onChange={(event) => setCategoryPolicy(event.target.value as "reject_missing" | "create_missing")}
-                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
+                        disabled={analyzing}
+                        onChange={(event) => void handleCategoryPolicyChange(event.target.value as "reject_missing" | "create_missing", 5)}
                       >
                         <option value="reject_missing">No crear y marcar error</option>
                         <option value="create_missing">Crear categorías faltantes</option>
-                      </select>
+                      </DarkSelect>
                     </FieldBlock>
 
                     <FieldBlock label="Errores de fila">
-                      <select
-                        value={importPolicy}
-                        onChange={(event) => setImportPolicy(event.target.value as "valid_only" | "fail_on_error")}
-                        className="h-11 w-full rounded-2xl border border-white/10 bg-black/10 px-3 text-sm text-slate-100"
-                      >
+                      <DarkSelect value={importPolicy} onChange={(event) => setImportPolicy(event.target.value as "valid_only" | "fail_on_error")}>
                         <option value="valid_only">Importar solo filas válidas</option>
                         <option value="fail_on_error">Cancelar toda la importación si hay errores</option>
-                      </select>
+                      </DarkSelect>
                     </FieldBlock>
                   </div>
                 </div>
@@ -629,6 +657,14 @@ function FieldBlock({ label, children }: { label: string; children: React.ReactN
       <p className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
       {children}
     </div>
+  );
+}
+
+function DarkSelect({ className = "", children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select {...props} className={`${SELECT_CLASS_NAME} ${className}`.trim()}>
+      {children}
+    </select>
   );
 }
 

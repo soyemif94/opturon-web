@@ -29,5 +29,10 @@ assert.match(templateRoute, /downloadPortalCatalogImportTemplate/);
 assert.match(wizard, /PreviewValue label="Precio" value=\{String\(row\.values\?\.price \?\? "-"\)\}/);
 assert.match(wizard, /Actualizar vista previa/);
 assert.match(wizard, /stats\?\.duplicateRows \? "warning" : "muted"/);
+assert.match(wizard, /handleCategoryPolicyChange/);
+assert.match(wizard, /create_missing/);
+assert.match(wizard, /Crear categor(?:Ã.|í)as faltantes/);
+assert.match(wizard, /\[color-scheme:dark\]/);
+assert.match(wizard, /runAnalyze\(targetStep, \{ categoryPolicy: nextPolicy \}\)/);
 
 console.log("catalog-import-ui.test.ts passed");
