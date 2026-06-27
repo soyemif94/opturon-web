@@ -26,5 +26,8 @@ assert.match(analyzeRoute, /analyzePortalCatalogImport/);
 assert.match(confirmRoute, /confirmPortalCatalogImport/);
 assert.match(errorsRoute, /downloadPortalCatalogImportErrors/);
 assert.match(templateRoute, /downloadPortalCatalogImportTemplate/);
+assert.match(wizard, /PreviewValue label="Precio" value=\{String\(row\.values\?\.price \?\? "-"\)\}/);
+assert.match(wizard, /Actualizar vista previa/);
+assert.match(wizard, /stats\?\.duplicateRows \? "warning" : "muted"/);
 
 console.log("catalog-import-ui.test.ts passed");
