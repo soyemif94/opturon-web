@@ -53,6 +53,7 @@ type ApplicationsResponse = {
   };
   duplicateWarnings?: string[];
   error?: string;
+  traceId?: string;
 };
 
 const STATUS_LABELS: Record<RecruitmentStatus, string> = {
@@ -102,6 +103,14 @@ function mapRecruitmentError(code?: string | null) {
     default:
       return "No pudimos completar la postulacion.";
   }
+}
+
+function formatRecruitmentError(payload?: ApplicationsResponse | null) {
+  const message = mapRecruitmentError(payload?.error);
+  if (message === "No pudimos completar la postulacion." && payload?.traceId) {
+    return `${message} Intenta nuevamente. Codigo de seguimiento: ${payload.traceId}`;
+  }
+  return message;
 }
 
 function initialForm() {
@@ -232,7 +241,7 @@ export function PartnerRecruitmentPanel() {
       const savePayload = await readJson(saveResponse);
       if (!saveResponse.ok) {
         setDuplicateWarnings(savePayload?.duplicateWarnings || savePayload?.data?.duplicateWarnings || []);
-        throw new Error(mapRecruitmentError(savePayload?.error));
+        throw new Error(formatRecruitmentError(savePayload));
       }
 
       const applicationId = savePayload?.data?.application?.id;
@@ -248,7 +257,7 @@ export function PartnerRecruitmentPanel() {
       const submitPayload = await readJson(submitResponse);
       if (!submitResponse.ok) {
         setDuplicateWarnings(submitPayload?.duplicateWarnings || submitPayload?.data?.duplicateWarnings || []);
-        throw new Error(mapRecruitmentError(submitPayload?.error));
+        throw new Error(formatRecruitmentError(submitPayload));
       }
 
       setOpen(false);
