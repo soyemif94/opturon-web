@@ -33,6 +33,8 @@ type RecruitmentApplication = {
   country?: string | null;
   notes?: string | null;
   adminNotes?: string | null;
+  invitationId?: string | null;
+  createdPartnerId?: string | null;
   createdAt?: string | null;
   submittedAt?: string | null;
   updatedAt?: string | null;
@@ -89,6 +91,14 @@ function mapRecruitmentError(code?: string | null) {
     case "partner_recruitment_phone_already_active":
     case "partner_recruitment_document_already_active":
       return "Ya existe una postulacion activa para esta persona.";
+    case "recruitment_duplicate_phone":
+      return "No se pudo enviar la invitacion porque el telefono coincide con una cuenta existente.";
+    case "recruitment_duplicate_email":
+      return "No se pudo enviar la invitacion porque el email coincide con una cuenta existente.";
+    case "recruitment_duplicate_document":
+      return "No se pudo enviar la invitacion porque el documento coincide con otra postulacion activa.";
+    case "recruitment_duplicate_invitation":
+      return "No se pudo enviar la invitacion porque ya existe una invitacion pendiente para esta persona.";
     case "partner_email_already_exists":
       return "Esta persona ya posee una cuenta de asesor.";
     case "partner_identity_invalid":
@@ -204,6 +214,36 @@ export function PartnerRecruitmentPanel() {
     setOpen(true);
     setMessage(null);
     setError(null);
+  }
+
+  function canReopenApproved(application: RecruitmentApplication) {
+    return application.status === "approved" && !application.invitationId && !application.createdPartnerId;
+  }
+
+  async function reopenForEdit(application: RecruitmentApplication) {
+    if (busy) return;
+    const confirmed = window.confirm("Al modificar una postulacion aprobada, volvera a revision de Administracion.");
+    if (!confirmed) return;
+    setBusy(application.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `/api/partners/me/recruitment-applications/${encodeURIComponent(application.id)}/reopen-for-edit`,
+        {
+          method: "POST",
+          cache: "no-store"
+        }
+      );
+      const payload = await readJson(response);
+      if (!response.ok || !payload?.data?.application) throw new Error(formatRecruitmentError(payload));
+      openEditForm(payload.data.application);
+      await loadApplications();
+    } catch (reopenError) {
+      setError(reopenError instanceof Error ? reopenError.message : "No pudimos reabrir la postulacion.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function saveAndSubmit(event: React.FormEvent) {
@@ -373,6 +413,7 @@ export function PartnerRecruitmentPanel() {
             <div className="grid gap-3">
               {activeApplications.map((application) => {
                 const canEdit = application.status === "draft" || application.status === "changes_requested";
+                const canCorrectApproved = canReopenApproved(application);
                 const canCancel = application.status === "draft" || application.status === "changes_requested" || application.status === "pending_review";
                 return (
                   <div key={application.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
@@ -393,6 +434,11 @@ export function PartnerRecruitmentPanel() {
                     {application.adminNotes ? (
                       <div className="mt-4 rounded-[18px] border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
                         Observacion admin: {application.adminNotes}
+                      </div>
+                    ) : null}
+                    {canCorrectApproved ? (
+                      <div className="mt-4 rounded-[18px] border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm text-sky-100">
+                        Aprobada. Pendiente de envio de invitacion. Si necesitas corregir datos, volvera a revision administrativa.
                       </div>
                     ) : null}
                     {application.createdPartner?.displayName || application.createdPartner?.email ? (
@@ -416,7 +462,12 @@ export function PartnerRecruitmentPanel() {
                           {busy === application.id ? "Cancelando..." : "Cancelar"}
                         </Button>
                       ) : null}
-                      {!canEdit && !canCancel ? (
+                      {canCorrectApproved ? (
+                        <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => void reopenForEdit(application)} disabled={busy === application.id}>
+                          {busy === application.id ? "Reabriendo..." : "Corregir datos"}
+                        </Button>
+                      ) : null}
+                      {!canEdit && !canCancel && !canCorrectApproved ? (
                         <span className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300">
                           <BadgeCheck className="h-4 w-4" />
                           Solo lectura

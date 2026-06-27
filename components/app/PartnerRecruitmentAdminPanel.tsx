@@ -63,11 +63,16 @@ type RecruitmentResponse = {
   detail?: string;
 };
 
+function canRequestCorrectionFromApproved(application: RecruitmentApplication | null) {
+  return Boolean(application && application.status === "approved" && !application.invitationId && !application.createdPartnerId);
+}
+
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos los estados" },
   { value: "pending_review", label: "Pendiente de revision" },
   { value: "changes_requested", label: "Correccion solicitada" },
   { value: "approved", label: "Aprobada" },
+  { value: "approved_pending_invitation", label: "Aprobadas pendientes de invitacion" },
   { value: "invitation_sent", label: "Invitacion enviada" },
   { value: "invitation_accepted", label: "Incorporado" },
   { value: "rejected", label: "Rechazada" },
@@ -110,6 +115,14 @@ function mapError(payload: RecruitmentResponse | null, fallback = "No pudimos ca
       return "No puedes enviar invitacion antes de aprobar la postulacion.";
     case "invalid_partner_recruitment_transition":
       return "La postulacion cambio de estado. Actualiza la bandeja.";
+    case "recruitment_duplicate_phone":
+      return "No se pudo enviar la invitacion porque el telefono coincide con una cuenta existente. Solicita una correccion al asesor.";
+    case "recruitment_duplicate_email":
+      return "No se pudo enviar la invitacion porque el email coincide con una cuenta existente. Solicita una correccion al asesor.";
+    case "recruitment_duplicate_document":
+      return "No se pudo enviar la invitacion porque el documento coincide con otra postulacion activa. Solicita una correccion al asesor.";
+    case "recruitment_duplicate_invitation":
+      return "No se pudo enviar la invitacion porque ya existe una invitacion pendiente para esta persona.";
     default:
       return code || fallback;
   }
@@ -141,7 +154,7 @@ export function PartnerRecruitmentAdminPanel({ panelClass, toolbarFieldClass }: 
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (status !== "all") params.set("status", status);
+      if (status !== "all" && status !== "approved_pending_invitation") params.set("status", status);
       if (search.trim()) params.set("search", search.trim());
       const response = await fetch(`/api/app/admin/partners/recruitment-applications?${params.toString()}`, {
         cache: "no-store",
@@ -149,7 +162,10 @@ export function PartnerRecruitmentAdminPanel({ panelClass, toolbarFieldClass }: 
       });
       const payload = await readJson(response);
       if (!response.ok) throw new Error(mapError(payload));
-      const next = Array.isArray(payload?.data?.applications) ? payload.data?.applications || [] : [];
+      let next = Array.isArray(payload?.data?.applications) ? payload.data?.applications || [] : [];
+      if (status === "approved_pending_invitation") {
+        next = next.filter((item) => item.status === "approved" && !item.invitationId && !item.createdPartnerId);
+      }
       setItems(next);
       if (selected) {
         const refreshed = next.find((item) => item.id === selected.id) || null;
@@ -302,6 +318,11 @@ export function PartnerRecruitmentAdminPanel({ panelClass, toolbarFieldClass }: 
                 <InfoRow label="Asesor creado" value={selected.createdPartner?.displayName || selected.createdPartner?.email || "Todavia no creado"} />
                 <InfoRow label="Aceptacion" value={formatDateTime(selected.acceptedAt)} />
               </div>
+              {canRequestCorrectionFromApproved(selected) ? (
+                <div className="rounded-2xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm text-sky-100">
+                  Aprobada pendiente de invitacion. Si detectas un conflicto corregible, solicita correccion para volver a revision sin crear otra postulacion.
+                </div>
+              ) : null}
               {duplicateWarnings.length > 0 ? (
                 <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
                   {duplicateWarnings.join(" ")}
@@ -321,7 +342,7 @@ export function PartnerRecruitmentAdminPanel({ panelClass, toolbarFieldClass }: 
                 <Button type="button" className="rounded-2xl" onClick={() => void review(selected.id, "approve")} disabled={busyId === selected.id || selected.status !== "pending_review"}>
                   Aprobar postulacion
                 </Button>
-                <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => void review(selected.id, "request-changes")} disabled={busyId === selected.id || selected.status !== "pending_review" || !reason.trim()}>
+                <Button type="button" variant="secondary" className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10" onClick={() => void review(selected.id, "request-changes")} disabled={busyId === selected.id || (!reason.trim()) || !(selected.status === "pending_review" || canRequestCorrectionFromApproved(selected))}>
                   Solicitar correccion
                 </Button>
                 <Button type="button" variant="destructive" className="rounded-2xl" onClick={() => void review(selected.id, "reject")} disabled={busyId === selected.id || (selected.status !== "pending_review" && selected.status !== "approved") || !reason.trim()}>

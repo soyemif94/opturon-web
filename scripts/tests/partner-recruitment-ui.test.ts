@@ -12,6 +12,7 @@ function testPartnerProxyRoutesExist() {
   assert.match(read("app/api/partners/me/recruitment-applications/route.ts"), /requirePartnerApi/);
   assert.match(read("app/api/partners/me/recruitment-applications\/route.ts"), /partner_sponsor_browser_override_forbidden/);
   assert.match(read("app/api/partners/me/recruitment-applications/[applicationId]/route.ts"), /requirePartnerApi/);
+  assert.match(read("app/api/partners/me/recruitment-applications/[applicationId]/reopen-for-edit/route.ts"), /reopen-for-edit/);
   assert.match(read("app/api/partners/me/recruitment-applications/[applicationId]/submit/route.ts"), /\/submit/);
   assert.match(read("app/api/partners/me/recruitment-applications/[applicationId]/cancel/route.ts"), /\/cancel/);
   assert.match(read("lib/partner-recruitment-applications-api.ts"), /x-partner-id/);
