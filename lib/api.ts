@@ -1920,6 +1920,7 @@ export type PortalCatalogImport = {
       errorRows: number;
       duplicateRows: number;
       ignoredRows: number;
+      newCategories?: number;
     };
   };
   result: {
