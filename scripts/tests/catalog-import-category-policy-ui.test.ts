@@ -9,12 +9,15 @@ function read(relativePath: string) {
 const wizard = read("components/app/CatalogImportWizard.tsx");
 const apiTypes = read("lib/api.ts");
 
-assert.match(wizard, /useState<"reject_missing" \| "create_missing">\("reject_missing"\)/);
+assert.match(wizard, /useState<"reject_missing" \| "create_missing">\("create_missing"\)/);
+assert.match(wizard, /function CategoryRecommendationCard/);
 assert.match(wizard, /function CategoryPolicyPanel/);
 assert.match(wizard, /Categorías inexistentes/);
 assert.match(wizard, /Marcarlas como error/);
 assert.match(wizard, /Crearlas al confirmar/);
 assert.match(wizard, /La categoría se mostrará en la vista previa, pero recién se creará cuando confirmes la importación\./);
+assert.match(wizard, /Cambiar configuración/);
+assert.match(wizard, /Crear categorías automáticamente/);
 assert.match(wizard, /formData\.append\("categoryPolicy", nextCategoryPolicy\)/);
 assert.match(wizard, /runAnalyze\(targetStep, \{ categoryPolicy: nextPolicy \}\)/);
 assert.match(wizard, /categoryPendingCreation/);

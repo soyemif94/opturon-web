@@ -16,8 +16,9 @@ const apiTypes = read("lib/api.ts");
 
 assert.match(manager, /CatalogImportWizard/);
 assert.match(wizard, /Importar productos/);
-assert.match(wizard, /Todavía no se modificó el catálogo|Todavia no se modifico el catalogo/);
+assert.match(wizard, /Subí tu archivo y Opturon preparará los productos por vos/);
 assert.match(wizard, /STEP_LABELS = \["Archivo", "Hoja y formato", "Mapeo", "Vista previa", "Confirmación", "Resultado"\]/);
+assert.match(wizard, /GUIDED_STAGE_LABELS = \["Subir archivo", "Revisar productos", "Confirmar importación"\]/);
 assert.match(wizard, /Descargar plantilla/);
 assert.match(wizard, /Descargar errores/);
 assert.match(wizard, /Confirmar importación|Confirmar importacion/);
@@ -35,11 +36,11 @@ assert.match(confirmRoute, /confirmPortalCatalogImport/);
 assert.match(errorsRoute, /downloadPortalCatalogImportErrors/);
 assert.match(templateRoute, /downloadPortalCatalogImportTemplate/);
 assert.match(wizard, /PreviewValue label="Precio" value=\{String\(row\.values\?\.price \?\? "-"\)\}/);
-assert.match(wizard, /Actualizar vista previa/);
+assert.match(wizard, /Revisar productos/);
 assert.match(wizard, /stats\?\.duplicateRows \? "warning" : "muted"/);
 assert.match(wizard, /handleCategoryPolicyChange/);
 assert.match(wizard, /create_missing/);
-assert.match(wizard, /Crear categor(?:Ã.|í)as faltantes/);
+assert.match(wizard, /Crear categorías automáticamente/);
 assert.match(wizard, /\[color-scheme:dark\]/);
 assert.match(wizard, /runAnalyze\(targetStep, \{ categoryPolicy: nextPolicy \}\)/);
 

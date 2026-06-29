@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
 const STEP_LABELS = ["Archivo", "Hoja y formato", "Mapeo", "Vista previa", "Confirmación", "Resultado"] as const;
+const GUIDED_STAGE_LABELS = ["Subir archivo", "Revisar productos", "Confirmar importación"] as const;
 const IMPORT_FIELDS = [
   { value: "", label: "No importar" },
   { value: "name", label: "Nombre" },
@@ -49,10 +50,13 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
   const [delimiter, setDelimiter] = useState("");
   const [hasHeaders, setHasHeaders] = useState(true);
   const [duplicatePolicy, setDuplicatePolicy] = useState<"skip" | "update" | "cancel">("skip");
-  const [categoryPolicy, setCategoryPolicy] = useState<"reject_missing" | "create_missing">("reject_missing");
+  const [categoryPolicy, setCategoryPolicy] = useState<"reject_missing" | "create_missing">("create_missing");
   const [importPolicy, setImportPolicy] = useState<"valid_only" | "fail_on_error">("valid_only");
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
   const [importSession, setImportSession] = useState<PortalCatalogImport | null>(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showColumnMapping, setShowColumnMapping] = useState(false);
+  const [showCategoryPolicyOptions, setShowCategoryPolicyOptions] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
@@ -64,6 +68,13 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
   const resultSummary = importSession?.result?.summary;
   const resultRows = importSession?.result?.rows || [];
   const sheetOptions = importSession?.config?.sheets || [];
+  const mappedColumns = columns.filter((column) => mapping[column.key]);
+  const reviewColumns = columns.filter((column) => !mapping[column.key]);
+  const columnExamples = mappedColumns.slice(0, 4);
+  const guidedStage = getGuidedStage(step);
+  const readyRowsLabel = stats?.errorRows
+    ? `${stats.validRows || 0} listos y ${stats.errorRows || 0} con problemas`
+    : `${stats?.totalRows || previewRows.length || 0} productos encontrados`;
   const previewStatusCount = useMemo(() => {
     return previewRows.reduce(
       (accumulator, row) => {
@@ -81,10 +92,13 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
     setDelimiter("");
     setHasHeaders(true);
     setDuplicatePolicy("skip");
-    setCategoryPolicy("reject_missing");
+    setCategoryPolicy("create_missing");
     setImportPolicy("valid_only");
     setMapping({});
     setImportSession(null);
+    setShowAdvancedOptions(false);
+    setShowColumnMapping(false);
+    setShowCategoryPolicyOptions(false);
     setAnalyzing(false);
     setConfirming(false);
     setMessage(null);
@@ -139,7 +153,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
     formData.append("mapping", JSON.stringify(mapping));
 
     setAnalyzing(true);
-    setMessage({ tone: "info", text: "Todavía no se modificó el catálogo. Estamos analizando el archivo." });
+    setMessage({ tone: "info", text: "Estamos preparando tus productos. Todavía no se guardará nada." });
 
     try {
       const response = await fetch("/api/app/catalog/imports/analyze", {
@@ -161,9 +175,12 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
       setImportPolicy(nextImport?.config?.importPolicy || nextImportPolicy);
       setMapping(nextImport?.analysis?.mapping || {});
       setStep(targetStep);
+      const nextStats = nextImport?.analysis?.stats;
       setMessage({
         tone: "info",
-        text: "Análisis listo. Todavía no se modificó el catálogo."
+        text: nextStats?.errorRows
+          ? `✓ Tu archivo está listo: ${nextStats.validRows || 0} productos listos y ${nextStats.errorRows || 0} necesitan revisión.`
+          : `✓ Tu archivo está listo: encontramos ${nextStats?.totalRows || 0} productos. Todavía no hicimos ningún cambio.`
       });
     } catch (error) {
       setMessage({
@@ -253,36 +270,33 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(15,24,38,0.98),rgba(8,14,24,0.98))] p-0">
           <div className="border-b border-white/10 px-6 py-5">
             <DialogHeader>
-              <DialogTitle className="text-xl text-white">Importación masiva de catálogo</DialogTitle>
+              <DialogTitle className="text-xl text-white">Importar productos</DialogTitle>
               <DialogDescription className="text-sm text-slate-300">
-                Subimos archivo, analizamos, mostramos vista previa y recién después confirmas. No escribimos nada en el catálogo hasta el último paso.
+                Subí tu archivo y Opturon preparará los productos por vos. Nada se guardará hasta que confirmes.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="mt-4 grid gap-2 md:grid-cols-6">
-              {STEP_LABELS.map((label, index) => {
-                const stepNumber = (index + 1) as Step;
-                const active = step === stepNumber;
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
+              {GUIDED_STAGE_LABELS.map((label, index) => {
+                const stageNumber = index + 1;
+                const active = guidedStage === stageNumber;
                 const enabled =
-                  stepNumber === 1 ||
-                  (stepNumber === 2 && file) ||
-                  (stepNumber === 3 && importSession) ||
-                  (stepNumber === 4 && importSession) ||
-                  (stepNumber === 5 && importSession) ||
-                  (stepNumber === 6 && importSession?.result?.summary);
+                  stageNumber === 1 ||
+                  (stageNumber === 2 && importSession) ||
+                  (stageNumber === 3 && importSession);
                 return (
                   <button
                     key={label}
                     type="button"
                     disabled={!enabled}
-                    onClick={() => enabled && setStep(stepNumber)}
+                    onClick={() => enabled && setStep(stageNumber === 1 ? (file ? 2 : 1) : stageNumber === 2 ? 4 : 5)}
                     className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
                       active
                         ? "border-amber-400/40 bg-amber-400/12 text-white"
                         : "border-white/10 bg-white/[0.03] text-slate-300"
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Paso {stepNumber}</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Etapa {stageNumber}</p>
                     <p className="mt-1 text-sm font-medium">{label}</p>
                   </button>
                 );
@@ -346,62 +360,63 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
             {step === 2 ? (
               <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-                  <p className="text-sm font-semibold text-white">2. Hoja y formato</p>
+                  <p className="text-sm font-semibold text-white">Archivo seleccionado</p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
-                    Puedes elegir hoja, indicar si la primera fila trae encabezados y forzar delimitador si tu CSV o TXT vino raro.
+                    Opturon usará la configuración recomendada. Si tu archivo tiene algo especial, podés abrir las opciones avanzadas.
                   </p>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <FieldBlock label="Archivo actual">
-                      <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-200">
-                        {file?.name || "Sin archivo"}
-                      </div>
-                    </FieldBlock>
-
-                    <FieldBlock label="Primera fila con encabezados">
-                      <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-200">
-                        <input type="checkbox" checked={hasHeaders} onChange={(event) => setHasHeaders(event.target.checked)} />
-                        Detectar encabezados en la primera fila
-                      </label>
-                    </FieldBlock>
-
-                    <FieldBlock label="Hoja (solo Excel)">
-                      <DarkSelect value={sheetName} onChange={(event) => setSheetName(event.target.value)}>
-                        <DarkOption value="">Primera hoja detectada</DarkOption>
-                        {sheetOptions.map((sheet) => (
-                          <DarkOption key={sheet.name} value={sheet.name}>
-                            {sheet.name} · {sheet.rowCount} filas
-                          </DarkOption>
-                        ))}
-                      </DarkSelect>
-                    </FieldBlock>
-
-                    <FieldBlock label="Delimitador (CSV/TXT)">
-                      <DarkSelect value={delimiter} onChange={(event) => setDelimiter(event.target.value)}>
-                        <DarkOption value="">Detectar automáticamente</DarkOption>
-                        <DarkOption value=";">Punto y coma (;)</DarkOption>
-                        <DarkOption value=",">Coma (,)</DarkOption>
-                        <DarkOption value={"	"}>Tabulación</DarkOption>
-                        <DarkOption value="|">Barra vertical (|)</DarkOption>
-                      </DarkSelect>
-                    </FieldBlock>
-
-                    <div className="md:col-span-2">
-                      <CategoryPolicyPanel value={categoryPolicy} onChange={setCategoryPolicy} />
+                  <div className="mt-5 space-y-4">
+                    <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-200">
+                      {file?.name || "Sin archivo"}
                     </div>
+
+                    <CategoryRecommendationCard
+                      value={categoryPolicy}
+                      expanded={showCategoryPolicyOptions}
+                      onToggle={() => setShowCategoryPolicyOptions((current) => !current)}
+                      onChange={setCategoryPolicy}
+                    />
+
+                    <AdvancedOptionsShell expanded={showAdvancedOptions} onToggle={() => setShowAdvancedOptions((current) => !current)}>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <FieldBlock label="Primera fila con encabezados">
+                          <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-200">
+                            <input type="checkbox" checked={hasHeaders} onChange={(event) => setHasHeaders(event.target.checked)} />
+                            Detectar encabezados automáticamente
+                          </label>
+                        </FieldBlock>
+
+                        <FieldBlock label="Hoja (solo Excel)">
+                          <DarkSelect value={sheetName} onChange={(event) => setSheetName(event.target.value)}>
+                            <DarkOption value="">Primera hoja detectada</DarkOption>
+                            {sheetOptions.map((sheet) => (
+                              <DarkOption key={sheet.name} value={sheet.name}>
+                                {sheet.name} · {sheet.rowCount} filas
+                              </DarkOption>
+                            ))}
+                          </DarkSelect>
+                        </FieldBlock>
+
+                        <FieldBlock label="Delimitador (CSV/TXT)">
+                          <DarkSelect value={delimiter} onChange={(event) => setDelimiter(event.target.value)}>
+                            <DarkOption value="">Detectar automáticamente</DarkOption>
+                            <DarkOption value=";">Punto y coma (;)</DarkOption>
+                            <DarkOption value=",">Coma (,)</DarkOption>
+                            <DarkOption value={"	"}>Tabulación</DarkOption>
+                            <DarkOption value="|">Barra vertical (|)</DarkOption>
+                          </DarkSelect>
+                        </FieldBlock>
+                      </div>
+                    </AdvancedOptionsShell>
                   </div>
                 </div>
 
                 <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(255,255,255,0.03))] p-5">
-                  <p className="text-sm font-semibold text-white">Antes de analizar</p>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-                    <li>Rechazamos archivos corruptos o sin estructura tabular.</li>
-                    <li>No ejecutamos fórmulas de Excel.</li>
-                    <li>No guardamos el archivo en una carpeta pública.</li>
-                  </ul>
+                  <p className="text-sm font-semibold text-white">Todo listo para preparar</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">Vamos a detectar columnas, productos y posibles problemas. Todavía no se guarda nada.</p>
                   <Button type="button" className="mt-6 w-full rounded-2xl" onClick={() => void runAnalyze(3)} disabled={!file || analyzing}>
                     {analyzing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                    Analizar archivo
+                    Preparar productos
                   </Button>
                 </div>
               </section>
@@ -411,24 +426,68 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
               <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-white">3. Mapeo manual</p>
+                    <p className="text-sm font-semibold text-white">Columnas del archivo</p>
                     <p className="mt-2 text-sm leading-6 text-slate-300">
-                      Sugerimos columnas por alias, pero tú decides qué entra y qué queda fuera.
+                      Opturon reconoció lo importante. Revisá sólo lo que necesite atención.
                     </p>
                   </div>
                   <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => void runAnalyze(4)} disabled={analyzing}>
                     {analyzing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Actualizar vista previa
+                    Revisar productos
                   </Button>
                 </div>
 
-                <div className="mt-5">
-                  <CategoryPolicyPanel value={categoryPolicy} disabled={analyzing} onChange={(nextPolicy) => void handleCategoryPolicyChange(nextPolicy, 3)} />
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+                  <div className="rounded-[24px] border border-emerald-300/20 bg-emerald-300/10 p-4">
+                    <Badge variant={reviewColumns.length ? "warning" : "success"}>
+                      {reviewColumns.length ? "Hay columnas para revisar" : "Todo fue reconocido correctamente"}
+                    </Badge>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <SummaryLine label="Columnas reconocidas" value={String(mappedColumns.length)} />
+                      <SummaryLine label="Necesitan revisión" value={String(reviewColumns.length)} />
+                    </div>
+                    {columnExamples.length ? (
+                      <div className="mt-4 grid gap-2 text-sm text-slate-200">
+                        {columnExamples.map((column) => (
+                          <div key={column.key} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-3 py-2">
+                            <span>{column.label}</span>
+                            <span className="font-medium text-white">→ {labelForImportField(mapping[column.key])}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className={`rounded-[24px] border p-4 ${reviewColumns.length ? "border-amber-300/25 bg-amber-300/10" : "border-white/10 bg-black/10"}`}>
+                    {reviewColumns.length ? (
+                      <>
+                        <Badge variant="warning">Necesitamos revisar {reviewColumns.length} columna(s)</Badge>
+                        <div className="mt-3 space-y-2 text-sm text-amber-100">
+                          {reviewColumns.slice(0, 3).map((column) => (
+                            <p key={column.key}>“{column.label}” todavía no tiene un destino.</p>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="success">Sin problemas</Badge>
+                        <p className="mt-3 text-sm leading-6 text-slate-300">Podés continuar sin revisar columnas manualmente.</p>
+                      </>
+                    )}
+                    <Button type="button" variant="secondary" className="mt-4 w-full rounded-2xl" onClick={() => setShowColumnMapping((current) => !current)}>
+                      {showColumnMapping ? "Ocultar columnas" : "Revisar columnas"}
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="mt-5 space-y-3">
+                {showColumnMapping || reviewColumns.length ? <div className="mt-5 space-y-3">
                   {columns.map((column) => (
-                    <div key={column.key} className="grid gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 md:grid-cols-[1fr_0.95fr]">
+                    <div
+                      key={column.key}
+                      className={`grid gap-3 rounded-2xl border p-4 md:grid-cols-[1fr_0.95fr] ${
+                        mapping[column.key] ? "border-white/10 bg-black/10" : "border-amber-300/25 bg-amber-300/10"
+                      }`}
+                    >
                       <div>
                         <p className="text-sm font-medium text-white">{column.label}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">Columna {column.index + 1}</p>
@@ -442,13 +501,18 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                       </DarkSelect>
                     </div>
                   ))}
-                </div>
+                </div> : null}
               </section>
             ) : null}
 
             {step === 4 ? (
               <section className="space-y-5">
                 <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                  <div className="mb-4 rounded-[24px] border border-emerald-300/20 bg-emerald-300/10 p-4">
+                    <Badge variant="success">✓ Tu archivo está listo</Badge>
+                    <p className="mt-3 text-2xl font-semibold text-white">{readyRowsLabel}</p>
+                    <p className="mt-1 text-sm text-slate-300">Todavía no hicimos ningún cambio.</p>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="muted">{stats?.totalRows || 0} filas detectadas</Badge>
                     <Badge variant="success">{stats?.validRows || 0} válidas</Badge>
@@ -458,7 +522,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                     <Badge variant={stats?.newCategories ? "warning" : "muted"}>Categorías nuevas: {stats?.newCategories || 0}</Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-300">
-                    Todavía no se modificó el catálogo. Esta vista previa ya usa tu mapeo, la política de duplicados y la política de categorías seleccionadas.
+                    Mostramos primero los productos que necesitan revisión. La configuración recomendada ya está aplicada.
                   </p>
                   <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                     <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-slate-300">
@@ -479,7 +543,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
 
                 <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                   <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-                    <p className="text-sm font-semibold text-white">Primeras filas normalizadas</p>
+                    <p className="text-sm font-semibold text-white">Productos revisados</p>
                     <div className="mt-4 space-y-3">
                       {previewRows.map((row) => (
                         <div key={`${row.sourceRowNumber}-${row.status}`} className="rounded-2xl border border-white/10 bg-black/10 p-4">
@@ -626,7 +690,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
             ) : null}
           </div>
 
-          <DialogFooter className="border-t border-white/10 px-6 py-4">
+          <DialogFooter className="sticky bottom-0 z-20 border-t border-white/10 bg-slate-950/95 px-6 py-4 backdrop-blur">
             {step > 1 && step < 6 ? (
               <Button type="button" variant="secondary" onClick={() => setStep((Math.max(1, step - 1) as Step))}>
                 Volver
@@ -642,13 +706,14 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
               {step === 6 ? "Cerrar" : "Cancelar"}
             </Button>
             {step === 3 ? (
-              <Button type="button" onClick={() => setStep(4)}>
-                Seguir a vista previa
+              <Button type="button" onClick={() => void runAnalyze(4)} disabled={analyzing}>
+                {analyzing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {stats?.errorRows ? `Revisar ${stats.errorRows} productos con problemas` : `Revisar ${stats?.totalRows || previewRows.length || "los"} productos`}
               </Button>
             ) : null}
             {step === 4 ? (
               <Button type="button" onClick={() => setStep(5)}>
-                Seguir a confirmación
+                Continuar con {stats?.validRows || 0} productos
               </Button>
             ) : null}
             {step === 6 ? (
@@ -685,6 +750,77 @@ function DarkOption({ children, ...props }: OptionHTMLAttributes<HTMLOptionEleme
     <option {...props} className={`${SELECT_OPTION_CLASS_NAME} ${props.className || ""}`.trim()}>
       {children}
     </option>
+  );
+}
+
+function AdvancedOptionsShell({
+  expanded,
+  onToggle,
+  children
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-black/10 p-4">
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-300/30"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        Opciones avanzadas
+        <span className="text-xs uppercase tracking-[0.16em] text-slate-400">{expanded ? "Ocultar" : "Mostrar"}</span>
+      </button>
+      {expanded ? <div className="mt-4">{children}</div> : null}
+    </div>
+  );
+}
+
+function CategoryRecommendationCard({
+  value,
+  expanded,
+  onToggle,
+  onChange
+}: {
+  value: "reject_missing" | "create_missing";
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: (value: "reject_missing" | "create_missing") => void;
+}) {
+  return (
+    <div className="rounded-[24px] border border-emerald-300/20 bg-emerald-300/10 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-emerald-100">Categorías nuevas</p>
+          <Badge variant="success" className="mt-3">✓ Recomendado</Badge>
+          <p className="mt-3 text-base font-semibold text-white">Crear las categorías automáticamente</p>
+          <p className="mt-1 text-sm text-emerald-50/80">Las crearemos recién cuando confirmes.</p>
+        </div>
+        <Button type="button" variant="secondary" size="sm" className="rounded-2xl" onClick={onToggle} aria-expanded={expanded}>
+          Cambiar configuración
+        </Button>
+      </div>
+      {expanded ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <CategoryPolicyOption
+            checked={value === "create_missing"}
+            disabled={false}
+            label="Crear categorías automáticamente"
+            description="Recomendado para importar productos nuevos sin detenerte."
+            onChange={() => onChange("create_missing")}
+          />
+          <CategoryPolicyOption
+            checked={value === "reject_missing"}
+            disabled={false}
+            label="No crear categorías nuevas"
+            description="Los productos con categorías nuevas quedarán para revisar."
+            onChange={() => onChange("reject_missing")}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -780,6 +916,16 @@ function badgeForPreviewStatus(status: string) {
   if (status === "warning" || status === "duplicated") return "warning";
   if (status === "ignored") return "muted";
   return "danger";
+}
+
+function getGuidedStage(step: Step) {
+  if (step <= 2) return 1;
+  if (step <= 4) return 2;
+  return 3;
+}
+
+function labelForImportField(value: string | null | undefined) {
+  return IMPORT_FIELDS.find((field) => field.value === value)?.label || "No importar";
 }
 
 function labelForPreviewStatus(status: string) {
