@@ -22,6 +22,7 @@ const IMPORT_FIELDS = [
   { value: "name", label: "Nombre" },
   { value: "description", label: "Descripción" },
   { value: "categoryName", label: "Categoría" },
+  { value: "brand", label: "Marca" },
   { value: "price", label: "Precio" },
   { value: "stock", label: "Stock" },
   { value: "sku", label: "SKU" },
@@ -492,6 +493,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                             <PreviewValue label="Precio" value={String(row.values?.price ?? "-")} />
                             <PreviewValue label="Stock" value={String(row.values?.stock ?? "-")} />
                             <PreviewValue label="Categoría" value={String(row.values?.categoryName || "Sin categoría")} />
+                            <PreviewValue label="Marca" value={String(row.values?.brand || "-")} />
                             <PreviewValue label="Estado" value={String(row.values?.status || "active")} />
                           </div>
                           {row.values?.categoryPendingCreation ? (

@@ -43,6 +43,7 @@ type Product = {
   active?: boolean;
   categoryId?: string | null;
   categoryName?: string | null;
+  brand?: string | null;
   subcategory?: string | null;
   attributes?: Array<{ name: string; options: string[] }>;
   image?: {
@@ -83,6 +84,7 @@ type Draft = {
   stock: string;
   currency: string;
   categoryId: string;
+  brand: string;
   subcategory: string;
   imageUrl: string;
   imageAlt: string;
@@ -141,6 +143,7 @@ const EMPTY_DRAFT: Draft = {
   stock: "0",
   currency: "ARS",
   categoryId: "",
+  brand: "",
   subcategory: "",
   imageUrl: "",
   imageAlt: "",
@@ -326,6 +329,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       stock: product ? String(resolveStock(product)) : "0",
       currency: product?.currency || "ARS",
       categoryId: product?.categoryId || "",
+      brand: product?.brand || "",
       subcategory: product?.subcategory || "",
       imageUrl: product?.image?.url || "",
       imageAlt: product?.image?.alt || "",
@@ -378,6 +382,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         escapeCsvValue(product.name),
         escapeCsvValue(product.sku || ""),
         escapeCsvValue(product.categoryName || ""),
+        escapeCsvValue(product.brand || ""),
         escapeCsvValue(product.subcategory || ""),
         escapeCsvValue(resolveStatus(product) === "active" ? "Activo" : "Archivado"),
         escapeCsvValue(String(resolveStock(product))),
@@ -387,7 +392,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     });
 
     const csv = [
-      "Nombre;SKU;Categoria;Subcategoria;Estado;Stock;Precio;Vencimiento",
+      "Nombre;SKU;Categoria;Marca;Subcategoria;Estado;Stock;Precio;Vencimiento",
       ...rows
     ].join("\n");
 
@@ -523,6 +528,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           stock,
           currency: draft.currency.trim() || "ARS",
           categoryId: draft.categoryId || null,
+          brand: draft.brand.trim() || null,
           subcategory: draft.subcategory.trim() || null,
           image,
           expirationDate: draft.expirationDate || null,
@@ -1190,6 +1196,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                                 <p className="text-sm text-muted">{product.sku || "Sin SKU"}</p>
                                 <div className="flex flex-wrap gap-2">
                                   {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
+                                  {product.brand ? <Badge variant="warning">{product.brand}</Badge> : null}
                                   {product.subcategory ? <Badge variant="outline">{product.subcategory}</Badge> : null}
                                   <Badge variant={getStockState(resolveStock(product)).variant}>{resolveStock(product)} en stock</Badge>
                                   <Badge variant={getExpirationBadgePresentation(product.expirationDate).variant}>
@@ -1218,6 +1225,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                             <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
                               <span>{product.sku || "Sin SKU"}</span>
                               <span>Stock {resolveStock(product)} unidades</span>
+                              {product.brand ? <span>Marca {product.brand}</span> : null}
                               <span>Vence {formatExpirationDate(product.expirationDate)}</span>
                               <span>{getExpirationBadgePresentation(product.expirationDate).helper}</span>
                               {product.attributes?.length ? <span>{formatAttributesText(product.attributes)}</span> : null}
@@ -1654,6 +1662,15 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-sm font-medium">Marca</label>
+                  <Input
+                    value={draft.brand}
+                    onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))}
+                    placeholder="Ej. NovaTech"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className="space-y-2">
                   <label className="text-sm font-medium">Texto alternativo</label>
                   <Input
                     value={draft.imageAlt}
@@ -1884,6 +1901,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <DetailStat label="Precio final" value={formatCurrency(getProductPricing(selectedProduct).finalPrice, selectedProduct.currency || "ARS")} />
                   <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                   <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
+                  <DetailStat label="Marca" value={selectedProduct.brand || "Sin marca"} />
                   <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
                 </div>
                 {!readOnly ? (

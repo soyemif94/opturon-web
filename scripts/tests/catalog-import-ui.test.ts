@@ -12,6 +12,7 @@ const analyzeRoute = read("app/api/app/catalog/imports/analyze/route.ts");
 const confirmRoute = read("app/api/app/catalog/imports/[importId]/confirm/route.ts");
 const errorsRoute = read("app/api/app/catalog/imports/[importId]/errors/route.ts");
 const templateRoute = read("app/api/app/catalog/imports/template/route.ts");
+const apiTypes = read("lib/api.ts");
 
 assert.match(manager, /CatalogImportWizard/);
 assert.match(wizard, /Importar productos/);
@@ -20,6 +21,13 @@ assert.match(wizard, /STEP_LABELS = \["Archivo", "Hoja y formato", "Mapeo", "Vis
 assert.match(wizard, /Descargar plantilla/);
 assert.match(wizard, /Descargar errores/);
 assert.match(wizard, /Confirmar importación|Confirmar importacion/);
+assert.match(wizard, /\{ value: "brand", label: "Marca" \}/);
+assert.match(wizard, /PreviewValue label="Marca" value=\{String\(row\.values\?\.brand \|\| "-"\)\}/);
+assert.match(manager, /brand\?: string \| null/);
+assert.match(manager, /brand: product\?\.brand \|\| ""/);
+assert.match(manager, /brand: draft\.brand\.trim\(\) \|\| null/);
+assert.match(manager, /"Nombre;SKU;Categoria;Marca;Subcategoria;Estado;Stock;Precio;Vencimiento"/);
+assert.match(apiTypes, /brand\?: string \| null/);
 
 assert.match(analyzeRoute, /resolveAppTenant\(\{ permission: "manage_catalog", requireWrite: true \}\)/);
 assert.match(analyzeRoute, /analyzePortalCatalogImport/);

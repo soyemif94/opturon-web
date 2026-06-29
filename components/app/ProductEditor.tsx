@@ -22,6 +22,7 @@ type ProductDraft = {
   vatRate: string;
   status: string;
   categoryId: string;
+  brand: string;
   subcategory: string;
   imageUrl: string;
   imageAlt: string;
@@ -42,6 +43,7 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     vatRate: String(product.vatRate ?? product.taxRate ?? 0),
     status: product.status || "active",
     categoryId: product.categoryId || "",
+    brand: product.brand || "",
     subcategory: product.subcategory || "",
     imageUrl: product.image?.url || "",
     imageAlt: product.image?.alt || "",
@@ -170,6 +172,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           description: draft.description.trim() || null,
           sku: sku || null,
           categoryId: draft.categoryId || null,
+          brand: draft.brand.trim() || null,
           subcategory: draft.subcategory.trim() || null,
           attributes,
           image,
@@ -239,6 +242,15 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
                   placeholder="Ej. Premium"
                   value={draft.subcategory}
                   onChange={(event) => setDraft((current) => ({ ...current, subcategory: event.target.value }))}
+                  disabled={saving || uploadingImage}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Marca</label>
+                <Input
+                  placeholder="Ej. NovaTech"
+                  value={draft.brand}
+                  onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))}
                   disabled={saving || uploadingImage}
                 />
               </div>
@@ -364,6 +376,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
                 <div className="flex flex-wrap items-center gap-2">
                   {draft.categoryId ? <Badge variant="warning">{categories.find((category) => category.id === draft.categoryId)?.name || "Categoria"}</Badge> : null}
                   {draft.subcategory ? <Badge variant="muted">{draft.subcategory}</Badge> : null}
+                  {draft.brand ? <Badge variant="outline">{draft.brand}</Badge> : null}
                 </div>
                 <div>
                   <p className="text-2xl font-semibold leading-tight">{draft.name || "Nombre del producto"}</p>
