@@ -337,6 +337,9 @@ export function OrderCreateEditor() {
     setCartItems((current) =>
       current.map((item) => {
         if (item.productId !== productId) return item;
+        if (nextQuantity > item.stockAvailable) {
+          toast.error("No hay stock suficiente.", `Disponible: ${item.stockAvailable}. Solicitado: ${nextQuantity}.`);
+        }
         const cappedQuantity = Math.min(Math.max(nextQuantity, 1), Math.max(item.stockAvailable, 1));
         return { ...item, quantity: cappedQuantity };
       })

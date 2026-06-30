@@ -15,6 +15,8 @@ assert.match(editor, /FEFO automatico/);
 assert.match(editor, /Se descontara automaticamente de los lotes que vencen primero/);
 assert.match(editor, /inventory_insufficient_lot_stock/);
 assert.match(editor, /Solicitado: \$\{details\.requested\}, disponible: \$\{details\.available\}, faltante: \$\{details\.missing\}/);
+assert.match(editor, /No hay stock suficiente\./);
+assert.match(editor, /Disponible: \$\{item\.stockAvailable\}\. Solicitado: \$\{nextQuantity\}\./);
 assert.match(api, /PortalOrderLotAllocation/);
 
 console.log("order-fefo-ui.test.ts passed");
