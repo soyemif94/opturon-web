@@ -1830,6 +1830,7 @@ export type PortalProduct = {
   weightUnit?: string | null;
   presentation?: string | null;
   subcategory?: string | null;
+  inventoryTrackingMode?: "legacy" | "lot_based";
   expirationDate?: string | null;
   discountPercentage?: number | null;
   attributes?: Record<string, string | number | boolean>;
@@ -1861,6 +1862,55 @@ export type PortalProductCategory = {
   isActive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+export type PortalInventoryLot = {
+  id: string;
+  tenantId: string;
+  productId: string;
+  productName?: string | null;
+  productSku?: string | null;
+  lotNumber?: string | null;
+  supplierName?: string | null;
+  receivedAt: string;
+  manufacturedAt?: string | null;
+  expiresAt?: string | null;
+  initialQuantity: number;
+  availableQuantity: number;
+  unitCost?: number | null;
+  warehouseName?: string | null;
+  locationName?: string | null;
+  status: "active" | "depleted" | "expired" | "quarantined" | "cancelled";
+  expirationStatus: "no_expiration" | "expired" | "critical" | "urgent" | "warning" | "upcoming" | "normal";
+  daysUntilExpiration?: number | null;
+  notes?: string | null;
+  metadata?: Record<string, unknown>;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PortalInventoryMovement = {
+  id: string;
+  tenantId: string;
+  productId: string;
+  lotId?: string | null;
+  movementType:
+    | "initial_stock"
+    | "purchase_receipt"
+    | "manual_adjustment_in"
+    | "manual_adjustment_out"
+    | "expired_writeoff"
+    | "cancellation";
+  quantity: number;
+  quantityBefore?: number | null;
+  quantityAfter?: number | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  reason?: string | null;
+  metadata?: Record<string, unknown>;
+  createdBy?: string | null;
+  createdAt: string;
 };
 
 export type PortalCatalogImportRow = {
@@ -2757,6 +2807,130 @@ export async function getPortalProducts(tenantId: string) {
       products: PortalProduct[];
     };
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+}
+
+export async function getPortalInventoryLots(
+  tenantId: string,
+  options?: {
+    productId?: string;
+    status?: string;
+    expirationStatus?: string;
+    warehouse?: string;
+    expiresBefore?: string;
+    expiresAfter?: string;
+    search?: string;
+    pageSize?: number;
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.productId) params.set("productId", options.productId);
+  if (options?.status) params.set("status", options.status);
+  if (options?.expirationStatus) params.set("expirationStatus", options.expirationStatus);
+  if (options?.warehouse) params.set("warehouse", options.warehouse);
+  if (options?.expiresBefore) params.set("expiresBefore", options.expiresBefore);
+  if (options?.expiresAfter) params.set("expiresAfter", options.expiresAfter);
+  if (options?.search) params.set("search", options.search);
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      lots: PortalInventoryLot[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/lots${suffix}`, undefined, false);
+}
+
+export async function getPortalInventoryLotDetail(tenantId: string, lotId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      lot: PortalInventoryLot;
+      movements: PortalInventoryMovement[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}`, undefined, false);
+}
+
+export async function createPortalInventoryLot(
+  tenantId: string,
+  payload: {
+    productId: string;
+    lotNumber?: string | null;
+    supplierName?: string | null;
+    receivedAt?: string | null;
+    manufacturedAt?: string | null;
+    expiresAt?: string | null;
+    quantity: number;
+    unitCost?: number | null;
+    warehouseName?: string | null;
+    locationName?: string | null;
+    notes?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalInventoryLot }>(
+    `/portal/tenants/${tenantId}/inventory/lots`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function adjustPortalInventoryLot(
+  tenantId: string,
+  lotId: string,
+  payload: {
+    movementType: PortalInventoryMovement["movementType"];
+    quantity: number;
+    reason?: string | null;
+    referenceType?: string | null;
+    referenceId?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      lot: PortalInventoryLot;
+      movement: PortalInventoryMovement;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/lots/${lotId}/adjust`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
+}
+
+export async function setPortalProductInventoryMode(
+  tenantId: string,
+  productId: string,
+  mode: "legacy" | "lot_based",
+  initialLot?: {
+    quantity: number;
+    receivedAt?: string | null;
+    manufacturedAt?: string | null;
+    expiresAt?: string | null;
+    lotNumber?: string | null;
+    supplierName?: string | null;
+    unitCost?: number | null;
+    warehouseName?: string | null;
+    locationName?: string | null;
+    notes?: string | null;
+  }
+) {
+  return backendFetch<{ success: boolean; data: PortalProduct }>(
+    `/portal/tenants/${tenantId}/products/${productId}/inventory-mode`,
+    {
+      method: "POST",
+      body: JSON.stringify({ mode, initialLot })
+    },
+    false
+  );
 }
 
 export async function deletePortalProduct(tenantId: string, productId: string) {

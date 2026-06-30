@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import { ProductInventoryLotsPanel } from "@/components/app/ProductInventoryLotsPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { canManageCatalog } from "@/lib/app-permissions";
-import { getPortalProductDetail, isBackendConfigured } from "@/lib/api";
+import { getPortalInventoryLots, getPortalProductDetail, isBackendConfigured, type PortalInventoryLot } from "@/lib/api";
 import { formatMoney, formatDateTimeLabel, titleCaseLabel } from "@/lib/billing";
 import { formatExpirationDate, getExpirationBadgePresentation } from "@/lib/product-expiration";
 import { getDiscountedPrice } from "@/lib/product-pricing";
@@ -15,13 +16,17 @@ export default async function CatalogProductDetail({ params }: { params: Promise
   const { id } = await params;
   const readOnly = !canManageCatalog(ctx);
   let product = null;
+  let lots: PortalInventoryLot[] = [];
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
       const result = await getPortalProductDetail(ctx.tenantId, id);
       product = result.data;
+      const lotsResult = await getPortalInventoryLots(ctx.tenantId, { productId: id, pageSize: 100 });
+      lots = Array.isArray(lotsResult.data?.lots) ? lotsResult.data.lots : [];
     } catch {
       product = null;
+      lots = [];
     }
   }
 
@@ -82,6 +87,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <DetailTile label="IVA" value={`${Number(product.vatRate ?? product.taxRate ?? 0)}%`} />
             <DetailTile label="Moneda" value={product.currency || "ARS"} />
             <DetailTile label="Stock" value={String(product.stock ?? 0)} />
+            <DetailTile label="Modo inventario" value={product.inventoryTrackingMode === "lot_based" ? "Por lotes" : "Legacy"} />
             <DetailTile label="Categoria" value={product.categoryName || "Sin categoria"} />
             <DetailTile label="Marca" value={product.brand || "Sin marca"} />
             <DetailTile label="Fabricante" value={product.manufacturer || "Sin fabricante"} />
@@ -139,6 +145,10 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             </div>
           </CardContent>
         </Card>
+
+        <div className="xl:col-span-2">
+          <ProductInventoryLotsPanel product={product} initialLots={lots} readOnly={readOnly} />
+        </div>
       </div>
     </ClientPageShell>
   );
