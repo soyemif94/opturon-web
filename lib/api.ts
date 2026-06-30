@@ -1916,7 +1916,7 @@ export type PortalInventoryMovement = {
 export type PortalCatalogImportRow = {
   sourceRowNumber: number;
   status: "valid" | "warning" | "error" | "duplicated" | "ignored";
-  action: "create" | "update" | "skip_duplicate" | "error" | "ignore";
+  action: "create" | "update" | "skip_duplicate" | "create_lot" | "create_with_lot" | "error" | "ignore";
   warnings: string[];
   errors: Array<{
     rowNumber: number;
@@ -1977,7 +1977,12 @@ export type PortalCatalogImport = {
       duplicateRows: number;
       ignoredRows: number;
       newCategories?: number;
+      lotRows?: number;
+      lotsToCreate?: number;
+      productsToCreateWithLots?: number;
+      legacyConversions?: number;
     };
+    recommendation?: Record<string, unknown>;
   };
   result: {
     summary?: {
@@ -1987,12 +1992,17 @@ export type PortalCatalogImport = {
       errors: number;
       ignored: number;
       createdCategories: number;
+      lotsCreated?: number;
+      initialLotsCreated?: number;
+      movementsCreated?: number;
+      productsConvertedToLots?: number;
       processingTimeMs: number;
     };
     rows?: Array<{
       sourceRowNumber: number;
       status: string;
       productId?: string;
+      lotId?: string;
       code?: string;
       message?: string;
     }>;

@@ -38,7 +38,17 @@ const IMPORT_FIELDS = [
   { value: "sku", label: "SKU" },
   { value: "active", label: "Activo" },
   { value: "currency", label: "Moneda" },
-  { value: "imageUrl", label: "Imagen URL" }
+  { value: "imageUrl", label: "Imagen URL" },
+  { value: "lotNumber", label: "Numero de lote" },
+  { value: "lotQuantity", label: "Cantidad del lote" },
+  { value: "expiresAt", label: "Fecha de vencimiento" },
+  { value: "receivedAt", label: "Fecha de recepcion" },
+  { value: "manufacturedAt", label: "Fecha de fabricacion" },
+  { value: "lotUnitCost", label: "Costo unitario del lote" },
+  { value: "warehouseName", label: "Deposito" },
+  { value: "locationName", label: "Ubicacion" },
+  { value: "lotSupplierName", label: "Proveedor del lote" },
+  { value: "lotNotes", label: "Notas del lote" }
 ];
 const SELECT_CLASS_NAME =
   "h-11 w-full rounded-2xl border border-white/10 bg-slate-950/95 px-3 text-sm text-slate-100 shadow-inner shadow-black/20 outline-none transition disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-slate-900/70 disabled:text-slate-500 focus:border-amber-300/60 focus:ring-2 focus:ring-amber-300/25 [color-scheme:dark] [&>option]:bg-slate-950 [&>option]:text-slate-100";
@@ -83,7 +93,9 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
   const guidedStage = getGuidedStage(step);
   const readyRowsLabel = stats?.errorRows
     ? `${stats.validRows || 0} listos y ${stats.errorRows || 0} con problemas`
-    : `${stats?.totalRows || previewRows.length || 0} productos encontrados`;
+    : stats?.lotRows
+      ? `${stats.lotRows} lote(s) preparados`
+      : `${stats?.totalRows || previewRows.length || 0} productos encontrados`;
   const previewStatusCount = useMemo(() => {
     return previewRows.reduce(
       (accumulator, row) => {
@@ -250,7 +262,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "catalog-import-template.csv";
+      anchor.download = "catalog-import-template.xlsx";
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -528,6 +540,8 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                     <Badge variant={stats?.warningRows ? "warning" : "muted"}>{stats?.warningRows || 0} con advertencias</Badge>
                     <Badge variant={stats?.errorRows ? "danger" : "muted"}>{stats?.errorRows || 0} con errores</Badge>
                     <Badge variant={stats?.duplicateRows ? "warning" : "muted"}>{stats?.duplicateRows || 0} duplicadas</Badge>
+                    <Badge variant={stats?.lotRows ? "success" : "muted"}>Lotes: {stats?.lotRows || 0}</Badge>
+                    <Badge variant={stats?.legacyConversions ? "warning" : "muted"}>Conversiones legacy: {stats?.legacyConversions || 0}</Badge>
                     <Badge variant={stats?.newCategories ? "warning" : "muted"}>Categorías nuevas: {stats?.newCategories || 0}</Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-300">
@@ -567,6 +581,13 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                             <PreviewValue label="Stock" value={String(row.values?.stock ?? "-")} />
                             <PreviewValue label="Categoría" value={String(row.values?.categoryName || "Sin categoría")} />
                             <PreviewValue label="Marca" value={String(row.values?.brand || "-")} />
+                            <PreviewValueIfPresent label="Lote" value={row.values?.lotNumber} />
+                            <PreviewValueIfPresent label="Cantidad del lote" value={row.values?.lotQuantity} />
+                            <PreviewValueIfPresent label="Vencimiento" value={row.values?.expiresAt} />
+                            <PreviewValueIfPresent label="Recepcion" value={row.values?.receivedAt} />
+                            <PreviewValueIfPresent label="Estado vencimiento" value={row.values?.lotExpirationStatus} />
+                            <PreviewValueIfPresent label="Deposito" value={row.values?.warehouseName} />
+                            <PreviewValueIfPresent label="Ubicacion" value={row.values?.locationName} />
                             <PreviewValueIfPresent label="Fabricante" value={row.values?.manufacturer} />
                             <PreviewValueIfPresent label="Codigo de barras" value={row.values?.barcode} />
                             <PreviewValueIfPresent label="Unidad" value={row.values?.unitOfMeasure} />
@@ -599,6 +620,9 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                       <SummaryLine label="Errores" value={String(previewStatusCount.error || 0)} />
                       <SummaryLine label="Duplicadas" value={String(previewStatusCount.duplicated || 0)} />
                       <SummaryLine label="Ignoradas" value={String(previewStatusCount.ignored || 0)} />
+                      <SummaryLine label="Lotes a crear" value={String(stats?.lotsToCreate || 0)} />
+                      <SummaryLine label="Productos nuevos con lote" value={String(stats?.productsToCreateWithLots || 0)} />
+                      <SummaryLine label="Conversiones legacy" value={String(stats?.legacyConversions || 0)} />
                       <SummaryLine label="Categorías nuevas" value={String(stats?.newCategories || 0)} />
                     </div>
                     <Button type="button" variant="secondary" className="mt-5 w-full rounded-2xl" onClick={downloadErrors}>
@@ -687,6 +711,9 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                   <ResultCard label="Productos actualizados" value={String(resultSummary?.updated || 0)} />
                   <ResultCard label="Duplicados omitidos" value={String(resultSummary?.skippedDuplicates || 0)} />
                   <ResultCard label="Filas con error" value={String(resultSummary?.errors || 0)} />
+                  <ResultCard label="Lotes creados" value={String(resultSummary?.lotsCreated || 0)} />
+                  <ResultCard label="Movimientos" value={String(resultSummary?.movementsCreated || 0)} />
+                  <ResultCard label="Stock legacy preservado" value={String(resultSummary?.initialLotsCreated || 0)} />
                   <ResultCard label="Categorías creadas" value={String(resultSummary?.createdCategories || 0)} />
                   <ResultCard label="Tiempo" value={formatProcessingTime(resultSummary?.processingTimeMs || 0)} />
                 </div>
@@ -1035,7 +1062,8 @@ function humanizeImportError(code: string) {
   }
 }
 
-function humanizeResultRow(row: { status: string; productId?: string; code?: string; message?: string }) {
+function humanizeResultRow(row: { status: string; productId?: string; lotId?: string; code?: string; message?: string }) {
+  if (row.lotId) return `Lote importado${row.productId ? ` para producto ${row.productId}` : ""} (${row.lotId}).`;
   if (row.status === "created") return `Producto creado${row.productId ? ` (${row.productId})` : ""}.`;
   if (row.status === "updated") return `Producto actualizado${row.productId ? ` (${row.productId})` : ""}.`;
   if (row.status === "skipped") return row.code === "duplicate_existing" ? "Duplicado omitido." : "Fila omitida.";

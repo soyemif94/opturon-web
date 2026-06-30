@@ -14,8 +14,8 @@ export async function GET() {
     return new NextResponse(buffer, {
       status: 200,
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="catalog-import-template.csv"',
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": 'attachment; filename="catalog-import-template.xlsx"',
         "Cache-Control": "no-store"
       }
     });
