@@ -1515,6 +1515,21 @@ export type PortalOrderItem = {
   quantity: number;
   variant: string | null;
   createdAt: string;
+  lotAllocations?: PortalOrderLotAllocation[];
+};
+
+export type PortalOrderLotAllocation = {
+  id: string;
+  orderId: string;
+  orderItemId: string;
+  productId: string;
+  productName?: string | null;
+  lotId: string;
+  lotNumber?: string | null;
+  quantity: number;
+  status: string;
+  createdAt: string;
+  releasedAt?: string | null;
 };
 
 export type PortalOrderTransferPayment = {
@@ -1610,6 +1625,7 @@ export type PortalOrder = {
   } | null;
   transferPayment?: PortalOrderTransferPayment | null;
   conversationPreview?: PortalOrderConversationPreview | null;
+  lotAllocations?: PortalOrderLotAllocation[];
   items: PortalOrderItem[];
 };
 

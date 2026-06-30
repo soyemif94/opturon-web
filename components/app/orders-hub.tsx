@@ -579,6 +579,24 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
             </div>
           </SidebarCard>
 
+          {selectedOrder?.lotAllocations?.length ? (
+            <SidebarCard badge="Inventario" title="Lotes utilizados" description="Asignacion automatica por vencimiento aplicada al crear el pedido.">
+              <div className="space-y-2">
+                {selectedOrder.lotAllocations.map((allocation) => (
+                  <div key={allocation.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium text-text">{allocation.lotNumber || "Lote sin numero"}</span>
+                      <Badge variant={allocation.status === "cancelled" || allocation.status === "released" ? "muted" : "success"}>
+                        {allocation.quantity} unidades
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted">{allocation.productName || "Producto"} · {allocation.status}</p>
+                  </div>
+                ))}
+              </div>
+            </SidebarCard>
+          ) : null}
+
           <SidebarCard badge="Resumen del dia" title="Canales de origen" description="De donde llegan los pedidos que hoy alimentan la operacion.">
             <ProgressList items={sourceBreakdown} emptyLabel="Todavia no hay canales suficientes para mostrar un ranking." valueFormatter={(value) => `${value} pedido(s)`} />
           </SidebarCard>

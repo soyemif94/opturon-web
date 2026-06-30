@@ -22,6 +22,7 @@ type CatalogProduct = {
   stockQty?: number;
   status?: string;
   active?: boolean;
+  inventoryTrackingMode?: "legacy" | "lot_based";
   image?: {
     url?: string | null;
   } | null;
@@ -54,6 +55,7 @@ type CartItem = {
   currency: string;
   quantity: number;
   stockAvailable: number;
+  inventoryTrackingMode: "legacy" | "lot_based";
 };
 
 const initialForm: OrderFormState = {
@@ -300,7 +302,8 @@ export function OrderCreateEditor() {
             unitPrice: selectedProductPrice,
             currency: selectedProduct.currency || "ARS",
             quantity: requestedQuantity,
-            stockAvailable: selectedProductStock
+            stockAvailable: selectedProductStock,
+            inventoryTrackingMode: selectedProduct.inventoryTrackingMode === "lot_based" ? "lot_based" : "legacy"
           }
         ];
       }
@@ -317,6 +320,7 @@ export function OrderCreateEditor() {
               ...item,
               quantity: nextQuantity,
               stockAvailable: selectedProductStock,
+              inventoryTrackingMode: selectedProduct.inventoryTrackingMode === "lot_based" ? "lot_based" : "legacy",
               unitPrice: selectedProductPrice,
               currency: selectedProduct.currency || "ARS",
               imageUrl: selectedProduct.image?.url || null
@@ -580,9 +584,15 @@ export function OrderCreateEditor() {
                             <p className="truncate text-base font-semibold text-text">{product.name}</p>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
                               <Badge variant={stockState.variant}>{stockState.label}</Badge>
-                              <span>Stock: {stock}</span>
+                              <span>Stock disponible: {stock}</span>
+                              {product.inventoryTrackingMode === "lot_based" ? <Badge variant="outline">FEFO automatico</Badge> : null}
                               {product.sku ? <span>{product.sku}</span> : null}
                             </div>
+                            {product.inventoryTrackingMode === "lot_based" ? (
+                              <p className="mt-2 text-xs text-emerald-200">
+                                Se descontara automaticamente de los lotes que vencen primero.
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -620,6 +630,11 @@ export function OrderCreateEditor() {
                       <div className="min-w-0">
                         <p className="truncate text-base font-semibold text-text">{item.name}</p>
                         <p className="mt-1 text-sm text-muted">{item.sku || "Sin codigo"}</p>
+                        {item.inventoryTrackingMode === "lot_based" ? (
+                          <p className="mt-1 text-xs text-emerald-200">
+                            Stock disponible: {item.stockAvailable}. Se descontara de los lotes que vencen primero.
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="flex items-center text-sm font-medium text-text">{formatCurrency(item.unitPrice, item.currency)}</div>
@@ -754,6 +769,13 @@ function humanizeOrderError(payload: any) {
       return "Selecciona un destino de cobro para registrar el pedido como pagado.";
     case "order_item_insufficient_stock":
       return "No hay stock suficiente para el producto seleccionado.";
+    case "inventory_insufficient_lot_stock": {
+      const details = payload.details && typeof payload.details === "object" ? payload.details : null;
+      if (details) {
+        return `No hay stock suficiente en lotes. Solicitado: ${details.requested}, disponible: ${details.available}, faltante: ${details.missing}.`;
+      }
+      return "No hay stock suficiente en lotes para el producto seleccionado.";
+    }
     case "order_item_product_inactive":
     case "order_item_product_archived":
       return "El producto seleccionado esta inactivo.";
