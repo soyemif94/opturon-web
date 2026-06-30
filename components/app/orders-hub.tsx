@@ -2,6 +2,7 @@
 
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, CreditCard, Package, Receipt } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { PortalOrder, PortalOrderPaymentMetrics, PortalOrderPaymentMetricsRange } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const defaultPaymentMetrics: PortalOrderPaymentMetrics = {
 };
 
 export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, backendReady }: OrdersHubProps) {
+  const router = useRouter();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(initialOrders.find((order) => order.id === initialOrderId)?.id || null);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,6 +51,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [sellers, setSellers] = useState<AssignableSeller[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   const monthSummary = useMemo(() => {
     const now = new Date();
@@ -259,6 +262,35 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     }
   }, [initialOrderId, initialOrders]);
 
+  async function cancelSelectedOrder(order: PortalOrder) {
+    if (readOnly || order.orderStatus === "cancelled") return;
+    const confirmed = window.confirm("Cancelar este pedido y restaurar el stock reservado?");
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/orders/${encodeURIComponent(order.id)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderStatus: "cancelled" })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.details || json?.error || "No se pudo cancelar el pedido.");
+      }
+      setFeedback({ tone: "success", text: "Pedido cancelado y stock restaurado." });
+      router.refresh();
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: error instanceof Error ? error.message : "No se pudo cancelar el pedido."
+      });
+    } finally {
+      setCancellingOrderId(null);
+    }
+  }
+
   const totalPages = Math.max(Math.ceil(filteredOrders.length / ORDERS_PER_PAGE), 1);
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * ORDERS_PER_PAGE;
@@ -437,10 +469,22 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                         {shortOrderId(selectedOrder.id)} · {formatDateCompact(selectedOrder.createdAt)} · {labelForOrderSeller(selectedOrder, sellers)}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={badgeForOrderStatus(selectedOrder.orderStatus)}>{labelForOrderStatus(selectedOrder.orderStatus)}</Badge>
                       <Badge variant={badgeForPaymentStatus(selectedOrder.paymentStatus)}>{labelForPaymentStatus(selectedOrder.paymentStatus)}</Badge>
                       <Badge variant="outline">{formatCurrency(selectedOrder.total, selectedOrder.currency)}</Badge>
+                      {!readOnly && selectedOrder.orderStatus !== "cancelled" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="rounded-2xl"
+                          onClick={() => cancelSelectedOrder(selectedOrder)}
+                          disabled={cancellingOrderId === selectedOrder.id}
+                        >
+                          {cancellingOrderId === selectedOrder.id ? "Cancelando..." : "Cancelar pedido"}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
