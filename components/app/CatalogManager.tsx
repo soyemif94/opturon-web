@@ -44,8 +44,16 @@ type Product = {
   categoryId?: string | null;
   categoryName?: string | null;
   brand?: string | null;
+  manufacturer?: string | null;
+  barcode?: string | null;
+  unitOfMeasure?: string | null;
+  cost?: number | null;
+  defaultSupplier?: string | null;
+  weight?: number | null;
+  weightUnit?: string | null;
+  presentation?: string | null;
   subcategory?: string | null;
-  attributes?: Array<{ name: string; options: string[] }>;
+  attributes?: Record<string, string | number | boolean>;
   image?: {
     url: string;
     alt?: string | null;
@@ -85,6 +93,14 @@ type Draft = {
   currency: string;
   categoryId: string;
   brand: string;
+  manufacturer: string;
+  barcode: string;
+  unitOfMeasure: string;
+  cost: string;
+  defaultSupplier: string;
+  weight: string;
+  weightUnit: string;
+  presentation: string;
   subcategory: string;
   imageUrl: string;
   imageAlt: string;
@@ -144,6 +160,14 @@ const EMPTY_DRAFT: Draft = {
   currency: "ARS",
   categoryId: "",
   brand: "",
+  manufacturer: "",
+  barcode: "",
+  unitOfMeasure: "",
+  cost: "",
+  defaultSupplier: "",
+  weight: "",
+  weightUnit: "",
+  presentation: "",
   subcategory: "",
   imageUrl: "",
   imageAlt: "",
@@ -330,6 +354,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       currency: product?.currency || "ARS",
       categoryId: product?.categoryId || "",
       brand: product?.brand || "",
+      manufacturer: product?.manufacturer || "",
+      barcode: product?.barcode || "",
+      unitOfMeasure: product?.unitOfMeasure || "",
+      cost: product?.cost == null ? "" : String(product.cost),
+      defaultSupplier: product?.defaultSupplier || "",
+      weight: product?.weight == null ? "" : String(product.weight),
+      weightUnit: product?.weightUnit || "",
+      presentation: product?.presentation || "",
       subcategory: product?.subcategory || "",
       imageUrl: product?.image?.url || "",
       imageAlt: product?.image?.alt || "",
@@ -383,7 +415,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         escapeCsvValue(product.sku || ""),
         escapeCsvValue(product.categoryName || ""),
         escapeCsvValue(product.brand || ""),
+        escapeCsvValue(product.manufacturer || ""),
+        escapeCsvValue(product.barcode || ""),
+        escapeCsvValue(product.unitOfMeasure || ""),
+        escapeCsvValue(product.cost == null ? "" : String(product.cost)),
+        escapeCsvValue(product.defaultSupplier || ""),
+        escapeCsvValue(product.weight == null ? "" : String(product.weight)),
+        escapeCsvValue(product.weightUnit || ""),
+        escapeCsvValue(product.presentation || ""),
         escapeCsvValue(product.subcategory || ""),
+        escapeCsvValue(formatAttributesText(product.attributes)),
         escapeCsvValue(resolveStatus(product) === "active" ? "Activo" : "Archivado"),
         escapeCsvValue(String(resolveStock(product))),
         escapeCsvValue(String(pricing.finalPrice)),
@@ -392,7 +433,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     });
 
     const csv = [
-      "Nombre;SKU;Categoria;Marca;Subcategoria;Estado;Stock;Precio;Vencimiento",
+      "Nombre;SKU;Categoria;Marca;Fabricante;Codigo de barras;Unidad;Costo;Proveedor;Peso;Unidad de peso;Presentacion;Subcategoria;Atributos;Estado;Stock;Precio;Vencimiento",
       ...rows
     ].join("\n");
 
@@ -494,6 +535,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     const price = Number(draft.price);
     const stock = Number.parseInt(draft.stock, 10);
+    const cost = draft.cost.trim() ? Number(draft.cost) : null;
+    const weight = draft.weight.trim() ? Number(draft.weight) : null;
     const attributes = parseAttributesText(draft.attributesText);
     const image = buildCatalogImagePayload(draft.imageUrl, draft.imageAlt, draft.imageSource);
 
@@ -507,6 +550,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
     if (!Number.isInteger(stock) || stock < 0) {
       setFeedback({ tone: "warning", text: "El stock debe ser cero o mayor." });
+      return;
+    }
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
+      setFeedback({ tone: "warning", text: "El costo debe ser un numero valido mayor o igual a cero." });
+      return;
+    }
+    if (weight !== null && (!Number.isFinite(weight) || weight < 0)) {
+      setFeedback({ tone: "warning", text: "El peso debe ser un numero valido mayor o igual a cero." });
       return;
     }
     if (draft.imageUrl.trim() && !image) {
@@ -529,6 +580,14 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           currency: draft.currency.trim() || "ARS",
           categoryId: draft.categoryId || null,
           brand: draft.brand.trim() || null,
+          manufacturer: draft.manufacturer.trim() || null,
+          barcode: draft.barcode.trim() || null,
+          unitOfMeasure: draft.unitOfMeasure.trim() || null,
+          cost,
+          defaultSupplier: draft.defaultSupplier.trim() || null,
+          weight,
+          weightUnit: draft.weightUnit.trim() || null,
+          presentation: draft.presentation.trim() || null,
           subcategory: draft.subcategory.trim() || null,
           image,
           expirationDate: draft.expirationDate || null,
@@ -1226,9 +1285,12 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                               <span>{product.sku || "Sin SKU"}</span>
                               <span>Stock {resolveStock(product)} unidades</span>
                               {product.brand ? <span>Marca {product.brand}</span> : null}
+                              {product.manufacturer ? <span>Fabricante {product.manufacturer}</span> : null}
+                              {product.barcode ? <span>Codigo {product.barcode}</span> : null}
+                              {product.presentation ? <span>{product.presentation}</span> : null}
                               <span>Vence {formatExpirationDate(product.expirationDate)}</span>
                               <span>{getExpirationBadgePresentation(product.expirationDate).helper}</span>
-                              {product.attributes?.length ? <span>{formatAttributesText(product.attributes)}</span> : null}
+                              {formatAttributesText(product.attributes) ? <span>{formatAttributesText(product.attributes)}</span> : null}
                             </div>
                             {product.riskDiscountSuggestion ? (
                               <p className="rounded-2xl border border-amber-400/15 bg-amber-500/8 px-3 py-2 text-xs text-amber-200">
@@ -1669,6 +1731,46 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     placeholder="Ej. NovaTech"
                     disabled={readOnly}
                   />
+                </div>
+                <div className="rounded-[22px] border border-white/8 bg-surface/45 p-4">
+                  <p className="text-sm font-semibold">Mas informacion comercial y operativa</p>
+                  <p className="mt-1 text-sm leading-6 text-muted">Datos opcionales para compras, trazabilidad y presentacion interna.</p>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Fabricante</label>
+                      <Input value={draft.manufacturer} onChange={(event) => setDraft((current) => ({ ...current, manufacturer: event.target.value }))} placeholder="Ej. Laboratorio Uno" disabled={readOnly} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Codigo de barras</label>
+                      <Input value={draft.barcode} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} placeholder="Ej. 7790000000012" disabled={readOnly} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Unidad de medida</label>
+                      <Input value={draft.unitOfMeasure} onChange={(event) => setDraft((current) => ({ ...current, unitOfMeasure: event.target.value }))} placeholder="unidad, kg, ml" disabled={readOnly} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Costo</label>
+                      <Input value={draft.cost} onChange={(event) => setDraft((current) => ({ ...current, cost: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Proveedor habitual</label>
+                      <Input value={draft.defaultSupplier} onChange={(event) => setDraft((current) => ({ ...current, defaultSupplier: event.target.value }))} placeholder="Ej. Distribuidora Norte" disabled={readOnly} />
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_0.8fr]">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Peso</label>
+                        <Input value={draft.weight} onChange={(event) => setDraft((current) => ({ ...current, weight: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Unidad</label>
+                        <Input value={draft.weightUnit} onChange={(event) => setDraft((current) => ({ ...current, weightUnit: event.target.value }))} placeholder="kg, g, ml" disabled={readOnly} />
+                      </div>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-medium">Presentacion</label>
+                      <Input value={draft.presentation} onChange={(event) => setDraft((current) => ({ ...current, presentation: event.target.value }))} placeholder="Ej. Caja x 12, Botella 500ml" disabled={readOnly} />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Texto alternativo</label>
@@ -2293,28 +2395,29 @@ function formatDate(value?: string | null) {
 }
 
 function parseAttributesText(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [namePart, optionsPart = ""] = line.split(":");
-      return {
-        name: namePart?.trim() || "",
-        options: optionsPart
-          .split(",")
-          .map((option) => option.trim())
-          .filter(Boolean)
-      };
-    })
-    .filter((attribute) => attribute.name && attribute.options.length > 0);
+  return value.split(/\r?\n/).reduce<Record<string, string | number | boolean>>((accumulator, line) => {
+    const normalized = line.trim();
+    if (!normalized) return accumulator;
+    const [namePart, ...valueParts] = normalized.split(":");
+    const name = String(namePart || "").trim();
+    const itemValue = valueParts.join(":").trim();
+    if (name && itemValue) accumulator[name] = itemValue;
+    return accumulator;
+  }, {});
 }
 
 function formatAttributesText(attributes?: Product["attributes"]) {
-  if (!Array.isArray(attributes) || attributes.length === 0) return "";
-  return attributes
-    .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
-    .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+  if (!attributes) return "";
+  if (Array.isArray(attributes)) {
+    return attributes
+      .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
+      .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+      .join(" | ");
+  }
+  if (typeof attributes !== "object") return "";
+  return Object.entries(attributes)
+    .filter(([key, value]) => key && value !== null && value !== undefined && String(value).trim())
+    .map(([key, value]) => `${key}: ${String(value)}`)
     .join(" | ");
 }
 

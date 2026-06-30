@@ -23,6 +23,14 @@ type ProductDraft = {
   status: string;
   categoryId: string;
   brand: string;
+  manufacturer: string;
+  barcode: string;
+  unitOfMeasure: string;
+  cost: string;
+  defaultSupplier: string;
+  weight: string;
+  weightUnit: string;
+  presentation: string;
   subcategory: string;
   imageUrl: string;
   imageAlt: string;
@@ -44,6 +52,14 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     status: product.status || "active",
     categoryId: product.categoryId || "",
     brand: product.brand || "",
+    manufacturer: product.manufacturer || "",
+    barcode: product.barcode || "",
+    unitOfMeasure: product.unitOfMeasure || "",
+    cost: product.cost == null ? "" : String(product.cost),
+    defaultSupplier: product.defaultSupplier || "",
+    weight: product.weight == null ? "" : String(product.weight),
+    weightUnit: product.weightUnit || "",
+    presentation: product.presentation || "",
     subcategory: product.subcategory || "",
     imageUrl: product.image?.url || "",
     imageAlt: product.image?.alt || "",
@@ -130,6 +146,8 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const price = Number(draft.price);
     const stock = Number(draft.stock || 0);
     const vatRate = Number(draft.vatRate || 0);
+    const cost = draft.cost.trim() ? Number(draft.cost) : null;
+    const weight = draft.weight.trim() ? Number(draft.weight) : null;
     const discountPercentage = draft.discountPercentage.trim() ? Number(draft.discountPercentage) : null;
     const attributes = parseAttributesText(draft.attributesText);
 
@@ -153,6 +171,14 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
       toast.error("Stock invalido", "Ingresa un stock valido mayor o igual a cero.");
       return;
     }
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
+      toast.error("Costo invalido", "Ingresa un costo valido mayor o igual a cero.");
+      return;
+    }
+    if (weight !== null && (!Number.isFinite(weight) || weight < 0)) {
+      toast.error("Peso invalido", "Ingresa un peso valido mayor o igual a cero.");
+      return;
+    }
     if (draft.imageUrl.trim() && !image) {
       toast.error("Imagen invalida", "Ingresa una URL valida con http o https para la imagen principal.");
       return;
@@ -173,6 +199,14 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           sku: sku || null,
           categoryId: draft.categoryId || null,
           brand: draft.brand.trim() || null,
+          manufacturer: draft.manufacturer.trim() || null,
+          barcode: draft.barcode.trim() || null,
+          unitOfMeasure: draft.unitOfMeasure.trim() || null,
+          cost,
+          defaultSupplier: draft.defaultSupplier.trim() || null,
+          weight,
+          weightUnit: draft.weightUnit.trim() || null,
+          presentation: draft.presentation.trim() || null,
           subcategory: draft.subcategory.trim() || null,
           attributes,
           image,
@@ -265,6 +299,56 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
                   <option value="active">Activo</option>
                   <option value="archived">Archivado</option>
                 </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-surface/70 text-brandBright">
+                  <Package2 className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-xl">Datos comerciales y operativos</CardTitle>
+                  <CardDescription>Campos opcionales para trazabilidad, compras, unidades y presentacion.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Fabricante</label>
+                <Input placeholder="Ej. Laboratorio Uno" value={draft.manufacturer} onChange={(event) => setDraft((current) => ({ ...current, manufacturer: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Codigo de barras</label>
+                <Input placeholder="Ej. 7790000000012" value={draft.barcode} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Unidad de medida</label>
+                <Input placeholder="unidad, kg, ml" value={draft.unitOfMeasure} onChange={(event) => setDraft((current) => ({ ...current, unitOfMeasure: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Costo</label>
+                <Input type="number" step="0.01" min="0" placeholder="0" value={draft.cost} onChange={(event) => setDraft((current) => ({ ...current, cost: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Proveedor habitual</label>
+                <Input placeholder="Ej. Distribuidora Norte" value={draft.defaultSupplier} onChange={(event) => setDraft((current) => ({ ...current, defaultSupplier: event.target.value }))} disabled={saving || uploadingImage} />
+              </div>
+              <div className="grid gap-3 md:grid-cols-[1fr_0.8fr]">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Peso</label>
+                  <Input type="number" step="0.01" min="0" placeholder="0" value={draft.weight} onChange={(event) => setDraft((current) => ({ ...current, weight: event.target.value }))} disabled={saving || uploadingImage} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Unidad</label>
+                  <Input placeholder="kg, g, ml" value={draft.weightUnit} onChange={(event) => setDraft((current) => ({ ...current, weightUnit: event.target.value }))} disabled={saving || uploadingImage} />
+                </div>
+              </div>
+              <div className="space-y-2 xl:col-span-3">
+                <label className="text-sm font-medium">Presentacion</label>
+                <Input placeholder="Ej. Caja x 12, Botella 500ml" value={draft.presentation} onChange={(event) => setDraft((current) => ({ ...current, presentation: event.target.value }))} disabled={saving || uploadingImage} />
               </div>
             </CardContent>
           </Card>
@@ -502,28 +586,29 @@ function PreviewStat({ label, value }: { label: string; value: string }) {
 }
 
 function parseAttributesText(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [namePart, optionsPart = ""] = line.split(":");
-      return {
-        name: namePart?.trim() || "",
-        options: optionsPart
-          .split(",")
-          .map((option) => option.trim())
-          .filter(Boolean)
-      };
-    })
-    .filter((attribute) => attribute.name && attribute.options.length > 0);
+  return value.split(/\r?\n/).reduce<Record<string, string | number | boolean>>((accumulator, line) => {
+    const normalized = line.trim();
+    if (!normalized) return accumulator;
+    const [namePart, ...valueParts] = normalized.split(":");
+    const name = String(namePart || "").trim();
+    const itemValue = valueParts.join(":").trim();
+    if (name && itemValue) accumulator[name] = itemValue;
+    return accumulator;
+  }, {});
 }
 
 function formatAttributesText(attributes?: PortalProduct["attributes"]) {
-  if (!Array.isArray(attributes) || attributes.length === 0) return "";
-  return attributes
-    .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
-    .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+  if (!attributes) return "";
+  if (Array.isArray(attributes)) {
+    return attributes
+      .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
+      .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+      .join("\n");
+  }
+  if (typeof attributes !== "object") return "";
+  return Object.entries(attributes)
+    .filter(([key, value]) => key && value !== null && value !== undefined && String(value).trim())
+    .map(([key, value]) => `${key}: ${String(value)}`)
     .join("\n");
 }
 

@@ -21,9 +21,18 @@ const GUIDED_STAGE_LABELS = ["Subir archivo", "Revisar productos", "Confirmar im
 const IMPORT_FIELDS = [
   { value: "", label: "No importar" },
   { value: "name", label: "Nombre" },
-  { value: "description", label: "Descripción" },
-  { value: "categoryName", label: "Categoría" },
+  { value: "description", label: "Descripcion" },
+  { value: "categoryName", label: "Categoria" },
+  { value: "subcategory", label: "Subcategoria" },
   { value: "brand", label: "Marca" },
+  { value: "manufacturer", label: "Fabricante" },
+  { value: "barcode", label: "Codigo de barras" },
+  { value: "unitOfMeasure", label: "Unidad de medida" },
+  { value: "cost", label: "Costo" },
+  { value: "defaultSupplier", label: "Proveedor habitual" },
+  { value: "weight", label: "Peso" },
+  { value: "weightUnit", label: "Unidad de peso" },
+  { value: "presentation", label: "Presentacion" },
   { value: "price", label: "Precio" },
   { value: "stock", label: "Stock" },
   { value: "sku", label: "SKU" },
@@ -493,7 +502,7 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">Columna {column.index + 1}</p>
                       </div>
                       <DarkSelect value={mapping[column.key] || ""} onChange={(event) => updateMapping(column.key, event.target.value)}>
-                        {IMPORT_FIELDS.map((field) => (
+                        {getImportFieldsForColumn(column).map((field) => (
                           <DarkOption key={field.value || "none"} value={field.value}>
                             {field.label}
                           </DarkOption>
@@ -558,6 +567,15 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                             <PreviewValue label="Stock" value={String(row.values?.stock ?? "-")} />
                             <PreviewValue label="Categoría" value={String(row.values?.categoryName || "Sin categoría")} />
                             <PreviewValue label="Marca" value={String(row.values?.brand || "-")} />
+                            <PreviewValueIfPresent label="Fabricante" value={row.values?.manufacturer} />
+                            <PreviewValueIfPresent label="Codigo de barras" value={row.values?.barcode} />
+                            <PreviewValueIfPresent label="Unidad" value={row.values?.unitOfMeasure} />
+                            <PreviewValueIfPresent label="Costo" value={row.values?.cost} />
+                            <PreviewValueIfPresent label="Proveedor" value={row.values?.defaultSupplier} />
+                            <PreviewValueIfPresent label="Peso" value={formatWeightPreview(row.values?.weight, row.values?.weightUnit)} />
+                            <PreviewValueIfPresent label="Presentacion" value={row.values?.presentation} />
+                            <PreviewValueIfPresent label="Subcategoria" value={row.values?.subcategory} />
+                            <PreviewValueIfPresent label="Atributos" value={formatAttributesPreview(row.values?.attributes)} />
                             <PreviewValue label="Estado" value={String(row.values?.status || "active")} />
                           </div>
                           {row.values?.categoryPendingCreation ? (
@@ -893,6 +911,12 @@ function PreviewValue({ label, value }: { label: string; value: string }) {
   );
 }
 
+function PreviewValueIfPresent({ label, value }: { label: string; value: unknown }) {
+  const normalized = value === null || value === undefined ? "" : String(value).trim();
+  if (!normalized) return null;
+  return <PreviewValue label={label} value={normalized} />;
+}
+
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
@@ -925,7 +949,57 @@ function getGuidedStage(step: Step) {
 }
 
 function labelForImportField(value: string | null | undefined) {
+  const attributeKey = parseAttributeTarget(value);
+  if (attributeKey) return `Atributo: ${attributeKey}`;
   return IMPORT_FIELDS.find((field) => field.value === value)?.label || "No importar";
+}
+
+function getImportFieldsForColumn(column: { label: string }) {
+  const attributeTarget = buildAttributeTarget(column.label);
+  if (!attributeTarget) return IMPORT_FIELDS;
+  return [
+    ...IMPORT_FIELDS,
+    {
+      value: attributeTarget,
+      label: `Crear atributo personalizado "${parseAttributeTarget(attributeTarget)}"`
+    }
+  ];
+}
+
+function normalizeAttributeKey(value: unknown) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9 _-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64);
+}
+
+function buildAttributeTarget(value: unknown) {
+  const key = normalizeAttributeKey(value);
+  return key ? `attribute:${key}` : null;
+}
+
+function parseAttributeTarget(value: string | null | undefined) {
+  const raw = String(value || "");
+  if (!raw.startsWith("attribute:")) return null;
+  return normalizeAttributeKey(raw.slice("attribute:".length));
+}
+
+function formatAttributesPreview(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  return Object.entries(value)
+    .filter(([, item]) => item !== null && item !== undefined && String(item).trim())
+    .map(([key, item]) => `${key}: ${String(item)}`)
+    .join(" · ");
+}
+
+function formatWeightPreview(weight: unknown, unit: unknown) {
+  const normalizedWeight = weight === null || weight === undefined ? "" : String(weight).trim();
+  if (!normalizedWeight) return "";
+  const normalizedUnit = unit === null || unit === undefined ? "" : String(unit).trim();
+  return normalizedUnit ? `${normalizedWeight} ${normalizedUnit}` : normalizedWeight;
 }
 
 function labelForPreviewStatus(status: string) {

@@ -1821,13 +1821,18 @@ export type PortalProduct = {
   categoryId?: string | null;
   categoryName?: string | null;
   brand?: string | null;
+  manufacturer?: string | null;
+  barcode?: string | null;
+  unitOfMeasure?: string | null;
+  cost?: number | null;
+  defaultSupplier?: string | null;
+  weight?: number | null;
+  weightUnit?: string | null;
+  presentation?: string | null;
   subcategory?: string | null;
   expirationDate?: string | null;
   discountPercentage?: number | null;
-  attributes?: Array<{
-    name: string;
-    options: string[];
-  }>;
+  attributes?: Record<string, string | number | boolean>;
   image?: {
     url: string;
     alt?: string | null;
@@ -3310,8 +3315,16 @@ export async function createPortalProduct(
     sku?: string | null;
     categoryId?: string | null;
     brand?: string | null;
+    manufacturer?: string | null;
+    barcode?: string | null;
+    unitOfMeasure?: string | null;
+    cost?: number | null;
+    defaultSupplier?: string | null;
+    weight?: number | null;
+    weightUnit?: string | null;
+    presentation?: string | null;
     subcategory?: string | null;
-    attributes?: Array<{ name: string; options: string[] }>;
+    attributes?: Record<string, string | number | boolean>;
     image?: {
       url: string;
       alt?: string | null;
@@ -3364,8 +3377,16 @@ export async function patchPortalProduct(
     sku?: string | null;
     categoryId?: string | null;
     brand?: string | null;
+    manufacturer?: string | null;
+    barcode?: string | null;
+    unitOfMeasure?: string | null;
+    cost?: number | null;
+    defaultSupplier?: string | null;
+    weight?: number | null;
+    weightUnit?: string | null;
+    presentation?: string | null;
     subcategory?: string | null;
-    attributes?: Array<{ name: string; options: string[] }>;
+    attributes?: Record<string, string | number | boolean>;
     image?: {
       url: string;
       alt?: string | null;
@@ -3474,8 +3495,16 @@ export async function createPortalProductsBulk(
       description?: string | null;
       categoryName?: string | null;
       brand?: string | null;
+      manufacturer?: string | null;
+      barcode?: string | null;
+      unitOfMeasure?: string | null;
+      cost?: number | null;
+      defaultSupplier?: string | null;
+      weight?: number | null;
+      weightUnit?: string | null;
+      presentation?: string | null;
       subcategory?: string | null;
-      attributes?: Array<{ name: string; options: string[] }>;
+      attributes?: Record<string, string | number | boolean>;
       currency?: string;
     }>;
   }

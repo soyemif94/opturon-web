@@ -83,6 +83,14 @@ export default async function CatalogProductDetail({ params }: { params: Promise
             <DetailTile label="Moneda" value={product.currency || "ARS"} />
             <DetailTile label="Stock" value={String(product.stock ?? 0)} />
             <DetailTile label="Categoria" value={product.categoryName || "Sin categoria"} />
+            <DetailTile label="Marca" value={product.brand || "Sin marca"} />
+            <DetailTile label="Fabricante" value={product.manufacturer || "Sin fabricante"} />
+            <DetailTile label="Codigo de barras" value={product.barcode || "Sin codigo"} />
+            <DetailTile label="Unidad de medida" value={product.unitOfMeasure || "Sin unidad"} />
+            <DetailTile label="Costo" value={product.cost == null ? "Sin costo" : formatMoney(product.cost, product.currency)} />
+            <DetailTile label="Proveedor habitual" value={product.defaultSupplier || "Sin proveedor"} />
+            <DetailTile label="Peso" value={formatProductWeight(product.weight, product.weightUnit)} />
+            <DetailTile label="Presentacion" value={product.presentation || "Sin presentacion"} />
             <DetailTile label="Subcategoria" value={product.subcategory || "Sin subcategoria"} />
             <DetailTile label="Imagen principal" value={product.image?.url || "Sin imagen"} />
             <DetailTile label="Estado" value={titleCaseLabel(product.status)} />
@@ -154,12 +162,26 @@ function MetricTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatProductAttributes(attributes?: Array<{ name: string; options: string[] }>) {
-  if (!Array.isArray(attributes) || attributes.length === 0) return "Sin atributos";
-  return attributes
-    .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
-    .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+function formatProductAttributes(attributes?: Record<string, string | number | boolean>) {
+  if (!attributes) return "Sin atributos";
+  if (Array.isArray(attributes)) {
+    const legacyValue = attributes
+      .filter((attribute) => attribute?.name && Array.isArray(attribute.options) && attribute.options.length > 0)
+      .map((attribute) => `${attribute.name}: ${attribute.options.join(", ")}`)
+      .join(" | ");
+    return legacyValue || "Sin atributos";
+  }
+  if (typeof attributes !== "object") return "Sin atributos";
+  const value = Object.entries(attributes)
+    .filter(([key, item]) => key && item !== null && item !== undefined && String(item).trim())
+    .map(([key, item]) => `${key}: ${String(item)}`)
     .join(" | ");
+  return value || "Sin atributos";
+}
+
+function formatProductWeight(weight?: number | null, unit?: string | null) {
+  if (weight == null) return "Sin peso";
+  return unit ? `${weight} ${unit}` : String(weight);
 }
 
 function ProductImagePreview({

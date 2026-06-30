@@ -27,7 +27,7 @@ assert.match(wizard, /PreviewValue label="Marca" value=\{String\(row\.values\?\.
 assert.match(manager, /brand\?: string \| null/);
 assert.match(manager, /brand: product\?\.brand \|\| ""/);
 assert.match(manager, /brand: draft\.brand\.trim\(\) \|\| null/);
-assert.match(manager, /"Nombre;SKU;Categoria;Marca;Subcategoria;Estado;Stock;Precio;Vencimiento"/);
+assert.match(manager, /"Nombre;SKU;Categoria;Marca;Fabricante;Codigo de barras;Unidad;Costo;Proveedor;Peso;Unidad de peso;Presentacion;Subcategoria;Atributos;Estado;Stock;Precio;Vencimiento"/);
 assert.match(apiTypes, /brand\?: string \| null/);
 
 assert.match(analyzeRoute, /resolveAppTenant\(\{ permission: "manage_catalog", requireWrite: true \}\)/);
