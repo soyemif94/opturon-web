@@ -20,6 +20,7 @@ import {
   TrendingUp,
   UserRoundPlus,
   WalletCards,
+  Warehouse,
   Zap
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -69,7 +70,8 @@ export function AppDashboard({
   channelStatus,
   recentActivity,
   contacts,
-  quickLinks
+  quickLinks,
+  expirationSummary
 }: {
   tenantName: string;
   tenantIndustry: string;
@@ -80,6 +82,13 @@ export function AppDashboard({
   recentActivity: ActivityItem[];
   contacts: ContactItem[];
   quickLinks: Array<{ label: string; href: string; helper: string }>;
+  expirationSummary?: {
+    expiredLots: number;
+    expiringTodayLots: number;
+    criticalLots: number;
+    urgentLots: number;
+    unitsAtRisk7Days: number;
+  } | null;
 }) {
   const conversationsStat = stats.find((item) => item.icon === "conversations") || stats[0];
   const contactsStat = stats.find((item) => item.icon === "contacts") || stats[1];
@@ -162,6 +171,19 @@ export function AppDashboard({
   ];
 
   const priorityItems = [
+    ...(expirationSummary
+      ? [
+          {
+            id: "priority-expiration",
+            title: "Vencimientos proximos",
+            detail: `${expirationSummary.expiredLots + expirationSummary.expiringTodayLots + expirationSummary.criticalLots + expirationSummary.urgentLots} lotes requieren atencion. ${expirationSummary.expiredLots} vencidos y ${expirationSummary.criticalLots + expirationSummary.urgentLots} vencen en 7 dias.`,
+            cta: "Revisar inventario",
+            href: "/app/inventory",
+            tone: expirationSummary.expiredLots > 0 ? ("red" as const) : ("amber" as const),
+            icon: <Warehouse className="h-4 w-4" />
+          }
+        ]
+      : []),
     {
       id: "priority-channel",
       title: hasWhatsAppChannel ? "Canal listo para atender" : "WhatsApp pendiente de activacion",

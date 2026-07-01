@@ -1897,8 +1897,9 @@ export type PortalInventoryLot = {
   warehouseName?: string | null;
   locationName?: string | null;
   status: "active" | "depleted" | "expired" | "quarantined" | "cancelled";
-  expirationStatus: "no_expiration" | "expired" | "critical" | "urgent" | "warning" | "upcoming" | "normal";
+  expirationStatus: "no_expiration" | "expired" | "today" | "critical" | "urgent" | "warning" | "upcoming" | "normal";
   daysUntilExpiration?: number | null;
+  expirationLabel?: string | null;
   notes?: string | null;
   metadata?: Record<string, unknown>;
   createdBy?: string | null;
@@ -1927,6 +1928,25 @@ export type PortalInventoryMovement = {
   metadata?: Record<string, unknown>;
   createdBy?: string | null;
   createdAt: string;
+};
+
+export type PortalInventoryExpirationThresholds = {
+  criticalDays: number;
+  urgentDays: number;
+  warningDays: number;
+  upcomingDays: number;
+};
+
+export type PortalInventoryExpirationSummary = {
+  expiredLots: number;
+  expiringTodayLots: number;
+  criticalLots: number;
+  urgentLots: number;
+  warningLots: number;
+  upcomingLots: number;
+  unitsAtRisk7Days: number;
+  unitsExpired: number;
+  unitsAtRisk30Days?: number;
 };
 
 export type PortalCatalogImportRow = {
@@ -2841,7 +2861,13 @@ export async function getPortalInventoryLots(
     productId?: string;
     status?: string;
     expirationStatus?: string;
+    daysUntilExpirationMin?: number | string;
+    daysUntilExpirationMax?: number | string;
+    hasStock?: boolean | string;
     warehouse?: string;
+    location?: string;
+    supplier?: string;
+    categoryId?: string;
     expiresBefore?: string;
     expiresAfter?: string;
     search?: string;
@@ -2852,7 +2878,13 @@ export async function getPortalInventoryLots(
   if (options?.productId) params.set("productId", options.productId);
   if (options?.status) params.set("status", options.status);
   if (options?.expirationStatus) params.set("expirationStatus", options.expirationStatus);
+  if (options?.daysUntilExpirationMin !== undefined) params.set("daysUntilExpirationMin", String(options.daysUntilExpirationMin));
+  if (options?.daysUntilExpirationMax !== undefined) params.set("daysUntilExpirationMax", String(options.daysUntilExpirationMax));
+  if (options?.hasStock !== undefined) params.set("hasStock", String(options.hasStock));
   if (options?.warehouse) params.set("warehouse", options.warehouse);
+  if (options?.location) params.set("location", options.location);
+  if (options?.supplier) params.set("supplier", options.supplier);
+  if (options?.categoryId) params.set("categoryId", options.categoryId);
   if (options?.expiresBefore) params.set("expiresBefore", options.expiresBefore);
   if (options?.expiresAfter) params.set("expiresAfter", options.expiresAfter);
   if (options?.search) params.set("search", options.search);
@@ -2865,6 +2897,70 @@ export async function getPortalInventoryLots(
       lots: PortalInventoryLot[];
     };
   }>(`/portal/tenants/${tenantId}/inventory/lots${suffix}`, undefined, false);
+}
+
+export async function getPortalInventoryExpirationSummary(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      summary: PortalInventoryExpirationSummary;
+      thresholds: PortalInventoryExpirationThresholds;
+      timezone: string;
+      today: string;
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/expiration-summary`, undefined, false);
+}
+
+export async function getPortalInventoryExpirationSettings(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      thresholds: PortalInventoryExpirationThresholds;
+      timezone: string;
+      today: string;
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/expiration-settings`, undefined, false);
+}
+
+export async function updatePortalInventoryExpirationSettings(tenantId: string, expirationAlertThresholds: PortalInventoryExpirationThresholds) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      thresholds: PortalInventoryExpirationThresholds;
+      timezone: string;
+      auditAction: string;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/expiration-settings`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ expirationAlertThresholds })
+    },
+    false
+  );
+}
+
+export async function bulkWriteoffExpiredPortalInventoryLots(
+  tenantId: string,
+  payload: { lotIds: string[]; reason?: string | null; notes?: string | null }
+) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      writtenOff: Array<{ lot: PortalInventoryLot; movement: PortalInventoryMovement }>;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/lots/bulk-writeoff-expired`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    false
+  );
 }
 
 export async function getPortalInventoryLotDetail(tenantId: string, lotId: string) {

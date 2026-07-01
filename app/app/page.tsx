@@ -5,6 +5,7 @@ import {
   getPortalBusinessSettings,
   getPortalContacts,
   getPortalConversations,
+  getPortalInventoryExpirationSummary,
   getPortalTenantContext,
   getPortalWhatsAppEmbeddedSignupStatus,
   isBackendConfigured,
@@ -58,6 +59,13 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
   };
   let botResponses = useLocalDemoData ? (localData?.messages || []).filter((item) => item.tenantId === tenantId && item.direction === "system").length : 0;
   let humanResponses = useLocalDemoData ? (localData?.messages || []).filter((item) => item.tenantId === tenantId && item.direction === "outbound").length : 0;
+  let expirationSummary: {
+    expiredLots: number;
+    expiringTodayLots: number;
+    criticalLots: number;
+    urgentLots: number;
+    unitsAtRisk7Days: number;
+  } | null = null;
 
   if (ctx.tenantId && isBackendReady) {
     try {
@@ -67,11 +75,12 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       tenantName = contextResult.data.clinic?.name || tenantName;
       tenantIndustry = "Espacio conectado";
 
-      const [conversationsResult, contactsResult, onboardingResult, businessResult] = await Promise.allSettled([
+      const [conversationsResult, contactsResult, onboardingResult, businessResult, expirationResult] = await Promise.allSettled([
         getPortalConversations(ctx.tenantId),
         getPortalContacts(ctx.tenantId),
         getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId),
-        getPortalBusinessSettings(ctx.tenantId)
+        getPortalBusinessSettings(ctx.tenantId),
+        getPortalInventoryExpirationSummary(ctx.tenantId)
       ]);
 
       if (conversationsResult.status === "fulfilled") {
@@ -97,6 +106,19 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
 
       if (businessResult.status === "fulfilled") {
         businessSettings = businessResult.value?.data?.settings || businessSettings;
+      }
+
+      if (expirationResult.status === "fulfilled") {
+        const summary = expirationResult.value?.data?.summary;
+        expirationSummary = summary
+          ? {
+              expiredLots: summary.expiredLots,
+              expiringTodayLots: summary.expiringTodayLots,
+              criticalLots: summary.criticalLots,
+              urgentLots: summary.urgentLots,
+              unitsAtRisk7Days: summary.unitsAtRisk7Days
+            }
+          : null;
       }
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
@@ -247,6 +269,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
           }
         ]}
         contacts={dashboardContacts}
+        expirationSummary={expirationSummary}
         quickLinks={[
           { label: "Abrir inbox", href: "/app/inbox", helper: "Ir a la vista completa de conversaciones y chat." },
           { label: "Abrir agenda", href: "/app/agenda", helper: "Ordenar seguimientos, notas y disponibilidad del negocio." },

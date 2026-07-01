@@ -29,9 +29,15 @@ export async function GET(request: NextRequest) {
   try {
     const result = await getPortalInventoryLots(tenantContext.tenantId, {
       productId: url.searchParams.get("productId") || undefined,
+      categoryId: url.searchParams.get("categoryId") || undefined,
       status: url.searchParams.get("status") || undefined,
       expirationStatus: url.searchParams.get("expirationStatus") || undefined,
+      daysUntilExpirationMin: url.searchParams.get("daysUntilExpirationMin") || undefined,
+      daysUntilExpirationMax: url.searchParams.get("daysUntilExpirationMax") || undefined,
+      hasStock: url.searchParams.get("hasStock") || undefined,
       warehouse: url.searchParams.get("warehouse") || undefined,
+      location: url.searchParams.get("location") || undefined,
+      supplier: url.searchParams.get("supplier") || undefined,
       expiresBefore: url.searchParams.get("expiresBefore") || undefined,
       expiresAfter: url.searchParams.get("expiresAfter") || undefined,
       search: url.searchParams.get("search") || undefined,

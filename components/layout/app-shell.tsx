@@ -223,7 +223,8 @@ function SidebarPanel({
   showManageShortcut,
   showUsersShortcut,
   onNavigate,
-  onSignOut
+  onSignOut,
+  inventoryAlertCount
 }: {
   pathname: string;
   visibleNavItems: typeof navItems;
@@ -238,6 +239,7 @@ function SidebarPanel({
   showUsersShortcut: boolean;
   onNavigate?: () => void;
   onSignOut: () => void;
+  inventoryAlertCount: number;
 }) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/95 p-5 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
@@ -294,7 +296,12 @@ function SidebarPanel({
 
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{item.label}</span>
+                    <span className="inline-flex items-center gap-2 font-medium">
+                      {item.label}
+                      {item.href === "/app/inventory" && inventoryAlertCount > 0 ? (
+                        <span className="rounded-full border border-rose-400/25 bg-rose-500/12 px-2 py-0.5 text-[11px] text-rose-200">{inventoryAlertCount}</span>
+                      ) : null}
+                    </span>
                     <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" />
                   </span>
                   <span className="mt-1 block text-xs leading-5 text-muted">{item.description}</span>
@@ -431,11 +438,13 @@ function OpturonMark({ compact = false }: { compact?: boolean }) {
 function DesktopRail({
   pathname,
   visibleNavItems,
-  onSignOut
+  onSignOut,
+  inventoryAlertCount
 }: {
   pathname: string;
   visibleNavItems: typeof navItems;
   onSignOut: () => void;
+  inventoryAlertCount: number;
 }) {
   return (
     <aside className="hidden w-[92px] shrink-0 self-start xl:block">
@@ -462,6 +471,11 @@ function DesktopRail({
                   title={item.label}
                 >
                   <Icon className="h-4.5 w-4.5" />
+                  {item.href === "/app/inventory" && inventoryAlertCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 rounded-full border border-card bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {inventoryAlertCount}
+                    </span>
+                  ) : null}
                   <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-[color:var(--border)] bg-surface/95 px-3 py-1.5 text-xs font-medium text-text shadow-[0_18px_40px_rgba(0,0,0,0.26)] group-hover:block">
                     {item.label}
                   </span>
@@ -521,6 +535,7 @@ export function AppShell({
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
+  const [inventoryAlertCount, setInventoryAlertCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const previousPathnameRef = useRef(pathname);
   const activePathnameRef = useRef(pathname);
@@ -629,6 +644,25 @@ export function AppShell({
     return () => controller.abort();
   }, [tenantId, pathname]);
 
+  useEffect(() => {
+    if (!tenantId) return;
+    const controller = new AbortController();
+    void fetch("/api/app/inventory/expiration-summary", {
+      cache: "no-store",
+      signal: controller.signal
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        const data = payload?.summary;
+        if (!data) return;
+        setInventoryAlertCount(Number(data.expiredLots || 0) + Number(data.urgentLots || 0));
+      })
+      .catch(() => {
+        // Badge is helpful but never blocks navigation.
+      });
+    return () => controller.abort();
+  }, [tenantId, pathname]);
+
   const buildLabel = [
     buildMarker ? `Build ${buildMarker}` : null,
     buildEnv ? `Env ${buildEnv}` : null,
@@ -661,6 +695,7 @@ export function AppShell({
         <DesktopRail
           pathname={pathname}
           visibleNavItems={visibleNavItems}
+          inventoryAlertCount={inventoryAlertCount}
           onSignOut={() => void signOut({ callbackUrl: "/login" })}
         />
 
@@ -751,6 +786,7 @@ export function AppShell({
             showManageShortcut={showManageShortcut}
             showUsersShortcut={showUsersShortcut}
             onNavigate={() => setSidebarOpen(false)}
+            inventoryAlertCount={inventoryAlertCount}
             onSignOut={() => void signOut({ callbackUrl: "/login" })}
           />
         </DialogContent>

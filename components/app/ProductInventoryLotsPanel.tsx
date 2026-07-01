@@ -48,7 +48,16 @@ export function ProductInventoryLotsPanel({
     const activeLots = lots.filter((lot) => lot.status === "active");
     const available = activeLots.reduce((sum, lot) => sum + Number(lot.availableQuantity || 0), 0);
     const expiring = lots.filter((lot) => ["expired", "critical", "urgent", "warning"].includes(lot.expirationStatus)).length;
-    return { activeLots: activeLots.length, available, expiring };
+    const datedLots = lots.filter((lot) => lot.expiresAt);
+    const nextExpiration = datedLots
+      .filter((lot) => typeof lot.daysUntilExpiration === "number" && lot.daysUntilExpiration >= 0)
+      .sort((a, b) => Number(a.daysUntilExpiration || 0) - Number(b.daysUntilExpiration || 0))[0];
+    const expiringStock = activeLots
+      .filter((lot) => ["expired", "today", "critical", "urgent", "warning", "upcoming"].includes(lot.expirationStatus))
+      .reduce((sum, lot) => sum + Number(lot.availableQuantity || 0), 0);
+    const expiredLots = lots.filter((lot) => lot.expirationStatus === "expired").length;
+    const withoutExpiration = lots.filter((lot) => lot.expirationStatus === "no_expiration").length;
+    return { activeLots: activeLots.length, available, expiring, nextExpiration, expiringStock, expiredLots, withoutExpiration, datedLots: datedLots.length };
   }, [lots]);
 
   async function refreshLots() {
@@ -136,9 +145,17 @@ export function ProductInventoryLotsPanel({
   }
 
   async function adjustLot(lot: PortalInventoryLot, movementType: "manual_adjustment_out" | "expired_writeoff") {
-    const raw = window.prompt(movementType === "expired_writeoff" ? "Cantidad a dar de baja por vencimiento" : "Cantidad a descontar");
+    const available = Number(lot.availableQuantity || 0);
+    const raw = window.prompt(
+      movementType === "expired_writeoff" ? `Cantidad a dar de baja. Disponible: ${formatQuantity(available)}` : "Cantidad a descontar",
+      movementType === "expired_writeoff" ? String(available) : ""
+    );
     const quantity = Number(raw);
-    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > available) return;
+    const defaultReason = movementType === "expired_writeoff" ? "Producto vencido" : "Ajuste de inventario";
+    const reason = window.prompt("Motivo: Producto vencido, Producto danado, Merma, Ajuste de inventario, Otro", defaultReason) || defaultReason;
+    const notes = window.prompt("Notas opcionales", "") || "";
+    if (!window.confirm(`Confirmar movimiento de ${formatQuantity(quantity)} unidades del lote ${lot.lotNumber || "sin numero"}. No se borra el lote.`)) return;
 
     setSaving(true);
     setFeedback(null);
@@ -149,7 +166,8 @@ export function ProductInventoryLotsPanel({
         body: JSON.stringify({
           movementType,
           quantity,
-          reason: movementType === "expired_writeoff" ? "Baja por vencimiento" : "Ajuste manual"
+          reason,
+          metadata: { notes, source: "product_inventory_lot_panel" }
         })
       });
       const json = await response.json().catch(() => null);
@@ -188,6 +206,19 @@ export function ProductInventoryLotsPanel({
           <SummaryPill label="Alertas vencimiento" value={String(summary.expiring)} />
         </div>
 
+        {summary.datedLots ? (
+          <div className="grid gap-3 md:grid-cols-4">
+            <SummaryPill label="Proximo vencimiento" value={summary.nextExpiration ? expirationDisplayLabel(summary.nextExpiration) : "Sin proximos"} />
+            <SummaryPill label="Stock proximo a vencer" value={formatQuantity(summary.expiringStock)} />
+            <SummaryPill label="Lotes vencidos" value={String(summary.expiredLots)} />
+            <SummaryPill label="Lotes sin fecha" value={String(summary.withoutExpiration)} />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-4 text-sm text-muted">
+            Este producto no tiene lotes con fecha de vencimiento.
+          </div>
+        )}
+
         <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -222,10 +253,15 @@ export function ProductInventoryLotsPanel({
                     <p className="mt-1 text-xs text-muted">
                       {lot.supplierName || "Sin proveedor"} | {lot.warehouseName || "Sin deposito"} | vence {lot.expiresAt || "sin fecha"}
                     </p>
+                    <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-bg/60 p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted">Estado del vencimiento</p>
+                      <p className="mt-1 font-medium">{stateTitle(lot.expirationStatus)}</p>
+                      <p className="mt-1 text-sm text-muted">{expirationDisplayLabel(lot)}</p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={lot.status === "active" ? "success" : lot.status === "expired" ? "danger" : "muted"}>{lot.status}</Badge>
-                    <Badge variant={lot.expirationStatus === "expired" ? "danger" : ["critical", "urgent", "warning"].includes(lot.expirationStatus) ? "warning" : "outline"}>{lot.expirationStatus}</Badge>
+                    <Badge variant={lot.expirationStatus === "expired" ? "danger" : ["today", "critical", "urgent", "warning"].includes(lot.expirationStatus) ? "warning" : "outline"}>{stateTitle(lot.expirationStatus)}</Badge>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -237,7 +273,8 @@ export function ProductInventoryLotsPanel({
                       Ajustar salida
                     </Button>
                     <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "expired_writeoff")} disabled={readOnly || saving || lot.availableQuantity <= 0}>
-                      Baja vencido
+                      Dar de baja stock vencido
+                      <span className="sr-only">Baja vencido</span>
                     </Button>
                   </div>
                 </div>
@@ -265,4 +302,29 @@ function SummaryPill({ label, value }: { label: string; value: string }) {
 
 function formatQuantity(value: number) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 }).format(Number(value || 0));
+}
+
+function expirationDisplayLabel(lot: PortalInventoryLot) {
+  if (lot.expirationLabel) return lot.expirationLabel;
+  if (lot.expirationStatus === "no_expiration") return "Sin fecha de vencimiento";
+  if (lot.daysUntilExpiration === 0) return "Vence hoy";
+  if (lot.daysUntilExpiration === 1) return "Vence manana";
+  if (typeof lot.daysUntilExpiration === "number" && lot.daysUntilExpiration > 1) return `Vence en ${lot.daysUntilExpiration} dias`;
+  if (lot.daysUntilExpiration === -1) return "Vencido hace 1 dia";
+  if (typeof lot.daysUntilExpiration === "number" && lot.daysUntilExpiration < -1) return `Vencido hace ${Math.abs(lot.daysUntilExpiration)} dias`;
+  return stateTitle(lot.expirationStatus);
+}
+
+function stateTitle(status: PortalInventoryLot["expirationStatus"]) {
+  const labels: Record<PortalInventoryLot["expirationStatus"], string> = {
+    expired: "Vencido",
+    today: "Hoy",
+    critical: "Critico",
+    urgent: "Urgente",
+    warning: "Preventivo",
+    upcoming: "Proximo",
+    normal: "Normal",
+    no_expiration: "Sin fecha"
+  };
+  return labels[status] || status;
 }
