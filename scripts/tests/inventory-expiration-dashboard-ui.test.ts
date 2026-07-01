@@ -1,8 +1,9 @@
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = path.join(__dirname, "../..");
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const workspace = fs.readFileSync(path.join(root, "components/app/InventoryLotsWorkspace.tsx"), "utf8");
 const shell = fs.readFileSync(path.join(root, "components/layout/app-shell.tsx"), "utf8");
 const home = fs.readFileSync(path.join(root, "components/app/app-dashboard.tsx"), "utf8");

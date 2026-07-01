@@ -1,8 +1,9 @@
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = path.join(__dirname, "../..");
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const workspace = fs.readFileSync(path.join(root, "components/app/InventoryLotsWorkspace.tsx"), "utf8");
 
 for (const copy of ["Configuracion de alertas", "Avisarme cuando falten", "Critico", "Urgente", "Preventivo", "Proximo vencimiento"]) {
