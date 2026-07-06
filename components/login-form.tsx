@@ -31,12 +31,13 @@ function safeCallbackUrl(value: string | null, fallback: string, authIntent: "po
   if (authIntent !== "partner") return candidate;
 
   const pathname = candidate.split(/[?#]/)[0] || "/";
+  const usePartnerPublicPaths = fallback === "/";
   if (PARTNER_CALLBACK_PATHS.has(pathname)) return candidate;
-  if (pathname === "/partners") return "/";
+  if (pathname === "/partners") return usePartnerPublicPaths ? "/" : candidate;
   if (pathname.startsWith("/partners/")) {
     const publicPath = pathname.slice("/partners".length) || "/";
     if (PARTNER_CALLBACK_PATHS.has(publicPath)) {
-      return candidate.replace(pathname, publicPath);
+      return usePartnerPublicPaths ? candidate.replace(pathname, publicPath) : candidate;
     }
   }
   return fallback;
