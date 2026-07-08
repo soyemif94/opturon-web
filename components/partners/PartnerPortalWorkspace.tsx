@@ -129,6 +129,7 @@ const PREMIUM_SURFACE_CARD =
   "border-white/10 bg-[linear-gradient(180deg,rgba(10,20,36,0.92),rgba(9,18,33,0.84))] text-slate-100 shadow-[0_22px_70px_rgba(2,8,23,0.35)]";
 const PREMIUM_TABLE_SHELL = "hidden overflow-hidden rounded-[24px] border border-white/10 lg:block";
 const PREMIUM_EMPTY_STATE = "min-h-[320px] border-white/10 bg-white/[0.03] text-slate-100";
+const PREMIUM_INFO_TILE = "rounded-[22px] border border-white/10 bg-white/[0.04] p-4";
 const PREMIUM_FILTER_FIELD =
   "h-10 rounded-xl border border-white/10 bg-slate-950/55 px-3 text-sm normal-case tracking-normal text-slate-100 outline-none transition focus:border-amber-300/45 focus:ring-2 focus:ring-amber-300/20 disabled:cursor-not-allowed disabled:opacity-55";
 const PREMIUM_SELECT_TRIGGER =
@@ -137,6 +138,8 @@ const PREMIUM_SELECT_PANEL =
   "absolute z-[80] mt-2 max-h-64 min-w-full overflow-y-auto rounded-2xl border border-amber-200/15 bg-[linear-gradient(180deg,rgba(7,16,30,0.98),rgba(10,23,41,0.98))] p-1.5 text-slate-100 shadow-[0_24px_70px_rgba(2,8,23,0.62)] backdrop-blur";
 const PREMIUM_SELECT_OPTION =
   "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-100 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.10] disabled:cursor-not-allowed disabled:text-slate-500 data-[selected=true]:bg-amber-300/12 data-[selected=true]:text-amber-100";
+const COMMERCIAL_RULES_NOTE =
+  "Las comisiones se calculan sobre el precio real cerrado y pagado. No se paga por reclutar; solo por pagos reales acreditados y no revertidos.";
 
 type PartnerSelectOption<T extends string> = {
   value: T;
@@ -445,6 +448,13 @@ function HomeView({
   const currentIndex = PARTNER_CAREER_LADDER.findIndex((level) => level.code === String(currentRank || "").trim().toLowerCase());
   const currentRequirements = currentIndex >= 0 ? PARTNER_CAREER_LADDER[currentIndex]?.rules || [] : [];
   const nextRequirements = currentIndex >= 0 ? PARTNER_CAREER_LADDER[currentIndex + 1]?.rules || [] : [];
+  const activeClientCount = clients.filter((client) => String(client.status || "").trim().toLowerCase() === "active").length;
+  const inactiveClientCount = clients.filter((client) => String(client.status || "").trim().toLowerCase() !== "active").length;
+  const payingClientCount = clients.filter((client) => resolvePartnerClientPaymentState(client) === "current").length;
+  const attentionClientCount = clients.filter((client) => {
+    const paymentState = resolvePartnerClientPaymentState(client);
+    return paymentState === "pending" || paymentState === "overdue";
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -462,6 +472,8 @@ function HomeView({
             <div className="mt-6 flex flex-wrap gap-2">
               <Badge variant={partnerStatusVariant(partner?.status)}>{formatPartnerStatus(partner?.status)}</Badge>
               <Badge className="border-white/10 bg-white/6 text-slate-100">{formatRankLabel(currentRank)}</Badge>
+              <Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{formatMetricValue(activeClientsValue)} clientes activos</Badge>
+              <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">{summary?.generatedCommissions ? `${formatPortalMoney(summary.generatedCommissions)} este mes` : "Comisiones sin dato"}</Badge>
               <Badge className="border-white/10 bg-white/6 text-slate-300">Ultimo acceso: {formatPortalDateTime(partner?.lastLoginAt)}</Badge>
             </div>
           </CardContent>
@@ -479,10 +491,9 @@ function HomeView({
           <CardContent className="space-y-4 pt-0">
             <MetricStrip dark label="Rango actual" value={formatRankLabel(currentRank)} icon={<BadgeCheck className="h-4 w-4" />} />
             <MetricStrip dark label="Proximo rango" value={nextRankLabel} icon={<ArrowRight className="h-4 w-4" />} />
-            <MetricStrip dark label="Progreso visible" value={`${stepProgress}%`} icon={<TrendingUp className="h-4 w-4" />} />
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
-              Tu estado actual es <span className="font-semibold text-white">{formatPartnerStatus(partner?.status)}</span>. Si el backend publica metas cuantificadas
-              adicionales en proximas etapas, este bloque se enriquecera sin recalcular datos desde el navegador.
+            <MetricStrip dark label="Progreso al proximo rango" value={`${stepProgress}%`} icon={<TrendingUp className="h-4 w-4" />} />
+            <div className={`${PREMIUM_INFO_TILE} text-sm leading-6 text-slate-300`}>
+              Tu estado actual es <span className="font-semibold text-white">{formatPartnerStatus(partner?.status)}</span>. {COMMERCIAL_RULES_NOTE}
             </div>
           </CardContent>
         </Card>
@@ -491,8 +502,8 @@ function HomeView({
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard dark icon={<Users2 className="h-4 w-4" />} label="Clientes activos" value={formatMetricValue(activeClientsValue)} detail="Valor servido desde tu resumen de asesor actual." />
         <KpiCard dark icon={<BriefcaseBusiness className="h-4 w-4" />} label="Cartera visible" value={formatMetricValue(totalClientsValue)} detail="Clientes atribuidos visibles hoy en el portal." />
-        <KpiCard dark icon={<Sparkles className="h-4 w-4" />} label="Rango actual" value={formatRankLabel(currentRank)} detail="Tomado del rango visible en backend o historial publicado." />
-        <KpiCard dark icon={<Star className="h-4 w-4" />} label="Progreso al proximo rango" value={`${stepProgress}%`} detail="Referencia visual segun el rango actual publicado." />
+        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Clientes que pagan" value={String(payingClientCount)} detail="Clientes con billing publicado como al dia." />
+        <KpiCard dark icon={<CalendarRange className="h-4 w-4" />} label="Pendientes de pago" value={String(attentionClientCount)} detail="Clientes pendientes o vencidos segun billing visible." />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
@@ -501,16 +512,21 @@ function HomeView({
             <div>
               <CardTitle className="text-xl text-white">Clientes recientes</CardTitle>
               <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                Ultimas atribuciones visibles desde `GET /api/partners/me/clients`, sin exponer identificadores internos.
+                Ultimas atribuciones visibles, separando cartera activa, vinculos cerrados y estado de billing publicado.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <MetricStrip dark label="Activos" value={String(activeClientCount)} icon={<BadgeCheck className="h-4 w-4" />} />
+              <MetricStrip dark label="Inactivos" value={String(inactiveClientCount)} icon={<ShieldCheck className="h-4 w-4" />} />
+              <MetricStrip dark label="Pagan al dia" value={String(payingClientCount)} icon={<TrendingUp className="h-4 w-4" />} />
+            </div>
             {recentClients.length === 0 ? (
               <EmptyState
                 icon={<Users2 className="h-5 w-5" />}
                 title="Todavia no tenes clientes visibles"
-                description="Cuando una atribucion quede asociada a tu cuenta, aparecera aca con su estado real."
+                description="Cuando una atribucion quede asociada a tu cuenta, aparecera aca con estado activo/inactivo y pago publicado. Mientras tanto podes registrar una solicitud desde Mis clientes."
                 className={PREMIUM_EMPTY_STATE}
               />
             ) : (
@@ -524,7 +540,8 @@ function HomeView({
                     <Badge variant={client.status === "active" ? "success" : "outline"}>{summarizeAttributionStatus(client.status)}</Badge>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
-                    <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Origen: {client.attributionSource || "No informado"}</span>
+                    <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Origen: {summarizeAttributionSource(client.attributionSource)}</span>
+                    <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Pago: {summarizePartnerBillingState(resolvePartnerClientPaymentState(client))}</span>
                     {client.notes ? <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Detalle: {client.notes}</span> : null}
                     {client.endedAt ? <span className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Cierre: {formatPortalDate(client.endedAt)}</span> : null}
                   </div>
@@ -608,11 +625,10 @@ function HomeView({
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.04] p-5">
-                <p className="text-base font-semibold text-white">El detalle de pagos y comisiones estara disponible en una proxima etapa.</p>
-                <p className="mt-3 text-sm leading-7 text-slate-300">
-                  Esta version prioriza visibilidad de cartera, estado y carrera usando solamente informacion real disponible hoy.
-                </p>
+              <div className="grid gap-3">
+                <RuleCallout dark title="Cuidar cartera activa" body="Revisa clientes pendientes o vencidos para sostener recurrentes sobre pagos reales." />
+                <RuleCallout dark title="Completar proximo requisito" body={nextRequirements[0] || "Mantene actividad y pagos acreditados para sostener el rango visible."} />
+                <RuleCallout dark title="Construir red directa" body="Invita asesores desde Mi red; no se paga por reclutar, pero la red ordena lineas comerciales futuras." />
               </div>
             </CardContent>
           </Card>
@@ -848,7 +864,12 @@ function ClientsView({
 
   const selectedClient = filtered.find((item) => item.id === selectedClientId) || null;
   const activeClients = clients.filter((item) => String(item.status || "").trim().toLowerCase() === "active").length;
+  const inactiveClients = clients.filter((item) => String(item.status || "").trim().toLowerCase() !== "active").length;
   const currentPaymentClients = clients.filter((item) => resolvePartnerClientPaymentState(item) === "current").length;
+  const unpaidClients = clients.filter((item) => {
+    const state = resolvePartnerClientPaymentState(item);
+    return state === "overdue" || state === "canceled";
+  }).length;
   const pendingOrOverdueClients = clients.filter((item) => {
     const state = resolvePartnerClientPaymentState(item);
     return state === "pending" || state === "overdue";
@@ -892,11 +913,13 @@ function ClientsView({
             </div>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.45rem]">Cartera del asesor</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-              Vista comercial de tus atribuciones activas e historicas usando unicamente los campos reales del endpoint de asesores.
+              Vista comercial de atribuciones activas e historicas, solicitudes de alta y estado de billing publicado.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-slate-300">
               <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Total visible: {clients.length}</span>
-              <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Estados reales: {statuses.length - 1 || 0}</span>
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-emerald-100">Activos: {activeClients}</span>
+              <span className="rounded-full border border-slate-300/15 bg-white/[0.05] px-3 py-1.5">Inactivos: {inactiveClients}</span>
+              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-amber-100">Pendientes: {hasBillingStates ? pendingOrOverdueClients : "sin dato"}</span>
               <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Sin UUIDs expuestos</span>
             </div>
           </CardContent>
@@ -911,10 +934,12 @@ function ClientsView({
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-3 pt-0 md:grid-cols-3 xl:grid-cols-1">
+          <CardContent className="grid gap-3 pt-0 md:grid-cols-2 xl:grid-cols-1">
             <MetricStrip dark label="Clientes totales" value={String(clients.length)} icon={<Users2 className="h-4 w-4" />} />
+            <MetricStrip dark label="Activos / inactivos" value={`${activeClients} / ${inactiveClients}`} icon={<ShieldCheck className="h-4 w-4" />} />
             <MetricStrip dark label="Al dia" value={hasBillingStates ? String(currentPaymentClients) : "Sin dato"} icon={<BadgeCheck className="h-4 w-4" />} />
             <MetricStrip dark label="Pendientes o vencidos" value={hasBillingStates ? String(pendingOrOverdueClients) : "Sin dato"} icon={<CalendarRange className="h-4 w-4" />} />
+            <MetricStrip dark label="Vencidos o cancelados" value={hasBillingStates ? String(unpaidClients) : "Sin dato"} icon={<AlertCircle className="h-4 w-4" />} />
           </CardContent>
         </Card>
       </section>
@@ -932,7 +957,7 @@ function ClientsView({
             <div>
               <CardTitle className="text-2xl text-white">Solicitudes de alta</CardTitle>
               <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                Presenta nuevos clientes con comprobante. Quedan pendientes de revision; no se crean tenants, comisiones ni carrera en esta fase.
+                Presenta nuevos clientes con comprobante. Quedan pendientes de revision; no crean tenants, comisiones ni carrera por si solas.
               </CardDescription>
             </div>
           </CardHeader>
@@ -1008,7 +1033,7 @@ function ClientsView({
           ) : (
             <CardContent className="pt-0">
               <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 text-sm leading-7 text-slate-300">
-                Usa el CTA para cargar datos, metodo de pago e evidencia. Admin revisa y resuelve; una solicitud aprobada no aparece como cliente activo automaticamente.
+                Usa el CTA para cargar datos, metodo de pago y evidencia. Admin revisa y resuelve; una solicitud aprobada no aparece como cliente activo automaticamente.
               </div>
             </CardContent>
           )}
@@ -1039,7 +1064,7 @@ function ClientsView({
               <EmptyState
                 icon={<FileText className="h-5 w-5" />}
                 title="Sin solicitudes visibles"
-                description="Cuando registres un cliente, la solicitud aparecera aca con su estado de revision."
+                description="Cuando registres un cliente, la solicitud aparecera aca con su estado de revision, comprobante y proximos pasos administrativos."
                 className="min-h-[180px] border-white/10 bg-white/[0.03] text-slate-100"
               />
             ) : (
@@ -1109,7 +1134,7 @@ function ClientsView({
             <EmptyState
               icon={<Users2 className="h-5 w-5" />}
               title="Todavia no tenes clientes atribuidos"
-              description="Cuando una atribucion quede asociada a tu cuenta, la cartera se va a completar automaticamente con su estado real."
+              description="La cartera se completa cuando el backend publica atribuciones aprobadas. Para iniciar una alta comercial, carga una solicitud con comprobante desde esta pantalla."
               className={PREMIUM_EMPTY_STATE}
             />
           ) : hasNoMatches ? (
@@ -1203,7 +1228,7 @@ function ClientsView({
                         <div className="mt-4 grid gap-2 text-sm text-slate-300">
                           <p>Origen: {summarizeAttributionSource(client.attributionSource)}</p>
                           <p>Vinculo: {client.endedAt ? "Finalizado" : "Vigente"}</p>
-                          {hasPartnerClientBilling(client) ? <p>Pago: {summarizePartnerBillingState(resolvePartnerClientPaymentState(client))}</p> : null}
+                          <p>Pago: {hasPartnerClientBilling(client) ? summarizePartnerBillingState(resolvePartnerClientPaymentState(client)) : "Sin informacion publicada"}</p>
                           {client.billing?.planName ? <p>Plan: {client.billing.planName}</p> : null}
                           <p>{client.notes || "Sin observaciones comerciales publicadas"}</p>
                         </div>
@@ -1485,6 +1510,8 @@ function CareerView({
   const evaluationStatus = summarizeCareerEvaluationStatus(progress?.evaluationStatus);
   const hasEvaluation = String(progress?.evaluationStatus || "").trim().toLowerCase() === "complete";
   const isMaxRank = !nextRank && String(currentRank || "").trim().toLowerCase() === "emperador";
+  const currentLevel = PARTNER_CAREER_LADDER.find((level) => level.code === String(currentRank || "").trim().toLowerCase()) || null;
+  const nextLevel = PARTNER_CAREER_LADDER.find((level) => level.code === String(nextRank || "").trim().toLowerCase()) || null;
   const evaluationWindow = progress?.windowStart && progress?.windowEnd
     ? `${formatPortalDate(progress.windowStart)} al ${formatPortalDate(progress.windowEnd)}`
     : null;
@@ -1545,6 +1572,26 @@ function CareerView({
             </div>
             {requirements.length > 0 ? (
               <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className={PREMIUM_INFO_TILE}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Beneficios actuales</p>
+                    <p className="mt-3 text-base font-semibold text-white">{currentLevel?.label || formatRankLabel(currentRank)}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(currentLevel?.rules || ["Sin beneficios publicados"]).map((rule) => (
+                        <span key={rule} className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">{rule}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className={PREMIUM_INFO_TILE}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Siguiente tramo</p>
+                    <p className="mt-3 text-base font-semibold text-white">{nextLevel?.label || (isMaxRank ? "Rango maximo" : "Sin siguiente rango")}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(nextLevel?.rules || [isMaxRank ? "Mantener pagos reales y cartera activa" : "Esperando evaluacion publicada"]).map((rule) => (
+                        <span key={rule} className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs text-amber-100">{rule}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
                 <div className="grid gap-3">
                   {requirements.map((requirement) => (
                     <CareerRequirementCard key={requirement.code} requirement={requirement} />
@@ -1578,14 +1625,20 @@ function CareerView({
                 </div>
               </>
             ) : (
-              <EmptyState
-                icon={<Sparkles className="h-5 w-5" />}
-                title={hasEvaluation ? "Respuesta incompleta para progreso detallado" : "Sin evaluacion cuantificada visible"}
-                description={hasEvaluation
-                  ? "El backend publica rango y evaluacion, pero no hay requisitos suficientes en esta respuesta para mostrar faltantes reales."
-                  : "Cuando exista una evaluacion de carrera publicada para tu cuenta, esta vista mostrara objetivos cumplidos y pendientes."}
-                className={PREMIUM_EMPTY_STATE}
-              />
+              <div className="grid gap-4">
+                <EmptyState
+                  icon={<Sparkles className="h-5 w-5" />}
+                  title={hasEvaluation ? "Respuesta incompleta para progreso detallado" : "Sin evaluacion cuantificada visible"}
+                  description={hasEvaluation
+                    ? "El backend publica rango y evaluacion, pero no hay requisitos suficientes en esta respuesta para mostrar faltantes reales."
+                    : "Cuando exista una evaluacion de carrera publicada para tu cuenta, esta vista mostrara objetivos cumplidos y pendientes."}
+                  className={PREMIUM_EMPTY_STATE}
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <RuleCallout dark title="Rango actual" body={`Hoy el rango visible es ${formatRankLabel(currentRank)}.`} />
+                  <RuleCallout dark title="Proximo requisito" body={nextLevel ? `El siguiente tramo publicado es ${nextLevel.label}.` : "No hay siguiente rango cuantificado visible en esta respuesta."} />
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1651,7 +1704,8 @@ function CareerView({
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
             <RuleCallout dark title="Tope recurrente" body="Tope recurrente acumulado por cliente: 15%." />
-            <RuleCallout dark title="Sin pago por reclutar" body="No se paga por reclutar. La comision depende de operacion real." />
+            <RuleCallout dark title="Base real pagada" body="La base es el precio real cerrado y pagado, no el precio lista del plan." />
+            <RuleCallout dark title="Sin pago por reclutar" body="No se paga por reclutar. La comision depende de pagos reales." />
             <RuleCallout dark title="Evento valido" body="Solo se comisionan pagos reales acreditados y no revertidos." />
             <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300">
               {isMaxRank
@@ -1734,6 +1788,10 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
   };
   const selectedLevel = levels.find((level) => level.depth === selectedDepth) || { depth: selectedDepth, partners: [] };
   const hasNetwork = levels.some((level) => level.partners.length > 0);
+  const normalizedLevels: PartnerPortalNetworkLevel[] = ([1, 2, 3] as const).map((depth) => {
+    const level = levels.find((item) => item.depth === depth);
+    return { depth, partners: level?.partners || [] };
+  });
 
   return (
     <div className="space-y-6">
@@ -1791,8 +1849,8 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
             </div>
           </CardHeader>
           <CardContent className="grid gap-2 pt-0">
-            {[1, 2, 3].map((depth) => {
-              const level = levels.find((item) => item.depth === depth);
+            {normalizedLevels.map((level) => {
+              const depth = level.depth;
               const active = selectedDepth === depth;
               return (
                 <button
@@ -1808,9 +1866,12 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-semibold">{summarizeNetworkDepth(depth)}</span>
                     <Badge className={active ? "border-white/10 bg-white/10 text-white" : "border-white/10 bg-white/6 text-slate-300"}>
-                      {level?.partners.length || 0}
+                      {level.partners.length}
                     </Badge>
                   </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                    {depth === 1 ? "Directos patrocinados por vos." : depth === 2 ? "Descendientes de tu primera linea." : "Tercera linea visible aprobada."}
+                  </p>
                 </button>
               );
             })}
@@ -1826,12 +1887,25 @@ function NetworkView({ network }: { network: PartnerPortalNetwork | null }) {
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="space-y-4 pt-0">
+            {hasNetwork ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                {normalizedLevels.map((level) => (
+                  <div key={level.depth} className={`${PREMIUM_INFO_TILE} ${selectedDepth === level.depth ? "ring-1 ring-amber-300/30" : ""}`}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{summarizeNetworkDepth(level.depth)}</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">{level.partners.length}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                      {level.partners.length === 0 ? "Sin asesores visibles en esta linea." : `${level.partners.filter((member) => String(member.status || "").trim().toLowerCase() === "active").length} activos visibles.`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {!hasNetwork ? (
               <EmptyState
                 icon={<Users2 className="h-5 w-5" />}
                 title="Todavia no tenes asesores en tu red"
-                description="Cuando existan descendientes asociados por sponsor, se mostraran aca por linea comercial."
+                description="La red aparece vacia porque no hay descendientes publicados por sponsor. Podes invitar asesores desde el panel inferior; no se paga por reclutar, solo por pagos reales segun reglas aprobadas."
                 className={PREMIUM_EMPTY_STATE}
               />
             ) : selectedLevel.partners.length === 0 ? (
@@ -1954,6 +2028,10 @@ function CommissionsView({
   const currency = summary.currency || entries.find((entry) => entry.currency)?.currency || "ARS";
   const hasEntries = entries.length > 0;
   const hasActiveFilters = statusFilter !== "all" || typeFilter !== "all" || Boolean(from) || Boolean(to);
+  const generatedEntries = entries.filter((entry) => String(entry.status || "").trim().toLowerCase() === "generated" && !entry.reversed);
+  const reversedEntries = entries.filter((entry) => entry.reversed || String(entry.status || "").trim().toLowerCase() === "reversed");
+  const paidEntries = entries.filter((entry) => isPartnerCommissionPaid(entry.paymentStatus));
+  const pendingEntries = entries.filter((entry) => !entry.reversed && !isPartnerCommissionPaid(entry.paymentStatus));
   const statusOptions: PartnerSelectOption<CommissionStatusFilter>[] = [
     { value: "all", label: "Todos los estados" },
     { value: "generated", label: "Registradas" },
@@ -1995,18 +2073,19 @@ function CommissionsView({
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
-            <RuleCallout dark title="Sin estados de cobro" body="No se usa 'Pagado', 'Cobrado' ni 'Disponible para retirar' porque no existe esa fuente en este modelo." />
+            <RuleCallout dark title="Registradas" body="Son movimientos del ledger con importe persistido; no se recalculan en el navegador." />
+            <RuleCallout dark title="Acreditacion publicada" body="Solo se muestran como acreditadas cuando el entry publica un paymentStatus compatible." />
+            <RuleCallout dark title="Pendientes" body="Si no hay paymentStatus acreditado, la vista lo muestra como pendiente o no publicado." />
             <RuleCallout dark title="Sin recalculo" body="Base, porcentaje e importe provienen del snapshot persistido en el ledger." />
-            <RuleCallout dark title="Sin acciones" body="El portal no genera, aprueba, revierte ni liquida movimientos desde esta pantalla." />
           </CardContent>
         </Card>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard dark icon={<TrendingUp className="h-4 w-4" />} label="Comisiones generadas" value={formatPortalMoney(summary.totalGenerated, currency)} detail="Suma de entries con estado real `generated`." />
-        <KpiCard dark icon={<ArrowRight className="h-4 w-4" />} label="Reversiones" value={formatPortalMoney(summary.totalReversed, currency)} detail="Importe revertido visible en el ledger publicado." />
-        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Neto registrado" value={formatPortalMoney(summary.netAmount, currency)} detail="Generadas menos reversiones registradas." />
-        <KpiCard dark icon={<BriefcaseBusiness className="h-4 w-4" />} label="Movimientos" value={String(pagination.total || 0)} detail="Cantidad total de registros segun los filtros aplicados." />
+        <KpiCard dark icon={<TrendingUp className="h-4 w-4" />} label="Registradas" value={formatPortalMoney(summary.totalGenerated, currency)} detail={`${generatedEntries.length} movimientos registrados no revertidos.`} />
+        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Vigentes" value={String(generatedEntries.length)} detail="Entries vigentes del ledger visible." />
+        <KpiCard dark icon={<ShieldCheck className="h-4 w-4" />} label="Acreditacion publicada" value={String(paidEntries.length)} detail="Movimientos con pago real/acreditacion publicada." />
+        <KpiCard dark icon={<CalendarRange className="h-4 w-4" />} label="Pendientes" value={String(pendingEntries.length)} detail={`${reversedEntries.length} reversiones quedan trazadas aparte.`} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -2066,7 +2145,7 @@ function CommissionsView({
               <EmptyState
                 icon={<BriefcaseBusiness className="h-5 w-5" />}
                 title={hasActiveFilters ? "No encontramos movimientos con esos filtros" : "Todavia no tenes movimientos registrados"}
-                description={hasActiveFilters ? "Ajusta periodo, tipo o estado para volver a consultar el ledger publicado." : "Cuando existan comisiones reales registradas para tu cuenta, apareceran aca con su trazabilidad."}
+                description={hasActiveFilters ? "Ajusta periodo, tipo o estado para volver a consultar el ledger publicado." : "Cuando existan comisiones reales registradas para tu cuenta, apareceran aca separadas entre registradas, revertidas y pendientes segun los campos publicados."}
                 className={PREMIUM_EMPTY_STATE}
               />
             ) : (
@@ -2082,6 +2161,7 @@ function CommissionsView({
                         <th className="px-4 py-3 text-left font-medium">Porcentaje</th>
                         <th className="px-4 py-3 text-left font-medium">Importe</th>
                         <th className="px-4 py-3 text-left font-medium">Estado</th>
+                        <th className="px-4 py-3 text-left font-medium">Acreditacion</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
@@ -2122,6 +2202,30 @@ function CommissionsView({
   );
 }
 
+function isPartnerCommissionPaid(paymentStatus?: string | null) {
+  const normalized = String(paymentStatus || "").trim().toLowerCase();
+  return normalized === "paid" || normalized === "accredited" || normalized === "approved" || normalized === "settled";
+}
+
+function summarizePartnerCommissionPaymentState(paymentStatus?: string | null) {
+  const normalized = String(paymentStatus || "").trim().toLowerCase();
+  if (normalized === "paid") return "Pago confirmado";
+  if (normalized === "accredited") return "Acreditada";
+  if (normalized === "approved") return "Aprobada";
+  if (normalized === "settled") return "Registrada";
+  if (normalized === "pending") return "Pendiente";
+  if (normalized === "rejected") return "Rechazada";
+  return "No publicado";
+}
+
+function partnerCommissionPaymentVariant(paymentStatus?: string | null) {
+  const normalized = String(paymentStatus || "").trim().toLowerCase();
+  if (isPartnerCommissionPaid(normalized)) return "success" as const;
+  if (normalized === "pending") return "warning" as const;
+  if (normalized === "rejected") return "danger" as const;
+  return "muted" as const;
+}
+
 function CommissionTableRow({ entry, index, currency }: { entry: PartnerPortalCommissionEntry; index: number; currency: string }) {
   return (
     <tr className="bg-white/[0.02] text-slate-200">
@@ -2133,6 +2237,9 @@ function CommissionTableRow({ entry, index, currency }: { entry: PartnerPortalCo
       <td className="px-4 py-4">{formatPortalMoney(entry.amount, entry.currency || currency)}</td>
       <td className="px-4 py-4">
         <Badge variant={partnerCommissionStatusVariant(entry.status)}>{summarizePartnerCommissionStatus(entry.status)}</Badge>
+      </td>
+      <td className="px-4 py-4">
+        <Badge variant={partnerCommissionPaymentVariant(entry.paymentStatus)}>{summarizePartnerCommissionPaymentState(entry.paymentStatus)}</Badge>
       </td>
     </tr>
   );
@@ -2157,6 +2264,7 @@ function CommissionCard({ entry, index, currency }: { entry: PartnerPortalCommis
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <MetricStrip dark label="Base" value={formatPortalMoney(entry.basisAmount, entry.currency || currency)} icon={<CalendarRange className="h-4 w-4" />} />
         <MetricStrip dark label="Porcentaje" value={`${entry.rate}%`} icon={<BadgeCheck className="h-4 w-4" />} />
+        <MetricStrip dark label="Acreditacion" value={summarizePartnerCommissionPaymentState(entry.paymentStatus)} icon={<ShieldCheck className="h-4 w-4" />} />
       </div>
 
       {entry.reversed ? (

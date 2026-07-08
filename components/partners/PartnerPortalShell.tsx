@@ -179,6 +179,9 @@ export function PartnerPortalShell({
                     <Badge className="border-white/10 bg-white/6 text-slate-200">{rankLabel}</Badge>
                     <Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-100">{statusLabel}</Badge>
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-400">
+                    Cartera, red, carrera y comisiones registradas en una vista separada del CRM interno.
+                  </p>
                 </div>
 
                 <nav className="mt-5 grid gap-2">
