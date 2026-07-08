@@ -138,6 +138,8 @@ const PREMIUM_SELECT_PANEL =
   "absolute z-[80] mt-2 max-h-64 min-w-full overflow-y-auto rounded-2xl border border-amber-200/15 bg-[linear-gradient(180deg,rgba(7,16,30,0.98),rgba(10,23,41,0.98))] p-1.5 text-slate-100 shadow-[0_24px_70px_rgba(2,8,23,0.62)] backdrop-blur";
 const PREMIUM_SELECT_OPTION =
   "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-100 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.10] disabled:cursor-not-allowed disabled:text-slate-500 data-[selected=true]:bg-amber-300/12 data-[selected=true]:text-amber-100";
+const COMMERCIAL_RULES_NOTE =
+  "Las comisiones se calculan sobre el precio real cerrado y pagado. No se paga por reclutar; solo por pagos reales acreditados y no revertidos.";
 
 type PartnerSelectOption<T extends string> = {
   value: T;
@@ -491,8 +493,7 @@ function HomeView({
             <MetricStrip dark label="Proximo rango" value={nextRankLabel} icon={<ArrowRight className="h-4 w-4" />} />
             <MetricStrip dark label="Progreso al proximo rango" value={`${stepProgress}%`} icon={<TrendingUp className="h-4 w-4" />} />
             <div className={`${PREMIUM_INFO_TILE} text-sm leading-6 text-slate-300`}>
-              Tu estado actual es <span className="font-semibold text-white">{formatPartnerStatus(partner?.status)}</span>. Si el backend publica metas cuantificadas
-              adicionales en proximas etapas, este bloque se enriquecera sin recalcular datos desde el navegador.
+              Tu estado actual es <span className="font-semibold text-white">{formatPartnerStatus(partner?.status)}</span>. {COMMERCIAL_RULES_NOTE}
             </div>
           </CardContent>
         </Card>
@@ -511,7 +512,7 @@ function HomeView({
             <div>
               <CardTitle className="text-xl text-white">Clientes recientes</CardTitle>
               <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                Ultimas atribuciones visibles desde `GET /api/partners/me/clients`, sin exponer identificadores internos.
+                Ultimas atribuciones visibles, separando cartera activa, vinculos cerrados y estado de billing publicado.
               </CardDescription>
             </div>
           </CardHeader>
@@ -912,7 +913,7 @@ function ClientsView({
             </div>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.45rem]">Cartera del asesor</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-              Vista comercial de tus atribuciones activas e historicas usando unicamente los campos reales del endpoint de asesores.
+              Vista comercial de atribuciones activas e historicas, solicitudes de alta y estado de billing publicado.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-slate-300">
               <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">Total visible: {clients.length}</span>
@@ -938,7 +939,7 @@ function ClientsView({
             <MetricStrip dark label="Activos / inactivos" value={`${activeClients} / ${inactiveClients}`} icon={<ShieldCheck className="h-4 w-4" />} />
             <MetricStrip dark label="Al dia" value={hasBillingStates ? String(currentPaymentClients) : "Sin dato"} icon={<BadgeCheck className="h-4 w-4" />} />
             <MetricStrip dark label="Pendientes o vencidos" value={hasBillingStates ? String(pendingOrOverdueClients) : "Sin dato"} icon={<CalendarRange className="h-4 w-4" />} />
-            <MetricStrip dark label="No pagan" value={hasBillingStates ? String(unpaidClients) : "Sin dato"} icon={<AlertCircle className="h-4 w-4" />} />
+            <MetricStrip dark label="Vencidos o cancelados" value={hasBillingStates ? String(unpaidClients) : "Sin dato"} icon={<AlertCircle className="h-4 w-4" />} />
           </CardContent>
         </Card>
       </section>
@@ -956,7 +957,7 @@ function ClientsView({
             <div>
               <CardTitle className="text-2xl text-white">Solicitudes de alta</CardTitle>
               <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
-                Presenta nuevos clientes con comprobante. Quedan pendientes de revision; no se crean tenants, comisiones ni carrera en esta fase.
+                Presenta nuevos clientes con comprobante. Quedan pendientes de revision; no crean tenants, comisiones ni carrera por si solas.
               </CardDescription>
             </div>
           </CardHeader>
@@ -1032,7 +1033,7 @@ function ClientsView({
           ) : (
             <CardContent className="pt-0">
               <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 text-sm leading-7 text-slate-300">
-                Usa el CTA para cargar datos, metodo de pago e evidencia. Admin revisa y resuelve; una solicitud aprobada no aparece como cliente activo automaticamente.
+                Usa el CTA para cargar datos, metodo de pago y evidencia. Admin revisa y resuelve; una solicitud aprobada no aparece como cliente activo automaticamente.
               </div>
             </CardContent>
           )}
@@ -1063,7 +1064,7 @@ function ClientsView({
               <EmptyState
                 icon={<FileText className="h-5 w-5" />}
                 title="Sin solicitudes visibles"
-                description="Cuando registres un cliente, la solicitud aparecera aca con su estado de revision."
+                description="Cuando registres un cliente, la solicitud aparecera aca con su estado de revision, comprobante y proximos pasos administrativos."
                 className="min-h-[180px] border-white/10 bg-white/[0.03] text-slate-100"
               />
             ) : (
@@ -1133,7 +1134,7 @@ function ClientsView({
             <EmptyState
               icon={<Users2 className="h-5 w-5" />}
               title="Todavia no tenes clientes atribuidos"
-              description="La cartera se va a completar automaticamente cuando el backend publique atribuciones aprobadas. Para iniciar una alta, usa la solicitud con comprobante de esta pantalla."
+              description="La cartera se completa cuando el backend publica atribuciones aprobadas. Para iniciar una alta comercial, carga una solicitud con comprobante desde esta pantalla."
               className={PREMIUM_EMPTY_STATE}
             />
           ) : hasNoMatches ? (
@@ -1703,7 +1704,8 @@ function CareerView({
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
             <RuleCallout dark title="Tope recurrente" body="Tope recurrente acumulado por cliente: 15%." />
-            <RuleCallout dark title="Sin pago por reclutar" body="No se paga por reclutar. La comision depende de operacion real." />
+            <RuleCallout dark title="Base real pagada" body="La base es el precio real cerrado y pagado, no el precio lista del plan." />
+            <RuleCallout dark title="Sin pago por reclutar" body="No se paga por reclutar. La comision depende de pagos reales." />
             <RuleCallout dark title="Evento valido" body="Solo se comisionan pagos reales acreditados y no revertidos." />
             <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-slate-300">
               {isMaxRank
@@ -2071,8 +2073,8 @@ function CommissionsView({
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-0">
-            <RuleCallout dark title="Estimadas" body="Son movimientos registrados en el ledger con importe persistido; no se recalculan en el navegador." />
-            <RuleCallout dark title="Aprobadas y pagadas" body="Solo se marcan como acreditadas cuando el entry publica un paymentStatus compatible." />
+            <RuleCallout dark title="Registradas" body="Son movimientos del ledger con importe persistido; no se recalculan en el navegador." />
+            <RuleCallout dark title="Acreditacion publicada" body="Solo se muestran como acreditadas cuando el entry publica un paymentStatus compatible." />
             <RuleCallout dark title="Pendientes" body="Si no hay paymentStatus acreditado, la vista lo muestra como pendiente o no publicado." />
             <RuleCallout dark title="Sin recalculo" body="Base, porcentaje e importe provienen del snapshot persistido en el ledger." />
           </CardContent>
@@ -2080,9 +2082,9 @@ function CommissionsView({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard dark icon={<TrendingUp className="h-4 w-4" />} label="Estimadas" value={formatPortalMoney(summary.totalGenerated, currency)} detail={`${generatedEntries.length} movimientos registrados no revertidos.`} />
-        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Aprobadas" value={String(generatedEntries.length)} detail="Entries vigentes del ledger visible." />
-        <KpiCard dark icon={<ShieldCheck className="h-4 w-4" />} label="Pagadas" value={String(paidEntries.length)} detail="Movimientos con pago/acreditacion publicada." />
+        <KpiCard dark icon={<TrendingUp className="h-4 w-4" />} label="Registradas" value={formatPortalMoney(summary.totalGenerated, currency)} detail={`${generatedEntries.length} movimientos registrados no revertidos.`} />
+        <KpiCard dark icon={<BadgeCheck className="h-4 w-4" />} label="Vigentes" value={String(generatedEntries.length)} detail="Entries vigentes del ledger visible." />
+        <KpiCard dark icon={<ShieldCheck className="h-4 w-4" />} label="Acreditacion publicada" value={String(paidEntries.length)} detail="Movimientos con pago real/acreditacion publicada." />
         <KpiCard dark icon={<CalendarRange className="h-4 w-4" />} label="Pendientes" value={String(pendingEntries.length)} detail={`${reversedEntries.length} reversiones quedan trazadas aparte.`} />
       </section>
 
@@ -2143,7 +2145,7 @@ function CommissionsView({
               <EmptyState
                 icon={<BriefcaseBusiness className="h-5 w-5" />}
                 title={hasActiveFilters ? "No encontramos movimientos con esos filtros" : "Todavia no tenes movimientos registrados"}
-                description={hasActiveFilters ? "Ajusta periodo, tipo o estado para volver a consultar el ledger publicado." : "Cuando existan comisiones reales registradas para tu cuenta, apareceran aca separadas entre estimadas, aprobadas, pagadas y pendientes segun los campos publicados."}
+                description={hasActiveFilters ? "Ajusta periodo, tipo o estado para volver a consultar el ledger publicado." : "Cuando existan comisiones reales registradas para tu cuenta, apareceran aca separadas entre registradas, revertidas y pendientes segun los campos publicados."}
                 className={PREMIUM_EMPTY_STATE}
               />
             ) : (
@@ -2159,7 +2161,7 @@ function CommissionsView({
                         <th className="px-4 py-3 text-left font-medium">Porcentaje</th>
                         <th className="px-4 py-3 text-left font-medium">Importe</th>
                         <th className="px-4 py-3 text-left font-medium">Estado</th>
-                        <th className="px-4 py-3 text-left font-medium">Pago</th>
+                        <th className="px-4 py-3 text-left font-medium">Acreditacion</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
@@ -2207,10 +2209,10 @@ function isPartnerCommissionPaid(paymentStatus?: string | null) {
 
 function summarizePartnerCommissionPaymentState(paymentStatus?: string | null) {
   const normalized = String(paymentStatus || "").trim().toLowerCase();
-  if (normalized === "paid") return "Pagada";
+  if (normalized === "paid") return "Pago confirmado";
   if (normalized === "accredited") return "Acreditada";
   if (normalized === "approved") return "Aprobada";
-  if (normalized === "settled") return "Liquidada";
+  if (normalized === "settled") return "Registrada";
   if (normalized === "pending") return "Pendiente";
   if (normalized === "rejected") return "Rechazada";
   return "No publicado";
@@ -2262,7 +2264,7 @@ function CommissionCard({ entry, index, currency }: { entry: PartnerPortalCommis
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <MetricStrip dark label="Base" value={formatPortalMoney(entry.basisAmount, entry.currency || currency)} icon={<CalendarRange className="h-4 w-4" />} />
         <MetricStrip dark label="Porcentaje" value={`${entry.rate}%`} icon={<BadgeCheck className="h-4 w-4" />} />
-        <MetricStrip dark label="Pago" value={summarizePartnerCommissionPaymentState(entry.paymentStatus)} icon={<ShieldCheck className="h-4 w-4" />} />
+        <MetricStrip dark label="Acreditacion" value={summarizePartnerCommissionPaymentState(entry.paymentStatus)} icon={<ShieldCheck className="h-4 w-4" />} />
       </div>
 
       {entry.reversed ? (
