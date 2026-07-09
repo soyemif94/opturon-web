@@ -7,6 +7,7 @@ import {
   buildAuditHeadline,
   buildPartnerKpis,
   filterAndSortPartners,
+  getPartnerActionAvailability,
   getPartnerPreviewBundle,
   getPartnerStatusLabel,
   normalizePartnerRank,
@@ -79,6 +80,9 @@ function testPresentationRules() {
   assert.equal(getPartnerStatusLabel("disabled"), "Dado de baja");
   assert.equal(getPartnerStatusLabel("invited"), "Invitacion pendiente");
   assert.equal(getPartnerStatusLabel("invitation_canceled"), "Invitacion cancelada");
+  assert.equal(getPartnerActionAvailability({ id: "p1", email: "p1@test.com", status: "invited" }).canDelete, true);
+  assert.equal(getPartnerActionAvailability({ id: "p2", email: "p2@test.com", status: "disabled" }).canDelete, true);
+  assert.equal(getPartnerActionAvailability({ id: "p3", email: "p3@test.com", status: "active" }).canDelete, false);
   assert.equal(buildAuditHeadline({ id: "a1", action: "partner_status_changed", reason: "suspended" }), "partner status changed · suspended");
 }
 
@@ -92,6 +96,10 @@ function testSensitiveHeadersStayOutOfUi() {
   assert.match(source, /Si el asesor no la recibe/);
   assert.match(source, /Cancelar invitacion/);
   assert.match(source, /Dar de baja asesor/);
+  assert.match(source, /Eliminar asesor/);
+  assert.match(source, /liberar email y codigo/);
+  assert.match(source, /partner_delete_blocked_by_activity/);
+  assert.match(source, /method: "DELETE"/);
   assert.match(source, /estado seguro de invitacion/);
   assert.doesNotMatch(source, /\/partners\/invite\?token=/);
   assert.doesNotMatch(source, /x-portal-key/i);

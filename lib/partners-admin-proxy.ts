@@ -110,6 +110,10 @@ export function resolveAdminPartnersBackendPath(method: string, slug: string[] =
     return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}`, searchParams);
   }
 
+  if (segments.length === 1 && normalizedMethod === "DELETE") {
+    return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}`, searchParams);
+  }
+
   if (segments.length === 2 && normalizedMethod === "PATCH" && segments[1] === "status") {
     return withSearch(`/api/admin/partners/${encodePathSegment(segments[0])}/status`, searchParams);
   }

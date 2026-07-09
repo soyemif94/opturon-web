@@ -274,6 +274,7 @@ export function getPartnerActionAvailability(partner: AdminPartner) {
     canCancelInvitation: normalizedStatus === "invited",
     canChangeStatus: normalizedStatus === "active" || normalizedStatus === "suspended",
     canDeactivate: normalizedStatus === "active" || normalizedStatus === "suspended",
+    canDelete: normalizedStatus === "invited" || normalizedStatus === "suspended" || normalizedStatus === "disabled" || normalizedStatus === "invitation_canceled",
     nextStatus
   };
 }

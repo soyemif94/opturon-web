@@ -174,6 +174,10 @@ type DeactivateDialogState = {
   partnerId: string;
 } | null;
 
+type DeleteDialogState = {
+  partnerId: string;
+} | null;
+
 type InviteFallbackState = {
   partnerId: string;
   inviteUrl: string;
@@ -305,6 +309,19 @@ function readErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+function readPartnerDeleteErrorMessage(payload: unknown) {
+  if (payload && typeof payload === "object") {
+    const error = String((payload as Record<string, unknown>).error || "").trim();
+    if (error === "partner_delete_status_not_allowed") {
+      return "Solo se puede eliminar un asesor invitado, suspendido, dado de baja o con invitacion cancelada.";
+    }
+    if (error === "partner_delete_blocked_by_activity") {
+      return "No se puede eliminar este asesor porque tiene clientes, comisiones, red o historial comercial asociado. Mantenelo dado de baja.";
+    }
+  }
+  return readErrorMessage(payload, "No se pudo eliminar el asesor.");
+}
+
 function getPendingInviteUrl(partner?: AdminPartner | null) {
   const status = String(partner?.status || "").trim().toLowerCase();
   const invitationStatus = String(partner?.invitation?.status || "").trim().toLowerCase();
@@ -350,6 +367,7 @@ export function PartnersAdminWorkspace({
   const [statusDialog, setStatusDialog] = useState<StatusDialogState>(null);
   const [cancelInvitationDialog, setCancelInvitationDialog] = useState<CancelInvitationDialogState>(null);
   const [deactivateDialog, setDeactivateDialog] = useState<DeactivateDialogState>(null);
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
   const [busyPartnerId, setBusyPartnerId] = useState<string | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<PartnerInviteFormState>(INITIAL_INVITE_FORM);
@@ -830,6 +848,40 @@ export function PartnersAdminWorkspace({
     }
   }
 
+  async function deletePartnerAccount(partnerId: string) {
+    if (previewMode) {
+      toast.error("La vista local no ejecuta cambios reales.");
+      return;
+    }
+
+    setBusyPartnerId(partnerId);
+    try {
+      const response = await fetch(`/api/app/admin/partners/${encodeURIComponent(partnerId)}`, {
+        method: "DELETE",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const body = (await readJsonSafe(response)) as PartnerMutationResponse | null;
+      if (!response.ok) {
+        throw new Error(readPartnerDeleteErrorMessage(body));
+      }
+
+      setPartners((current) => current.filter((partner) => partner.id !== partnerId));
+      if (selectedPartnerId === partnerId) {
+        setSelectedPartnerId(null);
+        setSelectedPartnerDetails(null);
+      }
+      setInviteFallback((current) => (current?.partnerId === partnerId ? null : current));
+      setManualInviteLink(null);
+      setDeleteDialog(null);
+      toast.success("Asesor eliminado", "El email y el codigo quedaron disponibles para una nueva invitacion.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el asesor.");
+    } finally {
+      setBusyPartnerId(null);
+    }
+  }
+
   useEffect(() => {
     void loadPartners("initial");
   }, []);
@@ -1241,6 +1293,9 @@ export function PartnersAdminWorkspace({
                                   onDeactivate={
                                     availability.canDeactivate ? () => void openDeactivateDialog(partner.id) : undefined
                                   }
+                                  onDelete={
+                                    availability.canDelete ? () => setDeleteDialog({ partnerId: partner.id }) : undefined
+                                  }
                                 />
                               </td>
                             </tr>
@@ -1290,6 +1345,9 @@ export function PartnersAdminWorkspace({
                               }
                               onDeactivate={
                                 availability.canDeactivate ? () => void openDeactivateDialog(partner.id) : undefined
+                              }
+                              onDelete={
+                                availability.canDelete ? () => setDeleteDialog({ partnerId: partner.id }) : undefined
                               }
                             />
                           </div>
@@ -1556,6 +1614,17 @@ export function PartnersAdminWorkspace({
                             Dar de baja asesor
                           </Button>
                         ) : null}
+                        {getPartnerActionAvailability(selectedPartner).canDelete ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="rounded-2xl"
+                            onClick={() => setDeleteDialog({ partnerId: selectedPartner.id })}
+                            disabled={busyPartnerId === selectedPartner.id}
+                          >
+                            Eliminar asesor
+                          </Button>
+                        ) : null}
                       </div>
                     }
                   >
@@ -1586,6 +1655,9 @@ export function PartnersAdminWorkspace({
                     ) : null}
                     {getPartnerActionAvailability(selectedPartner).canDeactivate ? (
                       <ActionHint title="Dar de baja asesor" description="Bloquea acceso futuro, conserva historial y exige revisar dependencias activas antes de confirmar." />
+                    ) : null}
+                    {getPartnerActionAvailability(selectedPartner).canDelete ? (
+                      <ActionHint title="Eliminar asesor" description="Solo se permite si no tiene clientes, comisiones, red ni historial comercial. Libera email y codigo." />
                     ) : null}
                     <ActionHint title="Ver clientes atribuidos" description="Visible en la seccion de atribuciones de este panel." />
                     <ActionHint title="Ver jerarquia" description="Proximamente" disabled />
@@ -1753,6 +1825,56 @@ export function PartnersAdminWorkspace({
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={Boolean(deleteDialog)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog(null);
+        }}
+      >
+        <DialogContent className={cn("max-w-xl rounded-[28px]", DETAIL_PANEL_CLASS)}>
+          <DialogHeader>
+            <DialogTitle className="text-white">Eliminar asesor</DialogTitle>
+            <DialogDescription className="text-muted/90">
+              Borra la cuenta pendiente o inactiva para liberar email y codigo. Si hay actividad comercial, el backend va a bloquear la accion.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoRow
+                label="Nombre"
+                value={deleteDialog ? getPartnerDisplayName(partnerMap.get(deleteDialog.partnerId) || { id: "", email: "", profile: null }) : "Sin registro"}
+              />
+              <InfoRow label="Email" value={deleteDialog ? partnerMap.get(deleteDialog.partnerId)?.email || "Sin registro" : "Sin registro"} />
+              <InfoRow label="Codigo" value={deleteDialog ? getPartnerCode(partnerMap.get(deleteDialog.partnerId) || { id: "", email: "", profile: null }) : "Sin registro"} />
+              <InfoRow label="Estado" value={deleteDialog ? getPartnerStatusLabel(partnerMap.get(deleteDialog.partnerId)?.status) : "Sin registro"} />
+            </div>
+            <div className="rounded-2xl border border-red-400/20 bg-red-400/[0.08] px-4 py-3 text-sm leading-6 text-red-50/90">
+              Esta accion no reemplaza la baja comercial. Usala solo para invitaciones o cuentas no activas sin clientes, comisiones, red ni historial asociado.
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="rounded-2xl border-white/12 bg-white/6 text-white hover:bg-white/10"
+                onClick={() => setDeleteDialog(null)}
+                disabled={busyPartnerId === deleteDialog?.partnerId}
+              >
+                Volver
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="rounded-2xl"
+                onClick={() => (deleteDialog ? deletePartnerAccount(deleteDialog.partnerId) : Promise.resolve())}
+                disabled={busyPartnerId === deleteDialog?.partnerId}
+              >
+                {busyPartnerId === deleteDialog?.partnerId ? "Eliminando..." : "Eliminar asesor"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -1765,7 +1887,8 @@ function PartnerRowActions({
   onCopyInviteLink,
   onCancelInvite,
   onToggleStatus,
-  onDeactivate
+  onDeactivate,
+  onDelete
 }: {
   partner: AdminPartner;
   busy?: boolean;
@@ -1775,6 +1898,7 @@ function PartnerRowActions({
   onCancelInvite?: () => void;
   onToggleStatus?: () => void;
   onDeactivate?: () => void;
+  onDelete?: () => void;
 }) {
   const availability = getPartnerActionAvailability(partner);
   const toggleLabel = availability.nextStatus === "active" ? "Activar" : "Suspender";
@@ -1811,6 +1935,9 @@ function PartnerRowActions({
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!availability.canDeactivate || busy} onClick={onDeactivate}>
           {busy ? "Procesando..." : "Dar de baja asesor"}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!availability.canDelete || busy} onClick={onDelete}>
+          {busy ? "Procesando..." : "Eliminar asesor"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

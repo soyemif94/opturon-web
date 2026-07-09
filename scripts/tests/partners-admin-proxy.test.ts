@@ -58,6 +58,7 @@ function testRouteResolutionWhitelistsOnlyKnownBackendEndpoints() {
     "/api/admin/partners/partner-1/cancel-invitation"
   );
   assert.equal(resolveAdminPartnersBackendPath("POST", ["partner-1", "deactivate"]), "/api/admin/partners/partner-1/deactivate");
+  assert.equal(resolveAdminPartnersBackendPath("DELETE", ["partner-1"]), "/api/admin/partners/partner-1");
   assert.equal(
     resolveAdminPartnersBackendPath("POST", ["partner-1", "rank", "evaluate"]),
     "/api/admin/partners/partner-1/rank/evaluate"
