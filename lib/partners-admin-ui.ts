@@ -26,6 +26,7 @@ export type AdminPartner = {
     status?: string | null;
     expiresAt?: string | null;
     sentAt?: string | null;
+    inviteUrl?: string | null;
   } | null;
 };
 

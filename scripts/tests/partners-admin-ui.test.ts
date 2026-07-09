@@ -86,9 +86,14 @@ function testSensitiveHeadersStayOutOfUi() {
   const source = read("components/app/PartnersAdminWorkspace.tsx");
   assert.match(source, /Crear y enviar invitacion/);
   assert.match(source, /Reenviar invitacion/);
+  assert.match(source, /Copiar link de invitacion/);
+  assert.match(source, /navigator\.clipboard/);
+  assert.match(source, /inviteUrl/);
+  assert.match(source, /Si el asesor no la recibe/);
   assert.match(source, /Cancelar invitacion/);
   assert.match(source, /Dar de baja asesor/);
   assert.match(source, /estado seguro de invitacion/);
+  assert.doesNotMatch(source, /\/partners\/invite\?token=/);
   assert.doesNotMatch(source, /x-portal-key/i);
   assert.doesNotMatch(source, /x-portal-actor-id/i);
   assert.doesNotMatch(source, /PORTAL_INTERNAL_KEY/i);

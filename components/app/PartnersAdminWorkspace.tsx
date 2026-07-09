@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   BadgeCheck,
   CircleSlash,
+  Copy,
   Crown,
   MoreHorizontal,
   RefreshCcw,
@@ -79,11 +80,14 @@ type PartnerMutationResponse = {
       status?: string | null;
       expiresAt?: string | null;
       sentAt?: string | null;
+      inviteUrl?: string | null;
     } | null;
   };
   error?: string;
   detail?: string;
 };
+
+type PartnerMutationInvitation = NonNullable<PartnerMutationResponse["data"]>["invitation"];
 
 type AdminClientRequestStatus = "draft" | "pending_review" | "changes_requested" | "approved" | "rejected" | "cancelled";
 
@@ -168,6 +172,13 @@ type CancelInvitationDialogState = {
 
 type DeactivateDialogState = {
   partnerId: string;
+} | null;
+
+type InviteFallbackState = {
+  partnerId: string;
+  inviteUrl: string;
+  email?: string | null;
+  displayName?: string | null;
 } | null;
 
 const INITIAL_QUERY: PartnerQueryState = {
@@ -294,6 +305,25 @@ function readErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+function getPendingInviteUrl(partner?: AdminPartner | null) {
+  const status = String(partner?.status || "").trim().toLowerCase();
+  const invitationStatus = String(partner?.invitation?.status || "").trim().toLowerCase();
+  const inviteUrl = String(partner?.invitation?.inviteUrl || "").trim();
+  if (status !== "invited" || invitationStatus !== "pending" || !inviteUrl) return "";
+  return inviteUrl;
+}
+
+function mergePartnerInvitation(partner: AdminPartner, invitation?: PartnerMutationInvitation) {
+  if (!invitation) return partner;
+  return {
+    ...partner,
+    invitation: {
+      ...(partner.invitation || {}),
+      ...invitation
+    }
+  };
+}
+
 async function readJsonSafe(response: Response) {
   const text = await response.text();
   if (!text) return null;
@@ -324,6 +354,8 @@ export function PartnersAdminWorkspace({
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<PartnerInviteFormState>(INITIAL_INVITE_FORM);
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteFallback, setInviteFallback] = useState<InviteFallbackState>(null);
+  const [manualInviteLink, setManualInviteLink] = useState<string | null>(null);
   const [deactivationReason, setDeactivationReason] = useState("");
   const [deactivateDetails, setDeactivateDetails] = useState<AdminPartnerDetails | null>(null);
   const [clientRequests, setClientRequests] = useState<AdminClientRequest[]>([]);
@@ -552,7 +584,7 @@ export function PartnersAdminWorkspace({
   }
 
   function applyPartnerMutationResult(body: PartnerMutationResponse | null) {
-    const nextPartner = body?.data?.partner;
+    const nextPartner = body?.data?.partner ? mergePartnerInvitation(body.data.partner, body.data.invitation) : null;
     if (!nextPartner) return false;
 
     setPartners((current) => current.map((partner) => (partner.id === nextPartner.id ? nextPartner : partner)));
@@ -565,7 +597,42 @@ export function PartnersAdminWorkspace({
           }
         : current
     );
+    if (!getPendingInviteUrl(nextPartner)) {
+      setInviteFallback((current) => (current?.partnerId === nextPartner.id ? null : current));
+      setManualInviteLink((current) => (current && inviteFallback?.partnerId === nextPartner.id ? null : current));
+    }
     return true;
+  }
+
+  async function copyInviteLink(inviteUrl: string) {
+    const safeUrl = String(inviteUrl || "").trim();
+    if (!safeUrl) return;
+
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(safeUrl);
+        setManualInviteLink(null);
+        toast.success("Link de invitacion copiado");
+        return;
+      } catch {
+        // Fall back to the visible selectable link below.
+      }
+    }
+
+    setManualInviteLink(safeUrl);
+    toast.error("No pudimos copiar automaticamente", "Selecciona el link visible y copialo manualmente.");
+  }
+
+  function showInviteFallback(partner: AdminPartner) {
+    const inviteUrl = getPendingInviteUrl(partner);
+    if (!inviteUrl) return;
+    setInviteFallback({
+      partnerId: partner.id,
+      inviteUrl,
+      email: partner.email,
+      displayName: getPartnerDisplayName(partner)
+    });
+    setManualInviteLink(null);
   }
 
   async function submitPartnerInvite(event: React.FormEvent) {
@@ -606,11 +673,12 @@ export function PartnersAdminWorkspace({
         throw new Error(readErrorMessage(body, "No se pudo enviar la invitacion del asesor."));
       }
 
-      setPartners((current) => [body.data!.partner!, ...current.filter((partner) => partner.id !== body.data!.partner!.id)]);
+      const nextPartner = mergePartnerInvitation(body.data.partner, body.data.invitation);
+      setPartners((current) => [nextPartner, ...current.filter((partner) => partner.id !== nextPartner.id)]);
+      showInviteFallback(nextPartner);
       setInviteDialogOpen(false);
       resetInviteForm();
-      toast.success("Invitacion enviada");
-      await loadPartners("refresh");
+      toast.success("Invitacion enviada por email.", "Si el asesor no la recibe, copia el link y envialo manualmente.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo enviar la invitacion del asesor.");
     } finally {
@@ -636,16 +704,18 @@ export function PartnersAdminWorkspace({
         throw new Error(readErrorMessage(body, "No se pudo reenviar la invitacion."));
       }
 
-      setPartners((current) => current.map((partner) => (partner.id === body.data!.partner!.id ? body.data!.partner! : partner)));
+      const nextPartner = mergePartnerInvitation(body.data.partner, body.data.invitation);
+      setPartners((current) => current.map((partner) => (partner.id === nextPartner.id ? nextPartner : partner)));
       setSelectedPartnerDetails((current) =>
-        current && current.partner.id === body.data!.partner!.id
+        current && current.partner.id === nextPartner.id
           ? {
               ...current,
-              partner: body.data!.partner!
+              partner: nextPartner
             }
           : current
       );
-      toast.success("Invitacion reenviada");
+      showInviteFallback(nextPartner);
+      toast.success("Invitacion enviada por email.", "Si el asesor no la recibe, copia el link y envialo manualmente.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo reenviar la invitacion.");
     } finally {
@@ -1047,6 +1117,20 @@ export function PartnersAdminWorkspace({
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
+            {inviteFallback ? (
+              <InviteFallbackPanel
+                inviteUrl={inviteFallback.inviteUrl}
+                title="Invitacion enviada por email."
+                description="Si el asesor no la recibe, copia este link y envialo manualmente."
+                manualVisible={manualInviteLink === inviteFallback.inviteUrl}
+                onCopy={() => void copyInviteLink(inviteFallback.inviteUrl)}
+                onDismiss={() => {
+                  setInviteFallback(null);
+                  setManualInviteLink(null);
+                }}
+              />
+            ) : null}
+
             {filteredPartners.length === 0 ? (
               <div className="space-y-4">
                 <EmptyState
@@ -1143,6 +1227,9 @@ export function PartnersAdminWorkspace({
                                   onResendInvite={
                                     availability.canResendInvite ? () => void resendInvite(partner.id) : undefined
                                   }
+                                  onCopyInviteLink={
+                                    getPendingInviteUrl(partner) ? () => void copyInviteLink(getPendingInviteUrl(partner)) : undefined
+                                  }
                                   onCancelInvite={
                                     availability.canCancelInvitation ? () => setCancelInvitationDialog({ partnerId: partner.id }) : undefined
                                   }
@@ -1189,6 +1276,9 @@ export function PartnersAdminWorkspace({
                               onViewDetail={() => void openPartnerDetails(partner.id)}
                               onResendInvite={
                                 availability.canResendInvite ? () => void resendInvite(partner.id) : undefined
+                              }
+                              onCopyInviteLink={
+                                getPendingInviteUrl(partner) ? () => void copyInviteLink(getPendingInviteUrl(partner)) : undefined
                               }
                               onCancelInvite={
                                 availability.canCancelInvitation ? () => setCancelInvitationDialog({ partnerId: partner.id }) : undefined
@@ -1481,6 +1571,16 @@ export function PartnersAdminWorkspace({
                     {getPartnerActionAvailability(selectedPartner).canResendInvite ? (
                       <ActionHint title="Invitacion pendiente" description="Puedes reenviar el acceso seguro sin exponer token ni contrasena." />
                     ) : null}
+                    {getPendingInviteUrl(selectedPartner) ? (
+                      <InviteFallbackPanel
+                        inviteUrl={getPendingInviteUrl(selectedPartner)}
+                        title="Link de invitacion disponible"
+                        description="Usalo solo si el asesor no recibio el email de invitacion."
+                        manualVisible={manualInviteLink === getPendingInviteUrl(selectedPartner)}
+                        compact
+                        onCopy={() => void copyInviteLink(getPendingInviteUrl(selectedPartner))}
+                      />
+                    ) : null}
                     {getPartnerActionAvailability(selectedPartner).canCancelInvitation ? (
                       <ActionHint title="Cancelar invitacion" description="El enlace deja de funcionar y la cuenta pendiente sale de la vista operativa." />
                     ) : null}
@@ -1662,6 +1762,7 @@ function PartnerRowActions({
   busy,
   onViewDetail,
   onResendInvite,
+  onCopyInviteLink,
   onCancelInvite,
   onToggleStatus,
   onDeactivate
@@ -1670,6 +1771,7 @@ function PartnerRowActions({
   busy?: boolean;
   onViewDetail: () => void;
   onResendInvite?: () => void;
+  onCopyInviteLink?: () => void;
   onCancelInvite?: () => void;
   onToggleStatus?: () => void;
   onDeactivate?: () => void;
@@ -1697,6 +1799,9 @@ function PartnerRowActions({
         <DropdownMenuItem disabled>Ver jerarquia · Proximamente</DropdownMenuItem>
         <DropdownMenuItem disabled={!availability.canResendInvite || busy} onClick={onResendInvite}>
           {busy ? "Procesando..." : "Reenviar invitacion"}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!onCopyInviteLink || busy} onClick={onCopyInviteLink}>
+          Copiar link de invitacion
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!availability.canCancelInvitation || busy} onClick={onCancelInvite}>
           {busy ? "Procesando..." : "Cancelar invitacion"}
@@ -1787,6 +1892,67 @@ function ActionHint({
     >
       <p className="text-sm font-medium">{title}</p>
       <p className="mt-1 text-xs leading-5">{description}</p>
+    </div>
+  );
+}
+
+function InviteFallbackPanel({
+  inviteUrl,
+  title,
+  description,
+  manualVisible,
+  compact = false,
+  onCopy,
+  onDismiss
+}: {
+  inviteUrl: string;
+  title: string;
+  description: string;
+  manualVisible?: boolean;
+  compact?: boolean;
+  onCopy: () => void;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className={cn("rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08]", compact ? "px-4 py-3" : "px-5 py-4")}>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-emerald-100">{title}</p>
+          <p className="mt-1 text-xs leading-5 text-emerald-50/80">{description}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="rounded-2xl border-emerald-300/20 bg-emerald-300/10 text-emerald-50 hover:bg-emerald-300/15"
+            onClick={onCopy}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Copiar link de invitacion
+          </Button>
+          {onDismiss ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="rounded-2xl text-emerald-50/80 hover:bg-emerald-300/10"
+              onClick={onDismiss}
+            >
+              Ocultar
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {manualVisible ? (
+        <Input
+          readOnly
+          value={inviteUrl}
+          onFocus={(event) => event.currentTarget.select()}
+          className="mt-3 border-emerald-300/20 bg-[rgba(6,78,59,0.22)] text-xs text-emerald-50"
+          aria-label="Link de invitacion para copiar manualmente"
+        />
+      ) : null}
     </div>
   );
 }
