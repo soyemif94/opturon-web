@@ -7,7 +7,7 @@ import { InboxConnectionEmptyState } from "@/components/app/inbox/InboxConnectio
 import { ConversationList } from "@/components/app/inbox/ConversationList";
 import { InboxLayout } from "@/components/app/inbox/InboxLayout";
 import { ProfilePanel } from "@/components/app/inbox/ProfilePanel";
-import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey, LeadStatus } from "@/components/app/inbox/types";
+import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey, InboxChannelKey, LeadStatus } from "@/components/app/inbox/types";
 import { useInboxContext } from "@/components/inbox/inbox-context";
 import { getSuggestions, type SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { normalizeText } from "@/lib/search/normalize";
@@ -89,6 +89,7 @@ export function InboxWorkspace({
   const setInboxControls = inbox.setControls;
   const clearInboxControls = inbox.clearControls;
   const [filter, setFilter] = useState<FilterKey>(DEFAULT_FILTER);
+  const [channel, setChannel] = useState<InboxChannelKey>("whatsapp");
   const [visibility, setVisibility] = useState<"active" | "archived">("active");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<ConversationRowData[]>([]);
@@ -185,7 +186,8 @@ export function InboxWorkspace({
       const response = await fetch(
         appendQuery("/api/app/inbox", {
           filter,
-          visibility
+          visibility,
+          channel
         }),
         { cache: "no-store" }
       );
@@ -245,6 +247,9 @@ export function InboxWorkspace({
         detailSnapshotRef.current = nextSnapshot;
         setDetail(json);
         setReadOnly(nextReadOnly);
+        if ((json.conversation?.channelType === "instagram" || json.conversation?.channelType === "whatsapp") && json.conversation.channelType !== channel) {
+          setChannel(json.conversation.channelType);
+        }
         if (json.deal?.stage) setDealStage(json.deal.stage);
         setAssignTo(json.conversation?.assignedSellerUserId || "");
         setNextActionAtInput(toDateTimeLocalValue(json.conversation?.nextActionAt));
@@ -261,6 +266,10 @@ export function InboxWorkspace({
                     priority: json.conversation.priority || row.priority,
                     botEnabled: json.conversation.botEnabled,
                     botFlowLock: json.conversation.botFlowLock || row.botFlowLock,
+                    channelId: json.conversation.channelId || row.channelId,
+                    channelType: json.conversation.channelType || row.channelType,
+                    channelProvider: json.conversation.channelProvider || row.channelProvider,
+                    channelLabel: json.conversation.channelLabel || row.channelLabel,
                     nextActionAt: json.conversation.nextActionAt || null,
                     nextActionNote: json.conversation.nextActionNote || null,
                     lastMessageAt: latestMessage?.timestamp || json.conversation.lastMessageAt || row.lastMessageAt,
@@ -279,7 +288,7 @@ export function InboxWorkspace({
   useEffect(() => {
     void loadRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, onlyUnread, visibility]);
+  }, [channel, filter, onlyUnread, visibility]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -321,7 +330,7 @@ export function InboxWorkspace({
       if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demo, readOnly, selectedId, tenantId]);
+  }, [channel, demo, readOnly, selectedId, tenantId]);
 
   useEffect(() => {
     if (!selectedId || readOnly) return;
@@ -912,6 +921,7 @@ export function InboxWorkspace({
 
   async function runOptimisticAction(action: string, payload: Record<string, unknown> = {}) {
     if (!selectedId || !detail) return false;
+    if (action === "toggle_bot" && detail.conversation.channelType === "instagram") return false;
     const snapshotDetail = detail;
     const snapshotRows = rows;
 
@@ -1070,6 +1080,10 @@ export function InboxWorkspace({
   async function sendMessage(value: string) {
     const text = value.trim();
     if (!selectedId || !text || readOnly || !detail) return;
+    if (detail.conversation.channelType === "instagram") {
+      toast.error("Instagram esta en modo lectura", "Respuesta desde Instagram todavia no disponible.");
+      return;
+    }
 
     const optimisticId = `optimistic-msg-${Date.now()}`;
     const optimisticMessage = {
@@ -1101,6 +1115,10 @@ export function InboxWorkspace({
 
   async function runAction(action: "toggle_bot" | "mark_hot" | "close" | "assign" | "change_stage" | "set_bot_domain_override") {
     if (!selectedId || !detail) return;
+    if (action === "toggle_bot" && detail.conversation.channelType === "instagram") {
+      toast.error("Bot no disponible para Instagram", "Instagram esta en modo lectura en esta etapa.");
+      return;
+    }
     const payload: Record<string, unknown> = {};
     if (action === "toggle_bot") payload.botEnabled = !detail.conversation.botEnabled;
     if (action === "assign") payload.assignedTo = assignTo || undefined;
@@ -1229,6 +1247,7 @@ export function InboxWorkspace({
     : undefined;
   const orderHref = detail?.relatedOrder?.id ? `/app/orders?orderId=${encodeURIComponent(detail.relatedOrder.id)}` : undefined;
   const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
+  const shouldShowConnectionEmptyStateForChannel = channel === "whatsapp" && shouldRenderChannelEmptyState;
 
   return (
     <div className="flex flex-col gap-3 text-sm">
@@ -1243,7 +1262,7 @@ export function InboxWorkspace({
         </div>
       ) : null}
 
-      {shouldRenderChannelEmptyState && channelState ? (
+      {shouldShowConnectionEmptyStateForChannel && channelState ? (
         <InboxConnectionEmptyState status={channelState} />
       ) : (
         <InboxLayout
@@ -1257,8 +1276,16 @@ export function InboxWorkspace({
               errorMessage={rowsError}
               selectedId={selectedId}
               filter={filter}
+              channel={channel}
               search={search}
               onFilterChange={setFilter}
+              onChannelChange={(value) => {
+                setChannel(value);
+                setSelectedIds([]);
+                setSelectedId(undefined);
+                setDetail(null);
+                setComposer("");
+              }}
               onSearchChange={setSearch}
               onSelect={setSelectedId}
               onMarkHot={(id) => void rowAction(id, "mark_hot")}

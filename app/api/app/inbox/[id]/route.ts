@@ -68,8 +68,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
       const result = await getPortalConversationDetail(tenantContext.tenantId, id);
+      const conversation = result.data?.conversation || {};
       return NextResponse.json({
         ...result.data,
+        conversation: {
+          ...conversation,
+          channelType: conversation.channelType || "whatsapp",
+          channelProvider: conversation.channelProvider || "whatsapp_cloud",
+          channelLabel: conversation.channelLabel || "WhatsApp"
+        },
         messages: enrichMessagesWithMediaUrls(tenantContext.tenantId, id, result.data?.messages || [])
       }, {
         headers: {
@@ -94,13 +101,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   applyCommercialBotHandoff(tenantContext.tenantId, id);
   const detail = getInboxConversationDetail(tenantContext.tenantId, id);
   if (!detail) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+  const localConversation = detail.conversation as typeof detail.conversation & {
+    channelType?: string | null;
+    channelProvider?: string | null;
+    channelLabel?: string | null;
+  };
 
   return NextResponse.json({
     readOnly: tenantContext.readOnly,
     ...detail,
     messages: enrichMessagesWithMediaUrls(tenantContext.tenantId, id, detail.messages || []),
     conversation: {
-      ...detail.conversation,
+      ...localConversation,
+      channelType: localConversation.channelType || "whatsapp",
+      channelProvider: localConversation.channelProvider || "whatsapp_cloud",
+      channelLabel: localConversation.channelLabel || "WhatsApp",
       leadStatus: detail.conversation.leadStatus || "NEW",
       nextActionAt: detail.conversation.nextActionAt || null,
       nextActionNote: detail.conversation.nextActionNote || null

@@ -15,6 +15,7 @@ const filtersSchema = z.object({
   filter: z.enum(["all", "new", "in_conversation", "follow_up", "closed", "unassigned", "with_follow_up", "overdue", "today", "nuevas", "asignadas"]).optional(),
   q: z.string().optional(),
   visibility: z.enum(["active", "archived"]).optional(),
+  channel: z.enum(["whatsapp", "instagram"]).optional(),
   tenantId: z.string().optional(),
   demo: z.string().optional()
 });
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
   const q = (params.q || "").toLowerCase().trim();
   const filter = params.filter || "all";
   const visibility = params.visibility || "active";
+  const channel = params.channel || "whatsapp";
 
   if (tenantContext.readOnly) {
     applyCommercialBotHandoff(tenantContext.tenantId);
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
     try {
       const [contextResult, conversationsResult, onboardingResult] = await Promise.all([
         getPortalTenantContext(tenantContext.tenantId),
-        getPortalConversations(tenantContext.tenantId, { visibility }),
+        getPortalConversations(tenantContext.tenantId, { visibility, channel }),
         getPortalWhatsAppEmbeddedSignupStatus(tenantContext.tenantId).catch(() => null)
       ]);
 
@@ -77,10 +79,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  conversations = conversations.map((item) => ({
-    ...item,
-    leadStatus: item.leadStatus || "NEW"
-  }));
+  conversations = conversations.map((item) => {
+    const conversation = item as typeof item & {
+      channelType?: string | null;
+      channelProvider?: string | null;
+      channelLabel?: string | null;
+    };
+    return {
+      ...conversation,
+      channelType: conversation.channelType || "whatsapp",
+      channelProvider: conversation.channelProvider || "whatsapp_cloud",
+      channelLabel: conversation.channelLabel || "WhatsApp",
+      leadStatus: conversation.leadStatus || "NEW"
+    };
+  });
+
+  conversations = conversations.filter((item) => {
+    const conversation = item as typeof item & { channelType?: string | null };
+    const itemChannel = String(conversation.channelType || "whatsapp").toLowerCase();
+    return itemChannel === channel;
+  });
 
   if (q) {
     conversations = conversations.filter((item) => {

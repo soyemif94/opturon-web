@@ -4,7 +4,7 @@ import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ConversationRow } from "@/components/app/inbox/ConversationRow";
 import { sortConversationsByPriority } from "@/components/app/inbox/conversation-priority";
 import { ConversationListSkeleton } from "@/components/app/inbox/Skeleton";
-import type { ConversationRowData, FilterKey } from "@/components/app/inbox/types";
+import type { ConversationRowData, FilterKey, InboxChannelKey } from "@/components/app/inbox/types";
 import { normalizeText } from "@/lib/search/normalize";
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
@@ -26,8 +26,10 @@ export function ConversationList({
   errorMessage,
   selectedId,
   filter,
+  channel,
   search,
   onFilterChange,
+  onChannelChange,
   onSearchChange,
   onSelect,
   onMarkHot,
@@ -52,8 +54,10 @@ export function ConversationList({
   errorMessage?: string | null;
   selectedId?: string;
   filter: FilterKey;
+  channel: InboxChannelKey;
   search: string;
   onFilterChange: (value: FilterKey) => void;
+  onChannelChange: (value: InboxChannelKey) => void;
   onSearchChange: (value: string) => void;
   onSelect: (id: string) => void;
   onMarkHot: (id: string) => void;
@@ -86,6 +90,18 @@ export function ConversationList({
   const selectedVisibleCount = useMemo(() => visibleIds.filter((id) => selectedIds.includes(id)).length, [selectedIds, visibleIds]);
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
   const showingArchived = visibility === "archived";
+  const emptyTitle =
+    channel === "instagram"
+      ? "Todavia no hay conversaciones de Instagram"
+      : showingArchived
+        ? "Todavia no hay conversaciones archivadas"
+        : "Todavia no hay conversaciones visibles";
+  const emptyCopy =
+    channel === "instagram"
+      ? "Cuando conectes Instagram y recibas mensajes, van a aparecer aca."
+      : showingArchived
+        ? "Cuando archives conversaciones desde la vista activa, apareceran aca."
+        : "Cuando entren mensajes o limpies filtros, las conversaciones apareceran aca para operarlas.";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
@@ -107,6 +123,27 @@ export function ConversationList({
             placeholder="Buscar por nombre, telefono o mensaje"
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 rounded-[18px] border border-[color:var(--border)] bg-bg/55 p-1">
+          <button
+            type="button"
+            onClick={() => onChannelChange("whatsapp")}
+            className={`rounded-[14px] px-3 py-2 text-xs font-medium transition ${
+              channel === "whatsapp" ? "bg-card text-text shadow-sm" : "text-muted hover:text-text"
+            }`}
+          >
+            WhatsApp
+          </button>
+          <button
+            type="button"
+            onClick={() => onChannelChange("instagram")}
+            className={`rounded-[14px] px-3 py-2 text-xs font-medium transition ${
+              channel === "instagram" ? "bg-card text-text shadow-sm" : "text-muted hover:text-text"
+            }`}
+          >
+            Instagram
+          </button>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -206,16 +243,12 @@ export function ConversationList({
             <p className="mt-3 text-base font-semibold">
               {isSearching
                 ? "No encontramos conversaciones para esa busqueda"
-                : showingArchived
-                  ? "Todavia no hay conversaciones archivadas"
-                  : "Todavia no hay conversaciones visibles"}
+                : emptyTitle}
             </p>
             <p className="mt-1 text-xs leading-6 text-muted">
               {isSearching
                 ? "Proba con otro nombre, telefono o limpia la busqueda."
-                : showingArchived
-                  ? "Cuando archives conversaciones desde la vista activa, apareceran aca."
-                  : "Cuando entren mensajes o limpies filtros, las conversaciones apareceran aca para operarlas."}
+                : emptyCopy}
             </p>
             <button
               type="button"

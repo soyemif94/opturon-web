@@ -46,6 +46,9 @@ function followUpUi(nextActionAt?: string | null) {
 }
 
 function responseUi(row: ConversationRowData) {
+  if (row.channelType === "instagram") {
+    return { label: "Lectura", className: "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" };
+  }
   if (!row.botEnabled) {
     return { label: "Bot pausado", className: "border-amber-400/30 bg-amber-400/10 text-amber-100" };
   }
@@ -81,6 +84,7 @@ export function ConversationRow({
   const leadStatus = leadStatusUi(row.leadStatus);
   const followUp = followUpUi(row.nextActionAt);
   const response = responseUi(row);
+  const channelLabel = row.channelType === "instagram" ? "Instagram" : "WhatsApp";
   const displayName = row.contact?.name?.trim() || row.contact?.phone || "Sin nombre";
   const metaLine = row.contact?.name?.trim() ? row.contact?.phone || row.contact?.email || "Sin contacto" : "Sin nombre guardado";
 
@@ -144,6 +148,9 @@ export function ConversationRow({
           <p className={cn("mt-3 line-clamp-2 text-sm leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <InboxBadge className={row.channelType === "instagram" ? "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" : ""}>
+              {channelLabel}
+            </InboxBadge>
             <InboxBadge className={response.className}>{response.label}</InboxBadge>
             <InboxBadge className={leadStatus.className}>{leadStatus.label}</InboxBadge>
             {row.priority === "hot" ? <InboxBadge className="text-brandBright">Caliente</InboxBadge> : null}

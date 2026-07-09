@@ -1080,9 +1080,13 @@ export async function acceptPortalInvitation(token: string, password: string) {
   });
 }
 
-export async function getPortalConversations(tenantId: string, options?: { visibility?: "active" | "archived" }) {
+export async function getPortalConversations(
+  tenantId: string,
+  options?: { visibility?: "active" | "archived"; channel?: "whatsapp" | "instagram" }
+) {
   const params = new URLSearchParams();
   if (options?.visibility === "archived") params.set("visibility", "archived");
+  if (options?.channel === "whatsapp" || options?.channel === "instagram") params.set("channel", options.channel);
   return backendFetch<{
     success: boolean;
     data: {

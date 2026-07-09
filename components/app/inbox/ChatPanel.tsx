@@ -73,6 +73,8 @@ export function ChatPanel({
   const hasCollapsibleHistory = timeline.length > COLLAPSED_TIMELINE_ITEMS;
   const visibleTimeline = historyExpanded || !hasCollapsibleHistory ? timeline : timeline.slice(-COLLAPSED_TIMELINE_ITEMS);
   const lastTimelineKey = visibleTimeline[visibleTimeline.length - 1]?.id || null;
+  const isInstagramConversation = detail?.conversation.channelType === "instagram";
+  const isComposerDisabled = readOnly || isInstagramConversation;
 
   useEffect(() => {
     setHistoryExpanded(false);
@@ -115,6 +117,9 @@ export function ChatPanel({
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
+              <InboxBadge className={isInstagramConversation ? "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" : ""}>
+                {isInstagramConversation ? "Instagram" : "WhatsApp"}
+              </InboxBadge>
               <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
               {!detail.conversation.botEnabled ? <InboxBadge className="border-amber-400/30 bg-amber-400/10 text-amber-100">Bot pausado</InboxBadge> : null}
               {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
@@ -202,15 +207,21 @@ export function ChatPanel({
 
       {detail ? (
         <div className="shrink-0 space-y-2 border-t border-[color:var(--border)] bg-surface/90 px-3 pb-3 pt-2">
-          <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />
+          {isInstagramConversation ? (
+            <div className="rounded-[18px] border border-fuchsia-300/25 bg-fuchsia-300/10 px-3 py-2 text-xs text-fuchsia-50">
+              Instagram esta disponible en modo lectura en esta etapa. Respuesta desde Instagram todavia no disponible.
+            </div>
+          ) : (
+            <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />
+          )}
           <Composer
             value={composer}
             onChange={onComposerChange}
             onSend={onSend}
-            disabled={readOnly}
-            quickReplies={detail.quickReplies}
+            disabled={isComposerDisabled}
+            quickReplies={isInstagramConversation ? [] : detail.quickReplies}
             onPickQuickReply={onSelectTemplate}
-            suggestions={suggestions}
+            suggestions={isInstagramConversation ? [] : suggestions}
             onSelectSuggestion={onSelectSuggestion}
           />
         </div>

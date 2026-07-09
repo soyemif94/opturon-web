@@ -1,10 +1,15 @@
 export type FilterKey = "all" | "new" | "in_conversation" | "follow_up" | "closed" | "unassigned" | "with_follow_up" | "overdue" | "today";
+export type InboxChannelKey = "whatsapp" | "instagram";
 export type BotDomainOverride = "automatic" | "agenda" | "commerce";
 export type BotFlowLock = "automatic" | "agenda" | "commerce";
 export type LeadStatus = "NEW" | "IN_CONVERSATION" | "FOLLOW_UP" | "CLOSED";
 
 export type ConversationRowData = {
   id: string;
+  channelId?: string | null;
+  channelType?: InboxChannelKey | "unknown" | null;
+  channelProvider?: string | null;
+  channelLabel?: string | null;
   status: "open" | "closed" | "new";
   leadStatus: LeadStatus;
   leadStatusLabel?: string;
