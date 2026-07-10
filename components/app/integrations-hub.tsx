@@ -693,14 +693,16 @@ function instagramErrorCopy(reason: string) {
   }
 
   if (
+    safeReason === "invalid_scope" ||
+    safeReason.toLowerCase().includes("invalid scopes") ||
     safeReason === "instagram_pages_lookup_failed" ||
     safeReason === "instagram_page_subscription_failed" ||
     safeReason.includes("permission") ||
     safeReason.includes("OAuthException")
   ) {
     return {
-      title: "Meta no concedio todos los permisos necesarios",
-      description: "Revisa permisos de la app en Meta. Instagram Messaging puede requerir App Review o Advanced Access."
+      title: "Meta rechazo los permisos solicitados",
+      description: "Si tu app usa Facebook Login for Business, configura el Login Configuration ID en Opturon. Instagram Messaging tambien puede requerir App Review o Advanced Access."
     };
   }
 
