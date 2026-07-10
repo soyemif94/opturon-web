@@ -11,17 +11,20 @@ function read(relativePath: string) {
 function testInstagramScopes() {
   const startRoute = read("app/api/app/integrations/instagram/start/route.ts");
 
+  assert.match(startRoute, /env\.META_INSTAGRAM_APP_ID\s*\|\|\s*env\.META_APP_ID/);
   assert.match(startRoute, /META_INSTAGRAM_LOGIN_CONFIG_ID/);
   assert.match(startRoute, /config_id/);
   assert.match(startRoute, /Facebook Login for Business uses config_id/);
   assert.match(startRoute, /url\.searchParams\.set\("config_id", config\.loginConfigId\)/);
   assert.match(startRoute, /else\s*\{\s*url\.searchParams\.set\("scope", config\.scopes\.join\(","\)\)/s);
   assert.match(startRoute, /"pages_show_list"/);
-  assert.match(startRoute, /"instagram_basic"/);
-  assert.match(startRoute, /"instagram_manage_messages"/);
-  assert.match(startRoute, /"pages_manage_metadata"/);
+  assert.match(startRoute, /"instagram_business_basic"/);
+  assert.match(startRoute, /"instagram_business_manage_messages"/);
+  assert.match(startRoute, /"instagram_business_manage_comments"/);
   assert.match(startRoute, /"pages_read_engagement"/);
-  assert.match(startRoute, /App Review \/ Advanced Access/);
+  assert.doesNotMatch(startRoute, /"instagram_basic"/);
+  assert.doesNotMatch(startRoute, /"instagram_manage_messages"/);
+  assert.doesNotMatch(startRoute, /"pages_manage_metadata"/);
 }
 
 function testInstagramIntegrationVisible() {

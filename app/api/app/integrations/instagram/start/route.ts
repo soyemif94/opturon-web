@@ -7,7 +7,9 @@ const INSTAGRAM_STATE_MAX_AGE_SECONDS = 10 * 60;
 
 export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env) {
   const appId = String(
-    env.NEXT_PUBLIC_META_APP_ID ||
+    env.META_INSTAGRAM_APP_ID ||
+      env.META_APP_ID ||
+      env.NEXT_PUBLIC_META_APP_ID ||
       env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_APP_ID ||
       env.WHATSAPP_APP_ID ||
       ""
@@ -21,13 +23,13 @@ export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env
     ).trim(),
     loginConfigId,
     callbackPath: "/api/app/integrations/instagram/callback",
-    // Facebook Login for Business uses config_id. Scopes are kept for classic/dev Facebook Login fallback.
-    // instagram_manage_messages and pages_manage_metadata may require Meta App Review / Advanced Access.
+    // Facebook Login for Business uses config_id. These scopes support the classic OAuth fallback.
+    // Page permissions remain necessary because the backend discovers the linked IG account via /me/accounts.
     scopes: [
       "pages_show_list",
-      "instagram_basic",
-      "instagram_manage_messages",
-      "pages_manage_metadata",
+      "instagram_business_basic",
+      "instagram_business_manage_messages",
+      "instagram_business_manage_comments",
       "pages_read_engagement"
     ]
   };
