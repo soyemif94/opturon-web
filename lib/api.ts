@@ -590,8 +590,11 @@ export async function getPortalInstagramStatus(tenantId: string) {
 export async function connectPortalInstagram(
   tenantId: string,
   payload: {
-    code: string;
-    redirectUri: string;
+    code?: string;
+    redirectUri?: string;
+    selectionToken?: string;
+    selectedPageId?: string;
+    selectedInstagramUserId?: string;
   }
 ) {
   return backendPortalFetch<{
@@ -1685,6 +1688,21 @@ export type PortalInstagramChannel = {
   instagramUserId: string | null;
   instagramUsername: string | null;
   status: string | null;
+  updatedAt?: string | null;
+};
+
+export type PortalInstagramCandidate = {
+  pageId: string | null;
+  pageName: string | null;
+  instagramUserId: string | null;
+  instagramUsername: string | null;
+};
+
+export type PortalInstagramConnectDetails = {
+  assetCount?: number;
+  selectionToken?: string;
+  candidates?: PortalInstagramCandidate[];
+  expiresInSeconds?: number;
 };
 
 export type PortalInstagramStatus = {

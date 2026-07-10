@@ -19,9 +19,13 @@ function resolveInstagramOauthConfig() {
       process.env.NEXT_PUBLIC_WHATSAPP_GRAPH_VERSION || process.env.WHATSAPP_GRAPH_VERSION || "v25.0"
     ).trim(),
     callbackPath: "/api/app/integrations/instagram/callback",
+    // instagram_manage_messages and pages_manage_metadata may require Meta App Review / Advanced Access.
     scopes: [
       "pages_show_list",
-      "instagram_basic"
+      "instagram_basic",
+      "instagram_manage_messages",
+      "pages_manage_metadata",
+      "pages_read_engagement"
     ]
   };
 }

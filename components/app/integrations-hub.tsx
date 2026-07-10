@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   Bot,
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PortalWhatsAppStatus } from "@/lib/api";
+import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
@@ -64,14 +65,22 @@ const productCards: ProductCard[] = [
 
 export function IntegrationsHub({
   whatsapp,
-  whatsappStatus
+  whatsappStatus,
+  instagramStatus
 }: {
   whatsapp: WhatsAppConnectionStatus;
   whatsappStatus: PortalWhatsAppStatus | null;
+  instagramStatus: PortalInstagramStatus | null;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
   const [liveWhatsAppStatus, setLiveWhatsAppStatus] = useState(whatsappStatus);
+  const [liveInstagramStatus, setLiveInstagramStatus] = useState(instagramStatus);
+  const [instagramBusy, setInstagramBusy] = useState(false);
+  const [instagramError, setInstagramError] = useState<string | null>(null);
+  const [assetSelection, setAssetSelection] = useState(() => readInstagramAssetSelection(searchParams));
+  const [selectedInstagramAssetKey, setSelectedInstagramAssetKey] = useState(() => assetSelection?.candidates[0] ? instagramAssetKey(assetSelection.candidates[0]) : "");
 
   const effectiveState = liveWhatsApp.state;
 
@@ -101,6 +110,48 @@ export function IntegrationsHub({
     }
 
     router.refresh();
+  }
+
+  async function refreshInstagramStatus() {
+    const response = await fetch("/api/app/integrations/instagram", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = (await response.json().catch(() => null)) as { data?: PortalInstagramStatus } | null;
+    if (json?.data) {
+      setLiveInstagramStatus(json.data);
+    }
+  }
+
+  async function connectSelectedInstagramAsset() {
+    if (!assetSelection || !selectedInstagramAssetKey || instagramBusy) return;
+    const selectedAsset = assetSelection.candidates.find((candidate) => instagramAssetKey(candidate) === selectedInstagramAssetKey);
+    if (!selectedAsset) return;
+
+    setInstagramBusy(true);
+    setInstagramError(null);
+    try {
+      const response = await fetch("/api/app/integrations/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectionToken: assetSelection.selectionToken,
+          selectedPageId: selectedAsset.pageId || "",
+          selectedInstagramUserId: selectedAsset.instagramUserId || ""
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "instagram_connect_failed"));
+      }
+      setAssetSelection(null);
+      setSelectedInstagramAssetKey("");
+      await refreshInstagramStatus();
+      router.replace("/app/integrations?instagram=connected");
+      router.refresh();
+    } catch (error) {
+      setInstagramError(error instanceof Error ? error.message : "instagram_connect_failed");
+    } finally {
+      setInstagramBusy(false);
+    }
   }
 
   const connected = liveWhatsApp.state === "connected" || Boolean(liveWhatsAppStatus?.channel.connected);
@@ -212,6 +263,18 @@ export function IntegrationsHub({
 
       <WhatsAppStatusPanel status={liveWhatsAppStatus} onRefresh={() => void refreshWhatsAppStatus()} />
 
+      <InstagramConnectionPanel
+        status={liveInstagramStatus}
+        errorReason={instagramError || searchParams.get("reason")}
+        mode={searchParams.get("instagram")}
+        assetSelection={assetSelection}
+        selectedAssetKey={selectedInstagramAssetKey}
+        busy={instagramBusy}
+        onSelectedAssetKeyChange={setSelectedInstagramAssetKey}
+        onConnectSelectedAsset={() => void connectSelectedInstagramAsset()}
+        onRefresh={() => void refreshInstagramStatus()}
+      />
+
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -261,7 +324,7 @@ export function IntegrationsHub({
             </CardHeader>
             <CardContent className="space-y-2 pt-0">
               {[
-                "Instagram y Messenger quedan fuera del frente principal.",
+                "Messenger queda fuera del frente principal hasta tener madurez operativa.",
                 "Webchat no compite hasta tener madurez real.",
                 "Google Calendar no se abre porque Agenda es nativa."
               ].map((item) => (
@@ -273,6 +336,135 @@ export function IntegrationsHub({
       </section>
 
     </div>
+  );
+}
+
+function InstagramConnectionPanel({
+  status,
+  errorReason,
+  mode,
+  assetSelection,
+  selectedAssetKey,
+  busy,
+  onSelectedAssetKeyChange,
+  onConnectSelectedAsset,
+  onRefresh
+}: {
+  status: PortalInstagramStatus | null;
+  errorReason?: string | null;
+  mode?: string | null;
+  assetSelection: InstagramAssetSelection | null;
+  selectedAssetKey: string;
+  busy?: boolean;
+  onSelectedAssetKeyChange: (value: string) => void;
+  onConnectSelectedAsset: () => void;
+  onRefresh: () => void;
+}) {
+  const connected = status?.state === "connected" && Boolean(status.channel);
+  const channel = status?.channel || null;
+  const errorCopy = errorReason ? instagramErrorCopy(errorReason) : null;
+  const needsSelection = mode === "select" && assetSelection && assetSelection.candidates.length > 0;
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Instagram</h2>
+          <p className="text-sm text-muted">Canal de mensajes dentro del Inbox, separado de WhatsApp y disponible inicialmente en modo lectura.</p>
+        </div>
+        <Badge variant={connected ? "success" : errorCopy || needsSelection ? "warning" : "muted"}>
+          {connected ? "Conectado" : needsSelection ? "Requiere seleccion" : errorCopy ? "Requiere accion" : "No conectado"}
+        </Badge>
+      </div>
+
+      <Card className="overflow-hidden border-fuchsia-300/16 bg-[linear-gradient(150deg,rgba(217,70,239,0.12),rgba(22,22,24,0.98)_42%,rgba(12,12,13,0.96))]">
+        <CardContent className="space-y-5 p-5 md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-fuchsia-300/25 bg-fuchsia-300/10 text-fuchsia-100">
+                <MessageSquareText className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-2xl font-semibold tracking-[-0.03em] text-white">Instagram Messaging</h3>
+                  <Badge variant={connected ? "success" : "warning"}>{connected ? "Activo" : "Preparado"}</Badge>
+                </div>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/64">
+                  Instagram esta disponible inicialmente en modo lectura dentro del Inbox. Las respuestas desde Instagram todavia no estan habilitadas.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button asChild className="rounded-2xl px-5">
+                <Link href="/api/app/integrations/instagram/start">Conectar Instagram</Link>
+              </Button>
+              <Button variant="secondary" className="rounded-2xl px-5" onClick={onRefresh}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refrescar
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <StatusMetric label="Estado" value={connected ? "Conectado" : "No conectado"} elevated />
+            <StatusMetric label="Cuenta Instagram" value={channel?.instagramUsername || channel?.instagramUserId || "-"} elevated />
+            <StatusMetric label="Pagina vinculada" value={channel?.externalPageName || channel?.externalPageId || "-"} elevated />
+            <StatusMetric label="Actualizado" value={formatDateTime(channel?.updatedAt || null) || "-"} elevated />
+          </div>
+
+          {errorCopy ? (
+            <div className="rounded-[24px] border border-amber-400/25 bg-amber-400/10 p-4 text-sm text-amber-50">
+              <p className="font-medium">{errorCopy.title}</p>
+              <p className="mt-1 leading-6 opacity-85">{errorCopy.description}</p>
+            </div>
+          ) : null}
+
+          {needsSelection ? (
+            <div className="rounded-[24px] border border-fuchsia-300/20 bg-fuchsia-300/10 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-white">Encontramos mas de una cuenta disponible.</p>
+                  <p className="mt-1 text-sm leading-6 text-white/65">Selecciona cual queres conectar. No se muestran tokens ni credenciales.</p>
+                </div>
+                <Badge variant="warning">{assetSelection.candidates.length} opciones</Badge>
+              </div>
+              <div className="mt-4 grid gap-2">
+                {assetSelection.candidates.map((candidate) => {
+                  const key = instagramAssetKey(candidate);
+                  return (
+                    <label key={key} className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/18 px-4 py-3">
+                      <input
+                        type="radio"
+                        name="instagram-asset"
+                        value={key}
+                        checked={selectedAssetKey === key}
+                        onChange={(event) => onSelectedAssetKeyChange(event.target.value)}
+                        className="mt-1 accent-[var(--brand)]"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-white">{candidate.instagramUsername || "Instagram sin nombre"}</span>
+                        <span className="mt-1 block text-xs text-white/55">Page: {candidate.pageName || candidate.pageId || "-"}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <Button className="mt-4 rounded-2xl px-5" disabled={!selectedAssetKey || busy} onClick={onConnectSelectedAsset}>
+                {busy ? "Conectando..." : "Conectar cuenta seleccionada"}
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="rounded-[24px] border border-white/8 bg-black/20 p-4">
+            <p className="text-sm font-medium text-white">Permisos requeridos por Meta</p>
+            <p className="mt-2 text-sm leading-6 text-white/62">
+              La app solicita permisos de Instagram Messaging y administracion de metadata de Page. Meta puede requerir App Review o Advanced Access antes de habilitar cuentas reales fuera de roles de prueba.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -453,6 +645,83 @@ function ErrorLine({ label, value }: { label: string; value: string }) {
       <p className="mt-2 line-clamp-3 break-words text-sm text-text">{value}</p>
     </div>
   );
+}
+
+type InstagramAssetSelection = {
+  selectionToken: string;
+  candidates: PortalInstagramCandidate[];
+};
+
+function readInstagramAssetSelection(searchParams: { get: (name: string) => string | null }): InstagramAssetSelection | null {
+  if (searchParams.get("instagram") !== "select") return null;
+  const selectionToken = String(searchParams.get("selectionToken") || "").trim();
+  const encodedCandidates = String(searchParams.get("candidates") || "").trim();
+  if (!selectionToken || !encodedCandidates) return null;
+
+  try {
+    const padded = encodedCandidates.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(encodedCandidates.length / 4) * 4, "=");
+    const json = JSON.parse(atob(padded)) as PortalInstagramCandidate[];
+    const candidates = Array.isArray(json)
+      ? json
+          .map((candidate) => ({
+            pageId: String(candidate?.pageId || "").trim() || null,
+            pageName: String(candidate?.pageName || "").trim() || null,
+            instagramUserId: String(candidate?.instagramUserId || "").trim() || null,
+            instagramUsername: String(candidate?.instagramUsername || "").trim() || null
+          }))
+          .filter((candidate) => candidate.pageId || candidate.instagramUserId)
+      : [];
+    return candidates.length ? { selectionToken, candidates } : null;
+  } catch {
+    return null;
+  }
+}
+
+function instagramAssetKey(candidate: PortalInstagramCandidate) {
+  return `${candidate.pageId || "page"}:${candidate.instagramUserId || "instagram"}`;
+}
+
+function instagramErrorCopy(reason: string) {
+  const safeReason = String(reason || "").trim();
+  if (!safeReason || safeReason === "connected") return null;
+
+  if (safeReason === "instagram_business_account_not_found") {
+    return {
+      title: "No encontramos una cuenta profesional de Instagram vinculada",
+      description: "Vincula Instagram como cuenta profesional a una pagina de Facebook y volve a intentar."
+    };
+  }
+
+  if (
+    safeReason === "instagram_pages_lookup_failed" ||
+    safeReason === "instagram_page_subscription_failed" ||
+    safeReason.includes("permission") ||
+    safeReason.includes("OAuthException")
+  ) {
+    return {
+      title: "Meta no concedio todos los permisos necesarios",
+      description: "Revisa permisos de la app en Meta. Instagram Messaging puede requerir App Review o Advanced Access."
+    };
+  }
+
+  if (safeReason === "instagram_multiple_assets_found") {
+    return {
+      title: "Encontramos mas de una cuenta disponible",
+      description: "Selecciona cual queres conectar para completar la configuracion."
+    };
+  }
+
+  if (safeReason === "instagram_asset_selection_expired") {
+    return {
+      title: "La seleccion vencio",
+      description: "Inicia nuevamente la conexion de Instagram para obtener una seleccion vigente."
+    };
+  }
+
+  return {
+    title: "No se pudo completar la conexion de Instagram",
+    description: "Reintenta el flujo OAuth. Si el problema persiste, revisa la configuracion de Meta."
+  };
 }
 
 function formatDateTime(value: string | null) {

@@ -61,7 +61,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let payload: { code?: string; redirectUri?: string } = {};
+  let payload: {
+    code?: string;
+    redirectUri?: string;
+    selectionToken?: string;
+    selectedPageId?: string;
+    selectedInstagramUserId?: string;
+  } = {};
   try {
     payload = await request.json();
   } catch {
@@ -71,7 +77,10 @@ export async function POST(request: NextRequest) {
   try {
     const result = await connectPortalInstagram(auth.ctx.tenantId, {
       code: String(payload.code || "").trim(),
-      redirectUri: String(payload.redirectUri || "").trim()
+      redirectUri: String(payload.redirectUri || "").trim(),
+      selectionToken: String(payload.selectionToken || "").trim(),
+      selectedPageId: String(payload.selectedPageId || "").trim(),
+      selectedInstagramUserId: String(payload.selectedInstagramUserId || "").trim()
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {

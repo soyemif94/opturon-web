@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectPortalInstagram, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
+import { connectPortalInstagram, getBackendErrorBody, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
 
 const INSTAGRAM_STATE_COOKIE = "opturon_instagram_oauth_state";
@@ -114,16 +114,27 @@ export async function GET(request: NextRequest) {
     });
     return clearCookie(NextResponse.redirect(redirectTarget));
   } catch (connectError) {
+    const backendBody = getBackendErrorBody(connectError) as { error?: string; details?: unknown } | null;
+    const backendReason =
+      String(backendBody?.error || "").trim() ||
+      (connectError instanceof Error ? connectError.message : "instagram_connect_failed");
     console.error("[instagram-oauth] callback_connect_failed", {
       tenantId: auth.ctx.tenantId,
       status: getBackendErrorStatus(connectError) || null,
-      message: connectError instanceof Error ? connectError.message : "instagram_connect_failed"
+      message: backendReason
     });
     redirectTarget.searchParams.set("instagram", "error");
-    redirectTarget.searchParams.set(
-      "reason",
-      String(getBackendErrorStatus(connectError) || (connectError instanceof Error ? connectError.message : "instagram_connect_failed"))
-    );
+    redirectTarget.searchParams.set("reason", backendReason);
+    if (backendReason === "instagram_multiple_assets_found") {
+      const details = backendBody?.details as { selectionToken?: string; candidates?: unknown[] } | undefined;
+      const selectionToken = String(details?.selectionToken || "").trim();
+      const candidates = Array.isArray(details?.candidates) ? details.candidates : [];
+      if (selectionToken && candidates.length) {
+        redirectTarget.searchParams.set("instagram", "select");
+        redirectTarget.searchParams.set("selectionToken", selectionToken);
+        redirectTarget.searchParams.set("candidates", Buffer.from(JSON.stringify(candidates)).toString("base64url"));
+      }
+    }
     return clearCookie(NextResponse.redirect(redirectTarget));
   }
 }
