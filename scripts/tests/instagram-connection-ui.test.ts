@@ -11,7 +11,12 @@ function read(relativePath: string) {
 function testInstagramScopes() {
   const startRoute = read("app/api/app/integrations/instagram/start/route.ts");
 
-  assert.match(startRoute, /env\.META_INSTAGRAM_APP_ID\s*\|\|\s*env\.META_APP_ID/);
+  assert.match(
+    startRoute,
+    /env\.META_INSTAGRAM_OAUTH_APP_ID\s*\|\|\s*env\.META_INSTAGRAM_APP_ID\s*\|\|\s*env\.META_APP_ID/
+  );
+  assert.match(startRoute, /Meta\/Facebook App ID/);
+  assert.match(startRoute, /not the internal "Instagram App ID"/);
   assert.match(startRoute, /META_INSTAGRAM_LOGIN_CONFIG_ID/);
   assert.match(startRoute, /config_id/);
   assert.match(startRoute, /Facebook Login for Business uses config_id/);

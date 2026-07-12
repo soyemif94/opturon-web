@@ -6,8 +6,11 @@ const INSTAGRAM_STATE_COOKIE = "opturon_instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE_SECONDS = 10 * 60;
 
 export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env) {
+  // OAuth client_id must be the Meta/Facebook App ID from developers.facebook.com/apps/<id>,
+  // not the internal "Instagram App ID" shown inside the Instagram API setup product.
   const appId = String(
-    env.META_INSTAGRAM_APP_ID ||
+    env.META_INSTAGRAM_OAUTH_APP_ID ||
+      env.META_INSTAGRAM_APP_ID ||
       env.META_APP_ID ||
       env.NEXT_PUBLIC_META_APP_ID ||
       env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_APP_ID ||
