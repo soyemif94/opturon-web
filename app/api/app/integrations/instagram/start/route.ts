@@ -23,11 +23,30 @@ export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env
   const instagramBusinessAppId = String(
     env.META_INSTAGRAM_BUSINESS_APP_ID || env.META_INSTAGRAM_APP_ID_INTERNAL || ""
   ).trim();
+  const facebookAppIdSource = env.META_INSTAGRAM_OAUTH_APP_ID
+    ? "META_INSTAGRAM_OAUTH_APP_ID"
+    : env.META_INSTAGRAM_APP_ID
+      ? "META_INSTAGRAM_APP_ID"
+      : env.META_APP_ID
+        ? "META_APP_ID"
+        : env.NEXT_PUBLIC_META_APP_ID
+          ? "NEXT_PUBLIC_META_APP_ID"
+          : env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_APP_ID
+            ? "NEXT_PUBLIC_META_EMBEDDED_SIGNUP_APP_ID"
+            : env.WHATSAPP_APP_ID
+              ? "WHATSAPP_APP_ID"
+              : "missing";
+  const instagramBusinessAppIdSource = env.META_INSTAGRAM_BUSINESS_APP_ID
+    ? "META_INSTAGRAM_BUSINESS_APP_ID"
+    : env.META_INSTAGRAM_APP_ID_INTERNAL
+      ? "META_INSTAGRAM_APP_ID_INTERNAL"
+      : "missing";
   const loginConfigId = String(env.META_INSTAGRAM_LOGIN_CONFIG_ID || "").trim();
 
   return {
     provider,
     appId: provider === "instagram_login" ? instagramBusinessAppId : facebookAppId,
+    appIdSource: provider === "instagram_login" ? instagramBusinessAppIdSource : facebookAppIdSource,
     graphVersion: String(
       env.NEXT_PUBLIC_WHATSAPP_GRAPH_VERSION || env.WHATSAPP_GRAPH_VERSION || "v25.0"
     ).trim(),
@@ -93,6 +112,12 @@ export async function GET(request: NextRequest) {
   console.info("[instagram-oauth] start", {
     tenantId: auth.ctx.tenantId,
     redirectUri,
+    selectedProvider: config.provider,
+    selectedAppIdSource: config.appIdSource,
+    selectedAppIdSuffix: config.appId.slice(-6),
+    authorizeHost: url.host,
+    hasConfigId: Boolean(config.loginConfigId),
+    hasScopes: Boolean(url.searchParams.get("scope")),
     loginMode: config.provider === "instagram_login"
       ? "instagram_login"
       : config.loginConfigId ? "facebook_login_for_business" : "classic_scope_fallback",

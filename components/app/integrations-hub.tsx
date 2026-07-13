@@ -397,7 +397,7 @@ function InstagramConnectionPanel({
 
             <div className="flex flex-wrap gap-2">
               <Button asChild className="rounded-2xl px-5">
-                <Link href="/api/app/integrations/instagram/start">Conectar Instagram</Link>
+                <a href="/api/app/integrations/instagram/start">Conectar Instagram</a>
               </Button>
               <Button variant="secondary" className="rounded-2xl px-5" onClick={onRefresh}>
                 <RefreshCw className="mr-2 h-4 w-4" />

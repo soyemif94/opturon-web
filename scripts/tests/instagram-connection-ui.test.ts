@@ -48,9 +48,27 @@ function testInstagramIntegrationVisible() {
   assert.match(pageSource, /instagramStatus=\{instagramStatus\}/);
   assert.match(hubSource, /Instagram Messaging/);
   assert.match(hubSource, /Conectar Instagram/);
+  assert.match(hubSource, /<a href="\/api\/app\/integrations\/instagram\/start">Conectar Instagram<\/a>/);
+  assert.doesNotMatch(
+    hubSource,
+    /<Link href="\/api\/app\/integrations\/instagram\/start">Conectar Instagram<\/Link>/
+  );
+  assert.doesNotMatch(hubSource, /instagram\/start\?_rsc/);
   assert.match(hubSource, /Instagram esta disponible inicialmente en modo lectura dentro del Inbox/);
   assert.match(hubSource, /Las respuestas desde Instagram todavia no estan habilitadas/);
   assert.doesNotMatch(hubSource, /Instagram y Messenger quedan fuera del frente principal/);
+}
+
+function testSafeInstagramOauthLogging() {
+  const startRoute = read("app/api/app/integrations/instagram/start/route.ts");
+
+  assert.match(startRoute, /selectedProvider: config\.provider/);
+  assert.match(startRoute, /selectedAppIdSource: config\.appIdSource/);
+  assert.match(startRoute, /selectedAppIdSuffix: config\.appId\.slice\(-6\)/);
+  assert.match(startRoute, /authorizeHost: url\.host/);
+  assert.match(startRoute, /hasConfigId: Boolean\(config\.loginConfigId\)/);
+  assert.match(startRoute, /hasScopes: Boolean\(url\.searchParams\.get\("scope"\)\)/);
+  assert.doesNotMatch(startRoute, /state:\s*state/);
 }
 
 function testInstagramErrorsAndAssetPicker() {
@@ -86,6 +104,7 @@ function testNoInstagramOutboundPromise() {
 function run() {
   testInstagramScopes();
   testInstagramIntegrationVisible();
+  testSafeInstagramOauthLogging();
   testInstagramErrorsAndAssetPicker();
   testNoInstagramOutboundPromise();
   console.log("instagram-connection-ui.test.ts: ok");
