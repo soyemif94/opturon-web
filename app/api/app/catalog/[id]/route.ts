@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) {
@@ -100,10 +100,25 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   }
 
   const { id } = await params;
+  const force = new URL(request.url).searchParams.get("force") === "true";
+  const body = force ? await request.json().catch(() => null) : null;
 
   try {
-    const result = await deletePortalProduct(tenantContext.tenantId, id);
-    return noStore(NextResponse.json({ ok: true, productId: result.data.productId }));
+    const result = await deletePortalProduct(tenantContext.tenantId, id, {
+      force,
+      confirmForceDelete: body?.confirmForceDelete === true,
+      acknowledgedReferences: body?.acknowledgedReferences === true,
+      actor: {
+        id: tenantContext.ctx.portalActorId || null,
+        name: tenantContext.ctx.session?.user?.name || null
+      }
+    });
+    return noStore(NextResponse.json({
+      ok: true,
+      productId: result.data.productId,
+      deletionMode: result.data.deletionMode || "hard_delete",
+      referencesPreserved: result.data.referencesPreserved === true
+    }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error) as { error?: string; message?: string; details?: unknown } | undefined;
     return noStore(
