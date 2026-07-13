@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { CatalogImportWizard } from "@/components/app/CatalogImportWizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { formatExpirationDate, getExpirationBadgePresentation, getProductExpirationStatus } from "@/lib/product-expiration";
 import { getDiscountedPrice, normalizeDiscountPercentage } from "@/lib/product-pricing";
@@ -162,7 +163,10 @@ function formatProductDeleteError(error?: string | null, message?: string | null
   if (safeError === "portal_product_delete_failed") {
     return "No pudimos eliminar el producto. Si tiene historial asociado, mantenelo archivado o reintentá más tarde.";
   }
-  return safeError || "No se pudo eliminar el producto.";
+  if (safeError === "force_delete_confirmation_required") {
+    return "Confirmá que entendés el impacto antes de continuar.";
+  }
+  return "No se pudo eliminar el producto.";
 }
 
 const EMPTY_DRAFT: Draft = {
@@ -211,6 +215,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [forceDeleteTarget, setForceDeleteTarget] = useState<Product | null>(null);
+  const [forceDeleteAcknowledged, setForceDeleteAcknowledged] = useState(false);
+  const [forceDeleting, setForceDeleting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
@@ -523,9 +530,13 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     });
   }
 
-  async function requestDelete(productId: string): Promise<DeleteAttemptResult> {
-    const response = await fetch(`/api/app/catalog/${productId}`, {
-      method: "DELETE"
+  async function requestDelete(productId: string, force = false): Promise<DeleteAttemptResult> {
+    const response = await fetch(`/api/app/catalog/${productId}${force ? "?force=true" : ""}`, {
+      method: "DELETE",
+      headers: force ? { "Content-Type": "application/json" } : undefined,
+      body: force
+        ? JSON.stringify({ confirmForceDelete: true, acknowledgedReferences: true })
+        : undefined
     });
 
     if (response.ok) {
@@ -941,6 +952,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
     try {
       const result = await requestDelete(product.id);
+      if (result.blocked) {
+        setForceDeleteTarget(product);
+        setForceDeleteAcknowledged(false);
+        return;
+      }
       if (!result.ok) {
         throw new Error(result.message || "No se pudo eliminar el producto.");
       }
@@ -955,6 +971,53 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       toast.error("Error al eliminar producto", message);
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function maintainProductArchived() {
+    const product = forceDeleteTarget;
+    if (!product) return;
+    setForceDeleting(true);
+    try {
+      const response = await fetch(`/api/app/catalog/${product.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error("No pudimos archivar el producto. Intentá nuevamente.");
+      setProducts((current) => current.map((item) => (item.id === product.id ? json.product : item)));
+      setForceDeleteTarget(null);
+      setForceDeleteAcknowledged(false);
+      toast.success("Producto archivado");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No pudimos archivar el producto.";
+      toast.error("Error al archivar producto", message);
+    } finally {
+      setForceDeleting(false);
+    }
+  }
+
+  async function forceDeleteProduct() {
+    const product = forceDeleteTarget;
+    if (!product || !forceDeleteAcknowledged) return;
+    setForceDeleting(true);
+    setFeedback(null);
+    try {
+      const result = await requestDelete(product.id, true);
+      if (!result.ok) throw new Error(result.message || "No pudimos eliminar el producto del catálogo.");
+      await reloadProducts(selectedId === product.id ? null : selectedId);
+      setForceDeleteTarget(null);
+      setForceDeleteAcknowledged(false);
+      setSelectedIds((current) => current.filter((id) => id !== product.id));
+      const message = "Producto eliminado del catálogo. El historial asociado se conserva.";
+      setFeedback({ tone: "success", text: message });
+      toast.success(message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No pudimos eliminar el producto del catálogo.";
+      toast.error("Error al eliminar producto", message);
+    } finally {
+      setForceDeleting(false);
     }
   }
 
@@ -2104,6 +2167,51 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear, editar ni eliminar.
         </div>
       ) : null}
+
+      <Dialog
+        open={Boolean(forceDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !forceDeleting) {
+            setForceDeleteTarget(null);
+            setForceDeleteAcknowledged(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Este producto tiene historial asociado</DialogTitle>
+            <DialogDescription>
+              Este producto tiene ventas, pedidos, comprobantes o movimientos de stock asociados. Si continuás, se eliminará del catálogo operativo, pero se conservará el historial para auditoría y comprobantes.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 shrink-0 accent-amber-500"
+              checked={forceDeleteAcknowledged}
+              onChange={(event) => setForceDeleteAcknowledged(event.target.checked)}
+              disabled={forceDeleting}
+            />
+            <span>Entiendo que este producto está asociado a historial y quiero eliminarlo del catálogo operativo.</span>
+          </label>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:flex-wrap">
+            <Button type="button" variant="ghost" disabled={forceDeleting} onClick={() => setForceDeleteTarget(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="secondary" disabled={forceDeleting} onClick={() => void maintainProductArchived()}>
+              Mantener archivado
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={forceDeleting || !forceDeleteAcknowledged}
+              onClick={() => void forceDeleteProduct()}
+            >
+              {forceDeleting ? "Eliminando..." : "Eliminar de todos modos"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {renderCatalogWorkspacePremium()}
     </div>

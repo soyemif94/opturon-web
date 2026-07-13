@@ -3077,14 +3077,37 @@ export async function setPortalProductInventoryMode(
   );
 }
 
-export async function deletePortalProduct(tenantId: string, productId: string) {
-  return backendFetch<{
+export async function deletePortalProduct(
+  tenantId: string,
+  productId: string,
+  options?: {
+    force?: boolean;
+    confirmForceDelete?: boolean;
+    acknowledgedReferences?: boolean;
+    actor?: { id?: string | null; name?: string | null };
+  }
+) {
+  const headers = new Headers();
+  if (options?.actor?.id) headers.set("x-portal-actor-id", options.actor.id);
+  if (options?.actor?.name) headers.set("x-portal-actor-name", options.actor.name);
+  return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
       productId: string;
+      deletionMode?: "hard_delete" | "tombstone";
+      referencesPreserved?: boolean;
     };
-  }>(`/portal/tenants/${tenantId}/products/${productId}`, { method: "DELETE" }, false);
+  }>(`/portal/tenants/${tenantId}/products/${productId}${options?.force ? "?force=true" : ""}`, {
+    method: "DELETE",
+    headers,
+    body: options?.force
+      ? JSON.stringify({
+          confirmForceDelete: options.confirmForceDelete === true,
+          acknowledgedReferences: options.acknowledgedReferences === true
+        })
+      : undefined
+  });
 }
 
 export async function getPortalInvoices(tenantId: string) {
