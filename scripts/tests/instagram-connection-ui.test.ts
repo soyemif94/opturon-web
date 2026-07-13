@@ -18,10 +18,15 @@ function testInstagramScopes() {
   assert.match(startRoute, /Meta\/Facebook App ID/);
   assert.match(startRoute, /not the internal "Instagram App ID"/);
   assert.match(startRoute, /META_INSTAGRAM_LOGIN_CONFIG_ID/);
+  assert.match(startRoute, /META_INSTAGRAM_OAUTH_PROVIDER/);
+  assert.match(startRoute, /META_INSTAGRAM_BUSINESS_APP_ID/);
+  assert.match(startRoute, /https:\/\/www\.instagram\.com\/oauth\/authorize/);
+  assert.match(startRoute, /https:\/\/www\.facebook\.com\/\$\{config\.graphVersion\}\/dialog\/oauth/);
   assert.match(startRoute, /config_id/);
   assert.match(startRoute, /Facebook Login for Business uses config_id/);
   assert.match(startRoute, /url\.searchParams\.set\("config_id", config\.loginConfigId\)/);
-  assert.match(startRoute, /else\s*\{\s*url\.searchParams\.set\("scope", config\.scopes\.join\(","\)\)/s);
+  assert.match(startRoute, /config\.instagramLoginScopes\.join\(","\)/);
+  assert.match(startRoute, /config\.facebookLoginScopes\.join\(","\)/);
   assert.match(startRoute, /"pages_show_list"/);
   assert.match(startRoute, /"instagram_business_basic"/);
   assert.match(startRoute, /"instagram_business_manage_messages"/);
@@ -30,6 +35,9 @@ function testInstagramScopes() {
   assert.doesNotMatch(startRoute, /"instagram_basic"/);
   assert.doesNotMatch(startRoute, /"instagram_manage_messages"/);
   assert.doesNotMatch(startRoute, /"pages_manage_metadata"/);
+
+  const instagramScopes = startRoute.match(/instagramLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
+  assert.doesNotMatch(instagramScopes, /pages_/);
 }
 
 function testInstagramIntegrationVisible() {
