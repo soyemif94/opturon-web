@@ -151,6 +151,20 @@ type DeleteAttemptResult = {
   message?: string;
 };
 
+function formatProductDeleteError(error?: string | null, message?: string | null) {
+  const safeMessage = typeof message === "string" ? message.trim() : "";
+  if (safeMessage) return safeMessage;
+
+  const safeError = typeof error === "string" ? error.trim() : "";
+  if (safeError === "product_delete_blocked") {
+    return "No se puede eliminar porque tiene ventas, pedidos o movimientos de stock asociados. Podés mantenerlo archivado.";
+  }
+  if (safeError === "portal_product_delete_failed") {
+    return "No pudimos eliminar el producto. Si tiene historial asociado, mantenelo archivado o reintentá más tarde.";
+  }
+  return safeError || "No se pudo eliminar el producto.";
+}
+
 const EMPTY_DRAFT: Draft = {
   name: "",
   description: "",
@@ -523,7 +537,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       productId,
       ok: false,
       blocked: json?.error === "product_delete_blocked",
-      message: json?.error || "No se pudo eliminar el producto."
+      message: formatProductDeleteError(json?.error, json?.message)
     };
   }
 

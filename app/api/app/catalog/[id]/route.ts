@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   deletePortalProduct,
+  getBackendErrorBody,
   getBackendErrorStatus,
   getPortalProductDetail,
   isBackendConfigured,
@@ -104,10 +105,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     const result = await deletePortalProduct(tenantContext.tenantId, id);
     return noStore(NextResponse.json({ ok: true, productId: result.data.productId }));
   } catch (error) {
+    const backendBody = getBackendErrorBody(error) as { error?: string; message?: string; details?: unknown } | undefined;
     return noStore(
       NextResponse.json(
         {
-          error: error instanceof Error ? error.message : "backend_delete_failed"
+          error: backendBody?.error || (error instanceof Error ? error.message : "backend_delete_failed"),
+          message: backendBody?.message || null,
+          details: backendBody?.details || null
         },
         { status: getBackendErrorStatus(error) || 502 }
       )

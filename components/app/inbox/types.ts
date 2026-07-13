@@ -21,6 +21,7 @@ export type ConversationRowData = {
   lastMessagePreview?: string;
   priority: "normal" | "hot";
   botEnabled: boolean;
+  importedHistory?: boolean;
   botFlowLock?: BotFlowLock;
   botDomainOverride?: BotDomainOverride;
   unreadCount: number;

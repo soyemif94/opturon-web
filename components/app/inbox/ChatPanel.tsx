@@ -120,6 +120,7 @@ export function ChatPanel({
               <InboxBadge className={isInstagramConversation ? "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" : ""}>
                 {isInstagramConversation ? "Instagram" : "WhatsApp"}
               </InboxBadge>
+              {detail.conversation.importedHistory ? <InboxBadge className="border-emerald-300/25 bg-emerald-300/10 text-emerald-100">Historial importado</InboxBadge> : null}
               <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
               {!detail.conversation.botEnabled ? <InboxBadge className="border-amber-400/30 bg-amber-400/10 text-amber-100">Bot pausado</InboxBadge> : null}
               {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}

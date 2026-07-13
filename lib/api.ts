@@ -3889,6 +3889,60 @@ export async function confirmPortalCatalogImport(
   );
 }
 
+export type PortalWhatsAppChatImportPreview = {
+  importId: string;
+  status: string;
+  totalMessages: number;
+  newEstimated: number;
+  duplicateEstimated: number;
+  ignoredLines: number;
+  participants: string[];
+  dateRange: { from?: string | null; to?: string | null };
+  detectedFormat: string;
+  warnings: Array<{ code?: string; message?: string } | string>;
+  conversationId?: string | null;
+  confirmedAt?: string | null;
+  insertedMessages?: number;
+  duplicateMessages?: number;
+};
+
+export async function previewPortalWhatsAppChatImport(
+  tenantId: string,
+  formData: FormData,
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalWhatsAppChatImportPreview }>(
+    `/portal/tenants/${tenantId}/whatsapp-imports/preview`,
+    {
+      method: "POST",
+      headers,
+      body: formData
+    }
+  );
+}
+
+export async function confirmPortalWhatsAppChatImport(
+  tenantId: string,
+  importId: string,
+  payload: { selectedContactId?: string | null },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalWhatsAppChatImportPreview; idempotent?: boolean }>(
+    `/portal/tenants/${tenantId}/whatsapp-imports/${importId}/confirm`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload || {})
+    }
+  );
+}
+
 export async function cancelPortalCatalogImport(
   tenantId: string,
   importId: string,

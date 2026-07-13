@@ -151,6 +151,7 @@ export function ConversationRow({
             <InboxBadge className={row.channelType === "instagram" ? "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" : ""}>
               {channelLabel}
             </InboxBadge>
+            {row.importedHistory ? <InboxBadge className="border-emerald-300/25 bg-emerald-300/10 text-emerald-100">Historial importado</InboxBadge> : null}
             <InboxBadge className={response.className}>{response.label}</InboxBadge>
             <InboxBadge className={leadStatus.className}>{leadStatus.label}</InboxBadge>
             {row.priority === "hot" ? <InboxBadge className="text-brandBright">Caliente</InboxBadge> : null}

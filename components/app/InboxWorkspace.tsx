@@ -7,6 +7,7 @@ import { InboxConnectionEmptyState } from "@/components/app/inbox/InboxConnectio
 import { ConversationList } from "@/components/app/inbox/ConversationList";
 import { InboxLayout } from "@/components/app/inbox/InboxLayout";
 import { ProfilePanel } from "@/components/app/inbox/ProfilePanel";
+import { WhatsAppChatImportModal } from "@/components/app/inbox/WhatsAppChatImportModal";
 import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey, InboxChannelKey, LeadStatus } from "@/components/app/inbox/types";
 import { useInboxContext } from "@/components/inbox/inbox-context";
 import { getSuggestions, type SuggestionItem } from "@/lib/suggestions/getSuggestions";
@@ -1252,8 +1253,18 @@ export function InboxWorkspace({
   return (
     <div className="flex flex-col gap-3 text-sm">
       <header className="shrink-0">
-        <h1 className="text-base font-semibold">Inbox</h1>
-        <p className="text-xs text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-base font-semibold">Inbox</h1>
+            <p className="text-xs text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>
+          </div>
+          <WhatsAppChatImportModal
+            onImported={(conversationId) => {
+              void loadRows();
+              if (conversationId) setSelectedId(conversationId);
+            }}
+          />
+        </div>
       </header>
 
       {readOnly ? (
