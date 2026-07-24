@@ -1,4 +1,11 @@
 import { hashSync } from "bcryptjs";
+import {
+  isBackendConfigured,
+  requestPortalPasswordReset as requestBackendPortalPasswordReset,
+  invalidatePortalPasswordResetToken as invalidateBackendPortalPasswordResetToken,
+  resetPortalPassword as resetBackendPortalPassword,
+  validatePortalPasswordResetToken as validateBackendPortalPasswordResetToken
+} from "@/lib/api";
 import { findUserByEmail } from "@/lib/saas/store";
 import {
   consumePasswordResetToken,
@@ -57,9 +64,38 @@ async function sendResetEmail(input: { email: string; resetLink: string }) {
   }
 }
 
+async function invalidateBackendResetDeliveryToken(token: string) {
+  try {
+    await invalidateBackendPortalPasswordResetToken(token);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown_error";
+    console.error("PASSWORD_RESET_TOKEN_INVALIDATION_FAILED", { message });
+  }
+}
+
 export async function requestPasswordReset(email: string) {
   const normalized = String(email || "").trim().toLowerCase();
   if (!normalized) return { ok: true };
+
+  if (isBackendConfigured()) {
+    const response = await requestBackendPortalPasswordReset(normalized);
+    const delivery = response.data?.delivery;
+    if (delivery?.token && delivery?.email) {
+      try {
+        const appBaseUrl = getAppBaseUrl();
+        if (!appBaseUrl) {
+          throw new Error("password_reset_base_url_not_configured");
+        }
+        const resetLink = `${appBaseUrl}/reset-password?token=${encodeURIComponent(delivery.token)}`;
+        await sendResetEmail({ email: delivery.email, resetLink });
+      } catch (error) {
+        await invalidateBackendResetDeliveryToken(delivery.token);
+        const message = error instanceof Error ? error.message : "unknown_error";
+        console.error("PASSWORD_RESET_EMAIL_DELIVERY_FAILED", { message });
+      }
+    }
+    return { ok: true };
+  }
 
   const user = findUserByEmail(normalized);
   if (!user?.id) {
@@ -83,10 +119,26 @@ export async function requestPasswordReset(email: string) {
 }
 
 export function isPasswordResetTokenValid(token: string) {
+  if (isBackendConfigured()) {
+    throw new Error("backend_password_reset_validation_requires_async");
+  }
   return Boolean(validatePasswordResetToken(token));
 }
 
-export function resetPasswordWithToken(token: string, password: string) {
+export async function isPasswordResetTokenValidAsync(token: string) {
+  if (isBackendConfigured()) {
+    const response = await validateBackendPortalPasswordResetToken(token);
+    return Boolean(response.data?.valid);
+  }
+  return Boolean(validatePasswordResetToken(token));
+}
+
+export async function resetPasswordWithToken(token: string, password: string) {
+  if (isBackendConfigured()) {
+    const response = await resetBackendPortalPassword(token, password);
+    return response.data;
+  }
+
   const tokenRecord = consumePasswordResetToken(token);
   if (!tokenRecord) {
     throw new Error("invalid_or_expired_reset_token");

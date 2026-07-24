@@ -790,6 +790,58 @@ export async function loginPortalUser(email: string, password: string) {
   );
 }
 
+export async function requestPortalPasswordReset(email: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      delivery?: {
+        email: string;
+        token: string;
+        expiresAt: string;
+      } | null;
+    };
+  }>("/portal/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  }, AUTH_API_TIMEOUT_MS);
+}
+
+export async function invalidatePortalPasswordResetToken(token: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      invalidated: boolean;
+    };
+  }>("/portal/auth/forgot-password/invalidate", {
+    method: "POST",
+    body: JSON.stringify({ token })
+  }, AUTH_API_TIMEOUT_MS);
+}
+
+export async function validatePortalPasswordResetToken(token: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+      valid: boolean;
+    };
+  }>(`/portal/auth/reset-password/validate?token=${encodeURIComponent(token)}`, undefined, false, AUTH_API_TIMEOUT_MS);
+}
+
+export async function resetPortalPassword(token: string, password: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      ok: boolean;
+    };
+  }>("/portal/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password })
+  }, false, AUTH_API_TIMEOUT_MS);
+}
+
 export async function loginPartnerUser(email: string, password: string) {
   return backendFetch<{
     success: boolean;

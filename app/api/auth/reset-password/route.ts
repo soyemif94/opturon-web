@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isPasswordResetTokenValid, resetPasswordWithToken } from "@/lib/password-reset";
+import { isPasswordResetTokenValidAsync, resetPasswordWithToken } from "@/lib/password-reset";
 
 const schema = z.object({
   token: z.string().min(20),
@@ -10,7 +10,7 @@ const schema = z.object({
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const token = String(url.searchParams.get("token") || "");
-  return NextResponse.json({ ok: true, valid: isPasswordResetTokenValid(token) });
+  return NextResponse.json({ ok: true, valid: await isPasswordResetTokenValidAsync(token) });
 }
 
 export async function POST(request: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    resetPasswordWithToken(parsed.data.token, parsed.data.password);
+    await resetPasswordWithToken(parsed.data.token, parsed.data.password);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "reset_password_failed";
