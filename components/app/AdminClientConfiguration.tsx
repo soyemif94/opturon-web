@@ -13,6 +13,7 @@ import type {
   TenantPolicy
 } from "@/lib/admin-client-policy";
 import type { PortalWhatsAppEmbeddedSignupStatus, PortalWhatsAppStatus } from "@/lib/api";
+import { buildEnabledModulesFromCapabilities, getCapabilityForAppModule } from "@/lib/tenant-policy";
 import {
   beginMetaWhatsAppConnection,
   getMetaEmbeddedSignupErrorDetails,
@@ -211,17 +212,19 @@ function clonePolicy(policy: TenantPolicy): TenantPolicy {
   };
 }
 
-function buildEnabledModulesFromCapabilities(capabilities: string[]) {
-  return MODULES.reduce<Record<string, boolean>>((acc, moduleKey) => {
-    const capability =
-      moduleKey === "invoices" ? "receipts"
-        : moduleKey === "cash" ? "cash_management"
-          : moduleKey === "sales" ? "sales_pipeline"
-            : moduleKey === "agenda" ? "appointments"
-              : moduleKey;
-    acc[moduleKey] = capabilities.includes(capability);
-    return acc;
-  }, {});
+function syncCapabilitiesForEnabledModule(capabilities: string[], moduleName: string, enabled: boolean) {
+  const capability = getCapabilityForAppModule(moduleName);
+  if (!enabled || !capability) return capabilities;
+  return Array.from(new Set([...capabilities, capability]));
+}
+
+function syncEnabledModulesForCapability(enabledModules: Record<string, boolean>, capability: string, enabled: boolean) {
+  const moduleName = MODULES.find((candidate) => getCapabilityForAppModule(candidate) === capability);
+  if (!moduleName) return enabledModules;
+  return {
+    ...enabledModules,
+    [moduleName]: enabled
+  };
 }
 
 function createNewClientDraft(presetKey = "custom"): NewClientDraft {
@@ -1102,7 +1105,10 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                             industryProfile
                           },
                           recommendedCapabilities: RECOMMENDED_CAPABILITIES_BY_PROFILE[industryProfile] || [],
-                          capabilities: RECOMMENDED_CAPABILITIES_BY_PROFILE[industryProfile] || draft.capabilities
+                          capabilities: RECOMMENDED_CAPABILITIES_BY_PROFILE[industryProfile] || draft.capabilities,
+                          enabledModules: buildEnabledModulesFromCapabilities(
+                            RECOMMENDED_CAPABILITIES_BY_PROFILE[industryProfile] || draft.capabilities
+                          )
                         });
                       }}
                       className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
@@ -1219,6 +1225,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                           checked={checked}
                           onChange={(event) =>
                             patchDraft({
+                              capabilities: syncCapabilitiesForEnabledModule(draft.capabilities, moduleName, event.target.checked),
                               enabledModules: { ...draft.enabledModules, [moduleName]: event.target.checked }
                             })
                           }
@@ -1267,7 +1274,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                           patchDraft({
                             capabilities: event.target.checked
                               ? Array.from(new Set([...draft.capabilities, capability]))
-                              : draft.capabilities.filter((item) => item !== capability)
+                              : draft.capabilities.filter((item) => item !== capability),
+                            enabledModules: syncEnabledModulesForCapability(draft.enabledModules, capability, event.target.checked)
                           })
                         }
                       />

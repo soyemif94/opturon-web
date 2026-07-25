@@ -41,6 +41,24 @@ export const APP_MODULE_TO_CAPABILITY: Partial<Record<AppModule, string>> = {
   metrics: "metrics"
 };
 
+export function getCapabilityForAppModule(moduleName: string) {
+  return APP_MODULE_TO_CAPABILITY[moduleName as AppModule] || null;
+}
+
+export function buildEnabledModulesFromCapabilities(capabilities: string[]) {
+  const granted = new Set(
+    (Array.isArray(capabilities) ? capabilities : [])
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  return IMPLEMENTED_APP_MODULES.reduce<Record<string, boolean>>((acc, moduleName) => {
+    const capability = getCapabilityForAppModule(moduleName);
+    acc[moduleName] = capability ? granted.has(capability) : true;
+    return acc;
+  }, {});
+}
+
 export type TenantOperatingProfile = {
   presetKey?: string;
   industryProfile?: string;

@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { buildTenantAppModules } = require("../../lib/tenant-policy.ts");
+const { canAccessAppModule } = require("../../lib/app-permissions.ts");
 
 function testLegacyTenantKeepsPreviousNavigation() {
   const modules = buildTenantAppModules(null);
@@ -62,10 +63,63 @@ function testFutureCapabilitiesDoNotCreateMenuItems() {
   assert.equal(modules.inventory, true);
 }
 
+function testOwnerSeesAllGrantedImplementedModules() {
+  const modules = buildTenantAppModules({
+    policyVersion: 1,
+    planCode: "basic",
+    limits: {
+      maxPortalUsers: 5,
+      maxAutomations: 20,
+      maxContacts: 1000
+    },
+    operatingProfile: {
+      presetKey: "custom",
+      industryProfile: "custom",
+      operatingModel: "hybrid"
+    },
+    recommendedCapabilities: [],
+    capabilities: ["inbox", "contacts", "catalog", "orders", "receipts", "payments", "cash_management", "sales_pipeline", "appointments", "loyalty", "metrics"],
+    enabledModules: {
+      inbox: true,
+      contacts: true,
+      catalog: true,
+      orders: true,
+      invoices: true,
+      payments: true,
+      cash: true,
+      sales: true,
+      agenda: true,
+      loyalty: true,
+      automations: false,
+      metrics: true
+    }
+  });
+
+  const context = {
+    accountScope: "client",
+    tenantRole: "owner",
+    tenantModules: modules
+  };
+
+  assert.equal(canAccessAppModule(context, "inbox"), true);
+  assert.equal(canAccessAppModule(context, "contacts"), true);
+  assert.equal(canAccessAppModule(context, "catalog"), true);
+  assert.equal(canAccessAppModule(context, "orders"), true);
+  assert.equal(canAccessAppModule(context, "invoices"), true);
+  assert.equal(canAccessAppModule(context, "payments"), true);
+  assert.equal(canAccessAppModule(context, "cash"), true);
+  assert.equal(canAccessAppModule(context, "sales"), true);
+  assert.equal(canAccessAppModule(context, "agenda"), true);
+  assert.equal(canAccessAppModule(context, "loyalty"), true);
+  assert.equal(canAccessAppModule(context, "metrics"), true);
+  assert.equal(canAccessAppModule(context, "automations"), false);
+}
+
 async function run() {
   testLegacyTenantKeepsPreviousNavigation();
   testExplicitPolicyRestrictsImplementedModulesOnly();
   testFutureCapabilitiesDoNotCreateMenuItems();
+  testOwnerSeesAllGrantedImplementedModules();
   console.log("tenant-policy-modules.test.ts: ok");
 }
 
