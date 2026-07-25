@@ -6,6 +6,12 @@ import {
   resetPortalPassword as resetBackendPortalPassword,
   validatePortalPasswordResetToken as validateBackendPortalPasswordResetToken
 } from "@/lib/api";
+import {
+  buildPasswordResetDeliveryFailureLog,
+  buildPasswordResetLink,
+  resolvePasswordResetBaseUrl,
+  sendPasswordResetEmailViaResend
+} from "@/lib/password-reset-delivery";
 import { findUserByEmail } from "@/lib/saas/store";
 import {
   consumePasswordResetToken,
@@ -13,56 +19,6 @@ import {
   setPasswordOverride,
   validatePasswordResetToken
 } from "@/lib/password-reset-store";
-
-function getAppBaseUrl() {
-  return String(
-    process.env.PASSWORD_RESET_BASE_URL ||
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      ""
-  )
-    .trim()
-    .replace(/\/$/, "");
-}
-
-async function sendResetEmail(input: { email: string; resetLink: string }) {
-  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
-  const from = String(process.env.RESET_EMAIL_FROM || "").trim();
-
-  if (!apiKey || !from) {
-    throw new Error("password_reset_email_not_configured");
-  }
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.email],
-      subject: "Restablece tu contraseña de Opturon",
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111">
-          <h2>Restablece tu contraseña</h2>
-          <p>Recibimos una solicitud para cambiar tu contraseña de Opturon.</p>
-          <p>
-            <a href="${input.resetLink}" style="display:inline-block;padding:12px 18px;background:#c05000;color:#fff;text-decoration:none;border-radius:10px;">
-              Crear nueva contraseña
-            </a>
-          </p>
-          <p>Este enlace vence en 30 minutos. Si no solicitaste este cambio, puedes ignorar este correo.</p>
-        </div>
-      `
-    })
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`password_reset_email_failed_${response.status}:${body}`);
-  }
-}
 
 async function invalidateBackendResetDeliveryToken(token: string) {
   try {
@@ -82,16 +38,11 @@ export async function requestPasswordReset(email: string) {
     const delivery = response.data?.delivery;
     if (delivery?.token && delivery?.email) {
       try {
-        const appBaseUrl = getAppBaseUrl();
-        if (!appBaseUrl) {
-          throw new Error("password_reset_base_url_not_configured");
-        }
-        const resetLink = `${appBaseUrl}/reset-password?token=${encodeURIComponent(delivery.token)}`;
-        await sendResetEmail({ email: delivery.email, resetLink });
+        const resetLink = buildPasswordResetLink(resolvePasswordResetBaseUrl(), delivery.token);
+        await sendPasswordResetEmailViaResend({ email: delivery.email, resetLink });
       } catch (error) {
         await invalidateBackendResetDeliveryToken(delivery.token);
-        const message = error instanceof Error ? error.message : "unknown_error";
-        console.error("PASSWORD_RESET_EMAIL_DELIVERY_FAILED", { message });
+        console.error("portal_password_reset_delivery_failed", buildPasswordResetDeliveryFailureLog(error));
       }
     }
     return { ok: true };
@@ -102,7 +53,7 @@ export async function requestPasswordReset(email: string) {
     return { ok: true };
   }
 
-  const appBaseUrl = getAppBaseUrl();
+  const appBaseUrl = resolvePasswordResetBaseUrl();
   if (!appBaseUrl) {
     throw new Error("password_reset_base_url_not_configured");
   }
@@ -113,8 +64,8 @@ export async function requestPasswordReset(email: string) {
     expiresInMinutes: 30
   });
 
-  const resetLink = `${appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
-  await sendResetEmail({ email: normalized, resetLink });
+  const resetLink = buildPasswordResetLink(appBaseUrl, token);
+  await sendPasswordResetEmailViaResend({ email: normalized, resetLink });
   return { ok: true };
 }
 

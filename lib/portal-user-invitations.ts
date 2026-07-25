@@ -69,20 +69,20 @@ function normalizeEmail(email: string) {
   return String(email || "").trim().toLowerCase();
 }
 
-function resolveAppBaseUrl() {
+export function resolvePortalInvitationBaseUrl(env: Record<string, string | undefined> = process.env) {
   return String(
-    process.env.PORTAL_INVITATION_BASE_URL ||
-      process.env.PASSWORD_RESET_BASE_URL ||
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
+    env.PORTAL_INVITATION_BASE_URL ||
+      env.PASSWORD_RESET_BASE_URL ||
+      env.NEXTAUTH_URL ||
+      env.NEXT_PUBLIC_SITE_URL ||
       ""
   )
     .trim()
     .replace(/\/$/, "");
 }
 
-function resolveInvitationEmailFrom() {
-  return String(process.env.PORTAL_INVITATION_EMAIL_FROM || process.env.RESET_EMAIL_FROM || "").trim();
+export function resolveInvitationEmailFrom(env: Record<string, string | undefined> = process.env) {
+  return String(env.PORTAL_INVITATION_EMAIL_FROM || env.RESET_EMAIL_FROM || "").trim();
 }
 
 function roleLabel(role: string) {
@@ -95,7 +95,7 @@ function roleLabel(role: string) {
 }
 
 export function buildPortalInvitationAcceptLink(token: string) {
-  const appBaseUrl = resolveAppBaseUrl();
+  const appBaseUrl = resolvePortalInvitationBaseUrl();
   if (!appBaseUrl) {
     throw new Error("portal_invitation_base_url_not_configured");
   }

@@ -11,10 +11,16 @@ function testPasswordResetUsesBackendWhenConfigured() {
   assert.match(source, /invalidatePortalPasswordResetToken as invalidateBackendPortalPasswordResetToken/);
   assert.match(source, /validatePortalPasswordResetToken as validateBackendPortalPasswordResetToken/);
   assert.match(source, /resetPortalPassword as resetBackendPortalPassword/);
+  assert.match(source, /sendPasswordResetEmailViaResend/);
+  assert.match(source, /buildPasswordResetLink/);
   assert.match(source, /if \(isBackendConfigured\(\)\) \{\s*const response = await requestBackendPortalPasswordReset\(normalized\);/s);
   assert.match(source, /if \(delivery\?\.token && delivery\?\.email\)/);
   assert.match(source, /await invalidateBackendResetDeliveryToken\(delivery\.token\)/);
-  assert.match(source, /console\.error\("PASSWORD_RESET_EMAIL_DELIVERY_FAILED", \{ message \}\)/);
+  assert.match(source, /console\.error\("portal_password_reset_delivery_failed", buildPasswordResetDeliveryFailureLog\(error\)\)/);
+  const helper = read('lib/password-reset-delivery.ts');
+  assert.match(helper, /resolveInvitationEmailFrom/);
+  assert.match(helper, /PORTAL_INVITATION_EMAIL_FROM/);
+  assert.match(helper, /event: "portal_password_reset_delivery_failed"/);
 }
 
 function testResetRouteIsAsyncAndBackendAware() {
