@@ -648,6 +648,7 @@ export function AppShell({
 
   useEffect(() => {
     if (!tenantId) return;
+    if (!pathname.startsWith("/app/inventory")) return;
     const controller = new AbortController();
     void fetch("/api/app/inventory/expiration-summary", {
       cache: "no-store",

@@ -149,7 +149,12 @@ export function getBackendErrorBody(error: unknown): unknown {
   return undefined;
 }
 
-async function backendPortalFetch<T>(path: string, init?: RequestInit, timeoutMs = API_TIMEOUT_MS): Promise<T> {
+async function backendPortalFetch<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = API_TIMEOUT_MS,
+  options?: { actorUserId?: string | null }
+): Promise<T> {
   const apiBase = getApiBase();
   if (!apiBase) throw new Error("API base URL is not configured");
 
@@ -159,6 +164,7 @@ async function backendPortalFetch<T>(path: string, init?: RequestInit, timeoutMs
   const headers = new Headers(init?.headers || {});
   headers.set("Content-Type", "application/json");
   headers.set("x-portal-key", portalKey);
+  if (options?.actorUserId) headers.set("x-portal-actor-id", options.actorUserId);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
@@ -196,7 +202,7 @@ export async function getAdminTenantPolicies() {
   }>("/api/admin/tenants");
 }
 
-export async function getAdminTenantPolicy(tenantId: string) {
+export async function getAdminTenantPolicy(tenantId: string, options?: { actorUserId?: string | null }) {
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -211,7 +217,7 @@ export async function getAdminTenantPolicy(tenantId: string) {
       primaryEmail?: string | null;
       policy: TenantPolicy;
     };
-  }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`);
+  }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`, undefined, API_TIMEOUT_MS, options);
 }
 
 export async function patchAdminTenantPolicy(
@@ -220,7 +226,8 @@ export async function patchAdminTenantPolicy(
     operatingProfile?: Partial<TenantOperatingProfile>;
     displayName?: string;
     primaryEmail?: string;
-  }
+  },
+  options?: { actorUserId?: string | null }
 ) {
   return backendPortalFetch<{
     success: boolean;
@@ -239,7 +246,7 @@ export async function patchAdminTenantPolicy(
   }>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/policy`, {
     method: "PATCH",
     body: JSON.stringify(payload)
-  });
+  }, API_TIMEOUT_MS, options);
 }
 
 export async function listAdminBillingSubscriptions(tenantId?: string) {
