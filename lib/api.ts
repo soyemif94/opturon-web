@@ -2457,6 +2457,65 @@ export type PortalLoyaltyProgram = {
   updatedAt: string | null;
 };
 
+export type PortalCatalogBulkDeleteSelection = {
+  mode: "ids" | "filter" | "import_batch";
+  ids?: string[];
+  importId?: string;
+  filter?: {
+    query?: string;
+    categoryId?: string | null;
+    expiration?: "all" | "critical" | "expired" | "expiring_soon";
+  };
+};
+
+export type PortalCatalogBulkDeletePreview = {
+  tenantId: string;
+  selection: {
+    mode: PortalCatalogBulkDeleteSelection["mode"];
+    filter?: PortalCatalogBulkDeleteSelection["filter"] | null;
+    importId?: string | null;
+  };
+  import?: {
+    importId: string;
+    fileName: string;
+    status: string;
+    rollbackStatus?: string | null;
+  } | null;
+  summary: {
+    totalSelected: number;
+    deletable: number;
+    blocked: number;
+    alreadyDeleted: number;
+    notFound: number;
+  };
+  deletable: Array<{ productId: string; name: string; sku?: string | null }>;
+  blocked: Array<{ productId: string; name: string; sku?: string | null; references?: Record<string, number> }>;
+  alreadyDeleted: Array<{ productId: string }>;
+  notFound: Array<{ productId: string }>;
+  forceDeleteAvailable: boolean;
+};
+
+export type PortalCatalogBulkDeleteExecution = {
+  tenantId: string;
+  status: "completed" | "partially_completed" | "already_completed" | "blocked" | "failed";
+  summary: {
+    requested?: number;
+    deleted?: number;
+    blocked?: number;
+    alreadyDeleted?: number;
+    notFound?: number;
+    failed?: number;
+  };
+  results: Array<{
+    productId: string;
+    status: "deleted" | "blocked" | "already_deleted" | "not_found" | "failed";
+    deletionMode?: "hard_delete" | "tombstone";
+    reason?: string;
+    details?: unknown;
+  }>;
+  idempotent?: boolean;
+};
+
 export type PortalLoyaltyReward = {
   id: string;
   clinicId: string;
@@ -2989,6 +3048,47 @@ export async function getPortalProducts(tenantId: string) {
       products: PortalProduct[];
     };
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+}
+
+export async function previewPortalCatalogBulkDelete(
+  tenantId: string,
+  selection: PortalCatalogBulkDeleteSelection
+) {
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeletePreview }>(
+    `/portal/tenants/${tenantId}/products/bulk-delete/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(selection || {})
+    }
+  );
+}
+
+export async function executePortalCatalogBulkDelete(
+  tenantId: string,
+  payload: {
+    selection: PortalCatalogBulkDeleteSelection;
+    idempotencyKey: string;
+    force?: boolean;
+    confirmForceDelete?: boolean;
+    actor?: { id?: string | null; name?: string | null };
+  }
+) {
+  const headers = new Headers();
+  if (payload?.actor?.id) headers.set("x-portal-actor-id", payload.actor.id);
+  if (payload?.actor?.name) headers.set("x-portal-actor-name", payload.actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeleteExecution }>(
+    `/portal/tenants/${tenantId}/products/bulk-delete/execute`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        selection: payload.selection,
+        idempotencyKey: payload.idempotencyKey,
+        force: payload.force === true,
+        confirmForceDelete: payload.confirmForceDelete === true
+      })
+    }
+  );
 }
 
 export async function getPortalInventoryLots(
@@ -4002,6 +4102,13 @@ export async function analyzePortalCatalogImport(
   });
 }
 
+export async function listPortalCatalogImports(tenantId: string, options?: { limit?: number }) {
+  const suffix = options?.limit ? `?limit=${options.limit}` : "";
+  return backendPortalFetch<{ success: boolean; data: { tenantId: string; imports: PortalCatalogImport[] } }>(
+    `/portal/tenants/${tenantId}/catalog-imports${suffix}`
+  );
+}
+
 export async function getPortalCatalogImport(tenantId: string, importId: string) {
   return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(
     `/portal/tenants/${tenantId}/catalog-imports/${importId}`
@@ -4095,6 +4202,43 @@ export async function cancelPortalCatalogImport(
       method: "POST",
       headers,
       body: JSON.stringify({})
+    }
+  );
+}
+
+export async function previewPortalCatalogImportRollback(tenantId: string, importId: string) {
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeletePreview }>(
+    `/portal/tenants/${tenantId}/catalog-imports/${importId}/rollback/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    }
+  );
+}
+
+export async function executePortalCatalogImportRollback(
+  tenantId: string,
+  importId: string,
+  payload: {
+    idempotencyKey: string;
+    force?: boolean;
+    confirmForceDelete?: boolean;
+    actor?: { id?: string | null; name?: string | null };
+  }
+) {
+  const headers = new Headers();
+  if (payload?.actor?.id) headers.set("x-portal-actor-id", payload.actor.id);
+  if (payload?.actor?.name) headers.set("x-portal-actor-name", payload.actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeleteExecution }>(
+    `/portal/tenants/${tenantId}/catalog-imports/${importId}/rollback`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        idempotencyKey: payload.idempotencyKey,
+        force: payload.force === true,
+        confirmForceDelete: payload.confirmForceDelete === true
+      })
     }
   );
 }

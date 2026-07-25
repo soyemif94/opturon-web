@@ -143,6 +143,59 @@ type BulkResultSummary = {
   results: BulkDisplayResult[];
 };
 
+type BulkSelectionPayload = {
+  mode: "ids" | "filter" | "import_batch";
+  ids?: string[];
+  importId?: string;
+  filter?: {
+    query?: string;
+    categoryId?: string | null;
+    expiration?: ExpirationFilter;
+  };
+};
+
+type BulkDeletePreview = {
+  selection: {
+    mode: BulkSelectionPayload["mode"];
+    importId?: string | null;
+  };
+  import?: {
+    importId: string;
+    fileName: string;
+    status: string;
+    rollbackStatus?: string | null;
+  } | null;
+  summary: {
+    totalSelected: number;
+    deletable: number;
+    blocked: number;
+    alreadyDeleted: number;
+    notFound: number;
+  };
+  deletable: Array<{ productId: string; name: string; sku?: string | null }>;
+  blocked: Array<{ productId: string; name: string; sku?: string | null; references?: Record<string, number> }>;
+  alreadyDeleted: Array<{ productId: string }>;
+  notFound: Array<{ productId: string }>;
+  forceDeleteAvailable: boolean;
+};
+
+type RecentImport = {
+  importId: string;
+  status: string;
+  file: { name: string };
+  result?: {
+    summary?: {
+      created?: number;
+      updated?: number;
+      errors?: number;
+    };
+    rollback?: {
+      status?: string;
+    };
+  };
+  createdAt?: string | null;
+};
+
 const PRODUCTS_PER_PAGE = 5;
 
 type DeleteAttemptResult = {
@@ -205,6 +258,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialProducts[0]?.id || null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectAllFiltered, setSelectAllFiltered] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [bulkText, setBulkText] = useState("");
@@ -219,6 +273,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [forceDeleteAcknowledged, setForceDeleteAcknowledged] = useState(false);
   const [forceDeleting, setForceDeleting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
+  const [bulkDeletePreview, setBulkDeletePreview] = useState<BulkDeletePreview | null>(null);
+  const [bulkDeleteSelection, setBulkDeleteSelection] = useState<BulkSelectionPayload | null>(null);
+  const [bulkDeletePhrase, setBulkDeletePhrase] = useState("");
+  const [bulkDeleteForce, setBulkDeleteForce] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -352,11 +411,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const validBulkRows = useMemo(() => bulkPreview.filter((row) => row.valid), [bulkPreview]);
   const allVisibleSelected = paginatedProducts.length > 0 && paginatedProducts.every((product) => selectedIds.includes(product.id));
   const selectedVisibleCount = paginatedProducts.filter((product) => selectedIds.includes(product.id)).length;
+  const selectedCount = selectAllFiltered ? visibleProducts.length : selectedIds.length;
+  const deleteConfirmationPhrase = bulkDeletePreview ? `ELIMINAR ${bulkDeletePreview.summary.totalSelected} PRODUCTOS` : "";
+  const bulkDeleteNeedsPhrase = Boolean(bulkDeletePreview && bulkDeletePreview.summary.totalSelected > 50);
   const hasActiveSearch = search.trim().length > 0;
   const isFilteredCategoryEmpty = Boolean(activeCategory && activeCategoryProductCount === 0);
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectAllFiltered(false);
+    setSelectedIds([]);
   }, [search, categoryFilter, expirationFilter, sortByUrgency]);
 
   useEffect(() => {
@@ -364,6 +428,26 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecentImports() {
+      try {
+        const response = await fetch("/api/app/catalog/imports?limit=6", { cache: "no-store" });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(String(json?.error || "No se pudieron cargar las importaciones recientes."));
+        if (!cancelled) setRecentImports(Array.isArray(json?.imports) ? json.imports : []);
+      } catch {
+        if (!cancelled) setRecentImports([]);
+      }
+    }
+
+    void loadRecentImports();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function hydrateDraft(product?: Product | null): Draft {
     return {
@@ -509,7 +593,72 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     return nextSelected;
   }
 
+  function buildCurrentFilterSelection(): BulkSelectionPayload {
+    if (selectAllFiltered) {
+      return {
+        mode: "filter",
+        filter: {
+          query: search.trim(),
+          categoryId: categoryFilter || null,
+          expiration: expirationFilter
+        }
+      };
+    }
+    return {
+      mode: "ids",
+      ids: selectedIds
+    };
+  }
+
+  async function openBulkDeletePreview(selection: BulkSelectionPayload) {
+    const response = await fetch(
+      selection.mode === "import_batch" && selection.importId
+        ? `/api/app/catalog/imports/${encodeURIComponent(selection.importId)}/rollback/preview`
+        : "/api/app/catalog/bulk-delete/preview",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: selection.mode === "import_batch" ? JSON.stringify({}) : JSON.stringify(selection)
+      }
+    );
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(String(json?.error || "No se pudo previsualizar la eliminación."));
+    setBulkDeleteSelection(selection);
+    setBulkDeletePreview(json?.preview || null);
+    setBulkDeletePhrase("");
+    setBulkDeleteForce(false);
+  }
+
+  async function runBulkDeleteExecution() {
+    if (!bulkDeleteSelection || !bulkDeletePreview) return;
+    if (bulkDeleteNeedsPhrase && bulkDeletePhrase.trim() !== deleteConfirmationPhrase) {
+      throw new Error(`Escribe exactamente "${deleteConfirmationPhrase}" para continuar.`);
+    }
+
+    const endpoint =
+      bulkDeleteSelection.mode === "import_batch" && bulkDeleteSelection.importId
+        ? `/api/app/catalog/imports/${encodeURIComponent(bulkDeleteSelection.importId)}/rollback`
+        : "/api/app/catalog/bulk-delete/execute";
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        selection: bulkDeleteSelection,
+        idempotencyKey: crypto.randomUUID(),
+        force: bulkDeleteForce,
+        confirmForceDelete: bulkDeleteForce
+      })
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(String(json?.error || "No se pudo ejecutar la eliminación."));
+    return json?.result || null;
+  }
+
   function toggleSelection(productId: string) {
+    if (selectAllFiltered) {
+      setSelectAllFiltered(false);
+      setSelectedIds([]);
+    }
     setSelectedIds((current) => (
       current.includes(productId)
         ? current.filter((id) => id !== productId)
@@ -518,6 +667,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   }
 
   function toggleSelectAllVisible() {
+    setSelectAllFiltered(false);
     if (allVisibleSelected) {
       setSelectedIds((current) => current.filter((id) => !paginatedProducts.some((product) => product.id === id)));
       return;
@@ -1086,60 +1236,48 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   }
 
   async function deleteSelectedProducts() {
-    if (readOnly || selectedIds.length === 0) return;
+    if (readOnly || selectedCount === 0) return;
 
-    const selectionSnapshot = [...selectedIds];
-    const names = products.filter((product) => selectionSnapshot.includes(product.id)).map((product) => product.name);
-    const confirmed = window.confirm(
-      `Se eliminaran ${selectionSnapshot.length} producto(s): ${names.slice(0, 3).join(", ")}${names.length > 3 ? "..." : ""}.`
-    );
-    if (!confirmed) return;
+    try {
+      await openBulkDeletePreview(buildCurrentFilterSelection());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo preparar la eliminación.";
+      setFeedback({ tone: "error", text: message });
+      toast.error("Error al preparar eliminación", message);
+    }
+  }
+
+  async function confirmBulkDelete() {
+    if (!bulkDeletePreview || !bulkDeleteSelection) return;
 
     setBulkDeleting(true);
     setFeedback(null);
-
     try {
-      const pending = [...selectionSnapshot];
-      const results: DeleteAttemptResult[] = [];
-      const workerCount = Math.min(4, pending.length);
-
-      await Promise.all(
-        Array.from({ length: workerCount }).map(async () => {
-          while (pending.length > 0) {
-            const nextId = pending.shift();
-            if (!nextId) return;
-            results.push(await requestDelete(nextId));
-          }
-        })
-      );
-
-      const deleted = results.filter((result) => result.ok).length;
-      const blocked = results.filter((result) => !result.ok && result.blocked).length;
-      const failed = results.filter((result) => !result.ok && !result.blocked);
-
+      const result = await runBulkDeleteExecution();
       await reloadProducts(selectedId);
-      setSelectedIds((current) => current.filter((id) => !selectionSnapshot.includes(id)));
-
-      if (deleted > 0 && blocked === 0 && failed.length === 0) {
-        setFeedback({ tone: "success", text: `Se eliminaron ${deleted} productos seleccionados.` });
-        toast.success("Productos eliminados");
-      } else if (deleted > 0) {
-        const fragments = [`Se eliminaron ${deleted} productos.`];
-        if (blocked > 0) fragments.push(`${blocked} quedaron bloqueados por referencias activas.`);
-        if (failed.length > 0) fragments.push(`${failed.length} fallaron y necesitan reintento.`);
-        setFeedback({ tone: "warning", text: fragments.join(" ") });
-        toast.success("Borrado masivo parcial");
-      } else if (blocked > 0 && failed.length === 0) {
-        setFeedback({ tone: "warning", text: "No se pudo eliminar ningun producto seleccionado porque tienen referencias activas." });
-        toast.error("Borrado masivo bloqueado");
-      } else if (failed.length > 0) {
-        throw new Error(failed[0]?.message || "No se pudieron eliminar los productos seleccionados.");
-      } else {
-        setFeedback({ tone: "warning", text: "No se pudo eliminar ningun producto seleccionado." });
-        toast.error("Borrado masivo bloqueado");
-      }
+      setRecentImports((current) => current.map((item) => (
+        item.importId === bulkDeleteSelection.importId
+          ? { ...item, result: { ...(item.result || {}), rollback: { status: result?.status || "completed" } } }
+          : item
+      )));
+      setSelectedIds([]);
+      setSelectAllFiltered(false);
+      setBulkDeletePreview(null);
+      setBulkDeleteSelection(null);
+      setBulkDeletePhrase("");
+      setBulkDeleteForce(false);
+      const deleted = Number(result?.summary?.deleted || 0);
+      const blocked = Number(result?.summary?.blocked || 0);
+      const alreadyDeleted = Number(result?.summary?.alreadyDeleted || 0);
+      const fragments = [];
+      if (deleted > 0) fragments.push(`Se eliminaron ${deleted} productos.`);
+      if (blocked > 0) fragments.push(`${blocked} quedaron bloqueados por referencias.`);
+      if (alreadyDeleted > 0) fragments.push(`${alreadyDeleted} ya estaban eliminados.`);
+      const message = fragments.join(" ") || "La operación ya había sido aplicada.";
+      setFeedback({ tone: blocked > 0 ? "warning" : "success", text: message });
+      toast.success(bulkDeleteSelection.mode === "import_batch" ? "Carga deshecha" : "Eliminación masiva completada");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudieron eliminar los productos seleccionados.";
+      const message = error instanceof Error ? error.message : "No se pudo ejecutar la eliminación.";
       setFeedback({ tone: "error", text: message });
       toast.error("Error al eliminar seleccionados", message);
     } finally {
@@ -1237,17 +1375,42 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
                   <CheckSquare className="h-4 w-4 text-brandBright" />
-                  <span>{selectedIds.length} seleccionados</span>
+                  <span>{selectedCount} seleccionados</span>
+                  {selectAllFiltered ? <span>· selección global del filtro actual</span> : null}
                   {selectedVisibleCount > 0 ? <span>· {selectedVisibleCount} visibles</span> : null}
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
                   <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" onClick={toggleSelectAllVisible}>
                     {allVisibleSelected ? "Limpiar visibles" : "Seleccionar todo"}
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedIds([])} disabled={selectedIds.length === 0}>
+                  {visibleProducts.length > 0 && !selectAllFiltered ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        setSelectAllFiltered(true);
+                        setSelectedIds([]);
+                      }}
+                    >
+                      Seleccionar los {visibleProducts.length} resultados
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      setSelectedIds([]);
+                      setSelectAllFiltered(false);
+                    }}
+                    disabled={selectedCount === 0}
+                  >
                     Limpiar seleccion
                   </Button>
-                  <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={readOnly || selectedIds.length === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
+                  <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={readOnly || selectedCount === 0 || bulkDeleting} onClick={() => void deleteSelectedProducts()}>
                     <Trash2 className="mr-1 h-4 w-4" />
                     {bulkDeleting ? "Eliminando..." : "Eliminar seleccionados"}
                   </Button>
@@ -1256,6 +1419,42 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             ) : null}
           </CardContent>
         </Card>
+
+        {recentImports.length > 0 ? (
+          <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
+            <CardHeader>
+              <div>
+                <CardTitle className="text-xl">Cargas recientes</CardTitle>
+                <CardDescription>Deshacer carga elimina sólo productos creados por ese batch. No revierte actualizaciones previas en esta fase.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              {recentImports.map((item) => (
+                <div key={item.importId} className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-surface/45 p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="muted">{item.status}</Badge>
+                      {item.result?.rollback?.status ? <Badge variant="warning">Rollback: {item.result.rollback.status}</Badge> : null}
+                    </div>
+                    <p className="text-sm font-medium text-white">{item.file?.name || "Carga sin nombre"}</p>
+                    <p className="text-xs text-muted">
+                      Creados: {item.result?.summary?.created || 0} · Actualizados: {item.result?.summary?.updated || 0} · Errores: {item.result?.summary?.errors || 0}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={readOnly || bulkDeleting}
+                    onClick={() => void openBulkDeletePreview({ mode: "import_batch", importId: item.importId })}
+                  >
+                    Deshacer carga
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_22px_48px_rgba(3,8,16,0.28)]">
           <CardHeader
@@ -2167,6 +2366,67 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           Tu rol es de solo lectura en catalogo. Puedes consultar productos, pero no crear, editar ni eliminar.
         </div>
       ) : null}
+
+      <Dialog
+        open={Boolean(bulkDeletePreview)}
+        onOpenChange={(open) => {
+          if (!open && !bulkDeleting) {
+            setBulkDeletePreview(null);
+            setBulkDeleteSelection(null);
+            setBulkDeletePhrase("");
+            setBulkDeleteForce(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{bulkDeleteSelection?.mode === "import_batch" ? "Deshacer carga" : "Eliminar seleccionados"}</DialogTitle>
+            <DialogDescription>
+              Preview obligatorio antes de confirmar. El backend vuelve a validar referencias al ejecutar, por lo que este resumen es informativo y no congela el catálogo.
+            </DialogDescription>
+          </DialogHeader>
+          {bulkDeletePreview ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailStat label="Total" value={String(bulkDeletePreview.summary.totalSelected)} />
+                <DetailStat label="Eliminables" value={String(bulkDeletePreview.summary.deletable)} />
+                <DetailStat label="Bloqueados" value={String(bulkDeletePreview.summary.blocked)} />
+                <DetailStat label="Ya eliminados" value={String(bulkDeletePreview.summary.alreadyDeleted)} />
+              </div>
+              {bulkDeletePreview.import ? (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
+                  <p className="font-medium text-white">{bulkDeletePreview.import.fileName}</p>
+                  <p className="mt-1 text-slate-300">Importación: {bulkDeletePreview.import.importId}</p>
+                </div>
+              ) : null}
+              {bulkDeletePreview.blocked.length > 0 ? (
+                <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+                  <p className="font-medium">Productos bloqueados por referencias</p>
+                  <p className="mt-2">{bulkDeletePreview.blocked.slice(0, 3).map((item) => item.name).join(", ")}</p>
+                </div>
+              ) : null}
+              <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 text-sm text-slate-200">
+                <input type="checkbox" checked={bulkDeleteForce} onChange={(event) => setBulkDeleteForce(event.target.checked)} disabled={bulkDeleting} />
+                <span>Usar eliminación forzada cuando ya exista bloqueo por historial asociado.</span>
+              </label>
+              {bulkDeleteNeedsPhrase ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-300">Escribe exactamente <span className="font-semibold text-white">{deleteConfirmationPhrase}</span></p>
+                  <Input value={bulkDeletePhrase} onChange={(event) => setBulkDeletePhrase(event.target.value)} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:flex-wrap">
+            <Button type="button" variant="ghost" disabled={bulkDeleting} onClick={() => setBulkDeletePreview(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="destructive" disabled={bulkDeleting} onClick={() => void confirmBulkDelete()}>
+              {bulkDeleting ? "Procesando..." : bulkDeleteSelection?.mode === "import_batch" ? "Confirmar rollback" : "Confirmar eliminación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(forceDeleteTarget)}
