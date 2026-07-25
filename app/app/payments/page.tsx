@@ -12,10 +12,10 @@ import {
   type PortalPayment,
   type PortalPaymentDestination
 } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function AppPaymentsPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("payments");
   const readOnly = !ctx.tenantId || !canEditWorkspace(ctx);
   let payments: PortalPayment[] = [];
   let invoices: PortalInvoice[] = [];

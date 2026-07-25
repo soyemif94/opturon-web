@@ -5,7 +5,7 @@ import {
   getBackendErrorStatus,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireAppModuleApi } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -17,7 +17,7 @@ function backendUnavailable() {
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const guard = await requireAppApi({ permission: "edit_workspace" });
+  const guard = await requireAppModuleApi("cash", { permission: "edit_workspace" });
   if (guard.error) return guard.error;
   if (!isBackendConfigured()) return backendUnavailable();
 

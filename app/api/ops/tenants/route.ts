@@ -15,6 +15,15 @@ const createTenantSchema = z.object({
   plan: z.string().optional().default("trial"),
   subaccountLimit: z.number().int().min(1).optional().default(5),
   capabilities: z.array(z.string()).optional().default([]),
+  operatingProfile: z
+    .object({
+      presetKey: z.string().optional(),
+      industryProfile: z.string().optional(),
+      operatingModel: z.string().optional(),
+      businessSubtype: z.string().optional().nullable()
+    })
+    .optional(),
+  enabledModules: z.record(z.string(), z.boolean()).optional().default({}),
   website: z.string().optional().default(""),
   city: z.string().optional().default(""),
   country: z.string().optional().default(""),
@@ -102,7 +111,10 @@ export async function POST(request: NextRequest) {
     try {
       await provisionPortalTenant(tenantId, {
         name: input.name,
-        timezone: "America/Argentina/Buenos_Aires"
+        timezone: "America/Argentina/Buenos_Aires",
+        operatingProfile: input.operatingProfile,
+        capabilities: input.capabilities,
+        enabledModules: input.enabledModules
       });
     } catch (error) {
       return NextResponse.json(

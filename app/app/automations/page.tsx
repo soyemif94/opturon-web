@@ -7,10 +7,10 @@ import {
   type PortalAutomationCatalogItem,
   type PortalBusinessSettings
 } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function AppAutomationsPage() {
-  const ctx = await requireAppPage({ permission: "manage_workspace" });
+  const ctx = await requireAppModulePage("automations", { permission: "manage_workspace" });
   let automations: PortalAutomation[] = [];
   let catalog: PortalAutomationCatalogItem[] = [];
   let businessProfile: PortalBusinessSettings | null = null;

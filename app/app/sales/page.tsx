@@ -10,10 +10,10 @@ import {
   type PortalSalesOpportunity,
   type PortalSalesSummary
 } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function AppSalesPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("sales");
   const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let summary: PortalSalesSummary = {

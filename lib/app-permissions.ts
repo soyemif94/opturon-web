@@ -34,6 +34,7 @@ type AccessContext = {
   globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
+  tenantModules?: Record<string, boolean> | null;
 };
 
 const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
@@ -105,11 +106,13 @@ export function hasAppPermission(context: AccessContext, permission: AppPermissi
 }
 
 export function canAccessAppModule(context: AccessContext, module: AppModule) {
-  if (isStaffRole(context.globalRole)) return true;
+  const tenantModules = context.tenantModules && typeof context.tenantModules === "object" ? context.tenantModules : null;
+  const moduleEnabled = tenantModules ? tenantModules[module] !== false : true;
+  if (isStaffRole(context.globalRole)) return moduleEnabled;
   if (String(context.accountScope || "").trim().toLowerCase() === "opturon_admin") return false;
   const tenantRole = normalizeTenantRole(context.tenantRole);
   if (!tenantRole) return false;
-  return TENANT_ROLE_MODULES[tenantRole].includes(module);
+  return moduleEnabled && TENANT_ROLE_MODULES[tenantRole].includes(module);
 }
 
 export function canViewWorkspace(context: AccessContext) {

@@ -5,7 +5,7 @@ import {
   getPortalLoyaltyOverview,
   isBackendConfigured
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -17,6 +17,8 @@ function backendUnavailable() {
 }
 
 export async function GET(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("loyalty");
+  if (moduleGuard.error) return moduleGuard.error;
   const url = new URL(request.url);
   const tenantContext = await resolveAppTenant({
     requestedTenantId: url.searchParams.get("tenantId") || undefined,

@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPortalContacts, getPortalConversations, getPortalSalesMetrics, isBackendConfigured } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
 
 const PERIOD_DAYS = 30;
@@ -30,7 +30,7 @@ const TIME_BUCKETS = [
 ];
 
 export default async function AppMetricsPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("metrics");
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   const useLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   const localData = useLocalDemoData ? readSaasData() : null;

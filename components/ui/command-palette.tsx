@@ -38,6 +38,7 @@ type RuntimeContext = CommandPaletteContextValue & {
   globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
+  tenantModules?: Record<string, boolean> | null;
 };
 
 type PreviewData = {
@@ -145,7 +146,8 @@ export function CommandPaletteProvider({
   userId,
   globalRole,
   tenantRole,
-  accountScope
+  accountScope,
+  tenantModules
 }: {
   children: ReactNode;
   scope: PaletteScope;
@@ -155,6 +157,7 @@ export function CommandPaletteProvider({
   globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
+  tenantModules?: Record<string, boolean> | null;
 }) {
   const [open, setOpen] = useState(false);
   const [context, setContextState] = useState<CommandPaletteContextValue>({ tenantId });
@@ -184,7 +187,7 @@ export function CommandPaletteProvider({
   return (
     <ProviderCtx.Provider value={{ open, setOpen, context, setContext }}>
       {children}
-      <CommandPalette scope={scope} isStaff={Boolean(isStaff)} userId={userId} globalRole={globalRole} tenantRole={tenantRole} accountScope={accountScope} />
+      <CommandPalette scope={scope} isStaff={Boolean(isStaff)} userId={userId} globalRole={globalRole} tenantRole={tenantRole} accountScope={accountScope} tenantModules={tenantModules} />
     </ProviderCtx.Provider>
   );
 }
@@ -214,7 +217,8 @@ export function CommandPalette({
   userId,
   globalRole,
   tenantRole,
-  accountScope
+  accountScope,
+  tenantModules
 }: {
   scope: PaletteScope;
   isStaff: boolean;
@@ -222,6 +226,7 @@ export function CommandPalette({
   globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
+  tenantModules?: Record<string, boolean> | null;
 }) {
   const { open, setOpen, context } = useProviderCtx();
   const inbox = useInboxContextOptional();
@@ -248,9 +253,10 @@ export function CommandPalette({
       userId,
       globalRole,
       tenantRole,
-      accountScope
+      accountScope,
+      tenantModules
     }),
-    [accountScope, context, globalRole, inbox?.state.contactId, inbox?.state.conversationId, inbox?.state.dealId, isStaff, scope, tenantRole, userId]
+    [accountScope, context, globalRole, inbox?.state.contactId, inbox?.state.conversationId, inbox?.state.dealId, isStaff, scope, tenantModules, tenantRole, userId]
   );
   const canEdit = canEditWorkspace(runtime);
   const canManage = canManageWorkspace(runtime);

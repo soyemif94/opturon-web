@@ -3,14 +3,14 @@ import { OrdersHub } from "@/components/app/orders-hub";
 import { Button } from "@/components/ui/button";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalOrders, isBackendConfigured, type PortalOrder } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function AppOrdersPage({
   searchParams
 }: {
   searchParams?: Promise<{ orderId?: string | string[] | undefined }>;
 }) {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("orders");
   const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let initialOrders: PortalOrder[] = [];

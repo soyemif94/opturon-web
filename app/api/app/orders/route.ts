@@ -6,7 +6,7 @@ import {
   getPortalOrders,
   isBackendConfigured
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -25,6 +25,8 @@ function backendUnavailable() {
 }
 
 export async function GET(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("orders");
+  if (moduleGuard.error) return moduleGuard.error;
   const url = new URL(request.url);
   const tenantContext = await resolveAppTenant({
     requestedTenantId: url.searchParams.get("tenantId") || undefined,
@@ -55,6 +57,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("orders");
+  if (moduleGuard.error) return moduleGuard.error;
   const tenantContext = await resolveAppTenant({ requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return backendUnavailable();

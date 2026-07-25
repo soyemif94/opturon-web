@@ -2,10 +2,10 @@ import { CashHub } from "@/components/app/cash-hub";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalCashOverview, isBackendConfigured, type PortalCashBoxOverview, type PortalCashSession } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function AppCashPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("cash");
   const readOnly = !canEditWorkspace(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let cashBoxes: PortalCashBoxOverview[] = [];

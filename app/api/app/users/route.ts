@@ -26,7 +26,18 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
   role: z.enum(["owner", "manager", "seller", "viewer"]),
-  tenantId: z.string().min(1).optional()
+  tenantId: z.string().min(1).optional(),
+  tenantName: z.string().min(2).optional(),
+  operatingProfile: z
+    .object({
+      presetKey: z.string().optional(),
+      industryProfile: z.string().optional(),
+      operatingModel: z.string().optional(),
+      businessSubtype: z.string().optional().nullable()
+    })
+    .optional(),
+  capabilities: z.array(z.string()).optional(),
+  enabledModules: z.record(z.string(), z.boolean()).optional()
 });
 
 const updateUserSchema = z.object({
@@ -398,7 +409,11 @@ export async function POST(request: NextRequest) {
       const response = await createPortalUser(tenantId, {
         email,
         name: parsed.data.name,
-        role: parsed.data.role
+        role: parsed.data.role,
+        tenantName: parsed.data.tenantName,
+        operatingProfile: parsed.data.operatingProfile,
+        capabilities: parsed.data.capabilities,
+        enabledModules: parsed.data.enabledModules
       }, resolveBackendActorUserId(guard.ctx?.userId));
 
       const invitation = response.data.invitation;
@@ -431,7 +446,13 @@ export async function POST(request: NextRequest) {
         metadata: { role: parsed.data.role, email }
       });
 
-      return NextResponse.json({ ok: true, userId: response.data.user.id }, { status: 201 });
+      return NextResponse.json({
+        ok: true,
+        userId: response.data.user.id,
+        tenantId: response.data.tenantId,
+        clinic: response.data.clinic || null,
+        user: response.data.user
+      }, { status: 201 });
     } catch (error) {
       return proxyUsersBackendError("create_user", tenantId, error, {
         email,

@@ -6,7 +6,7 @@ import {
   getPortalContacts,
   isBackendConfigured
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 import { listInboxConversations, readSaasData } from "@/lib/saas/store";
 
 function noStore(response: NextResponse) {
@@ -19,6 +19,8 @@ function backendUnavailable() {
 }
 
 export async function GET(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("contacts");
+  if (moduleGuard.error) return moduleGuard.error;
   const url = new URL(request.url);
   const visibility = url.searchParams.get("visibility") === "archived" ? "archived" : "active";
   const tenantContext = await resolveAppTenant({
@@ -81,6 +83,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("contacts");
+  if (moduleGuard.error) return moduleGuard.error;
   const tenantContext = await resolveAppTenant({ requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return backendUnavailable();

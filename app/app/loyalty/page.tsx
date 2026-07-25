@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { canEditWorkspace } from "@/lib/app-permissions";
 import { getPortalContacts, getPortalLoyaltyOverview, isBackendConfigured, type PortalContact, type PortalLoyaltyOverview } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 function buildEmptyOverview(): PortalLoyaltyOverview {
   return {
@@ -35,7 +35,7 @@ function buildEmptyOverview(): PortalLoyaltyOverview {
 }
 
 export default async function AppLoyaltyPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("loyalty");
   const readOnly = !ctx.tenantId || !canEditWorkspace(ctx);
   let overview = buildEmptyOverview();
   let contacts: PortalContact[] = [];

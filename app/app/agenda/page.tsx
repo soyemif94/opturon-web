@@ -1,4 +1,4 @@
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 import { isOperationalPortalAssigneeRole } from "@/lib/portal-users";
 import { listTenantMembers } from "@/lib/saas/store";
 import { ClientPageShell } from "@/components/app/client-page-shell";
@@ -13,7 +13,7 @@ function getSearchParam(value: string | string[] | undefined) {
 }
 
 export default async function AppAgendaPage({ searchParams }: AgendaPageProps) {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("agenda");
   const params = searchParams ? await searchParams : undefined;
   const actionType = getSearchParam(params?.actionType);
   const sellerOptions = ctx.tenantId

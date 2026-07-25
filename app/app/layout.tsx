@@ -1,8 +1,10 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { CommandPaletteProvider } from "@/components/ui/command-palette";
 import { isStaffRole } from "@/lib/app-permissions";
+import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
+import { buildTenantAppModules } from "@/lib/tenant-policy";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 
 export default async function ClientPortalLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +34,11 @@ export default async function ClientPortalLayout({ children }: { children: React
       undefined
     : undefined;
   const appGlobalRole = ctx.globalRole === "partner" ? undefined : ctx.globalRole;
+  const tenantContext =
+    ctx.tenantId && isBackendConfigured()
+      ? await getPortalTenantContext(ctx.tenantId).catch(() => null)
+      : null;
+  const tenantModules = buildTenantAppModules(tenantContext?.data?.policy || null);
   const whatsappStatus = buildWhatsAppConnectionStatus({
     fallbackReason: ctx.tenantId
       ? "portal_status_pending_client_refresh"
@@ -48,6 +55,7 @@ export default async function ClientPortalLayout({ children }: { children: React
       globalRole={ctx.globalRole}
       tenantRole={ctx.tenantRole}
       accountScope={ctx.accountScope}
+      tenantModules={tenantModules}
       userId={ctx.userId}
     >
       <div className="min-h-screen w-full">
@@ -60,6 +68,7 @@ export default async function ClientPortalLayout({ children }: { children: React
           globalRole={appGlobalRole}
           tenantRole={ctx.tenantRole}
           accountScope={ctx.accountScope}
+          tenantModules={tenantModules}
           whatsappStatus={whatsappStatus}
         >
           {children}

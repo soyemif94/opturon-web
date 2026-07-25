@@ -42,19 +42,69 @@ const LIMIT_KEYS = [
 ] as const;
 
 const CAPABILITIES = [
-  "whatsapp",
+  "inbox",
   "contacts",
-  "crm",
-  "agenda",
   "catalog",
-  "automations",
-  "sales",
+  "orders",
+  "receipts",
   "payments",
-  "payments_transfer",
-  "loyalty"
+  "cash_management",
+  "sales_pipeline",
+  "appointments",
+  "loyalty",
+  "automations",
+  "metrics",
+  "inventory",
+  "inventory_lots",
+  "expiration_tracking",
+  "suppliers",
+  "purchasing",
+  "customer_credit",
+  "collections",
+  "field_sales",
+  "mobile_inventory",
+  "whatsapp_documents"
 ] as const;
 
-const MODULES = ["inbox", "agenda", "catalog", "automations", "sales", "loyalty", "payments"] as const;
+const MODULES = ["inbox", "contacts", "catalog", "orders", "invoices", "payments", "cash", "sales", "agenda", "loyalty", "automations", "metrics"] as const;
+
+const OPERATING_PROFILE_OPTIONS = [
+  { value: "wholesale_distribution", label: "Distribucion mayorista" },
+  { value: "retail_commerce", label: "Comercio minorista" },
+  { value: "appointment_services", label: "Servicios con agenda" },
+  { value: "professional_services", label: "Servicios profesionales" },
+  { value: "commerce_and_service", label: "Comercio y servicio" },
+  { value: "custom", label: "Configuracion personalizada" }
+] as const;
+
+const OPERATING_MODEL_OPTIONS = [
+  { value: "physical_goods", label: "Productos fisicos" },
+  { value: "services", label: "Servicios" },
+  { value: "hybrid", label: "Hibrido" },
+  { value: "assets", label: "Activos" }
+] as const;
+
+const RECOMMENDED_CAPABILITIES_BY_PROFILE: Record<string, string[]> = {
+  wholesale_distribution: ["inbox", "contacts", "catalog", "orders", "receipts", "payments", "cash_management", "sales_pipeline", "automations", "metrics", "inventory", "inventory_lots", "expiration_tracking", "suppliers", "purchasing", "customer_credit", "collections", "field_sales", "mobile_inventory", "whatsapp_documents"],
+  retail_commerce: ["inbox", "contacts", "catalog", "orders", "receipts", "payments", "cash_management", "metrics", "inventory"],
+  appointment_services: ["inbox", "contacts", "appointments", "payments", "automations", "metrics"],
+  professional_services: ["inbox", "contacts", "appointments", "payments", "automations", "metrics"],
+  commerce_and_service: ["inbox", "contacts", "catalog", "orders", "receipts", "payments", "appointments", "automations", "metrics", "inventory"],
+  custom: ["inbox", "contacts", "payments", "metrics"]
+};
+
+const FUTURE_CAPABILITIES = new Set([
+  "inventory",
+  "inventory_lots",
+  "expiration_tracking",
+  "suppliers",
+  "purchasing",
+  "customer_credit",
+  "collections",
+  "field_sales",
+  "mobile_inventory",
+  "whatsapp_documents"
+]);
 
 const PLAN_LABELS: Record<string, string> = {
   basic: "Inicial",
@@ -65,25 +115,42 @@ const PLAN_LABELS: Record<string, string> = {
 
 const MODULE_LABELS: Record<(typeof MODULES)[number], string> = {
   inbox: "Inbox",
+  contacts: "Contactos",
   agenda: "Agenda",
   catalog: "Catalogo",
+  orders: "Pedidos",
+  invoices: "Comprobantes",
+  cash: "Caja",
   automations: "Automatizaciones",
   sales: "Ventas",
   loyalty: "Fidelizacion",
-  payments: "Cobros"
+  payments: "Cobros",
+  metrics: "Metricas"
 };
 
 const CAPABILITY_LABELS: Record<(typeof CAPABILITIES)[number], string> = {
-  whatsapp: "WhatsApp",
+  inbox: "Inbox",
   contacts: "Contactos",
-  crm: "CRM",
-  agenda: "Agenda",
   catalog: "Catalogo",
+  orders: "Pedidos",
+  receipts: "Comprobantes",
+  cash_management: "Caja",
+  sales_pipeline: "Ventas",
+  appointments: "Agenda",
   automations: "Automatizaciones",
-  sales: "Ventas",
   payments: "Cobros",
-  payments_transfer: "Transferencias",
-  loyalty: "Fidelizacion"
+  loyalty: "Fidelizacion",
+  metrics: "Metricas",
+  inventory: "Inventario",
+  inventory_lots: "Lotes",
+  expiration_tracking: "Vencimientos",
+  suppliers: "Proveedores",
+  purchasing: "Compras",
+  customer_credit: "Cuenta corriente cliente",
+  collections: "Cobranza",
+  field_sales: "Venta en campo",
+  mobile_inventory: "Stock movil",
+  whatsapp_documents: "Documentos por WhatsApp"
 };
 
 type BillingPlanCode = (typeof BILLING_PLAN_OPTIONS)[number]["value"];
@@ -94,14 +161,36 @@ type BillingDraftState = {
   currency: string;
 };
 
+type NewClientDraft = {
+  tenantName: string;
+  ownerName: string;
+  ownerEmail: string;
+  operatingProfile: {
+    presetKey: string;
+    industryProfile: string;
+    operatingModel: string;
+    businessSubtype: string;
+  };
+  capabilities: string[];
+  enabledModules: Record<string, boolean>;
+};
+
 function normalizePolicy(policy: TenantPolicy): TenantPolicy {
   return {
+    policyVersion: policy.policyVersion || 0,
     planCode: policy.planCode || "basic",
     limits: {
       maxPortalUsers: Number(policy.limits?.maxPortalUsers ?? 5),
       maxAutomations: Number(policy.limits?.maxAutomations ?? 20),
       maxContacts: Number(policy.limits?.maxContacts ?? 1000)
     },
+    operatingProfile: {
+      presetKey: policy.operatingProfile?.presetKey || policy.operatingProfile?.industryProfile || "custom",
+      industryProfile: policy.operatingProfile?.industryProfile || "custom",
+      operatingModel: policy.operatingProfile?.operatingModel || "hybrid",
+      businessSubtype: policy.operatingProfile?.businessSubtype || ""
+    },
+    recommendedCapabilities: Array.isArray(policy.recommendedCapabilities) ? policy.recommendedCapabilities : [],
     capabilities: Array.isArray(policy.capabilities) ? policy.capabilities : [],
     enabledModules: MODULES.reduce<Record<string, boolean>>((acc, key) => {
       acc[key] = policy.enabledModules?.[key] !== false;
@@ -116,7 +205,48 @@ function clonePolicy(policy: TenantPolicy): TenantPolicy {
     ...policy,
     limits: { ...policy.limits },
     capabilities: [...policy.capabilities],
-    enabledModules: { ...policy.enabledModules }
+    enabledModules: { ...policy.enabledModules },
+    operatingProfile: policy.operatingProfile ? { ...policy.operatingProfile } : undefined,
+    recommendedCapabilities: [...(policy.recommendedCapabilities || [])]
+  };
+}
+
+function buildEnabledModulesFromCapabilities(capabilities: string[]) {
+  return MODULES.reduce<Record<string, boolean>>((acc, moduleKey) => {
+    const capability =
+      moduleKey === "invoices" ? "receipts"
+        : moduleKey === "cash" ? "cash_management"
+          : moduleKey === "sales" ? "sales_pipeline"
+            : moduleKey === "agenda" ? "appointments"
+              : moduleKey;
+    acc[moduleKey] = capabilities.includes(capability);
+    return acc;
+  }, {});
+}
+
+function createNewClientDraft(presetKey = "custom"): NewClientDraft {
+  const recommendedCapabilities = RECOMMENDED_CAPABILITIES_BY_PROFILE[presetKey] || RECOMMENDED_CAPABILITIES_BY_PROFILE.custom;
+  const operatingModel =
+    OPERATING_PROFILE_OPTIONS.find((option) => option.value === presetKey)?.value === "appointment_services"
+      ? "services"
+      : presetKey === "wholesale_distribution" || presetKey === "retail_commerce"
+        ? "physical_goods"
+        : presetKey === "commerce_and_service"
+          ? "hybrid"
+          : "hybrid";
+
+  return {
+    tenantName: "",
+    ownerName: "",
+    ownerEmail: "",
+    operatingProfile: {
+      presetKey,
+      industryProfile: presetKey,
+      operatingModel,
+      businessSubtype: ""
+    },
+    capabilities: [...recommendedCapabilities],
+    enabledModules: buildEnabledModulesFromCapabilities(recommendedCapabilities)
   };
 }
 
@@ -235,6 +365,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     amount: String(BILLING_PLAN_OPTIONS[0].amount),
     currency: BILLING_PLAN_OPTIONS[0].currency
   });
+  const [newClientDraft, setNewClientDraft] = useState<NewClientDraft>(() => createNewClientDraft("custom"));
+  const [creatingClient, setCreatingClient] = useState(false);
 
   const currentSubscription = subscriptions[0] || null;
 
@@ -325,6 +457,37 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
   function patchDraft(patch: Partial<TenantPolicy>) {
     setDraft((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  function patchNewClientDraft(patch: Partial<NewClientDraft>) {
+    setNewClientDraft((current) => ({ ...current, ...patch }));
+  }
+
+  function applyNewClientPreset(presetKey: string) {
+    const next = createNewClientDraft(presetKey);
+    setNewClientDraft((current) => ({
+      ...current,
+      operatingProfile: next.operatingProfile,
+      capabilities: next.capabilities,
+      enabledModules: next.enabledModules
+    }));
+  }
+
+  async function reloadTenants(nextSelectedTenantId?: string) {
+    const response = await fetch("/api/app/admin/clients", { cache: "no-store" });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(json?.error || "admin_clients_reload_failed");
+    }
+    const nextTenants = (json?.tenants || []).map((tenant: AdminTenantPolicyRow) => ({
+      ...tenant,
+      policy: normalizePolicy(tenant.policy)
+    }));
+    setTenants(nextTenants);
+    const targetTenant = nextTenants.find((tenant: AdminTenantPolicyRow) => tenant.tenantId === nextSelectedTenantId) || nextTenants[0] || null;
+    if (targetTenant) {
+      selectTenant(targetTenant);
+    }
   }
 
   async function savePolicy() {
@@ -458,6 +621,46 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       toast.error(error instanceof Error ? error.message : "No se pudo enviar el link por email.");
     } finally {
       setSendingBillingLinkEmail(false);
+    }
+  }
+
+  async function createClient() {
+    if (creatingClient) return;
+    const tenantName = newClientDraft.tenantName.trim();
+    const ownerName = newClientDraft.ownerName.trim();
+    const ownerEmail = newClientDraft.ownerEmail.trim().toLowerCase();
+    if (tenantName.length < 2 || ownerName.length < 2 || !ownerEmail.includes("@")) {
+      toast.error("Completa nombre del negocio, owner y email.");
+      return;
+    }
+
+    setCreatingClient(true);
+    try {
+      const response = await fetch("/api/app/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: "owner",
+          name: ownerName,
+          email: ownerEmail,
+          tenantName,
+          operatingProfile: newClientDraft.operatingProfile,
+          capabilities: newClientDraft.capabilities,
+          enabledModules: newClientDraft.enabledModules
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.error || "client_create_failed");
+      }
+
+      await reloadTenants(json?.tenantId || null);
+      setNewClientDraft(createNewClientDraft("custom"));
+      toast.success("Cliente creado e invitacion enviada");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear el cliente.");
+    } finally {
+      setCreatingClient(false);
     }
   }
 
@@ -668,7 +871,132 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     Boolean(currentSubscription?.mercadoPagoPayerEmail);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(280px,360px)_1fr]">
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">Nuevo cliente</h2>
+            <p className="mt-1 text-sm text-muted">
+              Alta administrativa real: provisiona tenant, persiste profile inicial e invita al owner en un solo flujo.
+            </p>
+          </div>
+          <Button onClick={createClient} disabled={creatingClient} className="gap-2">
+            {creatingClient ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {creatingClient ? "Creando cliente" : "Confirmar alta"}
+          </Button>
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
+          <div className="grid gap-3">
+            <label className="block text-sm text-muted">
+              Nombre del negocio
+              <input
+                type="text"
+                value={newClientDraft.tenantName}
+                onChange={(event) => patchNewClientDraft({ tenantName: event.target.value })}
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                placeholder="Opturon Distribucion"
+              />
+            </label>
+            <label className="block text-sm text-muted">
+              Nombre del owner
+              <input
+                type="text"
+                value={newClientDraft.ownerName}
+                onChange={(event) => patchNewClientDraft({ ownerName: event.target.value })}
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                placeholder="Mati Moran"
+              />
+            </label>
+            <label className="block text-sm text-muted">
+              Email del owner
+              <input
+                type="email"
+                value={newClientDraft.ownerEmail}
+                onChange={(event) => patchNewClientDraft({ ownerEmail: event.target.value })}
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                placeholder="owner@negocio.com"
+              />
+            </label>
+          </div>
+
+          <div className="grid gap-3">
+            <label className="block text-sm text-muted">
+              Perfil operativo
+              <select
+                value={newClientDraft.operatingProfile.industryProfile}
+                onChange={(event) => applyNewClientPreset(event.target.value)}
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+              >
+                {OPERATING_PROFILE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm text-muted">
+              Modelo operativo
+              <select
+                value={newClientDraft.operatingProfile.operatingModel}
+                onChange={(event) =>
+                  setNewClientDraft((current) => ({
+                    ...current,
+                    operatingProfile: {
+                      ...current.operatingProfile,
+                      operatingModel: event.target.value
+                    }
+                  }))
+                }
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+              >
+                {OPERATING_MODEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm text-muted">
+              Subtipo
+              <input
+                type="text"
+                value={newClientDraft.operatingProfile.businessSubtype}
+                onChange={(event) =>
+                  setNewClientDraft((current) => ({
+                    ...current,
+                    operatingProfile: {
+                      ...current.operatingProfile,
+                      businessSubtype: event.target.value
+                    }
+                  }))
+                }
+                className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                placeholder="Ej: beverage_distribution"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/45 p-4">
+            <p className="text-sm font-medium">Resumen de alta</p>
+            <p className="mt-2 text-sm text-muted">
+              Modulos visibles iniciales: {Object.values(newClientDraft.enabledModules).filter(Boolean).length}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {MODULES.filter((moduleKey) => newClientDraft.enabledModules[moduleKey]).map((moduleKey) => (
+                <Badge key={moduleKey} variant="success">
+                  {MODULE_LABELS[moduleKey]}
+                </Badge>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-muted">
+              Las capacidades futuras quedan persistidas para Admin, pero no crean rutas ni menu si todavia no estan implementadas.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(280px,360px)_1fr]">
       <section className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -756,6 +1084,80 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
             <div className="grid gap-5 lg:grid-cols-2">
               <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+                <h3 className="font-semibold">Perfil operativo</h3>
+                <p className="mt-2 text-sm text-muted">
+                  Define el preset inicial editable del tenant. El checklist de capacidades se propone desde este perfil.
+                </p>
+                <div className="mt-4 grid gap-3">
+                  <label className="block text-sm text-muted">
+                    Perfil operativo
+                    <select
+                      value={draft.operatingProfile?.industryProfile || "custom"}
+                      onChange={(event) => {
+                        const industryProfile = event.target.value;
+                        patchDraft({
+                          operatingProfile: {
+                            ...(draft.operatingProfile || {}),
+                            presetKey: industryProfile,
+                            industryProfile
+                          },
+                          recommendedCapabilities: RECOMMENDED_CAPABILITIES_BY_PROFILE[industryProfile] || [],
+                          capabilities: RECOMMENDED_CAPABILITIES_BY_PROFILE[industryProfile] || draft.capabilities
+                        });
+                      }}
+                      className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                    >
+                      {OPERATING_PROFILE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block text-sm text-muted">
+                    Modelo operativo
+                    <select
+                      value={draft.operatingProfile?.operatingModel || "hybrid"}
+                      onChange={(event) =>
+                        patchDraft({
+                          operatingProfile: {
+                            ...(draft.operatingProfile || {}),
+                            operatingModel: event.target.value
+                          }
+                        })
+                      }
+                      className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                    >
+                      {OPERATING_MODEL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block text-sm text-muted">
+                    Subtipo comercial
+                    <input
+                      type="text"
+                      value={String(draft.operatingProfile?.businessSubtype || "")}
+                      onChange={(event) =>
+                        patchDraft({
+                          operatingProfile: {
+                            ...(draft.operatingProfile || {}),
+                            businessSubtype: event.target.value
+                          }
+                        })
+                      }
+                      className="mt-2 h-10 w-full rounded-xl border border-[color:var(--border)] bg-surface px-3 text-sm text-text"
+                      placeholder="Ej: beverage_distribution"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
                 <h3 className="font-semibold">Plan y limites</h3>
                 <label className="mt-4 block text-sm text-muted">
                   Plan
@@ -837,6 +1239,11 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 Estas capacidades alimentan compatibilidades del backend y automatizaciones. No reemplazan a los modulos
                 visibles del portal.
               </p>
+              {draft.recommendedCapabilities && draft.recommendedCapabilities.length > 0 ? (
+                <p className="mt-2 text-xs text-muted">
+                  Preset sugerido actual: {draft.recommendedCapabilities.map((item) => CAPABILITY_LABELS[item as keyof typeof CAPABILITY_LABELS] || item).join(", ")}
+                </p>
+              ) : null}
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {CAPABILITIES.map((capability) => {
                   const checked = draft.capabilities.includes(capability);
@@ -865,6 +1272,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                         }
                       />
                       <span>{CAPABILITY_LABELS[capability]}</span>
+                      {FUTURE_CAPABILITIES.has(capability) ? <Badge variant="muted">Proximamente</Badge> : null}
                     </label>
                   );
                 })}
@@ -1066,6 +1474,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </aside>
         </div>
       </section>
+      </div>
     </div>
   );
 }

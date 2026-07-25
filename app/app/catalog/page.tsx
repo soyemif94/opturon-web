@@ -1,10 +1,10 @@
 import { CatalogManager } from "@/components/app/CatalogManager";
 import { canManageCatalog } from "@/lib/app-permissions";
 import { getPortalProducts, isBackendConfigured, type PortalProduct } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function CatalogPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("catalog");
   const readOnly = !canManageCatalog(ctx);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: Array<PortalProduct & { stockQty: number; active: boolean }> = [];

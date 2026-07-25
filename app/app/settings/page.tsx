@@ -316,6 +316,22 @@ export default async function AppSettingsPage() {
         </HubCard>
 
         <HubCard
+          href="/app/settings/modules"
+          icon={<Cog className="h-6 w-6 text-amber-300" />}
+          title="Modulos y operacion"
+          subtitle="Perfil operativo del tenant"
+          description="Define perfil operativo, subtipo comercial y capacidades activas del portal sin borrar datos existentes."
+          cta="Editar modulos"
+          accent="green"
+        >
+          <div className="space-y-3">
+            <StatusRow label="Politica" value={backendReady ? "Persistida en backend" : "Backend requerido"} tone={backendReady ? "success" : "muted"} />
+            <StatusRow label="Desactivacion" value="Oculta y bloquea acceso" tone="muted" />
+            <StatusRow label="Reactivacion" value="Recupera acceso sobre los datos existentes" tone="success" />
+          </div>
+        </HubCard>
+
+        <HubCard
           href="/app/settings/bot"
           icon={<Bot className="h-6 w-6 text-sky-300" />}
           title="Bot de WhatsApp"

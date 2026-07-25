@@ -7,7 +7,7 @@ import {
   getPortalSalesSummary,
   isBackendConfigured
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -19,6 +19,8 @@ function backendUnavailable() {
 }
 
 export async function GET(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("sales");
+  if (moduleGuard.error) return moduleGuard.error;
   const url = new URL(request.url);
   const visibility = url.searchParams.get("visibility") === "archived" ? "archived" : "active";
   const tenantContext = await resolveAppTenant({

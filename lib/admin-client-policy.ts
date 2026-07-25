@@ -1,3 +1,5 @@
+import type { TenantOperatingProfile, TenantPortalPolicy } from "@/lib/tenant-policy";
+
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const PROD_BACKEND_FALLBACK = "https://opturon-api.onrender.com";
 
@@ -6,17 +8,7 @@ type BackendError = Error & {
   body?: unknown;
 };
 
-export type TenantPolicy = {
-  planCode: string;
-  limits: {
-    maxPortalUsers: number;
-    maxAutomations: number;
-    maxContacts: number;
-  };
-  capabilities: string[];
-  enabledModules: Record<string, boolean>;
-  source?: string;
-};
+export type TenantPolicy = TenantPortalPolicy;
 
 export type AdminTenantPolicyRow = {
   id: string;
@@ -224,7 +216,11 @@ export async function getAdminTenantPolicy(tenantId: string) {
 
 export async function patchAdminTenantPolicy(
   tenantId: string,
-  payload: Partial<TenantPolicy> & { displayName?: string; primaryEmail?: string }
+  payload: Partial<TenantPolicy> & {
+    operatingProfile?: Partial<TenantOperatingProfile>;
+    displayName?: string;
+    primaryEmail?: string;
+  }
 ) {
   return backendPortalFetch<{
     success: boolean;

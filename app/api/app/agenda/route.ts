@@ -6,7 +6,7 @@ import {
   getPortalAgendaItems,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireAppModuleApi } from "@/lib/saas/access";
 import { createAgendaItem, listAgendaItems, touchTenantActivity } from "@/lib/saas/store";
 
 function noStore(response: NextResponse) {
@@ -21,7 +21,7 @@ function backendUnavailable() {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAppApi();
+  const auth = await requireAppModuleApi("agenda");
   if (auth.error) return auth.error;
 
   if (!auth.ctx.tenantId) {
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAppApi({ permission: "edit_workspace" });
+  const auth = await requireAppModuleApi("agenda", { permission: "edit_workspace" });
   if (auth.error) return auth.error;
 
   if (!auth.ctx.tenantId) {

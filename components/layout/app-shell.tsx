@@ -513,6 +513,7 @@ export function AppShell({
   globalRole,
   tenantRole,
   accountScope,
+  tenantModules,
   whatsappStatus
 }: {
   children: React.ReactNode;
@@ -525,11 +526,12 @@ export function AppShell({
   globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
+  tenantModules?: Record<string, boolean> | null;
   whatsappStatus?: WhatsAppConnectionStatus;
 }) {
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
-  const accessContext = { globalRole, tenantRole, accountScope };
+  const accessContext = { globalRole, tenantRole, accountScope, tenantModules };
   const isOpturonAdmin = globalRole === "superadmin" || globalRole === "ops_admin";
   const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module) && (!item.adminOnly || isOpturonAdmin));
   const showManageShortcut = canManageWorkspace(accessContext);

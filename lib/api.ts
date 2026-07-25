@@ -1,5 +1,6 @@
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
+import type { TenantOperatingProfile, TenantPortalPolicy } from "@/lib/tenant-policy";
 
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const AUTH_API_TIMEOUT_MS = Number(process.env.AUTH_API_TIMEOUT_MS || 2500);
@@ -267,7 +268,21 @@ export type PortalTenantContext = {
     conversationsCount: number;
     automationsCount: number;
   };
+  policy?: TenantPortalPolicy;
   reason: string;
+};
+
+export type PortalTenantPolicyResponse = {
+  ok: boolean;
+  tenantId: string;
+  clinic: {
+    id: string;
+    name: string | null;
+    externalTenantId: string | null;
+    primaryEmail?: string | null;
+  };
+  primaryEmail?: string | null;
+  policy: TenantPortalPolicy;
 };
 
 export type PortalWhatsAppOnboardingSession = {
@@ -436,7 +451,13 @@ export async function getPortalTenantContext(tenantId: string) {
 
 export async function provisionPortalTenant(
   tenantId: string,
-  payload: { name: string; timezone?: string | null }
+  payload: {
+    name: string;
+    timezone?: string | null;
+    operatingProfile?: TenantOperatingProfile;
+    capabilities?: string[];
+    enabledModules?: Record<string, boolean>;
+  }
 ) {
   return backendPortalFetch<{
     success: boolean;
@@ -451,6 +472,32 @@ export async function provisionPortalTenant(
     };
   }>(`/portal/tenants/${tenantId}/provision`, {
     method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getPortalTenantPolicy(tenantId: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalTenantPolicyResponse;
+  }>(`/portal/tenants/${tenantId}/policy`);
+}
+
+export async function patchPortalTenantPolicy(
+  tenantId: string,
+  payload: Partial<TenantPortalPolicy> & {
+    operatingProfile?: Partial<TenantOperatingProfile>;
+    displayName?: string;
+    primaryEmail?: string;
+  },
+  options?: { actorUserId?: string | null }
+) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalTenantPolicyResponse;
+  }>(`/portal/tenants/${tenantId}/policy`, {
+    method: "PATCH",
+    headers: options?.actorUserId ? { "x-portal-actor-id": options.actorUserId } : undefined,
     body: JSON.stringify(payload)
   });
 }
@@ -744,7 +791,16 @@ export async function getPortalUsers(tenantId: string) {
 
 export async function createPortalUser(
   tenantId: string,
-  payload: { email: string; name: string; role: string; password?: string },
+  payload: {
+    email: string;
+    name: string;
+    role: string;
+    password?: string;
+    tenantName?: string;
+    operatingProfile?: TenantOperatingProfile;
+    capabilities?: string[];
+    enabledModules?: Record<string, boolean>;
+  },
   actorUserId?: string | null
   ) {
   const headers = actorUserId ? { "x-portal-actor-id": actorUserId } : undefined;
@@ -752,6 +808,12 @@ export async function createPortalUser(
     success: boolean;
     data: {
       tenantId: string;
+      clinic?: {
+        id: string;
+        name: string | null;
+        timezone?: string | null;
+        externalTenantId?: string | null;
+      } | null;
       user: PortalUser;
       invitation?: {
         token: string;

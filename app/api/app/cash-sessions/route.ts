@@ -6,7 +6,7 @@ import {
   isBackendConfigured,
   openPortalCashSession
 } from "@/lib/api";
-import { requireAppApi, resolveAppTenant } from "@/lib/saas/access";
+import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -18,6 +18,8 @@ function backendUnavailable() {
 }
 
 export async function GET(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("cash");
+  if (moduleGuard.error) return moduleGuard.error;
   const url = new URL(request.url);
   const tenantContext = await resolveAppTenant({
     requestedTenantId: url.searchParams.get("tenantId") || undefined,
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireAppApi({ permission: "edit_workspace" });
+  const guard = await requireAppModuleApi("cash", { permission: "edit_workspace" });
   if (guard.error) return guard.error;
   if (!isBackendConfigured()) return backendUnavailable();
 

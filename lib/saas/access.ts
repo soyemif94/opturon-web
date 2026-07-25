@@ -2,12 +2,14 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { hasAppPermission, isStaffRole, type AppPermission } from "@/lib/app-permissions";
+import { canAccessAppModule, hasAppPermission, isStaffRole, type AppModule, type AppPermission } from "@/lib/app-permissions";
 import { authOptions } from "@/lib/auth";
 import { isPartnerLikeIdentity, isStrictPartnerIdentity } from "@/lib/auth-identity";
+import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { isPartnerPortalHost, PARTNER_PORTAL_PREVIEW_HEADER, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
+import { buildTenantAppModules } from "@/lib/tenant-policy";
 
 const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
 const OPTURON_ADMIN_ROLES = new Set(["superadmin", "ops_admin"]);
@@ -133,6 +135,26 @@ export async function requireOpturonAdminApi() {
   return { ctx };
 }
 
+async function resolveTenantModulesForContext(ctx: {
+  tenantId?: string;
+  globalRole?: string;
+  tenantRole?: string;
+  accountScope?: string;
+}) {
+  if (!ctx.tenantId || !isBackendConfigured()) return null;
+  const result = await getPortalTenantContext(ctx.tenantId).catch(() => null);
+  return buildTenantAppModules(result?.data?.policy || null);
+}
+
+export async function requireAppModulePage(module: AppModule, options?: { permission?: AppPermission; callbackUrl?: string }) {
+  const ctx = await requireAppPage({ permission: options?.permission });
+  const tenantModules = await resolveTenantModulesForContext(ctx);
+  if (!canAccessAppModule({ ...ctx, tenantModules }, module)) {
+    redirect("/app");
+  }
+  return { ...ctx, tenantModules };
+}
+
 export async function requireAppApi(options?: { permission?: AppPermission }) {
   const ctx = await getSessionContext();
   if (!ctx.session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
@@ -147,6 +169,16 @@ export async function requireAppApi(options?: { permission?: AppPermission }) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ctx };
+}
+
+export async function requireAppModuleApi(module: AppModule, options?: { permission?: AppPermission }) {
+  const guard = await requireAppApi(options);
+  if (guard.error) return { error: guard.error, ctx: undefined };
+  const tenantModules = await resolveTenantModulesForContext(guard.ctx || {});
+  if (!canAccessAppModule({ ...(guard.ctx || {}), tenantModules }, module)) {
+    return { error: NextResponse.json({ error: "tenant_module_disabled", module }, { status: 403 }), ctx: undefined };
+  }
+  return { error: undefined, ctx: { ...(guard.ctx || {}), tenantModules } };
 }
 
 export async function requirePartnerPage() {

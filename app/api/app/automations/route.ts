@@ -6,10 +6,10 @@ import {
   getPortalAutomations,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireAppModuleApi } from "@/lib/saas/access";
 
 export async function GET() {
-  const auth = await requireAppApi({ permission: "manage_workspace" });
+  const auth = await requireAppModuleApi("automations", { permission: "manage_workspace" });
   if (auth.error) return auth.error;
 
   if (!auth.ctx.tenantId) {
@@ -38,7 +38,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAppApi({ permission: "manage_workspace" });
+  const auth = await requireAppModuleApi("automations", { permission: "manage_workspace" });
   if (auth.error) return auth.error;
 
   if (!auth.ctx.tenantId) {
