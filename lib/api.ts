@@ -3972,6 +3972,7 @@ export type PortalWhatsAppChatImportPreview = {
   duplicateEstimated: number;
   ignoredLines: number;
   participants: string[];
+  selfParticipantRequired?: boolean;
   dateRange: { from?: string | null; to?: string | null };
   detectedFormat: string;
   warnings: Array<{ code?: string; message?: string } | string>;
@@ -4002,7 +4003,7 @@ export async function previewPortalWhatsAppChatImport(
 export async function confirmPortalWhatsAppChatImport(
   tenantId: string,
   importId: string,
-  payload: { selectedContactId?: string | null },
+  payload: { selectedContactId?: string | null; selectedSelfParticipant?: string | null },
   actor?: { id?: string | null; name?: string | null }
 ) {
   const headers = new Headers();

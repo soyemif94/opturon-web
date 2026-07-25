@@ -17,11 +17,14 @@ assert.match(modal, /Esta importación sólo agrega historial\. No envía mensaj
 assert.match(modal, /accept="\.txt,text\/plain"/);
 assert.match(modal, /\/api\/app\/whatsapp\/imports\/preview/);
 assert.match(modal, /\/api\/app\/whatsapp\/imports\/\$\{encodeURIComponent\(preview\.importId\)\}\/confirm/);
+assert.match(modal, /selectedSelfParticipant/);
+assert.match(modal, /Tu nombre en el chat exportado/);
 assert.match(modal, /disabled=\{!canConfirm\}/);
 assert.doesNotMatch(modal, /confirmImport\(\)\s*;?\s*}\s*}\s*>\s*Previsualizar/);
 
 assert.match(previewRoute, /resolveAppTenant\(\{ requireWrite: true \}\)/);
 assert.match(confirmRoute, /resolveAppTenant\(\{ requireWrite: true \}\)/);
+assert.match(confirmRoute, /selectedSelfParticipant/);
 assert.match(api, /previewPortalWhatsAppChatImport/);
 assert.match(api, /confirmPortalWhatsAppChatImport/);
 assert.match(api, /backendPortalFetch/);

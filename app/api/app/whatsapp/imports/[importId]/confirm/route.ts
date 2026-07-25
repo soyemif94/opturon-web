@@ -33,6 +33,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         selectedContactId:
           typeof payload?.selectedContactId === "string" && payload.selectedContactId.trim()
             ? payload.selectedContactId.trim()
+            : null,
+        selectedSelfParticipant:
+          typeof payload?.selectedSelfParticipant === "string" && payload.selectedSelfParticipant.trim()
+            ? payload.selectedSelfParticipant.trim()
             : null
       },
       actorFromTenantContext(tenantContext)

@@ -12,6 +12,7 @@ type ImportPreview = {
   duplicateEstimated: number;
   ignoredLines: number;
   participants: string[];
+  selfParticipantRequired?: boolean;
   dateRange?: { from?: string | null; to?: string | null };
   detectedFormat: string;
   warnings: Array<{ code?: string; message?: string } | string>;
@@ -45,12 +46,16 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [selectedContactId, setSelectedContactId] = useState("");
+  const [selectedSelfParticipant, setSelectedSelfParticipant] = useState("");
   const [previewing, setPreviewing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fileValid = useMemo(() => Boolean(file && file.name.toLowerCase().endsWith(".txt")), [file]);
-  const canConfirm = Boolean(preview?.importId && !confirming);
+  const selfParticipantMissing = Boolean(
+    preview?.selfParticipantRequired && !selectedSelfParticipant
+  );
+  const canConfirm = Boolean(preview?.importId && !confirming && !selfParticipantMissing);
 
   useEffect(() => {
     if (!open) return;
@@ -70,6 +75,7 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
     setFile(null);
     setPreview(null);
     setSelectedContactId("");
+    setSelectedSelfParticipant("");
     setError(null);
   }
 
@@ -88,6 +94,7 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(String(json?.error || "whatsapp_import_preview_failed"));
       setPreview(json.import as ImportPreview);
+      setSelectedSelfParticipant("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo previsualizar el archivo.");
     } finally {
@@ -103,7 +110,10 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
       const response = await fetch(`/api/app/whatsapp/imports/${encodeURIComponent(preview.importId)}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedContactId: selectedContactId || null })
+        body: JSON.stringify({
+          selectedContactId: selectedContactId || null,
+          selectedSelfParticipant: selectedSelfParticipant || null
+        })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(String(json?.error || "whatsapp_import_confirm_failed"));
@@ -199,6 +209,26 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
                     <p className="mt-1 text-sm text-muted">{preview.participants?.length ? preview.participants.join(", ") : "Sin participantes detectados"}</p>
                   </div>
 
+                  <label className="block">
+                    <span className="text-xs font-medium text-text">Tu nombre en el chat exportado</span>
+                    <select
+                      value={selectedSelfParticipant}
+                      onChange={(event) => setSelectedSelfParticipant(event.target.value)}
+                      className="mt-2 w-full rounded-[14px] border border-[color:var(--border)] bg-surface px-3 py-2 text-sm text-text"
+                    >
+                      <option value="">
+                        {preview.selfParticipantRequired
+                          ? "Selecciona tu nombre para definir mensajes propios"
+                          : "No hace falta seleccionar"}
+                      </option>
+                      {preview.participants.map((participant) => (
+                        <option key={participant} value={participant}>
+                          {participant}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
                   {preview.warnings?.length ? (
                     <div className="rounded-[16px] border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
                       {preview.warnings.map((warning, index) => (
@@ -222,6 +252,12 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
                       ))}
                     </select>
                   </label>
+
+                  {selfParticipantMissing ? (
+                    <div className="rounded-[16px] border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+                      Selecciona tu nombre en el chat para importar con direcciÃ³n correcta sin inferencias inseguras.
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-wrap items-center gap-3">
                     <button
