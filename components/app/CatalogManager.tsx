@@ -36,6 +36,7 @@ type Product = {
   name: string;
   description?: string | null;
   sku?: string | null;
+  internalCode?: string | null;
   price: number;
   currency?: string | null;
   stock?: number | null;
@@ -349,7 +350,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       : products;
     if (!query) return categoryFiltered;
     return categoryFiltered.filter((product) => {
-      const haystack = [product.name, product.sku, product.description].filter(Boolean).join(" ").toLowerCase();
+      const haystack = [product.name, product.internalCode, product.sku, product.description].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
   }, [products, search, categoryFilter]);
@@ -709,7 +710,6 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     setBulkResult(null);
 
     const price = Number(draft.price);
-    const stock = Number.parseInt(draft.stock, 10);
     const cost = draft.cost.trim() ? Number(draft.cost) : null;
     const weight = draft.weight.trim() ? Number(draft.weight) : null;
     const attributes = parseAttributesText(draft.attributesText);
@@ -721,10 +721,6 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     }
     if (!Number.isFinite(price) || price < 0) {
       setFeedback({ tone: "warning", text: "El precio debe ser un numero valido." });
-      return;
-    }
-    if (!Number.isInteger(stock) || stock < 0) {
-      setFeedback({ tone: "warning", text: "El stock debe ser cero o mayor." });
       return;
     }
     if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
@@ -751,7 +747,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           sku: draft.sku.trim() || null,
           price,
           vatRate: 0,
-          stock,
+          stock: 0,
           currency: draft.currency.trim() || "ARS",
           categoryId: draft.categoryId || null,
           brand: draft.brand.trim() || null,
@@ -1528,7 +1524,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                                   </Badge>
                                   {getProductPricing(product).hasDiscount ? <Badge variant="warning">Promocion</Badge> : null}
                                 </div>
-                                <p className="text-sm text-muted">{product.sku || "Sin SKU"}</p>
+                                <p className="text-sm text-muted">{product.internalCode || product.sku || "Sin codigo"}</p>
                                 <div className="flex flex-wrap gap-2">
                                   {product.categoryName ? <Badge variant="muted">{product.categoryName}</Badge> : null}
                                   {product.brand ? <Badge variant="warning">{product.brand}</Badge> : null}
@@ -1558,7 +1554,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
-                              <span>{product.sku || "Sin SKU"}</span>
+                              <span>{product.internalCode || product.sku || "Sin codigo"}</span>
                               <span>Stock {resolveStock(product)} unidades</span>
                               {product.brand ? <span>Marca {product.brand}</span> : null}
                               {product.manufacturer ? <span>Fabricante {product.manufacturer}</span> : null}
@@ -2082,8 +2078,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                     <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="0" inputMode="decimal" disabled={readOnly} />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Stock basico</label>
-                    <Input value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="0" inputMode="numeric" disabled={readOnly} />
+                    <label className="text-sm font-medium">Stock actual</label>
+                    <Input value={draft.stock} readOnly placeholder="0" inputMode="numeric" disabled />
+                    <p className="text-xs text-muted">El stock se gestiona desde Inventario con movimientos auditables.</p>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -2280,7 +2277,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                   <DetailStat label="Stock" value={String(resolveStock(selectedProduct))} />
                   <DetailStat label="Categoria" value={selectedProduct.categoryName || "Sin categoria"} />
                   <DetailStat label="Marca" value={selectedProduct.brand || "Sin marca"} />
-                  <DetailStat label="SKU" value={selectedProduct.sku || "Sin SKU"} />
+                  <DetailStat label="Codigo interno" value={selectedProduct.internalCode || "Sin codigo"} />
                 </div>
                 {!readOnly ? (
                   <Button asChild variant="secondary" size="sm" className="rounded-2xl">

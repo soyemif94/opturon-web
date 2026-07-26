@@ -1,0 +1,392 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { ArrowUpDown, Boxes, Search } from "lucide-react";
+import { ClientPageShell } from "@/components/app/client-page-shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import type { PortalInventoryMovement, PortalInventoryProduct } from "@/lib/api";
+
+type MovementMode = "opening_balance" | "manual_increase" | "manual_decrease" | "correction";
+
+const EMPTY_HISTORY: PortalInventoryMovement[] = [];
+
+export function InventoryBaseWorkspace({
+  initialProducts,
+  readOnly = false
+}: {
+  initialProducts: PortalInventoryProduct[];
+  readOnly?: boolean;
+}) {
+  const [products, setProducts] = useState(initialProducts);
+  const [search, setSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState<"all" | "with_stock" | "without_stock">("all");
+  const [loading, setLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<PortalInventoryProduct | null>(null);
+  const [history, setHistory] = useState<PortalInventoryMovement[]>(EMPTY_HISTORY);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [mode, setMode] = useState<MovementMode>("opening_balance");
+  const [quantity, setQuantity] = useState("1");
+  const [countedStock, setCountedStock] = useState("");
+  const [reason, setReason] = useState("");
+
+  async function refreshProducts(nextSearch = search, nextFilter = stockFilter) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("pageSize", "100");
+      if (nextSearch.trim()) params.set("search", nextSearch.trim());
+      if (nextFilter !== "all") params.set("stockFilter", nextFilter);
+      const response = await fetch(`/api/app/inventory/products?${params.toString()}`, { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo cargar inventario.");
+      setProducts(Array.isArray(json?.products) ? json.products : []);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo cargar inventario.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadHistory(product: PortalInventoryProduct) {
+    setHistoryLoading(true);
+    setSelectedProduct(product);
+    try {
+      const response = await fetch(`/api/app/inventory/products/${product.id}/movements?page=1&pageSize=25`, { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo cargar historial.");
+      setHistory(Array.isArray(json?.movements) ? json.movements : EMPTY_HISTORY);
+      setCountedStock(String(resolveStock(product)));
+      setQuantity("1");
+      setReason("");
+      setMode(resolveStock(product) > 0 ? "manual_increase" : "opening_balance");
+    } catch (error) {
+      setHistory(EMPTY_HISTORY);
+      setFeedback(error instanceof Error ? error.message : "No se pudo cargar historial.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const refreshed = products.find((product) => product.id === selectedProduct.id) || null;
+    if (refreshed) setSelectedProduct(refreshed);
+  }, [products, selectedProduct]);
+
+  const currentStock = selectedProduct ? resolveStock(selectedProduct) : 0;
+  const quantityNumber = Number(quantity || 0);
+  const countedStockNumber = Number(countedStock || 0);
+  const deltaPreview =
+    mode === "correction"
+      ? (Number.isFinite(countedStockNumber) ? countedStockNumber - currentStock : NaN)
+      : mode === "manual_decrease"
+        ? -quantityNumber
+        : quantityNumber;
+  const resultingStock =
+    mode === "correction"
+      ? countedStockNumber
+      : currentStock + (Number.isFinite(deltaPreview) ? deltaPreview : 0);
+
+  const summary = useMemo(() => {
+    const withStock = products.filter((product) => resolveStock(product) > 0).length;
+    const withoutStock = products.length - withStock;
+    return { total: products.length, withStock, withoutStock };
+  }, [products]);
+
+  async function submitMovement() {
+    if (!selectedProduct) return;
+    if (mode === "correction") {
+      if (!Number.isFinite(countedStockNumber) || countedStockNumber < 0) {
+        setFeedback("El stock contado debe ser cero o mayor.");
+        return;
+      }
+    } else if (!Number.isInteger(quantityNumber) || quantityNumber <= 0) {
+      setFeedback("La cantidad debe ser un entero mayor a cero.");
+      return;
+    }
+
+    if (mode === "manual_decrease" && quantityNumber > currentStock) {
+      setFeedback(`No podés sacar más que el stock disponible (${currentStock}).`);
+      return;
+    }
+
+    if ((mode === "manual_decrease" || mode === "correction") && !reason.trim()) {
+      setFeedback("El motivo es obligatorio para salidas y correcciones.");
+      return;
+    }
+
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/inventory/products/${selectedProduct.id}/movements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          movementType: mode,
+          quantity: mode === "correction" ? undefined : quantityNumber,
+          countedStock: mode === "correction" ? countedStockNumber : undefined,
+          reason: reason.trim() || null,
+          idempotencyKey: crypto.randomUUID(),
+          metadata: { source: "inventory_base_workspace" }
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo registrar el movimiento.");
+      setFeedback("Movimiento registrado.");
+      await refreshProducts();
+      await loadHistory({ ...selectedProduct, stock: Number(json?.balance?.quantity ?? resultingStock) });
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo registrar el movimiento.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ClientPageShell
+      title="Inventario"
+      description="Base operativa de stock con código interno, ubicación principal y ledger auditable."
+      badge="Inventario"
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        <SummaryCard label="Productos" value={String(summary.total)} helper="Catálogo visible en inventario" />
+        <SummaryCard label="Con stock" value={String(summary.withStock)} helper="Disponibilidad positiva" />
+        <SummaryCard label="Sin stock" value={String(summary.withoutStock)} helper="Requieren reposición o corrección" />
+      </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Stock actual</CardTitle>
+          <CardDescription>Ubicación principal única por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por nombre, código interno, SKU o barras"
+              />
+            </label>
+            <select
+              className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
+              value={stockFilter}
+              onChange={(event) => setStockFilter(event.target.value as "all" | "with_stock" | "without_stock")}
+            >
+              <option value="all">Todos</option>
+              <option value="with_stock">Con stock</option>
+              <option value="without_stock">Sin stock</option>
+            </select>
+            <Button type="button" variant="secondary" onClick={() => refreshProducts()} disabled={loading}>
+              {loading ? "Actualizando..." : "Actualizar"}
+            </Button>
+          </div>
+
+          {feedback ? <div className="rounded-xl border border-[color:var(--border)] bg-muted/40 px-4 py-3 text-sm">{feedback}</div> : null}
+
+          <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
+            <table className="min-w-[980px] w-full text-left text-sm">
+              <thead className="bg-muted/40 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3">Código</th>
+                  <th className="px-4 py-3">Producto</th>
+                  <th className="px-4 py-3">Categoría</th>
+                  <th className="px-4 py-3">Stock</th>
+                  <th className="px-4 py-3">Ubicación</th>
+                  <th className="px-4 py-3">Último movimiento</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id} className="border-t border-[color:var(--border)]">
+                    <td className="px-4 py-4 font-mono text-xs">{product.internalCode || "-"}</td>
+                    <td className="px-4 py-4">
+                      <p className="font-medium">{product.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{product.sku || "Sin SKU"}</p>
+                    </td>
+                    <td className="px-4 py-4">{product.categoryName || "-"}</td>
+                    <td className="px-4 py-4 font-semibold">{resolveStock(product)}</td>
+                    <td className="px-4 py-4">{product.locationName || "Principal"}</td>
+                    <td className="px-4 py-4 text-xs text-muted-foreground">{humanizeMovement(product.lastMovementType, product.lastMovementAt)}</td>
+                    <td className="px-4 py-4">
+                      <Badge variant={badgeVariant(product.stockState || "without_stock")}>{badgeLabel(product.stockState || "without_stock")}</Badge>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="secondary" onClick={() => loadHistory(product)}>
+                          Historial
+                        </Button>
+                        <Button type="button" size="sm" onClick={() => loadHistory(product)} disabled={readOnly}>
+                          Registrar movimiento
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!products.length ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                      No hay productos para este filtro.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {selectedProduct ? (
+        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Registrar movimiento</CardTitle>
+              <CardDescription>
+                {selectedProduct.name} · {selectedProduct.internalCode || "Sin código"} · stock actual {currentStock}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                <label className="grid gap-2 text-sm">
+                  <span>Tipo</span>
+                  <select
+                    className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
+                    value={mode}
+                    onChange={(event) => setMode(event.target.value as MovementMode)}
+                    disabled={readOnly || saving}
+                  >
+                    <option value="opening_balance">Carga inicial</option>
+                    <option value="manual_increase">Entrada</option>
+                    <option value="manual_decrease">Salida</option>
+                    <option value="correction">Ajuste por stock contado</option>
+                  </select>
+                </label>
+
+                {mode === "correction" ? (
+                  <label className="grid gap-2 text-sm">
+                    <span>Stock contado</span>
+                    <Input type="number" min="0" step="1" value={countedStock} onChange={(event) => setCountedStock(event.target.value)} disabled={readOnly || saving} />
+                  </label>
+                ) : (
+                  <label className="grid gap-2 text-sm">
+                    <span>Cantidad</span>
+                    <Input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={readOnly || saving} />
+                  </label>
+                )}
+
+                <label className="grid gap-2 text-sm">
+                  <span>Motivo {mode === "manual_decrease" || mode === "correction" ? "(obligatorio)" : "(opcional)"}</span>
+                  <Input value={reason} onChange={(event) => setReason(event.target.value)} disabled={readOnly || saving} placeholder="Ej. conteo físico, merma, ingreso manual" />
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-[color:var(--border)] bg-muted/30 px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">Saldo posterior</span>
+                  <span className="font-semibold">{Number.isFinite(resultingStock) ? resultingStock : "-"}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">Diferencia</span>
+                  <span className="font-semibold">{Number.isFinite(deltaPreview) ? signed(deltaPreview) : "-"}</span>
+                </div>
+              </div>
+
+              <Button type="button" className="w-full" onClick={submitMovement} disabled={readOnly || saving}>
+                {saving ? "Registrando..." : "Confirmar movimiento"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Historial</CardTitle>
+              <CardDescription>Ledger inmutable del producto. Las correcciones futuras deben compensar, no editar.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {historyLoading ? <p className="text-sm text-muted-foreground">Cargando historial...</p> : null}
+              {!historyLoading && !history.length ? <p className="text-sm text-muted-foreground">Todavía no hay movimientos para este producto.</p> : null}
+              {history.map((movement) => (
+                <div key={movement.id} className="rounded-xl border border-[color:var(--border)] bg-muted/20 px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{movement.movementType}</Badge>
+                      <span className="font-medium">{signed(resolveSignedMovement(movement))}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(movement.createdAt)}</span>
+                  </div>
+                  <div className="mt-2 grid gap-1 text-xs text-muted-foreground md:grid-cols-2">
+                    <span>Saldo anterior: {movement.quantityBefore ?? "-"}</span>
+                    <span>Saldo posterior: {movement.quantityAfter ?? "-"}</span>
+                    <span>Ubicación: {movement.locationName || "Principal"}</span>
+                    <span>Referencia: {movement.referenceType || "-"}</span>
+                  </div>
+                  {movement.reason ? <p className="mt-2 text-sm">{movement.reason}</p> : null}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+    </ClientPageShell>
+  );
+}
+
+function resolveStock(product: PortalInventoryProduct) {
+  return Number((product.stock ?? 0) || 0);
+}
+
+function humanizeMovement(type?: string | null, createdAt?: string | null) {
+  if (!type && !createdAt) return "Sin movimientos";
+  return `${type || "movimiento"}${createdAt ? ` · ${formatDateTime(createdAt)}` : ""}`;
+}
+
+function badgeVariant(state: string) {
+  if (state === "with_stock") return "success";
+  if (state === "low_stock") return "warning";
+  return "muted";
+}
+
+function badgeLabel(state: string) {
+  if (state === "with_stock") return "Con stock";
+  if (state === "low_stock") return "Bajo";
+  return "Sin stock";
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("es-AR");
+}
+
+function resolveSignedMovement(movement: PortalInventoryMovement) {
+  const positive = new Set(["opening_balance", "purchase_receipt", "manual_increase", "return_in", "initial_stock", "manual_adjustment_in"]);
+  return positive.has(movement.movementType) ? Number(movement.quantity || 0) : Number(movement.quantity || 0) * -1;
+}
+
+function signed(value: number) {
+  if (!Number.isFinite(value)) return "-";
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function SummaryCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="text-3xl">{value}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-sm text-muted-foreground">{helper}</CardContent>
+    </Card>
+  );
+}

@@ -144,7 +144,6 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     const name = draft.name.trim();
     const sku = draft.sku.trim();
     const price = Number(draft.price);
-    const stock = Number(draft.stock || 0);
     const vatRate = Number(draft.vatRate || 0);
     const cost = draft.cost.trim() ? Number(draft.cost) : null;
     const weight = draft.weight.trim() ? Number(draft.weight) : null;
@@ -165,10 +164,6 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
     }
     if (!Number.isFinite(vatRate) || vatRate < 0) {
       toast.error("IVA invalido", "Ingresa una alicuota valida mayor o igual a cero.");
-      return;
-    }
-    if (!Number.isFinite(stock) || stock < 0) {
-      toast.error("Stock invalido", "Ingresa un stock valido mayor o igual a cero.");
       return;
     }
     if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
@@ -213,7 +208,6 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           expirationDate: draft.expirationDate || null,
           discountPercentage,
           price,
-          stock,
           currency: draft.currency.trim().toUpperCase() || "ARS",
           vatRate,
           status: draft.status
@@ -386,7 +380,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
                 </span>
                 <div>
                   <CardTitle className="text-xl">Precio e inventario</CardTitle>
-                  <CardDescription>Define precio base, descuento, stock y configuracion fiscal sin salir del catalogo.</CardDescription>
+                  <CardDescription>Define precio base, descuento y configuracion fiscal. El stock se administra desde Inventario.</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -404,8 +398,9 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
                 <Input type="number" step="0.01" min="0" placeholder="0" value={draft.vatRate} onChange={(event) => setDraft((current) => ({ ...current, vatRate: event.target.value }))} disabled={saving || uploadingImage} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Stock disponible</label>
-                <Input type="number" step="1" min="0" placeholder="0" value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} disabled={saving || uploadingImage} />
+                <label className="text-sm font-medium">Stock actual</label>
+                <Input type="number" step="1" min="0" placeholder="0" value={draft.stock} readOnly disabled />
+                <p className="text-xs text-muted">Para modificar stock usa la pantalla de Inventario y registra un movimiento.</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Descuento %</label>
@@ -548,7 +543,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
                 <Input placeholder="Ej. Banner Plan Empresa" value={draft.imageAlt} onChange={(event) => setDraft((current) => ({ ...current, imageAlt: event.target.value }))} disabled={saving || uploadingImage} />
               </div>
               <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
-                Este editor mantiene intactos precio, stock, imagen, categoria, descuento y atributos usando los mismos handlers del catalogo actual.
+                Este editor mantiene intacto el stock y lo muestra solo como referencia. Las variaciones de inventario se registran desde el ledger del modulo Inventario.
               </div>
             </CardContent>
           </Card>

@@ -1970,6 +1970,7 @@ export type PortalProduct = {
   status: string;
   active?: boolean;
   sku: string | null;
+  internalCode?: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
   brand?: string | null;
@@ -2048,13 +2049,22 @@ export type PortalInventoryMovement = {
   tenantId: string;
   productId: string;
   lotId?: string | null;
+  locationId?: string | null;
+  locationName?: string | null;
   movementType:
     | "initial_stock"
+    | "opening_balance"
     | "purchase_receipt"
+    | "manual_increase"
+    | "manual_decrease"
+    | "correction"
+    | "return_in"
+    | "return_out"
     | "manual_adjustment_in"
     | "manual_adjustment_out"
     | "expired_writeoff"
-    | "cancellation";
+    | "cancellation"
+    | "sale";
   quantity: number;
   quantityBefore?: number | null;
   quantityAfter?: number | null;
@@ -2064,6 +2074,17 @@ export type PortalInventoryMovement = {
   metadata?: Record<string, unknown>;
   createdBy?: string | null;
   createdAt: string;
+  idempotencyKey?: string | null;
+  unit?: string | null;
+  status?: "posted" | "reversed";
+};
+
+export type PortalInventoryProduct = PortalProduct & {
+  locationId?: string | null;
+  locationName?: string | null;
+  lastMovementAt?: string | null;
+  lastMovementType?: string | null;
+  stockState?: "with_stock" | "low_stock" | "without_stock";
 };
 
 export type PortalInventoryExpirationThresholds = {
@@ -3048,6 +3069,90 @@ export async function getPortalProducts(tenantId: string) {
       products: PortalProduct[];
     };
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+}
+
+export async function getPortalInventoryProducts(
+  tenantId: string,
+  options?: {
+    search?: string;
+    stockFilter?: "all" | "with_stock" | "without_stock";
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.search) params.set("search", options.search);
+  if (options?.stockFilter) params.set("stockFilter", options.stockFilter);
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      location: { id: string; name: string; code: string };
+      page: number;
+      pageSize: number;
+      total: number;
+      products: PortalInventoryProduct[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/products${suffix}`, undefined, false);
+}
+
+export async function getPortalInventoryProductHistory(
+  tenantId: string,
+  productId: string,
+  options?: { page?: number; pageSize?: number }
+) {
+  const params = new URLSearchParams();
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      product: PortalProduct;
+      movements: PortalInventoryMovement[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/products/${productId}/movements${suffix}`, undefined, false);
+}
+
+export async function createPortalInventoryMovement(
+  tenantId: string,
+  productId: string,
+  payload: {
+    movementType: "opening_balance" | "purchase_receipt" | "sale" | "manual_increase" | "manual_decrease" | "correction" | "return_in" | "return_out";
+    quantity?: number;
+    countedStock?: number;
+    reason?: string | null;
+    referenceType?: string | null;
+    referenceId?: string | null;
+    idempotencyKey: string;
+    metadata?: Record<string, unknown>;
+  },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      product: PortalProduct;
+      location: { id: string; name: string; code: string };
+      balance: { id: string; quantity: number };
+      movement: PortalInventoryMovement;
+      internalCode: string;
+      idempotent: boolean;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/products/${productId}/movements`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    }
+  );
 }
 
 export async function previewPortalCatalogBulkDelete(

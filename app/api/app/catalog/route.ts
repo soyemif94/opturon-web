@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       description: body?.description || null,
       price: Number(body?.price || 0),
       currency: String(body?.currency || "ARS"),
-      stock: Number(body?.stock ?? body?.stockQty ?? 0),
+      stock: 0,
       sku: body?.sku || null,
       categoryId: body?.categoryId || null,
       subcategory: body?.subcategory || null,

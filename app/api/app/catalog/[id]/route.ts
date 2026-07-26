@@ -66,7 +66,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body?.description !== undefined) payload.description = body.description || null;
     if (body?.price !== undefined) payload.price = Number(body.price);
     if (body?.currency !== undefined) payload.currency = String(body.currency || "ARS");
-    if (body?.stock !== undefined || body?.stockQty !== undefined) payload.stock = Number(body.stock ?? body.stockQty);
     if (body?.sku !== undefined) payload.sku = body.sku || null;
     if (body?.categoryId !== undefined) payload.categoryId = body.categoryId || null;
     if (body?.subcategory !== undefined) payload.subcategory = body.subcategory || null;
