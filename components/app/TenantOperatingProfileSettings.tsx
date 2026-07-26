@@ -33,7 +33,6 @@ const CAPABILITY_LABELS: Record<string, string> = {
 };
 
 const FUTURE_CAPABILITIES = new Set([
-  "inventory",
   "inventory_lots",
   "expiration_tracking",
   "suppliers",
@@ -49,6 +48,7 @@ const MODULE_LABELS: Record<string, string> = {
   inbox: "Inbox",
   contacts: "Contactos",
   catalog: "Catalogo",
+  inventory: "Inventario",
   orders: "Pedidos",
   invoices: "Comprobantes",
   payments: "Cobros",

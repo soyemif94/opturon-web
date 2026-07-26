@@ -67,7 +67,7 @@ const CAPABILITIES = [
   "whatsapp_documents"
 ] as const;
 
-const MODULES = ["inbox", "contacts", "catalog", "orders", "invoices", "payments", "cash", "sales", "agenda", "loyalty", "automations", "metrics"] as const;
+const MODULES = ["inbox", "contacts", "catalog", "inventory", "orders", "invoices", "payments", "cash", "sales", "agenda", "loyalty", "automations", "metrics"] as const;
 
 const OPERATING_PROFILE_OPTIONS = [
   { value: "wholesale_distribution", label: "Distribucion mayorista" },
@@ -95,7 +95,6 @@ const RECOMMENDED_CAPABILITIES_BY_PROFILE: Record<string, string[]> = {
 };
 
 const FUTURE_CAPABILITIES = new Set([
-  "inventory",
   "inventory_lots",
   "expiration_tracking",
   "suppliers",
@@ -119,6 +118,7 @@ const MODULE_LABELS: Record<(typeof MODULES)[number], string> = {
   contacts: "Contactos",
   agenda: "Agenda",
   catalog: "Catalogo",
+  inventory: "Inventario",
   orders: "Pedidos",
   invoices: "Comprobantes",
   cash: "Caja",

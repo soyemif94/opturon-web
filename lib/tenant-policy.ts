@@ -4,6 +4,7 @@ export const IMPLEMENTED_APP_MODULES = [
   "inbox",
   "contacts",
   "catalog",
+  "inventory",
   "orders",
   "invoices",
   "payments",
@@ -22,14 +23,14 @@ export const LEGACY_ALWAYS_VISIBLE_MODULES = [
   "settings",
   "users",
   "business",
-  "faqs",
-  "inventory"
+  "faqs"
 ] as const;
 
 export const APP_MODULE_TO_CAPABILITY: Partial<Record<AppModule, string>> = {
   inbox: "inbox",
   contacts: "contacts",
   catalog: "catalog",
+  inventory: "inventory",
   orders: "orders",
   invoices: "receipts",
   payments: "payments",

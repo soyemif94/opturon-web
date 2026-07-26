@@ -7,6 +7,7 @@ function testLegacyTenantKeepsPreviousNavigation() {
   assert.equal(modules.inbox, true);
   assert.equal(modules.orders, true);
   assert.equal(modules.settings, true);
+  assert.equal(modules.inventory, true);
 }
 
 function testExplicitPolicyRestrictsImplementedModulesOnly() {
@@ -61,6 +62,30 @@ function testFutureCapabilitiesDoNotCreateMenuItems() {
   assert.equal(Object.prototype.hasOwnProperty.call(modules, "suppliers"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(modules, "inventory_lots"), false);
   assert.equal(modules.inventory, true);
+}
+
+function testExplicitPolicyCanDisableInventoryModule() {
+  const modules = buildTenantAppModules({
+    policyVersion: 1,
+    planCode: "basic",
+    limits: {
+      maxPortalUsers: 5,
+      maxAutomations: 20,
+      maxContacts: 1000
+    },
+    operatingProfile: {
+      presetKey: "retail_commerce",
+      industryProfile: "retail_commerce",
+      operatingModel: "physical_goods"
+    },
+    recommendedCapabilities: ["inventory"],
+    capabilities: ["inventory"],
+    enabledModules: {
+      inventory: false
+    }
+  });
+
+  assert.equal(modules.inventory, false);
 }
 
 function testOwnerSeesAllGrantedImplementedModules() {
@@ -119,6 +144,7 @@ async function run() {
   testLegacyTenantKeepsPreviousNavigation();
   testExplicitPolicyRestrictsImplementedModulesOnly();
   testFutureCapabilitiesDoNotCreateMenuItems();
+  testExplicitPolicyCanDisableInventoryModule();
   testOwnerSeesAllGrantedImplementedModules();
   console.log("tenant-policy-modules.test.ts: ok");
 }

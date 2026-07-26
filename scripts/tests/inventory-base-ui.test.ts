@@ -18,6 +18,9 @@ assert.match(page, /InventoryBaseWorkspace/);
 assert.match(page, /InventoryLotsWorkspace/);
 assert.match(page, /getPortalInventoryProducts/);
 assert.match(page, /getPortalInventoryLots/);
+assert.match(page, /access_restricted/);
+assert.match(page, /Error al cargar inventario/);
+assert.match(page, /Inventario no esta habilitado para este tenant/);
 
 assert.match(workspace, /Buscar por nombre, c[oó]digo interno, SKU o barras/);
 assert.match(workspace, /<option value="with_stock">Con stock<\/option>/);
