@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, Boxes, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import type { PortalInventoryMovement, PortalInventoryProduct } from "@/lib/api";
 
 type MovementMode = "opening_balance" | "manual_increase" | "manual_decrease" | "correction";
+type InventoryActionPanel = "history" | "movement" | null;
 
 const EMPTY_HISTORY: PortalInventoryMovement[] = [];
 
@@ -25,6 +26,7 @@ export function InventoryBaseWorkspace({
   const [stockFilter, setStockFilter] = useState<"all" | "with_stock" | "without_stock">("all");
   const [loading, setLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<PortalInventoryProduct | null>(null);
+  const [activePanel, setActivePanel] = useState<InventoryActionPanel>(null);
   const [history, setHistory] = useState<PortalInventoryMovement[]>(EMPTY_HISTORY);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,6 +35,8 @@ export function InventoryBaseWorkspace({
   const [quantity, setQuantity] = useState("1");
   const [countedStock, setCountedStock] = useState("");
   const [reason, setReason] = useState("");
+  const detailsSectionRef = useRef<HTMLDivElement | null>(null);
+  const detailsHeadingRef = useRef<HTMLHeadingElement | null>(null);
 
   async function refreshProducts(nextSearch = search, nextFilter = stockFilter) {
     setLoading(true);
@@ -53,7 +57,8 @@ export function InventoryBaseWorkspace({
     }
   }
 
-  async function loadHistory(product: PortalInventoryProduct) {
+  async function openPanel(product: PortalInventoryProduct, nextPanel: Exclude<InventoryActionPanel, null>) {
+    setActivePanel(nextPanel);
     setHistoryLoading(true);
     setSelectedProduct(product);
     try {
@@ -78,6 +83,21 @@ export function InventoryBaseWorkspace({
     const refreshed = products.find((product) => product.id === selectedProduct.id) || null;
     if (refreshed) setSelectedProduct(refreshed);
   }, [products, selectedProduct]);
+
+  useEffect(() => {
+    if (!selectedProduct || !activePanel) return;
+    const section = detailsSectionRef.current;
+    if (!section) return;
+    const prefersReducedMotion =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        : false;
+    const frame = window.requestAnimationFrame(() => {
+      section.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+      detailsHeadingRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activePanel, selectedProduct?.id]);
 
   const currentStock = selectedProduct ? resolveStock(selectedProduct) : 0;
   const quantityNumber = Number(quantity || 0);
@@ -112,7 +132,7 @@ export function InventoryBaseWorkspace({
     }
 
     if (mode === "manual_decrease" && quantityNumber > currentStock) {
-      setFeedback(`No podés sacar más que el stock disponible (${currentStock}).`);
+      setFeedback(`No podes sacar mas que el stock disponible (${currentStock}).`);
       return;
     }
 
@@ -140,7 +160,7 @@ export function InventoryBaseWorkspace({
       if (!response.ok) throw new Error(json?.error || "No se pudo registrar el movimiento.");
       setFeedback("Movimiento registrado.");
       await refreshProducts();
-      await loadHistory({ ...selectedProduct, stock: Number(json?.balance?.quantity ?? resultingStock) });
+      await openPanel({ ...selectedProduct, stock: Number(json?.balance?.quantity ?? resultingStock) }, "movement");
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "No se pudo registrar el movimiento.");
     } finally {
@@ -148,22 +168,29 @@ export function InventoryBaseWorkspace({
     }
   }
 
+  function closeDetailsPanel() {
+    setActivePanel(null);
+    setSelectedProduct(null);
+    setHistory(EMPTY_HISTORY);
+    setHistoryLoading(false);
+  }
+
   return (
     <ClientPageShell
       title="Inventario"
-      description="Base operativa de stock con código interno, ubicación principal y ledger auditable."
+      description="Base operativa de stock con codigo interno, ubicacion principal y ledger auditable."
       badge="Inventario"
     >
       <div className="grid gap-4 md:grid-cols-3">
-        <SummaryCard label="Productos" value={String(summary.total)} helper="Catálogo visible en inventario" />
+        <SummaryCard label="Productos" value={String(summary.total)} helper="Catalogo visible en inventario" />
         <SummaryCard label="Con stock" value={String(summary.withStock)} helper="Disponibilidad positiva" />
-        <SummaryCard label="Sin stock" value={String(summary.withoutStock)} helper="Requieren reposición o corrección" />
+        <SummaryCard label="Sin stock" value={String(summary.withoutStock)} helper="Requieren reposicion o correccion" />
       </div>
 
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>Stock actual</CardTitle>
-          <CardDescription>Ubicación principal única por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
+          <CardDescription>Ubicacion principal unica por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
@@ -173,7 +200,7 @@ export function InventoryBaseWorkspace({
                 className="pl-9"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por nombre, código interno, SKU o barras"
+                placeholder="Buscar por nombre, codigo interno, SKU o barras"
               />
             </label>
             <select
@@ -196,12 +223,12 @@ export function InventoryBaseWorkspace({
             <table className="min-w-[980px] w-full text-left text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">Código</th>
+                  <th className="px-4 py-3">Codigo</th>
                   <th className="px-4 py-3">Producto</th>
-                  <th className="px-4 py-3">Categoría</th>
+                  <th className="px-4 py-3">Categoria</th>
                   <th className="px-4 py-3">Stock</th>
-                  <th className="px-4 py-3">Ubicación</th>
-                  <th className="px-4 py-3">Último movimiento</th>
+                  <th className="px-4 py-3">Ubicacion</th>
+                  <th className="px-4 py-3">Ultimo movimiento</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3">Acciones</th>
                 </tr>
@@ -223,10 +250,10 @@ export function InventoryBaseWorkspace({
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" variant="secondary" onClick={() => loadHistory(product)}>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => openPanel(product, "history")}>
                           Historial
                         </Button>
-                        <Button type="button" size="sm" onClick={() => loadHistory(product)} disabled={readOnly}>
+                        <Button type="button" size="sm" onClick={() => openPanel(product, "movement")} disabled={readOnly}>
                           Registrar movimiento
                         </Button>
                       </div>
@@ -246,95 +273,114 @@ export function InventoryBaseWorkspace({
         </CardContent>
       </Card>
 
-      {selectedProduct ? (
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Registrar movimiento</CardTitle>
-              <CardDescription>
-                {selectedProduct.name} · {selectedProduct.internalCode || "Sin código"} · stock actual {currentStock}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3">
-                <label className="grid gap-2 text-sm">
-                  <span>Tipo</span>
-                  <select
-                    className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
-                    value={mode}
-                    onChange={(event) => setMode(event.target.value as MovementMode)}
-                    disabled={readOnly || saving}
-                  >
-                    <option value="opening_balance">Carga inicial</option>
-                    <option value="manual_increase">Entrada</option>
-                    <option value="manual_decrease">Salida</option>
-                    <option value="correction">Ajuste por stock contado</option>
-                  </select>
-                </label>
+      {selectedProduct && activePanel ? (
+        <div ref={detailsSectionRef} className="mt-6 space-y-4">
+          <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Producto seleccionado</p>
+              <h2 ref={detailsHeadingRef} tabIndex={-1} className="mt-1 text-lg font-semibold focus:outline-none">
+                {selectedProduct.name}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {selectedProduct.internalCode || "Sin codigo"} · stock actual {currentStock}
+              </p>
+            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={closeDetailsPanel}>
+              Cerrar panel
+            </Button>
+          </div>
 
-                {mode === "correction" ? (
+          {activePanel === "movement" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Registrar movimiento</CardTitle>
+                <CardDescription>
+                  {selectedProduct.name} · {selectedProduct.internalCode || "Sin codigo"} · stock actual {currentStock}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3">
                   <label className="grid gap-2 text-sm">
-                    <span>Stock contado</span>
-                    <Input type="number" min="0" step="1" value={countedStock} onChange={(event) => setCountedStock(event.target.value)} disabled={readOnly || saving} />
+                    <span>Tipo</span>
+                    <select
+                      className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
+                      value={mode}
+                      onChange={(event) => setMode(event.target.value as MovementMode)}
+                      disabled={readOnly || saving}
+                    >
+                      <option value="opening_balance">Carga inicial</option>
+                      <option value="manual_increase">Entrada</option>
+                      <option value="manual_decrease">Salida</option>
+                      <option value="correction">Ajuste por stock contado</option>
+                    </select>
                   </label>
-                ) : (
+
+                  {mode === "correction" ? (
+                    <label className="grid gap-2 text-sm">
+                      <span>Stock contado</span>
+                      <Input type="number" min="0" step="1" value={countedStock} onChange={(event) => setCountedStock(event.target.value)} disabled={readOnly || saving} />
+                    </label>
+                  ) : (
+                    <label className="grid gap-2 text-sm">
+                      <span>Cantidad</span>
+                      <Input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={readOnly || saving} />
+                    </label>
+                  )}
+
                   <label className="grid gap-2 text-sm">
-                    <span>Cantidad</span>
-                    <Input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={readOnly || saving} />
+                    <span>Motivo {mode === "manual_decrease" || mode === "correction" ? "(obligatorio)" : "(opcional)"}</span>
+                    <Input value={reason} onChange={(event) => setReason(event.target.value)} disabled={readOnly || saving} placeholder="Ej. conteo fisico, merma, ingreso manual" />
                   </label>
-                )}
-
-                <label className="grid gap-2 text-sm">
-                  <span>Motivo {mode === "manual_decrease" || mode === "correction" ? "(obligatorio)" : "(opcional)"}</span>
-                  <Input value={reason} onChange={(event) => setReason(event.target.value)} disabled={readOnly || saving} placeholder="Ej. conteo físico, merma, ingreso manual" />
-                </label>
-              </div>
-
-              <div className="rounded-xl border border-[color:var(--border)] bg-muted/30 px-4 py-3 text-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">Saldo posterior</span>
-                  <span className="font-semibold">{Number.isFinite(resultingStock) ? resultingStock : "-"}</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">Diferencia</span>
-                  <span className="font-semibold">{Number.isFinite(deltaPreview) ? signed(deltaPreview) : "-"}</span>
+
+                <div className="rounded-xl border border-[color:var(--border)] bg-muted/30 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Saldo posterior</span>
+                    <span className="font-semibold">{Number.isFinite(resultingStock) ? resultingStock : "-"}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Diferencia</span>
+                    <span className="font-semibold">{Number.isFinite(deltaPreview) ? signed(deltaPreview) : "-"}</span>
+                  </div>
                 </div>
-              </div>
 
-              <Button type="button" className="w-full" onClick={submitMovement} disabled={readOnly || saving}>
-                {saving ? "Registrando..." : "Confirmar movimiento"}
-              </Button>
-            </CardContent>
-          </Card>
+                <Button type="button" className="w-full" onClick={submitMovement} disabled={readOnly || saving}>
+                  {saving ? "Registrando..." : "Confirmar movimiento"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Historial</CardTitle>
-              <CardDescription>Ledger inmutable del producto. Las correcciones futuras deben compensar, no editar.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {historyLoading ? <p className="text-sm text-muted-foreground">Cargando historial...</p> : null}
-              {!historyLoading && !history.length ? <p className="text-sm text-muted-foreground">Todavía no hay movimientos para este producto.</p> : null}
-              {history.map((movement) => (
-                <div key={movement.id} className="rounded-xl border border-[color:var(--border)] bg-muted/20 px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline">{movement.movementType}</Badge>
-                      <span className="font-medium">{signed(resolveSignedMovement(movement))}</span>
+          {activePanel === "history" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial</CardTitle>
+                <CardDescription>Ledger inmutable del producto. Las correcciones futuras deben compensar, no editar.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {historyLoading ? <p className="text-sm text-muted-foreground">Cargando historial...</p> : null}
+                {!historyLoading && !history.length ? <p className="text-sm text-muted-foreground">Todavia no hay movimientos para este producto.</p> : null}
+                {history.map((movement) => (
+                  <div key={movement.id} className="rounded-xl border border-[color:var(--border)] bg-muted/20 px-4 py-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{movement.movementType}</Badge>
+                        <span className="font-medium">{signed(resolveSignedMovement(movement))}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{formatDateTime(movement.createdAt)}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{formatDateTime(movement.createdAt)}</span>
+                    <div className="mt-2 grid gap-1 text-xs text-muted-foreground md:grid-cols-2">
+                      <span>Saldo anterior: {movement.quantityBefore ?? "-"}</span>
+                      <span>Saldo posterior: {movement.quantityAfter ?? "-"}</span>
+                      <span>Ubicacion: {movement.locationName || "Principal"}</span>
+                      <span>Referencia: {movement.referenceType || "-"}</span>
+                    </div>
+                    {movement.reason ? <p className="mt-2 text-sm">{movement.reason}</p> : null}
                   </div>
-                  <div className="mt-2 grid gap-1 text-xs text-muted-foreground md:grid-cols-2">
-                    <span>Saldo anterior: {movement.quantityBefore ?? "-"}</span>
-                    <span>Saldo posterior: {movement.quantityAfter ?? "-"}</span>
-                    <span>Ubicación: {movement.locationName || "Principal"}</span>
-                    <span>Referencia: {movement.referenceType || "-"}</span>
-                  </div>
-                  {movement.reason ? <p className="mt-2 text-sm">{movement.reason}</p> : null}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       ) : null}
     </ClientPageShell>
