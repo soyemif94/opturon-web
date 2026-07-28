@@ -16,9 +16,11 @@ const EMPTY_HISTORY: PortalInventoryMovement[] = [];
 
 export function InventoryBaseWorkspace({
   initialProducts,
+  tenantId = null,
   readOnly = false
 }: {
   initialProducts: PortalInventoryProduct[];
+  tenantId?: string | null;
   readOnly?: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts);
@@ -29,24 +31,74 @@ export function InventoryBaseWorkspace({
   const [activePanel, setActivePanel] = useState<InventoryActionPanel>(null);
   const [history, setHistory] = useState<PortalInventoryMovement[]>(EMPTY_HISTORY);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [mode, setMode] = useState<MovementMode>("opening_balance");
   const [quantity, setQuantity] = useState("1");
   const [countedStock, setCountedStock] = useState("");
   const [reason, setReason] = useState("");
+  const [movementAttemptKey, setMovementAttemptKey] = useState("");
   const detailsSectionRef = useRef<HTMLDivElement | null>(null);
   const detailsHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const historyRequestIdRef = useRef(0);
+
+  function buildInventoryUrl(path: string, params?: Record<string, string>) {
+    const search = new URLSearchParams(params);
+    if (tenantId) search.set("tenantId", tenantId);
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return `${path}${suffix}`;
+  }
+
+  function resetMovementDraft(product: PortalInventoryProduct) {
+    const stock = resolveStock(product);
+    setCountedStock(String(stock));
+    setQuantity("1");
+    setReason("");
+    setMode(stock > 0 ? "manual_increase" : "opening_balance");
+    setMovementAttemptKey(createMovementAttemptKey());
+  }
+
+  async function loadHistory(product: PortalInventoryProduct, options?: { surfaceError?: boolean }) {
+    const requestId = historyRequestIdRef.current + 1;
+    historyRequestIdRef.current = requestId;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const response = await fetch(
+        buildInventoryUrl(`/api/app/inventory/products/${product.id}/movements`, {
+          page: "1",
+          pageSize: "25"
+        }),
+        { cache: "no-store" }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo cargar historial.");
+      if (historyRequestIdRef.current !== requestId) return;
+      setHistory(Array.isArray(json?.movements) ? json.movements : EMPTY_HISTORY);
+    } catch (error) {
+      if (historyRequestIdRef.current !== requestId) return;
+      const message = error instanceof Error ? error.message : "No se pudo cargar historial.";
+      setHistory(EMPTY_HISTORY);
+      setHistoryError(message);
+      if (options?.surfaceError) setFeedback(message);
+    } finally {
+      if (historyRequestIdRef.current === requestId) {
+        setHistoryLoading(false);
+      }
+    }
+  }
 
   async function refreshProducts(nextSearch = search, nextFilter = stockFilter) {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set("page", "1");
-      params.set("pageSize", "100");
-      if (nextSearch.trim()) params.set("search", nextSearch.trim());
-      if (nextFilter !== "all") params.set("stockFilter", nextFilter);
-      const response = await fetch(`/api/app/inventory/products?${params.toString()}`, { cache: "no-store" });
+      const params: Record<string, string> = {
+        page: "1",
+        pageSize: "100"
+      };
+      if (nextSearch.trim()) params.search = nextSearch.trim();
+      if (nextFilter !== "all") params.stockFilter = nextFilter;
+      const response = await fetch(buildInventoryUrl("/api/app/inventory/products", params), { cache: "no-store" });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error || "No se pudo cargar inventario.");
       setProducts(Array.isArray(json?.products) ? json.products : []);
@@ -57,25 +109,14 @@ export function InventoryBaseWorkspace({
     }
   }
 
-  async function openPanel(product: PortalInventoryProduct, nextPanel: Exclude<InventoryActionPanel, null>) {
+  function openPanel(product: PortalInventoryProduct, nextPanel: Exclude<InventoryActionPanel, null>) {
+    setFeedback(null);
+    setHistory(EMPTY_HISTORY);
+    setHistoryError(null);
     setActivePanel(nextPanel);
-    setHistoryLoading(true);
     setSelectedProduct(product);
-    try {
-      const response = await fetch(`/api/app/inventory/products/${product.id}/movements?page=1&pageSize=25`, { cache: "no-store" });
-      const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(json?.error || "No se pudo cargar historial.");
-      setHistory(Array.isArray(json?.movements) ? json.movements : EMPTY_HISTORY);
-      setCountedStock(String(resolveStock(product)));
-      setQuantity("1");
-      setReason("");
-      setMode(resolveStock(product) > 0 ? "manual_increase" : "opening_balance");
-    } catch (error) {
-      setHistory(EMPTY_HISTORY);
-      setFeedback(error instanceof Error ? error.message : "No se pudo cargar historial.");
-    } finally {
-      setHistoryLoading(false);
-    }
+    resetMovementDraft(product);
+    void loadHistory(product, { surfaceError: nextPanel === "movement" });
   }
 
   useEffect(() => {
@@ -143,8 +184,10 @@ export function InventoryBaseWorkspace({
 
     setSaving(true);
     setFeedback(null);
+    const idempotencyKey = movementAttemptKey || createMovementAttemptKey();
+    if (!movementAttemptKey) setMovementAttemptKey(idempotencyKey);
     try {
-      const response = await fetch(`/api/app/inventory/products/${selectedProduct.id}/movements`, {
+      const response = await fetch(buildInventoryUrl(`/api/app/inventory/products/${selectedProduct.id}/movements`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,26 +195,28 @@ export function InventoryBaseWorkspace({
           quantity: mode === "correction" ? undefined : quantityNumber,
           countedStock: mode === "correction" ? countedStockNumber : undefined,
           reason: reason.trim() || null,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey,
           metadata: { source: "inventory_base_workspace" }
         })
       });
       const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(json?.error || "No se pudo registrar el movimiento.");
+      if (!response.ok) throw new Error(resolveMovementSubmitErrorMessage(json?.error));
       setFeedback("Movimiento registrado.");
       await refreshProducts();
-      await openPanel({ ...selectedProduct, stock: Number(json?.balance?.quantity ?? resultingStock) }, "movement");
+      openPanel({ ...selectedProduct, stock: Number(json?.balance?.quantity ?? resultingStock) }, "movement");
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "No se pudo registrar el movimiento.");
+      setFeedback(error instanceof Error ? error.message : resolveMovementSubmitErrorMessage());
     } finally {
       setSaving(false);
     }
   }
 
   function closeDetailsPanel() {
+    historyRequestIdRef.current += 1;
     setActivePanel(null);
     setSelectedProduct(null);
     setHistory(EMPTY_HISTORY);
+    setHistoryError(null);
     setHistoryLoading(false);
   }
 
@@ -299,6 +344,11 @@ export function InventoryBaseWorkspace({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {historyError ? (
+                  <div className="rounded-xl border border-[color:var(--border)] bg-muted/30 px-4 py-3 text-sm">
+                    No se pudo cargar historial. Podes registrar el movimiento igual y reintentar mas tarde.
+                  </div>
+                ) : null}
                 <div className="grid gap-3">
                   <label className="grid gap-2 text-sm">
                     <span>Tipo</span>
@@ -359,7 +409,15 @@ export function InventoryBaseWorkspace({
               </CardHeader>
               <CardContent className="space-y-3">
                 {historyLoading ? <p className="text-sm text-muted-foreground">Cargando historial...</p> : null}
-                {!historyLoading && !history.length ? <p className="text-sm text-muted-foreground">Todavia no hay movimientos para este producto.</p> : null}
+                {!historyLoading && historyError ? (
+                  <div className="rounded-xl border border-[color:var(--border)] bg-muted/30 px-4 py-3 text-sm">
+                    <p>{historyError}</p>
+                    <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={() => selectedProduct && void loadHistory(selectedProduct)}>
+                      Reintentar
+                    </Button>
+                  </div>
+                ) : null}
+                {!historyLoading && !historyError && !history.length ? <p className="text-sm text-muted-foreground">Todavia no hay movimientos para este producto.</p> : null}
                 {history.map((movement) => (
                   <div key={movement.id} className="rounded-xl border border-[color:var(--border)] bg-muted/20 px-4 py-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -423,6 +481,29 @@ function resolveSignedMovement(movement: PortalInventoryMovement) {
 function signed(value: number) {
   if (!Number.isFinite(value)) return "-";
   return value > 0 ? `+${value}` : String(value);
+}
+
+function createMovementAttemptKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `inventory-movement-${Date.now()}`;
+}
+
+function resolveMovementSubmitErrorMessage(errorCode?: string | null) {
+  if (
+    errorCode === "inventory_negative_stock_blocked" ||
+    errorCode === "inventory_opening_balance_already_exists" ||
+    errorCode === "inventory_zero_delta_not_allowed" ||
+    errorCode === "invalid_inventory_movement_type" ||
+    errorCode === "invalid_inventory_quantity" ||
+    errorCode === "invalid_inventory_counted_stock" ||
+    errorCode === "missing_inventory_idempotency_key" ||
+    errorCode === "portal_inventory_movement_create_failed"
+  ) {
+    return "No pudimos registrar el movimiento. El stock no fue modificado. Intentá nuevamente.";
+  }
+  return "No pudimos registrar el movimiento. El stock no fue modificado. Intentá nuevamente.";
 }
 
 function SummaryCard({ label, value, helper }: { label: string; value: string; helper: string }) {

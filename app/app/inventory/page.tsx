@@ -69,7 +69,7 @@ export default async function InventoryPage() {
 
   return (
     <>
-      <InventoryBaseWorkspace initialProducts={products} readOnly={!ctx.tenantId || readOnly} />
+      <InventoryBaseWorkspace initialProducts={products} tenantId={ctx.tenantId || null} readOnly={!ctx.tenantId || readOnly} />
       <InventoryLotsWorkspace initialLots={lots} readOnly={!ctx.tenantId || readOnly} />
     </>
   );
