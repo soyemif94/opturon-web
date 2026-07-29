@@ -3,6 +3,7 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, FileText, ImageIcon, Layers3, Package2, Save, Upload, Wallet } from "lucide-react";
+import { ProductSupplierSelect } from "@/components/app/ProductSupplierSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +28,7 @@ type ProductDraft = {
   barcode: string;
   unitOfMeasure: string;
   cost: string;
-  defaultSupplier: string;
+  defaultSupplierId: string;
   weight: string;
   weightUnit: string;
   presentation: string;
@@ -56,7 +57,7 @@ function buildInitialState(product: PortalProduct): ProductDraft {
     barcode: product.barcode || "",
     unitOfMeasure: product.unitOfMeasure || "",
     cost: product.cost == null ? "" : String(product.cost),
-    defaultSupplier: product.defaultSupplier || "",
+    defaultSupplierId: product.defaultSupplierId || "",
     weight: product.weight == null ? "" : String(product.weight),
     weightUnit: product.weightUnit || "",
     presentation: product.presentation || "",
@@ -198,7 +199,7 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
           barcode: draft.barcode.trim() || null,
           unitOfMeasure: draft.unitOfMeasure.trim() || null,
           cost,
-          defaultSupplier: draft.defaultSupplier.trim() || null,
+          defaultSupplierId: draft.defaultSupplierId || null,
           weight,
           weightUnit: draft.weightUnit.trim() || null,
           presentation: draft.presentation.trim() || null,
@@ -328,7 +329,14 @@ export function ProductEditor({ product }: { product: PortalProduct }) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Proveedor habitual</label>
-                <Input placeholder="Ej. Distribuidora Norte" value={draft.defaultSupplier} onChange={(event) => setDraft((current) => ({ ...current, defaultSupplier: event.target.value }))} disabled={saving || uploadingImage} />
+                <ProductSupplierSelect
+                  value={draft.defaultSupplierId}
+                  onChange={(value) => setDraft((current) => ({ ...current, defaultSupplierId: value }))}
+                  disabled={saving || uploadingImage}
+                  currentSupplierLabel={product.defaultSupplier}
+                  currentSupplierStatus={product.defaultSupplierStatus}
+                  legacySupplierLabel={product.defaultSupplierLegacyName}
+                />
               </div>
               <div className="grid gap-3 md:grid-cols-[1fr_0.8fr]">
                 <div className="space-y-2">

@@ -79,11 +79,21 @@ export async function POST(request: NextRequest) {
       stock: 0,
       sku: body?.sku || null,
       categoryId: body?.categoryId || null,
+      brand: body?.brand || null,
+      manufacturer: body?.manufacturer || null,
+      barcode: body?.barcode || null,
+      unitOfMeasure: body?.unitOfMeasure || null,
+      cost: body?.cost ?? null,
+      defaultSupplierId: body?.defaultSupplierId || null,
+      weight: body?.weight ?? null,
+      weightUnit: body?.weightUnit || null,
+      presentation: body?.presentation || null,
       subcategory: body?.subcategory || null,
-      attributes: Array.isArray(body?.attributes) ? body.attributes : [],
+      attributes: body?.attributes && typeof body.attributes === "object" ? body.attributes : [],
       image: body?.image || null,
       expirationDate: body?.expirationDate || null,
       discountPercentage: body?.discountPercentage ?? null,
+      vatRate: body?.vatRate ?? 0,
       status:
         typeof body?.status === "string"
           ? body.status
