@@ -4,7 +4,7 @@ import { ProductInventoryLotsPanel } from "@/components/app/ProductInventoryLots
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { canManageCatalog } from "@/lib/app-permissions";
+import { canManageCatalog, canManageInventoryReceipts, canManageInventorySensitive } from "@/lib/app-permissions";
 import { getPortalInventoryLots, getPortalProductDetail, isBackendConfigured, type PortalInventoryLot } from "@/lib/api";
 import { formatMoney, formatDateTimeLabel, titleCaseLabel } from "@/lib/billing";
 import { formatExpirationDate, getExpirationBadgePresentation } from "@/lib/product-expiration";
@@ -15,6 +15,9 @@ export default async function CatalogProductDetail({ params }: { params: Promise
   const ctx = await requireAppPage();
   const { id } = await params;
   const readOnly = !canManageCatalog(ctx);
+  const canReceiveLots = canManageInventoryReceipts(ctx);
+  const canManageSensitive = canManageInventorySensitive(ctx);
+  const inventoryReadOnly = !canReceiveLots && !canManageSensitive;
   let product = null;
   let lots: PortalInventoryLot[] = [];
 
@@ -147,7 +150,13 @@ export default async function CatalogProductDetail({ params }: { params: Promise
         </Card>
 
         <div className="xl:col-span-2">
-          <ProductInventoryLotsPanel product={product} initialLots={lots} readOnly={readOnly} />
+          <ProductInventoryLotsPanel
+            product={product}
+            initialLots={lots}
+            readOnly={inventoryReadOnly}
+            canManageReceipts={canReceiveLots}
+            canManageSensitive={canManageSensitive}
+          />
         </div>
       </div>
     </ClientPageShell>

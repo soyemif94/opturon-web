@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { type PortalInventoryExpirationSummary, type PortalInventoryExpirationThresholds, type PortalInventoryLot } from "@/lib/api";
+import { type PortalInventoryExpirationSummary, type PortalInventoryExpirationThresholds, type PortalInventoryLot, type PortalInventoryLotHistoryEntry } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const DEFAULT_THRESHOLDS: PortalInventoryExpirationThresholds = {
@@ -22,10 +22,14 @@ const WRITE_OFF_REASONS = ["Producto vencido", "Producto danado", "Merma", "Ajus
 
 export function InventoryLotsWorkspace({
   initialLots,
-  readOnly = false
+  readOnly = false,
+  canManageSensitive = false,
+  canManageReceipts = false
 }: {
   initialLots: PortalInventoryLot[];
   readOnly?: boolean;
+  canManageSensitive?: boolean;
+  canManageReceipts?: boolean;
 }) {
   const [lots, setLots] = useState(initialLots);
   const [summary, setSummary] = useState<PortalInventoryExpirationSummary | null>(null);
@@ -42,6 +46,7 @@ export function InventoryLotsWorkspace({
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [selectedLot, setSelectedLot] = useState<PortalInventoryLot | null>(null);
   const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
+  const [lotHistory, setLotHistory] = useState<PortalInventoryLotHistoryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -114,7 +119,7 @@ export function InventoryLotsWorkspace({
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > available) return;
     const reason = window.prompt(`Motivo (${WRITE_OFF_REASONS.join(", ")})`, lot.expirationStatus === "expired" ? "Producto vencido" : "Ajuste de inventario") || "Producto vencido";
     const notes = window.prompt("Notas opcionales", "") || "";
-    if (!window.confirm(`Confirmar baja de ${formatQuantity(quantity)} unidades del lote ${lot.lotNumber || "sin numero"}. Esta accion crea trazabilidad y no borra el lote.`)) return;
+    if (!window.confirm(`Confirmar baja de ${formatQuantity(quantity)} unidades del lote ${lot.lotNumber || "sin numero"}.`)) return;
 
     setSaving(true);
     setFeedback(null);
@@ -126,13 +131,13 @@ export function InventoryLotsWorkspace({
           movementType: "expired_writeoff",
           quantity,
           reason,
+          idempotencyKey: `lot-writeoff:${lot.id}:${quantity}:${reason}`,
           metadata: { notes, source: "inventory_expiration_ui" }
         })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error || "No se pudo registrar la baja.");
       setFeedback("Baja registrada con movimiento expired_writeoff.");
-      setSelectedLot(json?.lot || null);
       await refreshData();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "No se pudo registrar la baja.");
@@ -145,13 +150,12 @@ export function InventoryLotsWorkspace({
     const available = Number(lot.availableQuantity || 0);
     const quantity = Number(window.prompt(`Cantidad a descontar. Disponible: ${formatQuantity(available)}`, ""));
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > available) return;
-    if (!window.confirm(`Confirmar ajuste manual de ${formatQuantity(quantity)} unidades del lote ${lot.lotNumber || "sin numero"}.`)) return;
     setSaving(true);
     try {
       const response = await fetch(`/api/app/inventory/lots/${lot.id}/adjust`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ movementType: "manual_adjustment_out", quantity, reason: "Ajuste de inventario" })
+        body: JSON.stringify({ movementType: "manual_adjustment_out", quantity, reason: "Ajuste de inventario", idempotencyKey: `lot-adjust:${lot.id}:${quantity}` })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error || "No se pudo ajustar el lote.");
@@ -170,7 +174,7 @@ export function InventoryLotsWorkspace({
       return;
     }
     const total = selectedLots.reduce((sum, lot) => sum + Number(lot.availableQuantity || 0), 0);
-    if (!window.confirm(`Dar de baja completamente ${selectedLots.length} lotes vencidos (${formatQuantity(total)} unidades). No se borran lotes. Confirmar?`)) return;
+    if (!window.confirm(`Dar de baja completamente ${selectedLots.length} lotes vencidos (${formatQuantity(total)} unidades). Confirmar?`)) return;
     setSaving(true);
     try {
       const response = await fetch("/api/app/inventory/lots/bulk-writeoff-expired", {
@@ -215,6 +219,81 @@ export function InventoryLotsWorkspace({
     }
   }
 
+  async function viewHistory(lot: PortalInventoryLot) {
+    setSelectedLot(lot);
+    const response = await fetch(`/api/app/inventory/lots/${lot.id}/history?pageSize=20&offset=0`, { cache: "no-store" });
+    const json = await response.json().catch(() => null);
+    setLotHistory(Array.isArray(json?.history) ? json.history : []);
+  }
+
+  async function blockLot(lot: PortalInventoryLot) {
+    const reason = window.prompt("Motivo del bloqueo", "Retiro preventivo") || "";
+    if (!reason) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/app/inventory/lots/${lot.id}/block`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, idempotencyKey: `lot-block:${lot.id}:${reason}` })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo bloquear el lote.");
+      setFeedback("Lote bloqueado.");
+      await refreshData();
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo bloquear el lote.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function unblockLot(lot: PortalInventoryLot) {
+    const reason = window.prompt("Motivo del desbloqueo", "Liberado para uso") || "";
+    if (!reason) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/app/inventory/lots/${lot.id}/unblock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, idempotencyKey: `lot-unblock:${lot.id}:${reason}` })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo desbloquear el lote.");
+      setFeedback("Lote desbloqueado.");
+      await refreshData();
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo desbloquear el lote.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function editExpiration(lot: PortalInventoryLot) {
+    const nextValue = window.prompt("Nueva fecha de vencimiento YYYY-MM-DD. Deja vacio para quitarla.", lot.expiresAt || "") ?? lot.expiresAt ?? "";
+    const reason = window.prompt("Motivo del cambio", "Correccion operativa") || "";
+    if (!reason) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/app/inventory/lots/${lot.id}/expiration`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expiresAt: nextValue.trim() || null,
+          reason,
+          idempotencyKey: `lot-expiration:${lot.id}:${nextValue.trim() || "null"}:${reason}`
+        })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "No se pudo actualizar el vencimiento.");
+      setFeedback("Vencimiento actualizado.");
+      await refreshData();
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo actualizar el vencimiento.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <ClientPageShell
       title="Inventario por lotes"
@@ -243,9 +322,11 @@ export function InventoryLotsWorkspace({
               <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => refreshData()} disabled={refreshing}>
                 {refreshing ? "Actualizando..." : "Actualizar"}
               </Button>
-              <Button type="button" className="rounded-2xl" onClick={bulkWriteOff} disabled={readOnly || saving || !bulkEligible}>
-                Baja masiva vencidos
-              </Button>
+              {canManageSensitive ? (
+                <Button type="button" className="rounded-2xl" onClick={bulkWriteOff} disabled={readOnly || saving || !bulkEligible}>
+                  Baja masiva vencidos
+                </Button>
+              ) : null}
             </div>
           }
         >
@@ -295,13 +376,15 @@ export function InventoryLotsWorkspace({
           {feedback ? <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3 text-sm text-muted">{feedback}</div> : null}
 
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
-            <table className="min-w-[1080px] w-full text-left text-sm">
+            <table className="min-w-[1320px] w-full text-left text-sm">
               <thead className="bg-surface/70 text-xs uppercase tracking-[0.14em] text-muted">
                 <tr>
                   <th className="px-4 py-3">Sel</th>
                   <th className="px-4 py-3">Producto</th>
                   <th className="px-4 py-3">Lote</th>
-                  <th className="px-4 py-3">Stock disponible</th>
+                  <th className="px-4 py-3">Disponible</th>
+                  <th className="px-4 py-3">Fisico</th>
+                  <th className="px-4 py-3">Comprometido</th>
                   <th className="px-4 py-3">Vencimiento</th>
                   <th className="px-4 py-3">Dias restantes</th>
                   <th className="px-4 py-3">Deposito</th>
@@ -311,59 +394,75 @@ export function InventoryLotsWorkspace({
                 </tr>
               </thead>
               <tbody>
-                {visibleLots.length ? (
-                  visibleLots.map((lot) => (
-                    <tr key={lot.id} className="border-t border-[color:var(--border)]">
-                      <td className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedLotIds.includes(lot.id)}
-                          onChange={(event) =>
-                            setSelectedLotIds((current) => (event.target.checked ? [...current, lot.id] : current.filter((id) => id !== lot.id)))
-                          }
-                          disabled={lot.expirationStatus !== "expired" || Number(lot.availableQuantity || 0) <= 0}
-                          aria-label={`Seleccionar lote ${lot.lotNumber || lot.id}`}
-                        />
-                      </td>
-                      <td className="px-4 py-4">
-                        <Link href={`/app/catalog/${lot.productId}`} className="font-medium text-foreground hover:underline">
-                          {lot.productName || "Producto"}
-                        </Link>
-                        <p className="mt-1 text-xs text-muted">{lot.productSku || "Sin SKU"}</p>
-                      </td>
-                      <td className="px-4 py-4">{lot.lotNumber || "Sin numero"}</td>
-                      <td className="px-4 py-4 font-semibold">{formatQuantity(lot.availableQuantity)}</td>
-                      <td className="px-4 py-4">{formatDate(lot.expiresAt)}</td>
-                      <td className="px-4 py-4">{remainingDaysLabel(lot)}</td>
-                      <td className="px-4 py-4 text-muted">{lot.warehouseName || "-"}</td>
-                      <td className="px-4 py-4 text-muted">{lot.locationName || "-"}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={lot.status === "active" ? "success" : lot.status === "expired" ? "danger" : "muted"}>{statusLabel(lot.status)}</Badge>
-                          <Badge variant={expirationVariant(lot.expirationStatus)}>{expirationDisplayLabel(lot)}</Badge>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => setSelectedLot(lot)}>
-                            Ver lote
-                          </Button>
+                {visibleLots.length ? visibleLots.map((lot) => (
+                  <tr key={lot.id} className="border-t border-[color:var(--border)]">
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedLotIds.includes(lot.id)}
+                        onChange={(event) => setSelectedLotIds((current) => (event.target.checked ? [...current, lot.id] : current.filter((id) => id !== lot.id)))}
+                        disabled={lot.expirationStatus !== "expired" || Number(lot.availableQuantity || 0) <= 0}
+                        aria-label={`Seleccionar lote ${lot.lotNumber || lot.id}`}
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/app/catalog/${lot.productId}`} className="font-medium text-foreground hover:underline">
+                        {lot.productName || "Producto"}
+                      </Link>
+                      <p className="mt-1 text-xs text-muted">{lot.productSku || "Sin SKU"}</p>
+                    </td>
+                    <td className="px-4 py-4">{lot.lotNumber || "Sin numero"}</td>
+                    <td className="px-4 py-4 font-semibold">{formatQuantity(Number((lot.availableCommercialQuantity ?? lot.availableQuantity) || 0))}</td>
+                    <td className="px-4 py-4">{formatQuantity(Number((lot.physicalQuantity ?? lot.availableQuantity) || 0))}</td>
+                    <td className="px-4 py-4">{formatQuantity(Number(lot.committedQuantity || 0))}</td>
+                    <td className="px-4 py-4">{formatDate(lot.expiresAt)}</td>
+                    <td className="px-4 py-4">{remainingDaysLabel(lot)}</td>
+                    <td className="px-4 py-4 text-muted">{lot.warehouseName || "-"}</td>
+                    <td className="px-4 py-4 text-muted">{lot.locationName || "Ubicacion historica"}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={lot.status === "active" ? "success" : lot.status === "blocked" ? "warning" : lot.status === "written_off" ? "danger" : "muted"}>{statusLabel(lot.status)}</Badge>
+                        <Badge variant={expirationVariant(lot.expirationStatus)}>{expirationDisplayLabel(lot)}</Badge>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => viewHistory(lot)}>
+                          Historial
+                        </Button>
+                        {canManageSensitive ? (
                           <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => writeOffLot(lot)} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
                             Dar de baja
                           </Button>
+                        ) : null}
+                        {canManageSensitive ? (
                           <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot)} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
                             Ajustar stock
                           </Button>
-                          <Link className="inline-flex items-center gap-1 rounded-2xl border border-[color:var(--border)] px-3 py-2 text-xs font-medium text-muted hover:text-text" href={`/app/catalog/${lot.productId}`}>
-                            Ver producto <ArrowRight className="size-3" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
+                        ) : null}
+                        {canManageSensitive && lot.status === "blocked" ? (
+                          <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => unblockLot(lot)} disabled={readOnly || saving}>
+                            Desbloquear
+                          </Button>
+                        ) : canManageSensitive ? (
+                          <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => blockLot(lot)} disabled={readOnly || saving || lot.status === "written_off" || lot.status === "cancelled"}>
+                            Bloquear
+                          </Button>
+                        ) : null}
+                        {canManageSensitive ? (
+                          <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => editExpiration(lot)} disabled={readOnly || saving}>
+                            Editar venc.
+                          </Button>
+                        ) : null}
+                        <Link className="inline-flex items-center gap-1 rounded-2xl border border-[color:var(--border)] px-3 py-2 text-xs font-medium text-muted hover:text-text" href={`/app/catalog/${lot.productId}`}>
+                          Ver producto <ArrowRight className="size-3" />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                )) : (
                   <tr>
-                    <td colSpan={10} className="px-4 py-10 text-center text-sm text-muted">
+                    <td colSpan={12} className="px-4 py-10 text-center text-sm text-muted">
                       {readOnly ? "No hay lotes para consultar." : "No encontramos lotes con estos filtros. Proba limpiar la busqueda o revisar productos con inventario por lotes."}
                     </td>
                   </tr>
@@ -372,7 +471,7 @@ export function InventoryLotsWorkspace({
             </table>
           </div>
 
-          {selectedLot ? <LotDetailCard lot={selectedLot} onWriteOff={() => writeOffLot(selectedLot)} readOnly={readOnly || saving} /> : null}
+          {selectedLot ? <LotDetailCard lot={selectedLot} history={lotHistory} onWriteOff={() => writeOffLot(selectedLot)} readOnly={readOnly || saving} /> : null}
         </CardContent>
       </Card>
 
@@ -380,7 +479,7 @@ export function InventoryLotsWorkspace({
         <CardHeader action={<Settings2 className="size-5 text-muted" />}>
           <div>
             <CardTitle>Configuracion de alertas</CardTitle>
-            <CardDescription>Avisarme cuando falten dias para el vencimiento. No se guardan estados temporales en la base.</CardDescription>
+            <CardDescription>Avisarme cuando falten dias para el vencimiento.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
@@ -394,9 +493,11 @@ export function InventoryLotsWorkspace({
             <p className="text-sm text-muted">
               Actual: {thresholds.criticalDays} dias critico, {thresholds.urgentDays} urgente, {thresholds.warningDays} preventivo, {thresholds.upcomingDays} proximo.
             </p>
-            <Button type="button" className="rounded-2xl" onClick={saveThresholds} disabled={readOnly || saving}>
-              Guardar configuracion
-            </Button>
+            {canManageSensitive ? (
+              <Button type="button" className="rounded-2xl" onClick={saveThresholds} disabled={readOnly || saving}>
+                Guardar configuracion
+              </Button>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -437,7 +538,7 @@ function ExpirationCard({
   );
 }
 
-function LotDetailCard({ lot, onWriteOff, readOnly }: { lot: PortalInventoryLot; onWriteOff: () => void; readOnly: boolean }) {
+function LotDetailCard({ lot, history, onWriteOff, readOnly }: { lot: PortalInventoryLot; history: PortalInventoryLotHistoryEntry[]; onWriteOff: () => void; readOnly: boolean }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -445,12 +546,20 @@ function LotDetailCard({ lot, onWriteOff, readOnly }: { lot: PortalInventoryLot;
           <p className="text-xs uppercase tracking-[0.16em] text-muted">Estado del vencimiento</p>
           <h3 className="mt-1 text-xl font-semibold">{stateTitle(lot.expirationStatus)}</h3>
           <p className="mt-1 text-sm text-muted">
-            Lote {lot.lotNumber || "sin numero"} | {expirationDisplayLabel(lot)} | Disponible {formatQuantity(lot.availableQuantity)}
+            Lote {lot.lotNumber || "sin numero"} | {expirationDisplayLabel(lot)} | Disponible {formatQuantity(Number((lot.availableCommercialQuantity ?? lot.availableQuantity) || 0))}
           </p>
         </div>
         <Button type="button" className="rounded-2xl" onClick={onWriteOff} disabled={readOnly || Number(lot.availableQuantity || 0) <= 0}>
           Dar de baja stock vencido
         </Button>
+      </div>
+      <div className="mt-4 space-y-2">
+        <p className="text-xs uppercase tracking-[0.16em] text-muted">Historial reciente</p>
+        {history.length ? history.map((entry) => (
+          <div key={entry.id} className="rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm text-muted">
+            <span className="font-medium text-foreground">{entry.type}</span> | {entry.reason || "Sin motivo"} | {entry.createdAt?.slice(0, 19).replace("T", " ")}
+          </div>
+        )) : <p className="text-sm text-muted">Todavia no cargamos historial para este lote.</p>}
       </div>
     </div>
   );
@@ -467,7 +576,7 @@ function ThresholdInput({ label, value, onChange }: { label: string; value: numb
 }
 
 function buildSummary(lots: PortalInventoryLot[]): PortalInventoryExpirationSummary {
-  const stockLots = lots.filter((lot) => Number(lot.availableQuantity || 0) > 0 && !["cancelled", "depleted", "quarantined"].includes(lot.status));
+  const stockLots = lots.filter((lot) => Number(lot.availableQuantity || 0) > 0 && !["cancelled", "depleted", "blocked", "written_off"].includes(lot.status));
   return {
     expiredLots: lots.filter((lot) => lot.expirationStatus === "expired").length,
     expiringTodayLots: lots.filter((lot) => lot.expirationStatus === "today").length,
@@ -537,11 +646,11 @@ function stateTitle(status: PortalInventoryLot["expirationStatus"]) {
 }
 
 function statusLabel(status: PortalInventoryLot["status"]) {
-  const labels = {
+  const labels: Record<PortalInventoryLot["status"], string> = {
     active: "Activo",
     depleted: "Agotado",
-    expired: "Vencido",
-    quarantined: "Cuarentena",
+    blocked: "Bloqueado",
+    written_off: "Dado de baja",
     cancelled: "Cancelado"
   };
   return labels[status] || status;

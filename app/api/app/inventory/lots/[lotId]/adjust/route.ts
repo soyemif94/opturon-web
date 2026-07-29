@@ -8,7 +8,7 @@ function noStore(response: NextResponse) {
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ lotId: string }> }) {
-  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
+  const tenantContext = await resolveAppTenant({ permission: "manage_inventory_sensitive", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) {
     return noStore(NextResponse.json({ error: "inventory_backend_unavailable" }, { status: 503 }));
@@ -17,14 +17,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { lotId } = await params;
   try {
     const body = await request.json().catch(() => null);
+    const actor = {
+      id: tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId || null,
+      name: tenantContext.ctx?.session?.user?.name || null
+    };
     const result = await adjustPortalInventoryLot(tenantContext.tenantId, lotId, {
       movementType: body?.movementType || "manual_adjustment_out",
       quantity: Number(body?.quantity || 0),
       reason: body?.reason || null,
       referenceType: body?.referenceType || null,
       referenceId: body?.referenceId || null,
+      idempotencyKey: body?.idempotencyKey || null,
       metadata: body?.metadata && typeof body.metadata === "object" ? body.metadata : {}
-    });
+    }, actor);
     return noStore(NextResponse.json({ ok: true, lot: result.data.lot, movement: result.data.movement }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

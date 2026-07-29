@@ -7,7 +7,9 @@ export type AppPermission =
   | "edit_workspace"
   | "manage_workspace"
   | "manage_users"
-  | "manage_catalog";
+  | "manage_catalog"
+  | "manage_inventory_receipts"
+  | "manage_inventory_sensitive";
 export type AppModule =
   | "home"
   | "inbox"
@@ -46,28 +48,36 @@ const TENANT_ROLE_PERMISSIONS: Record<TenantRole, Record<AppPermission, boolean>
     edit_workspace: true,
     manage_workspace: true,
     manage_users: true,
-    manage_catalog: true
+    manage_catalog: true,
+    manage_inventory_receipts: true,
+    manage_inventory_sensitive: true
   },
   manager: {
     view_workspace: true,
     edit_workspace: true,
     manage_workspace: true,
     manage_users: false,
-    manage_catalog: true
+    manage_catalog: true,
+    manage_inventory_receipts: true,
+    manage_inventory_sensitive: true
   },
   seller: {
     view_workspace: true,
     edit_workspace: true,
     manage_workspace: false,
     manage_users: false,
-    manage_catalog: false
+    manage_catalog: false,
+    manage_inventory_receipts: true,
+    manage_inventory_sensitive: false
   },
   viewer: {
     view_workspace: true,
     edit_workspace: false,
     manage_workspace: false,
     manage_users: false,
-    manage_catalog: false
+    manage_catalog: false,
+    manage_inventory_receipts: false,
+    manage_inventory_sensitive: false
   }
 };
 
@@ -133,4 +143,12 @@ export function canManageUsers(context: AccessContext) {
 
 export function canManageCatalog(context: AccessContext) {
   return hasAppPermission(context, "manage_catalog");
+}
+
+export function canManageInventoryReceipts(context: AccessContext) {
+  return hasAppPermission(context, "manage_inventory_receipts");
+}
+
+export function canManageInventorySensitive(context: AccessContext) {
+  return hasAppPermission(context, "manage_inventory_sensitive");
 }

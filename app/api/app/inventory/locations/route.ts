@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  createPortalInventoryLocation,
   getBackendErrorBody,
   getBackendErrorStatus,
-  getPortalInventoryExpirationSettings,
-  isBackendConfigured,
-  updatePortalInventoryExpirationSettings
+  getPortalInventoryLocations,
+  isBackendConfigured
 } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 
@@ -13,30 +13,23 @@ function noStore(response: NextResponse) {
   return response;
 }
 
-export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  const tenantContext = await resolveAppTenant({
-    requestedTenantId: url.searchParams.get("tenantId") || undefined,
-    demo: url.searchParams.get("demo") === "1"
-  });
+export async function GET() {
+  const tenantContext = await resolveAppTenant();
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return noStore(NextResponse.json({ error: "inventory_backend_unavailable" }, { status: 503 }));
 
   try {
-    const result = await getPortalInventoryExpirationSettings(tenantContext.tenantId);
-    return noStore(NextResponse.json(result.data));
+    const result = await getPortalInventoryLocations(tenantContext.tenantId);
+    return noStore(NextResponse.json({ locations: result.data.locations || [], readOnly: tenantContext.readOnly }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);
     return noStore(
-      NextResponse.json(
-        backendBody && typeof backendBody === "object" ? backendBody : { error: error instanceof Error ? error.message : "backend_fetch_failed" },
-        { status: getBackendErrorStatus(error) || 502 }
-      )
+      NextResponse.json(backendBody && typeof backendBody === "object" ? backendBody : { error: "backend_fetch_failed" }, { status: getBackendErrorStatus(error) || 502 })
     );
   }
 }
 
-export async function PUT(request: NextRequest) {
+export async function POST(request: NextRequest) {
   const tenantContext = await resolveAppTenant({ permission: "manage_inventory_sensitive", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return noStore(NextResponse.json({ error: "inventory_backend_unavailable" }, { status: 503 }));
@@ -47,15 +40,17 @@ export async function PUT(request: NextRequest) {
       id: tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId || null,
       name: tenantContext.ctx?.session?.user?.name || null
     };
-    const result = await updatePortalInventoryExpirationSettings(tenantContext.tenantId, body?.expirationAlertThresholds || body, actor);
-    return noStore(NextResponse.json(result.data));
+    const result = await createPortalInventoryLocation(tenantContext.tenantId, {
+      code: body?.code || null,
+      name: body?.name || "",
+      type: body?.type || "other",
+      active: body?.active !== false
+    }, actor);
+    return noStore(NextResponse.json({ ok: true, location: result.data.location }, { status: 201 }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);
     return noStore(
-      NextResponse.json(
-        backendBody && typeof backendBody === "object" ? backendBody : { error: error instanceof Error ? error.message : "backend_update_failed" },
-        { status: getBackendErrorStatus(error) || 502 }
-      )
+      NextResponse.json(backendBody && typeof backendBody === "object" ? backendBody : { error: "backend_create_failed" }, { status: getBackendErrorStatus(error) || 502 })
     );
   }
 }

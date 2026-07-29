@@ -62,14 +62,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
+  const tenantContext = await resolveAppTenant({ permission: "manage_inventory_receipts", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
     const body = await request.json().catch(() => null);
+    const actor = {
+      id: tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId || null,
+      name: tenantContext.ctx?.session?.user?.name || null
+    };
     const result = await createPortalInventoryLot(tenantContext.tenantId, {
       productId: String(body?.productId || "").trim(),
+      locationId: String(body?.locationId || "").trim(),
       lotNumber: body?.lotNumber || null,
       supplierName: body?.supplierName || null,
       receivedAt: body?.receivedAt || null,
@@ -80,8 +85,9 @@ export async function POST(request: NextRequest) {
       warehouseName: body?.warehouseName || null,
       locationName: body?.locationName || null,
       notes: body?.notes || null,
+      idempotencyKey: body?.idempotencyKey || null,
       metadata: body?.metadata && typeof body.metadata === "object" ? body.metadata : {}
-    });
+    }, actor);
     return noStore(NextResponse.json({ ok: true, lot: result.data }, { status: 201 }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

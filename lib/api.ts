@@ -2024,16 +2024,28 @@ export type PortalInventoryLot = {
   productName?: string | null;
   productSku?: string | null;
   lotNumber?: string | null;
+  normalizedLotNumber?: string | null;
   supplierName?: string | null;
   receivedAt: string;
   manufacturedAt?: string | null;
   expiresAt?: string | null;
   initialQuantity: number;
   availableQuantity: number;
+  committedQuantity?: number;
+  physicalQuantity?: number;
+  availableCommercialQuantity?: number;
   unitCost?: number | null;
   warehouseName?: string | null;
   locationName?: string | null;
-  status: "active" | "depleted" | "expired" | "quarantined" | "cancelled";
+  locationId?: string | null;
+  locationCode?: string | null;
+  status: "active" | "depleted" | "blocked" | "written_off" | "cancelled";
+  legacyStatus?: "active" | "depleted" | "expired" | "quarantined" | "cancelled";
+  operationalStatus?: "active" | "blocked" | "written_off" | "cancelled";
+  blockedAt?: string | null;
+  blockReason?: string | null;
+  writtenOffAt?: string | null;
+  writeoffReason?: string | null;
   expirationStatus: "no_expiration" | "expired" | "today" | "critical" | "urgent" | "warning" | "upcoming" | "normal";
   daysUntilExpiration?: number | null;
   expirationLabel?: string | null;
@@ -2079,6 +2091,33 @@ export type PortalInventoryMovement = {
   status?: "posted" | "reversed";
 };
 
+export type PortalInventoryLocation = {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  type: "main" | "warehouse" | "shelf" | "other";
+  isPrimary: boolean;
+  active: boolean;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PortalInventoryLotHistoryEntry = {
+  id: string;
+  kind: "movement" | "operation";
+  type: string;
+  quantity?: number | null;
+  quantityBefore?: number | null;
+  quantityAfter?: number | null;
+  reason?: string | null;
+  metadata?: Record<string, unknown>;
+  createdBy?: string | null;
+  createdAt: string;
+  locationName?: string | null;
+};
+
 export type PortalInventoryProduct = PortalProduct & {
   locationId?: string | null;
   locationName?: string | null;
@@ -2101,6 +2140,10 @@ export type PortalInventoryExpirationSummary = {
   urgentLots: number;
   warningLots: number;
   upcomingLots: number;
+  blockedLots?: number;
+  stockOnlyExpiredLots?: number;
+  inconsistentLots?: number;
+  lotsWithoutLocation?: number;
   unitsAtRisk7Days: number;
   unitsExpired: number;
   unitsAtRisk30Days?: number;
@@ -3265,8 +3308,15 @@ export async function getPortalInventoryExpirationSettings(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/inventory/expiration-settings`, undefined, false);
 }
 
-export async function updatePortalInventoryExpirationSettings(tenantId: string, expirationAlertThresholds: PortalInventoryExpirationThresholds) {
-  return backendFetch<{
+export async function updatePortalInventoryExpirationSettings(
+  tenantId: string,
+  expirationAlertThresholds: PortalInventoryExpirationThresholds,
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -3277,18 +3327,22 @@ export async function updatePortalInventoryExpirationSettings(tenantId: string, 
   }>(
     `/portal/tenants/${tenantId}/inventory/expiration-settings`,
     {
+      headers,
       method: "PUT",
       body: JSON.stringify({ expirationAlertThresholds })
-    },
-    false
+    }
   );
 }
 
 export async function bulkWriteoffExpiredPortalInventoryLots(
   tenantId: string,
-  payload: { lotIds: string[]; reason?: string | null; notes?: string | null }
+  payload: { lotIds: string[]; reason?: string | null; notes?: string | null },
+  actor?: { id?: string | null; name?: string | null }
 ) {
-  return backendFetch<{
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -3297,10 +3351,10 @@ export async function bulkWriteoffExpiredPortalInventoryLots(
   }>(
     `/portal/tenants/${tenantId}/inventory/lots/bulk-writeoff-expired`,
     {
+      headers,
       method: "POST",
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
@@ -3314,10 +3368,80 @@ export async function getPortalInventoryLotDetail(tenantId: string, lotId: strin
   }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}`, undefined, false);
 }
 
+export async function getPortalInventoryLotHistory(tenantId: string, lotId: string, options?: { pageSize?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  if (options?.offset) params.set("offset", String(options.offset));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      history: PortalInventoryLotHistoryEntry[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}/history${suffix}`, undefined, false);
+}
+
+export async function getPortalInventoryLocations(tenantId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: {
+      locations: PortalInventoryLocation[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/locations`, undefined, false);
+}
+
+export async function createPortalInventoryLocation(
+  tenantId: string,
+  payload: { code?: string | null; name: string; type?: PortalInventoryLocation["type"]; active?: boolean },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      location: PortalInventoryLocation;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/locations`,
+    {
+      headers,
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function updatePortalInventoryLocation(
+  tenantId: string,
+  locationId: string,
+  payload: { code?: string | null; name?: string | null; type?: PortalInventoryLocation["type"]; active?: boolean },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      location: PortalInventoryLocation;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/locations/${locationId}`,
+    {
+      headers,
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
 export async function createPortalInventoryLot(
   tenantId: string,
   payload: {
     productId: string;
+    locationId: string;
     lotNumber?: string | null;
     supplierName?: string | null;
     receivedAt?: string | null;
@@ -3328,16 +3452,21 @@ export async function createPortalInventoryLot(
     warehouseName?: string | null;
     locationName?: string | null;
     notes?: string | null;
+    idempotencyKey?: string | null;
     metadata?: Record<string, unknown>;
-  }
+  },
+  actor?: { id?: string | null; name?: string | null }
 ) {
-  return backendFetch<{ success: boolean; data: PortalInventoryLot }>(
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalInventoryLot }>(
     `/portal/tenants/${tenantId}/inventory/lots`,
     {
+      headers,
       method: "POST",
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
@@ -3350,10 +3479,15 @@ export async function adjustPortalInventoryLot(
     reason?: string | null;
     referenceType?: string | null;
     referenceId?: string | null;
+    idempotencyKey?: string | null;
     metadata?: Record<string, unknown>;
-  }
+  },
+  actor?: { id?: string | null; name?: string | null }
 ) {
-  return backendFetch<{
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
     success: boolean;
     data: {
       lot: PortalInventoryLot;
@@ -3362,10 +3496,10 @@ export async function adjustPortalInventoryLot(
   }>(
     `/portal/tenants/${tenantId}/inventory/lots/${lotId}/adjust`,
     {
+      headers,
       method: "POST",
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
@@ -4205,6 +4339,81 @@ export async function analyzePortalCatalogImport(
     headers,
     body: formData
   });
+}
+
+export async function blockPortalInventoryLot(
+  tenantId: string,
+  lotId: string,
+  payload: { reason: string; idempotencyKey: string },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      lot: PortalInventoryLot;
+      idempotent?: boolean;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/lots/${lotId}/block`,
+    {
+      headers,
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function unblockPortalInventoryLot(
+  tenantId: string,
+  lotId: string,
+  payload: { reason: string; idempotencyKey: string },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      lot: PortalInventoryLot;
+      idempotent?: boolean;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/lots/${lotId}/unblock`,
+    {
+      headers,
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function updatePortalInventoryLotExpiration(
+  tenantId: string,
+  lotId: string,
+  payload: { expiresAt?: string | null; reason: string; idempotencyKey: string },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      lot: PortalInventoryLot;
+      idempotent?: boolean;
+    };
+  }>(
+    `/portal/tenants/${tenantId}/inventory/lots/${lotId}/expiration`,
+    {
+      headers,
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }
+  );
 }
 
 export async function listPortalCatalogImports(tenantId: string, options?: { limit?: number }) {

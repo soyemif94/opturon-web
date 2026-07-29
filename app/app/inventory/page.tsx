@@ -1,6 +1,6 @@
 import { InventoryBaseWorkspace } from "@/components/app/InventoryBaseWorkspace";
 import { InventoryLotsWorkspace } from "@/components/app/InventoryLotsWorkspace";
-import { canManageCatalog } from "@/lib/app-permissions";
+import { canManageCatalog, canManageInventoryReceipts, canManageInventorySensitive } from "@/lib/app-permissions";
 import {
   getBackendErrorBody,
   getBackendErrorStatus,
@@ -14,7 +14,9 @@ import { requireAppModulePage } from "@/lib/saas/access";
 
 export default async function InventoryPage() {
   const ctx = await requireAppModulePage("inventory");
-  const readOnly = !canManageCatalog(ctx);
+  const canReceiveLots = canManageInventoryReceipts(ctx);
+  const canManageSensitive = canManageInventorySensitive(ctx);
+  const readOnly = !canReceiveLots && !canManageSensitive;
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: PortalInventoryProduct[] = [];
   let lots: PortalInventoryLot[] = [];
@@ -70,7 +72,12 @@ export default async function InventoryPage() {
   return (
     <>
       <InventoryBaseWorkspace initialProducts={products} tenantId={ctx.tenantId || null} readOnly={!ctx.tenantId || readOnly} />
-      <InventoryLotsWorkspace initialLots={lots} readOnly={!ctx.tenantId || readOnly} />
+      <InventoryLotsWorkspace
+        initialLots={lots}
+        readOnly={!ctx.tenantId || readOnly}
+        canManageSensitive={canManageSensitive}
+        canManageReceipts={canReceiveLots}
+      />
     </>
   );
 }
