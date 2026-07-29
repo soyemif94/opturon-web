@@ -429,6 +429,7 @@ export function InventoryLotsWorkspace({
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => viewHistory(lot)}>
                           Historial
+                          <span className="sr-only">Ver lote</span>
                         </Button>
                         {canManageSensitive ? (
                           <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => writeOffLot(lot)} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>

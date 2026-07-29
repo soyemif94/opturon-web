@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { type PortalInventoryLocation, type PortalInventoryLot, type PortalProduct } from "@/lib/api";
+import { type PortalInventoryLocation, type PortalInventoryLot, type PortalInventoryLotHistoryEntry, type PortalProduct } from "@/lib/api";
+import { buildLotMutationPayload, createLotMutationAttemptKey, getLotActionAvailability, getLotActorName, sanitizeLotMutationError } from "@/lib/inventory-lot-ui";
 
 type LotDraft = {
   lotNumber: string;
@@ -46,10 +48,21 @@ export function ProductInventoryLotsPanel({
   canManageSensitive?: boolean;
 }) {
   const [lots, setLots] = useState(initialLots);
+  const [lotHistoryById, setLotHistoryById] = useState<Record<string, PortalInventoryLotHistoryEntry[]>>({});
   const [locations, setLocations] = useState<PortalInventoryLocation[]>([]);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [lotDialog, setLotDialog] = useState<
+    | null
+    | {
+        kind: "block" | "unblock";
+        lot: PortalInventoryLot;
+        reason: string;
+        error: string | null;
+      }
+  >(null);
+  const [busyLotAction, setBusyLotAction] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchLocations();
@@ -82,6 +95,14 @@ export function ProductInventoryLotsPanel({
     const response = await fetch(`/api/app/inventory/lots?productId=${product.id}&pageSize=100`, { cache: "no-store" });
     const json = await response.json().catch(() => null);
     if (response.ok && Array.isArray(json?.lots)) setLots(json.lots);
+  }
+
+  async function refreshLotHistory(lotId: string) {
+    const response = await fetch(`/api/app/inventory/lots/${lotId}/history?pageSize=20&offset=0`, { cache: "no-store" });
+    const json = await response.json().catch(() => null);
+    if (response.ok && Array.isArray(json?.history)) {
+      setLotHistoryById((current) => ({ ...current, [lotId]: json.history }));
+    }
   }
 
   async function activateLotMode() {
@@ -215,129 +236,255 @@ export function ProductInventoryLotsPanel({
     }
   }
 
+  function openBlockDialog(lot: PortalInventoryLot) {
+    setLotDialog({ kind: "block", lot, reason: "", error: null });
+  }
+
+  function openUnblockDialog(lot: PortalInventoryLot) {
+    setLotDialog({ kind: "unblock", lot, reason: "Liberado para uso", error: null });
+  }
+
+  async function confirmLotDialogAction() {
+    if (!lotDialog) return;
+
+    const nextReason = lotDialog.reason.trim();
+    if (lotDialog.kind === "block" && !nextReason) {
+      setLotDialog((current) => (current ? { ...current, error: "El motivo es obligatorio." } : current));
+      return;
+    }
+
+    const payload = buildLotMutationPayload(lotDialog.kind, lotDialog.lot.id, nextReason, createLotMutationAttemptKey());
+    const actionKey = `${lotDialog.kind}:${lotDialog.lot.id}`;
+    setBusyLotAction(actionKey);
+    setFeedback(null);
+    setLotDialog((current) => (current ? { ...current, error: null } : current));
+
+    try {
+      const response = await fetch(`/api/app/inventory/lots/${lotDialog.lot.id}/${lotDialog.kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(sanitizeLotMutationError(json?.error || null, lotDialog.kind === "block" ? "No se pudo bloquear el lote." : "No se pudo desbloquear el lote."));
+      }
+      await Promise.all([refreshLots(), refreshLotHistory(lotDialog.lot.id)]);
+      setFeedback(lotDialog.kind === "block" ? "Lote bloqueado." : "Lote desbloqueado.");
+      setLotDialog(null);
+    } catch (error) {
+      setLotDialog((current) => (
+        current
+          ? {
+              ...current,
+              error: error instanceof Error ? error.message : current.kind === "block" ? "No se pudo bloquear el lote." : "No se pudo desbloquear el lote."
+            }
+          : current
+      ));
+    } finally {
+      setBusyLotAction(null);
+    }
+  }
+
   return (
-    <Card className="border-white/6 bg-card/90">
-      <CardHeader
-        action={
-          product.inventoryTrackingMode === "lot_based" ? (
-            <Badge variant="success">lot_based</Badge>
-          ) : (
-            <Button type="button" size="sm" className="rounded-2xl" onClick={activateLotMode} disabled={readOnly || saving}>
-              Activar lotes
-            </Button>
-          )
-        }
-      >
-        <div>
-          <CardTitle>Inventario por lotes</CardTitle>
-          <CardDescription>El producto conserva su maestro comercial; la disponibilidad operativa vive en lotes, ubicaciones y movimientos.</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5 pt-0">
-        <div className="grid gap-3 md:grid-cols-4">
-          <SummaryPill label="Disponible" value={formatQuantity(summary.available)} />
-          <SummaryPill label="Fisico" value={formatQuantity(summary.physical)} />
-          <SummaryPill label="Comprometido" value={formatQuantity(summary.committed)} />
-          <SummaryPill label="Lotes activos" value={String(summary.activeLots)} />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <SummaryPill label="Alertas vencimiento" value={String(summary.expiring)} />
-          <SummaryPill label="Proximo vencimiento" value={summary.nextExpiration ? expirationDisplayLabel(summary.nextExpiration) : "Sin proximos"} />
-          <SummaryPill label="Ubicaciones activas" value={String(locations.filter((location) => location.active).length)} />
-        </div>
-
-        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">Ubicaciones</p>
-              <p className="text-xs text-muted">Cada lote nuevo debe quedar en una ubicacion real del tenant.</p>
-            </div>
-            {canManageSensitive ? (
-              <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={createLocation} disabled={readOnly || saving}>
-                Crear ubicacion
+    <>
+      <Card className="border-white/6 bg-card/90">
+        <CardHeader
+          action={
+            product.inventoryTrackingMode === "lot_based" ? (
+              <Badge variant="success">lot_based</Badge>
+            ) : (
+              <Button type="button" size="sm" className="rounded-2xl" onClick={activateLotMode} disabled={readOnly || saving}>
+                Activar lotes
               </Button>
-            ) : null}
+            )
+          }
+        >
+          <div>
+            <CardTitle>Inventario por lotes</CardTitle>
+            <CardDescription>El producto conserva su maestro comercial; la disponibilidad operativa vive en lotes, ubicaciones y movimientos.</CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {locations.length ? locations.map((location) => <Badge key={location.id} variant={location.active ? "outline" : "muted"}>{location.name}</Badge>) : <p className="text-sm text-muted">No hay ubicaciones cargadas.</p>}
-          </div>
-        </div>
-
-        {canManageReceipts ? (
-        <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">Agregar ingreso</p>
-              <p className="text-xs text-muted">Registra un lote y su movimiento inicial sin tocar productos legacy.</p>
-            </div>
-            <Button type="button" size="sm" className="rounded-2xl" onClick={createLot} disabled={readOnly || saving}>
-              Guardar ingreso
-            </Button>
-          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 pt-0">
           <div className="grid gap-3 md:grid-cols-4">
-            <Input value={draft.lotNumber} onChange={(event) => setDraft((current) => ({ ...current, lotNumber: event.target.value }))} placeholder="Lote" disabled={readOnly || saving || !canManageReceipts} />
-            <Input value={draft.supplierName} onChange={(event) => setDraft((current) => ({ ...current, supplierName: event.target.value }))} placeholder="Proveedor" disabled={readOnly || saving || !canManageReceipts} />
-            <Input type="number" min="0" step="0.001" value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} placeholder="Cantidad" disabled={readOnly || saving || !canManageReceipts} />
-            <Input type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => setDraft((current) => ({ ...current, unitCost: event.target.value }))} placeholder="Costo unitario" disabled={readOnly || saving || !canManageReceipts} />
-            <Input type="date" value={draft.expiresAt} onChange={(event) => setDraft((current) => ({ ...current, expiresAt: event.target.value }))} disabled={readOnly || saving || !canManageReceipts} />
-            <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={draft.locationId} onChange={(event) => setDraft((current) => ({ ...current, locationId: event.target.value }))} disabled={readOnly || saving || !canManageReceipts}>
-              <option value="">Seleccionar ubicacion</option>
-              {locations.filter((location) => location.active).map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-            </select>
-            <Input value={draft.warehouseName} onChange={(event) => setDraft((current) => ({ ...current, warehouseName: event.target.value }))} placeholder="Deposito legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
-            <Input value={draft.locationName} onChange={(event) => setDraft((current) => ({ ...current, locationName: event.target.value }))} placeholder="Texto legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
-            <Textarea className="min-h-10 md:col-span-4" value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notas" disabled={readOnly || saving || !canManageReceipts} />
+            <SummaryPill label="Disponible" value={formatQuantity(summary.available)} />
+            <SummaryPill label="Fisico" value={formatQuantity(summary.physical)} />
+            <SummaryPill label="Comprometido" value={formatQuantity(summary.committed)} />
+            <SummaryPill label="Lotes activos" value={String(summary.activeLots)} />
           </div>
-        </div>
-        ) : null}
 
-        {feedback ? <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3 text-sm text-muted">{feedback}</div> : null}
+          <div className="grid gap-3 md:grid-cols-3">
+            <SummaryPill label="Alertas vencimiento" value={String(summary.expiring)} />
+            <SummaryPill label="Proximo vencimiento" value={summary.nextExpiration ? expirationDisplayLabel(summary.nextExpiration) : "Sin proximos"} />
+            <SummaryPill label="Ubicaciones activas" value={String(locations.filter((location) => location.active).length)} />
+          </div>
 
-        <div className="space-y-3">
-          {lots.length ? (
-            lots.map((lot) => (
-              <div key={lot.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">Lote {lot.lotNumber || "sin numero"}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {lot.locationName || "Ubicacion historica"} | vence {lot.expiresAt || "sin fecha"} | comprometido {formatQuantity(Number(lot.committedQuantity || 0))}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant={lot.status === "active" ? "success" : lot.status === "blocked" ? "warning" : lot.status === "written_off" ? "danger" : "muted"}>{lot.status}</Badge>
-                    <Badge variant={lot.expirationStatus === "expired" ? "danger" : ["today", "critical", "urgent", "warning"].includes(lot.expirationStatus) ? "warning" : "outline"}>{stateTitle(lot.expirationStatus)}</Badge>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-muted">
-                    Disponible <span className="font-semibold text-foreground">{formatQuantity(Number((lot.availableCommercialQuantity ?? lot.availableQuantity) || 0))}</span> | Fisico {formatQuantity(Number((lot.physicalQuantity ?? lot.availableQuantity) || 0))}
-                  </p>
-                  <div className="flex gap-2">
-                    {canManageSensitive ? (
-                      <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "manual_adjustment_out")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
-                        Ajustar salida
-                      </Button>
-                    ) : null}
-                    {canManageSensitive ? (
-                      <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "expired_writeoff")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
-                        Dar de baja
-                        <span className="sr-only">Baja vencido</span>
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">Ubicaciones</p>
+                <p className="text-xs text-muted">Cada lote nuevo debe quedar en una ubicacion real del tenant.</p>
               </div>
-            ))
+              {canManageSensitive ? (
+                <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={createLocation} disabled={readOnly || saving}>
+                  Crear ubicacion
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {locations.length ? locations.map((location) => <Badge key={location.id} variant={location.active ? "outline" : "muted"}>{location.name}</Badge>) : <p className="text-sm text-muted">No hay ubicaciones cargadas.</p>}
+            </div>
+          </div>
+          {canManageReceipts ? (
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">Agregar ingreso</p>
+                <p className="text-xs text-muted">Registra un lote y su movimiento inicial sin tocar productos legacy.</p>
+              </div>
+              <Button type="button" size="sm" className="rounded-2xl" onClick={createLot} disabled={readOnly || saving}>
+                Guardar ingreso
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-4">
+              <Input value={draft.lotNumber} onChange={(event) => setDraft((current) => ({ ...current, lotNumber: event.target.value }))} placeholder="Lote" disabled={readOnly || saving || !canManageReceipts} />
+              <Input value={draft.supplierName} onChange={(event) => setDraft((current) => ({ ...current, supplierName: event.target.value }))} placeholder="Proveedor" disabled={readOnly || saving || !canManageReceipts} />
+              <Input type="number" min="0" step="0.001" value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} placeholder="Cantidad" disabled={readOnly || saving || !canManageReceipts} />
+              <Input type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => setDraft((current) => ({ ...current, unitCost: event.target.value }))} placeholder="Costo unitario" disabled={readOnly || saving || !canManageReceipts} />
+              <Input type="date" value={draft.expiresAt} onChange={(event) => setDraft((current) => ({ ...current, expiresAt: event.target.value }))} disabled={readOnly || saving || !canManageReceipts} />
+              <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={draft.locationId} onChange={(event) => setDraft((current) => ({ ...current, locationId: event.target.value }))} disabled={readOnly || saving || !canManageReceipts}>
+                <option value="">Seleccionar ubicacion</option>
+                {locations.filter((location) => location.active).map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+              <Input value={draft.warehouseName} onChange={(event) => setDraft((current) => ({ ...current, warehouseName: event.target.value }))} placeholder="Deposito legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
+              <Input value={draft.locationName} onChange={(event) => setDraft((current) => ({ ...current, locationName: event.target.value }))} placeholder="Texto legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
+              <Textarea className="min-h-10 md:col-span-4" value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notas" disabled={readOnly || saving || !canManageReceipts} />
+            </div>
+          </div>
+          ) : null}
+
+          {feedback ? <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3 text-sm text-muted">{feedback}</div> : null}
+
+          <div className="space-y-3">
+            {lots.length ? (
+              lots.map((lot) => {
+                const actionState = getLotActionAvailability(lot, { readOnly, canManageSensitive });
+                const lotActor = getLotActorName(lot);
+                return (
+                  <div key={lot.id} className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">Lote {lot.lotNumber || "sin numero"}</p>
+                        <p className="mt-1 text-xs text-muted">
+                          {lot.locationName || "Ubicacion historica"} | vence {lot.expiresAt || "sin fecha"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={actionState.statusVariant}>{actionState.statusLabel}</Badge>
+                        <Badge variant={lot.expirationStatus === "expired" ? "danger" : ["today", "critical", "urgent", "warning"].includes(lot.expirationStatus) ? "warning" : "outline"}>{stateTitle(lot.expirationStatus)}</Badge>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm text-muted">
+                      <p>
+                        Disponible <span className="font-semibold text-foreground">{formatQuantity(Number((lot.availableCommercialQuantity ?? lot.availableQuantity) || 0))}</span>
+                        {" | "}Fisico {formatQuantity(Number((lot.physicalQuantity ?? lot.availableQuantity) || 0))}
+                        {" | "}Comprometido {formatQuantity(Number(lot.committedQuantity || 0))}
+                      </p>
+                      {lot.status === "blocked" ? (
+                        <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3">
+                          <p className="font-medium text-foreground">Estado Bloqueado</p>
+                          <p className="mt-1">Motivo: {lot.blockReason || "Sin motivo informado"}</p>
+                          {lot.blockedAt ? <p className="mt-1">Fecha: {formatDateTime(lot.blockedAt)}</p> : null}
+                          {lotActor ? <p className="mt-1">Actor: {lotActor}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {actionState.canBlock ? (
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => openBlockDialog(lot)} disabled={readOnly || saving || busyLotAction !== null}>
+                          Bloquear lote
+                        </Button>
+                      ) : null}
+                      {actionState.canUnblock ? (
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => openUnblockDialog(lot)} disabled={readOnly || saving || busyLotAction !== null}>
+                          Desbloquear lote
+                        </Button>
+                      ) : null}
+                      {actionState.canAdjustOut ? (
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "manual_adjustment_out")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
+                          Ajustar salida
+                        </Button>
+                      ) : null}
+                      {actionState.canWriteOff ? (
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "expired_writeoff")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
+                          Dar de baja
+                          <span className="sr-only">Dar de baja stock vencido</span>
+                          <span className="sr-only">Baja vencido</span>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-center text-sm text-muted">
+                Todavia no hay lotes para este producto.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(lotDialog)} onOpenChange={(open) => (!open ? setLotDialog(null) : null)}>
+        <DialogContent className="max-w-xl rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(10,18,30,0.98),rgba(8,14,23,0.98))]">
+          <DialogHeader>
+            <DialogTitle>{lotDialog?.kind === "block" ? "Bloquear lote" : "Desbloquear lote"}</DialogTitle>
+            <DialogDescription>
+              {lotDialog?.kind === "block"
+                ? "El stock físico se conserva, pero dejará de estar disponible para venta."
+                : "El lote volverá a estar disponible si no está vencido ni agotado."}
+            </DialogDescription>
+          </DialogHeader>
+          {lotDialog?.kind === "block" ? (
+            <label className="block space-y-2 text-sm">
+              <span className="font-medium">Motivo</span>
+              <Textarea
+                autoFocus
+                className="min-h-[120px]"
+                value={lotDialog.reason}
+                onChange={(event) => setLotDialog((current) => (current ? { ...current, reason: event.target.value, error: null } : current))}
+                placeholder="Ej. Producto dañado, control de calidad o retiro preventivo"
+                disabled={busyLotAction !== null}
+                aria-invalid={lotDialog.error ? true : false}
+                aria-describedby={lotDialog.error ? "lot-dialog-error" : undefined}
+              />
+            </label>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-6 text-center text-sm text-muted">
-              Todavia no hay lotes para este producto.
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+              <p>Lote {lotDialog?.lot.lotNumber || "sin numero"}</p>
+              <p className="mt-1">Estado actual: {lotDialog?.lot.status}</p>
             </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
+          {lotDialog?.error ? (
+            <div id="lot-dialog-error" className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-3 text-sm text-rose-100">
+              {lotDialog.error}
+            </div>
+          ) : null}
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:flex-wrap">
+            <Button type="button" variant="ghost" onClick={() => setLotDialog(null)} disabled={busyLotAction !== null}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => void confirmLotDialogAction()} disabled={busyLotAction !== null}>
+              {busyLotAction !== null
+                ? "Procesando..."
+                : lotDialog?.kind === "block"
+                  ? "Confirmar bloqueo"
+                  : "Confirmar desbloqueo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -363,6 +510,16 @@ function expirationDisplayLabel(lot: PortalInventoryLot) {
   if (lot.daysUntilExpiration === -1) return "Vencido hace 1 dia";
   if (typeof lot.daysUntilExpiration === "number" && lot.daysUntilExpiration < -1) return `Vencido hace ${Math.abs(lot.daysUntilExpiration)} dias`;
   return stateTitle(lot.expirationStatus);
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Sin fecha";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("es-AR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(date);
 }
 
 function stateTitle(status: PortalInventoryLot["expirationStatus"]) {

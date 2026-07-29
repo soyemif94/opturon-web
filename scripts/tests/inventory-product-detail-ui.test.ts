@@ -9,6 +9,8 @@ const page = fs.readFileSync(path.join(root, "app/app/catalog/[id]/page.tsx"), "
 assert(panel.includes("Agregar ingreso"), "product detail must include lot receipt form");
 assert(panel.includes("Activar lotes"), "product detail must expose lot mode activation");
 assert(panel.includes("expired_writeoff"), "product detail must support expired writeoff");
+assert(panel.includes("Bloquear lote"), "product detail must expose lot blocking");
+assert(panel.includes("Desbloquear lote"), "product detail must expose lot unblocking");
 assert(page.includes("ProductInventoryLotsPanel"), "product detail page must render lot inventory panel");
 assert(page.includes("getPortalInventoryLots"), "product detail page must prefetch product lots");
 
