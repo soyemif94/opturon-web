@@ -1084,11 +1084,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             ? `Importacion parcial: ${summary.created} creados y ${summary.failed} fallidos.`
             : `Importacion completa: ${summary.created} productos creados.`
       });
-      toast.success("Carga masiva procesada");
+      toast.success("Carga por texto procesada");
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron importar los productos.";
       setFeedback({ tone: "error", text: message });
-      toast.error("Error en carga masiva", message);
+      toast.error("Error en carga por texto", message);
     } finally {
       setBulkImporting(false);
     }
@@ -1320,11 +1320,9 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     if (workspaceMode === "closed") return null;
 
     const isBulkWorkspace = workspaceMode === "bulk";
-    const workspaceTitle = isBulkWorkspace
-      ? "Carga masiva en workspace"
-      : "Nuevo producto en workspace";
+    const workspaceTitle = isBulkWorkspace ? "Carga rápida por texto" : "Nuevo producto en workspace";
     const workspaceDescription = isBulkWorkspace
-      ? "Previsualiza, valida e importa productos en un espacio ancho dentro de la misma pantalla."
+      ? "Pegá productos en líneas separadas y previsualizalos antes de importarlos."
       : "Alta individual con espacio completo para completar datos comerciales, imagen y atributos.";
 
     return (
@@ -1339,7 +1337,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             <div className="max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={isBulkWorkspace ? "warning" : "success"}>
-                  {isBulkWorkspace ? "Carga masiva" : "Alta guiada"}
+                  {isBulkWorkspace ? "Carga por texto" : "Alta guiada"}
                 </Badge>
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{workspaceTitle}</h2>
@@ -1350,7 +1348,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 Alta individual
               </Button>
               <Button type="button" variant={workspaceMode === "bulk" ? "primary" : "secondary"} size="sm" onClick={openWorkspaceForBulkImport} disabled={readOnly}>
-                Carga masiva
+                Carga por texto
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={closeWorkspace}>
                 Cerrar workspace
@@ -1363,10 +1361,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           {isBulkWorkspace ? (
             <div className="space-y-4">
               <div className="rounded-[24px] border border-white/8 bg-surface/45 p-4 text-sm leading-6 text-muted">
-                La carga masiva sigue funcionando con previsualizacion y validacion previa, pero ahora vive en una zona central y no dentro del sidebar.
+                Pegá varias líneas de productos con un formato simple. Ideal para agregar rápidamente varios productos copiando y pegando.
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Pega varias lineas</label>
+                <label className="text-sm font-medium">Pegá varias líneas</label>
                 <Textarea
                   className="min-h-[220px]"
                   value={bulkText}
@@ -2128,7 +2126,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               }}
               disabled={readOnly}
             />
-            <QuickActionButton title="Importar productos" description="Carga masiva" onClick={openWorkspaceForBulkImport} disabled={readOnly} />
+            <QuickActionButton title="Importar archivo" description="Excel, CSV o TXT" onClick={() => scrollToSection("catalog-file-import")} disabled={readOnly} />
+            <QuickActionButton title="Carga rápida por texto" description="Pegá varias líneas" onClick={openWorkspaceForBulkImport} disabled={readOnly} />
             <QuickActionButton title="Exportar catalogo" description="Excel compatible" onClick={exportVisibleProducts} />
             <QuickActionButton title="Gestion de categorias" description="Orden comercial" onClick={() => scrollToSection("catalog-categories")} />
             <QuickActionButton
@@ -2280,7 +2279,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         </Card>
 
         <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
-          <CardHeader action={<Badge variant={workspaceMode === "bulk" ? "warning" : workspaceMode === "single" ? "success" : "muted"}>{workspaceMode === "bulk" ? "Carga masiva" : workspaceMode === "single" ? "Alta abierta" : "Workspace cerrada"}</Badge>}>
+          <CardHeader action={<Badge variant={workspaceMode === "bulk" ? "warning" : workspaceMode === "single" ? "success" : "muted"}>{workspaceMode === "bulk" ? "Carga por texto" : workspaceMode === "single" ? "Alta abierta" : "Workspace cerrada"}</Badge>}>
             <div>
               <CardTitle className="text-xl">Workspace principal</CardTitle>
               <CardDescription>El rail derecho queda para contexto y atajos. Las tareas largas viven en la banda ancha superior.</CardDescription>
@@ -2292,7 +2291,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 Alta rapida
               </Button>
               <Button type="button" variant={workspaceMode === "bulk" ? "primary" : "secondary"} size="sm" onClick={openWorkspaceForBulkImport} disabled={readOnly}>
-                Carga masiva
+                Carga por texto
               </Button>
             </div>
             <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(135deg,rgba(16,24,36,0.92),rgba(9,15,24,0.96))] p-4">
@@ -2301,12 +2300,20 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 {workspaceMode === "single"
                   ? "La workspace esta abierta para crear productos con mayor ancho y mejor continuidad visual."
                   : workspaceMode === "bulk"
-                    ? "La importacion masiva esta abierta en la zona principal con preview y validacion."
-                    : "No hay workspace abierta. Usa los atajos para abrir alta o importacion."}
+                    ? "La carga rápida por texto está abierta en la zona principal con previsualización antes de importar."
+                    : "No hay workspace abierta. Usa los atajos para abrir alta, importar archivo o carga por texto."}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                {workspaceMode === "bulk"
+                  ? "Ideal para agregar rápidamente varios productos copiando y pegando."
+                  : "Ideal para catálogos completos o actualizaciones masivas desde archivo."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" size="sm" onClick={() => scrollToSection("catalog-workspace")} disabled={workspaceMode === "closed"}>
                   Ir a la workspace
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => scrollToSection("catalog-file-import")}>
+                  Importar archivo
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={exportVisibleProducts}>
                   Exportar visibles
@@ -2376,7 +2383,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] px-5 py-5 shadow-[var(--card-shadow)] lg:px-7 lg:py-6">
+      <section id="catalog-file-import" className="overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] px-5 py-5 shadow-[var(--card-shadow)] lg:px-7 lg:py-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
             <Badge variant="warning">Catálogo comercial</Badge>
@@ -2396,6 +2403,10 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                 await reloadProducts(selectedId);
               }}
             />
+            <Button type="button" variant="secondary" size="sm" disabled={readOnly} onClick={openWorkspaceForBulkImport}>
+              <Upload className="mr-2 h-4 w-4" />
+              Carga rápida por texto
+            </Button>
             <Button type="button" variant="secondary" size="sm" onClick={() => scrollToSection("catalog-categories")}>
               <FolderCog className="mr-2 h-4 w-4" />
               Configuración

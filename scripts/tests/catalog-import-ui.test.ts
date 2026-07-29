@@ -15,8 +15,11 @@ const templateRoute = read("app/api/app/catalog/imports/template/route.ts");
 const apiTypes = read("lib/api.ts");
 
 assert.match(manager, /CatalogImportWizard/);
-assert.match(wizard, /Importar productos/);
-assert.match(wizard, /Subí tu archivo y Opturon preparará los productos por vos/);
+assert.match(wizard, /Importar archivo/);
+assert.match(wizard, /Importar productos desde archivo/);
+assert.match(wizard, /Subí tu archivo y Opturon preparará los productos para que los revises antes de confirmar/);
+assert.match(wizard, /Excel, CSV o TXT/);
+assert.match(wizard, /Ideal para catálogos completos o actualizaciones masivas/);
 assert.match(wizard, /STEP_LABELS = \["Archivo", "Hoja y formato", "Mapeo", "Vista previa", "Confirmación", "Resultado"\]/);
 assert.match(wizard, /GUIDED_STAGE_LABELS = \["Subir archivo", "Revisar productos", "Confirmar importación"\]/);
 assert.match(wizard, /Descargar plantilla/);

@@ -282,18 +282,18 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={() => setOpen(true)}>
+      <Button type="button" variant="primary" size="sm" disabled={disabled} onClick={() => setOpen(true)}>
         <Upload className="mr-2 h-4 w-4" />
-        Importar productos
+        Importar archivo
       </Button>
 
       <Dialog open={open} onOpenChange={closeModal}>
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(15,24,38,0.98),rgba(8,14,24,0.98))] p-0">
           <div className="border-b border-white/10 px-6 py-5">
             <DialogHeader>
-              <DialogTitle className="text-xl text-white">Importar productos</DialogTitle>
+              <DialogTitle className="text-xl text-white">Importar productos desde archivo</DialogTitle>
               <DialogDescription className="text-sm text-slate-300">
-                Subí tu archivo y Opturon preparará los productos por vos. Nada se guardará hasta que confirmes.
+                Subí tu archivo y Opturon preparará los productos para que los revises antes de confirmar.
               </DialogDescription>
             </DialogHeader>
 
@@ -341,6 +341,8 @@ export function CatalogImportWizard({ disabled = false, onImported }: Props) {
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     Admitimos `.xlsx`, `.csv` y `.txt` delimitado. Límite inicial: hasta 10 MB, 10.000 filas y 100 columnas.
                   </p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-amber-200/80">Excel, CSV o TXT</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">Ideal para catálogos completos o actualizaciones masivas.</p>
                   <label className="mt-5 flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(245,158,11,0.06))] px-6 text-center">
                     <FileSpreadsheet className="h-10 w-10 text-amber-300" />
                     <span className="mt-4 text-base font-medium text-white">
