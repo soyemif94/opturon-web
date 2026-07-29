@@ -8,7 +8,9 @@ const items = [
   { href: "/app/inventory", label: "Resumen" },
   { href: "/app/inventory#movimientos", label: "Movimientos" },
   { href: "/app/inventory#lotes", label: "Lotes" },
-  { href: "/app/inventory/suppliers", label: "Proveedores" }
+  { href: "/app/inventory/suppliers", label: "Proveedores" },
+  { href: "/app/inventory/receipts", label: "Recepciones" },
+  { href: "/app/inventory/receipts/new", label: "Ingresar mercaderia" }
 ];
 
 export function InventorySectionNav() {
@@ -17,7 +19,14 @@ export function InventorySectionNav() {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((item) => {
-        const active = item.href === "/app/inventory/suppliers" ? pathname.startsWith("/app/inventory/suppliers") : pathname === "/app/inventory";
+        const active =
+          item.href === "/app/inventory/suppliers"
+            ? pathname.startsWith("/app/inventory/suppliers")
+            : item.href === "/app/inventory/receipts"
+              ? pathname.startsWith("/app/inventory/receipts") && !pathname.startsWith("/app/inventory/receipts/new")
+              : item.href === "/app/inventory/receipts/new"
+                ? pathname.startsWith("/app/inventory/receipts/new")
+                : pathname === "/app/inventory";
         return (
           <Link
             key={item.href}

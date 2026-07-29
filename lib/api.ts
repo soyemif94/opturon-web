@@ -2137,6 +2137,82 @@ export type PortalInventoryLocation = {
   updatedAt: string;
 };
 
+export type PortalPurchaseReceiptListItem = {
+  id: string;
+  tenantId: string;
+  documentNumber: string | null;
+  receivedAt: string;
+  confirmedAt: string;
+  createdAt: string;
+  supplier: {
+    id: string;
+    legalName: string;
+    tradeName?: string | null;
+    displayName: string;
+    status: "active" | "inactive";
+  } | null;
+  location: {
+    id: string;
+    code?: string | null;
+    name?: string | null;
+    active: boolean;
+  } | null;
+  itemCount: number;
+  totalQuantity: string;
+  totalCost: string | null;
+};
+
+export type PortalPurchaseReceiptItem = {
+  id: string;
+  receiptId: string;
+  tenantId: string;
+  productId: string;
+  quantity: string;
+  unitCost: string | null;
+  lotNumber: string | null;
+  normalizedLotNumber: string | null;
+  expiresAt: string | null;
+  inventoryLotId: string | null;
+  inventoryMovementId: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  product: {
+    id: string;
+    name: string | null;
+    internalCode?: string | null;
+    sku?: string | null;
+    inventoryTrackingMode: "legacy" | "lot_based";
+  };
+};
+
+export type PortalPurchaseReceiptDetail = {
+  id: string;
+  tenantId: string;
+  supplierId: string;
+  locationId: string;
+  documentNumber: string | null;
+  receivedAt: string;
+  notes: string | null;
+  idempotencyKey: string;
+  metadata?: Record<string, unknown>;
+  createdBy?: string | null;
+  createdAt: string;
+  confirmedAt: string;
+  supplier: PortalPurchaseReceiptListItem["supplier"];
+  location: PortalPurchaseReceiptListItem["location"];
+  actor: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  } | null;
+  items: PortalPurchaseReceiptItem[];
+  summary: {
+    itemCount: number;
+    totalQuantity: string;
+    totalCost: string | null;
+  };
+};
+
 export type PortalInventoryLotHistoryEntry = {
   id: string;
   kind: "movement" | "operation";
@@ -4156,6 +4232,82 @@ export async function getPortalSuppliers(
       summary: { total: number; active: number; inactive: number };
     };
   }>(`/portal/tenants/${tenantId}/suppliers${suffix}`, undefined, false);
+}
+
+export async function getPortalPurchaseReceipts(
+  tenantId: string,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    sort?: "receivedAt_desc" | "receivedAt_asc";
+    supplierId?: string;
+    locationId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  if (options?.sort) params.set("sort", options.sort);
+  if (options?.supplierId) params.set("supplierId", options.supplierId);
+  if (options?.locationId) params.set("locationId", options.locationId);
+  if (options?.dateFrom) params.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) params.set("dateTo", options.dateTo);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      items: PortalPurchaseReceiptListItem[];
+      page: number;
+      pageSize: number;
+      total: number;
+    };
+  }>(`/portal/tenants/${tenantId}/purchase-receipts${suffix}`, undefined, false);
+}
+
+export async function getPortalPurchaseReceiptDetail(tenantId: string, receiptId: string) {
+  return backendFetch<{ success: boolean; data: PortalPurchaseReceiptDetail }>(
+    `/portal/tenants/${tenantId}/purchase-receipts/${receiptId}`,
+    undefined,
+    false
+  );
+}
+
+export async function createPortalPurchaseReceipt(
+  tenantId: string,
+  payload: {
+    supplierId: string;
+    locationId: string;
+    documentNumber?: string | null;
+    receivedAt: string;
+    notes?: string | null;
+    idempotencyKey: string;
+    items: Array<{
+      productId: string;
+      quantity: string;
+      unitCost?: string;
+      lotNumber?: string;
+      expiresAt?: string;
+    }>;
+  },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      receipt: PortalPurchaseReceiptDetail;
+      idempotent: boolean;
+    };
+  }>(`/portal/tenants/${tenantId}/purchase-receipts`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function getPortalSupplierDetail(tenantId: string, supplierId: string) {
