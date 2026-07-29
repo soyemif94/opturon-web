@@ -9,6 +9,7 @@ function read(relativePath: string) {
 
 const listRoute = read("app/api/app/suppliers/route.ts");
 const detailRoute = read("app/api/app/suppliers/[supplierId]/route.ts");
+const queryParser = read("app/api/app/suppliers/query.ts");
 
 const catalogOnlyModules = buildTenantAppModules({
   policyVersion: 1,
@@ -38,6 +39,9 @@ assert.match(listRoute, /async function requireSuppliersReadModuleApi\(\)/);
 assert.match(listRoute, /requireAppModuleApi\("inventory"\)/);
 assert.match(listRoute, /return requireAppModuleApi\("catalog"\)/);
 assert.match(listRoute, /const moduleGuard = await requireSuppliersReadModuleApi\(\)/);
+assert.match(listRoute, /parseSuppliersListQuery/);
+assert.match(queryParser, /invalid_\$\{field\}/);
+assert.match(queryParser, /invalid_sort/);
 
 assert.match(detailRoute, /async function requireSuppliersReadModuleApi\(\)/);
 assert.match(detailRoute, /requireAppModuleApi\("inventory"\)/);

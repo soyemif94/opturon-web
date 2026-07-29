@@ -7,6 +7,7 @@ import {
   isBackendConfigured
 } from "@/lib/api";
 import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { parseSuppliersListQuery } from "./query";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest) {
   const moduleGuard = await requireSuppliersReadModuleApi();
   if (moduleGuard.error) return moduleGuard.error;
   const url = new URL(request.url);
+  const parsedQuery = parseSuppliersListQuery(url.searchParams);
+  if (!parsedQuery.ok) {
+    return noStore(NextResponse.json({ error: parsedQuery.error }, { status: 400 }));
+  }
   const tenantContext = await resolveAppTenant({
     requestedTenantId: url.searchParams.get("tenantId") || undefined,
     demo: url.searchParams.get("demo") === "1"
@@ -42,13 +47,7 @@ export async function GET(request: NextRequest) {
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
-    const result = await getPortalSuppliers(tenantContext.tenantId, {
-      search: url.searchParams.get("search") || undefined,
-      status: (url.searchParams.get("status") as "active" | "inactive" | "all" | null) || undefined,
-      page: Number(url.searchParams.get("page") || 1),
-      pageSize: Number(url.searchParams.get("pageSize") || 20),
-      sort: (url.searchParams.get("sort") as "name_asc" | "name_desc" | "updated_asc" | "updated_desc" | null) || undefined
-    });
+    const result = await getPortalSuppliers(tenantContext.tenantId, parsedQuery.options);
     return noStore(
       NextResponse.json({
         readOnly: tenantContext.readOnly,
