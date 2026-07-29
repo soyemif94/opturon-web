@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { type PortalInventoryLocation, type PortalInventoryLot, type PortalInventoryLotHistoryEntry, type PortalProduct } from "@/lib/api";
-import { buildLotMutationPayload, createLotMutationAttemptKey, getLotActionAvailability, getLotActorName, sanitizeLotMutationError } from "@/lib/inventory-lot-ui";
+import { buildLotExpirationPayload, buildLotMutationPayload, createLotMutationAttemptKey, getLotActionAvailability, getLotActorName, sanitizeLotMutationError } from "@/lib/inventory-lot-ui";
 
 type LotDraft = {
   lotNumber: string;
@@ -56,9 +56,10 @@ export function ProductInventoryLotsPanel({
   const [lotDialog, setLotDialog] = useState<
     | null
     | {
-        kind: "block" | "unblock";
+        kind: "block" | "unblock" | "expiration";
         lot: PortalInventoryLot;
         reason: string;
+        expiresAt: string;
         error: string | null;
       }
   >(null);
@@ -237,47 +238,81 @@ export function ProductInventoryLotsPanel({
   }
 
   function openBlockDialog(lot: PortalInventoryLot) {
-    setLotDialog({ kind: "block", lot, reason: "", error: null });
+    setLotDialog({ kind: "block", lot, reason: "", expiresAt: lot.expiresAt || "", error: null });
   }
 
   function openUnblockDialog(lot: PortalInventoryLot) {
-    setLotDialog({ kind: "unblock", lot, reason: "Liberado para uso", error: null });
+    setLotDialog({ kind: "unblock", lot, reason: "Liberado para uso", expiresAt: lot.expiresAt || "", error: null });
+  }
+
+  function openExpirationDialog(lot: PortalInventoryLot) {
+    setLotDialog({ kind: "expiration", lot, reason: "Correccion operativa", expiresAt: lot.expiresAt || "", error: null });
   }
 
   async function confirmLotDialogAction() {
     if (!lotDialog) return;
 
     const nextReason = lotDialog.reason.trim();
-    if (lotDialog.kind === "block" && !nextReason) {
+    const nextExpiresAt = lotDialog.expiresAt.trim();
+    if ((lotDialog.kind === "block" || lotDialog.kind === "expiration") && !nextReason) {
       setLotDialog((current) => (current ? { ...current, error: "El motivo es obligatorio." } : current));
       return;
     }
+    if (lotDialog.kind === "expiration" && !nextExpiresAt) {
+      setLotDialog((current) => (current ? { ...current, error: "La nueva fecha de vencimiento es obligatoria." } : current));
+      return;
+    }
 
-    const payload = buildLotMutationPayload(lotDialog.kind, lotDialog.lot.id, nextReason, createLotMutationAttemptKey());
+    const payload =
+      lotDialog.kind === "expiration"
+        ? buildLotExpirationPayload(lotDialog.lot.id, nextExpiresAt, nextReason, createLotMutationAttemptKey())
+        : buildLotMutationPayload(lotDialog.kind, lotDialog.lot.id, nextReason, createLotMutationAttemptKey());
     const actionKey = `${lotDialog.kind}:${lotDialog.lot.id}`;
     setBusyLotAction(actionKey);
     setFeedback(null);
     setLotDialog((current) => (current ? { ...current, error: null } : current));
 
     try {
-      const response = await fetch(`/api/app/inventory/lots/${lotDialog.lot.id}/${lotDialog.kind}`, {
-        method: "POST",
+      const response = await fetch(`/api/app/inventory/lots/${lotDialog.lot.id}/${lotDialog.kind === "expiration" ? "expiration" : lotDialog.kind}`, {
+        method: lotDialog.kind === "expiration" ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(sanitizeLotMutationError(json?.error || null, lotDialog.kind === "block" ? "No se pudo bloquear el lote." : "No se pudo desbloquear el lote."));
+        throw new Error(
+          sanitizeLotMutationError(
+            json?.error || null,
+            lotDialog.kind === "block"
+              ? "No se pudo bloquear el lote."
+              : lotDialog.kind === "unblock"
+                ? "No se pudo desbloquear el lote."
+                : "No se pudo actualizar el vencimiento."
+          )
+        );
       }
       await Promise.all([refreshLots(), refreshLotHistory(lotDialog.lot.id)]);
-      setFeedback(lotDialog.kind === "block" ? "Lote bloqueado." : "Lote desbloqueado.");
+      setFeedback(
+        lotDialog.kind === "block"
+          ? "Lote bloqueado."
+          : lotDialog.kind === "unblock"
+            ? "Lote desbloqueado."
+            : "Vencimiento actualizado."
+      );
       setLotDialog(null);
     } catch (error) {
       setLotDialog((current) => (
         current
           ? {
               ...current,
-              error: error instanceof Error ? error.message : current.kind === "block" ? "No se pudo bloquear el lote." : "No se pudo desbloquear el lote."
+              error:
+                error instanceof Error
+                  ? error.message
+                  : current.kind === "block"
+                    ? "No se pudo bloquear el lote."
+                    : current.kind === "unblock"
+                      ? "No se pudo desbloquear el lote."
+                      : "No se pudo actualizar el vencimiento."
             }
           : current
       ));
@@ -336,31 +371,31 @@ export function ProductInventoryLotsPanel({
             </div>
           </div>
           {canManageReceipts ? (
-          <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-medium">Agregar ingreso</p>
-                <p className="text-xs text-muted">Registra un lote y su movimiento inicial sin tocar productos legacy.</p>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium">Agregar ingreso</p>
+                  <p className="text-xs text-muted">Registra un lote y su movimiento inicial sin tocar productos legacy.</p>
+                </div>
+                <Button type="button" size="sm" className="rounded-2xl" onClick={createLot} disabled={readOnly || saving}>
+                  Guardar ingreso
+                </Button>
               </div>
-              <Button type="button" size="sm" className="rounded-2xl" onClick={createLot} disabled={readOnly || saving}>
-                Guardar ingreso
-              </Button>
+              <div className="grid gap-3 md:grid-cols-4">
+                <Input value={draft.lotNumber} onChange={(event) => setDraft((current) => ({ ...current, lotNumber: event.target.value }))} placeholder="Lote" disabled={readOnly || saving || !canManageReceipts} />
+                <Input value={draft.supplierName} onChange={(event) => setDraft((current) => ({ ...current, supplierName: event.target.value }))} placeholder="Proveedor" disabled={readOnly || saving || !canManageReceipts} />
+                <Input type="number" min="0" step="0.001" value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} placeholder="Cantidad" disabled={readOnly || saving || !canManageReceipts} />
+                <Input type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => setDraft((current) => ({ ...current, unitCost: event.target.value }))} placeholder="Costo unitario" disabled={readOnly || saving || !canManageReceipts} />
+                <Input type="date" value={draft.expiresAt} onChange={(event) => setDraft((current) => ({ ...current, expiresAt: event.target.value }))} disabled={readOnly || saving || !canManageReceipts} />
+                <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={draft.locationId} onChange={(event) => setDraft((current) => ({ ...current, locationId: event.target.value }))} disabled={readOnly || saving || !canManageReceipts}>
+                  <option value="">Seleccionar ubicacion</option>
+                  {locations.filter((location) => location.active).map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                </select>
+                <Input value={draft.warehouseName} onChange={(event) => setDraft((current) => ({ ...current, warehouseName: event.target.value }))} placeholder="Deposito legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
+                <Input value={draft.locationName} onChange={(event) => setDraft((current) => ({ ...current, locationName: event.target.value }))} placeholder="Texto legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
+                <Textarea className="min-h-10 md:col-span-4" value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notas" disabled={readOnly || saving || !canManageReceipts} />
+              </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <Input value={draft.lotNumber} onChange={(event) => setDraft((current) => ({ ...current, lotNumber: event.target.value }))} placeholder="Lote" disabled={readOnly || saving || !canManageReceipts} />
-              <Input value={draft.supplierName} onChange={(event) => setDraft((current) => ({ ...current, supplierName: event.target.value }))} placeholder="Proveedor" disabled={readOnly || saving || !canManageReceipts} />
-              <Input type="number" min="0" step="0.001" value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} placeholder="Cantidad" disabled={readOnly || saving || !canManageReceipts} />
-              <Input type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => setDraft((current) => ({ ...current, unitCost: event.target.value }))} placeholder="Costo unitario" disabled={readOnly || saving || !canManageReceipts} />
-              <Input type="date" value={draft.expiresAt} onChange={(event) => setDraft((current) => ({ ...current, expiresAt: event.target.value }))} disabled={readOnly || saving || !canManageReceipts} />
-              <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={draft.locationId} onChange={(event) => setDraft((current) => ({ ...current, locationId: event.target.value }))} disabled={readOnly || saving || !canManageReceipts}>
-                <option value="">Seleccionar ubicacion</option>
-                {locations.filter((location) => location.active).map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-              </select>
-              <Input value={draft.warehouseName} onChange={(event) => setDraft((current) => ({ ...current, warehouseName: event.target.value }))} placeholder="Deposito legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
-              <Input value={draft.locationName} onChange={(event) => setDraft((current) => ({ ...current, locationName: event.target.value }))} placeholder="Texto legacy opcional" disabled={readOnly || saving || !canManageReceipts} />
-              <Textarea className="min-h-10 md:col-span-4" value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notas" disabled={readOnly || saving || !canManageReceipts} />
-            </div>
-          </div>
           ) : null}
 
           {feedback ? <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3 text-sm text-muted">{feedback}</div> : null}
@@ -410,6 +445,11 @@ export function ProductInventoryLotsPanel({
                           Desbloquear lote
                         </Button>
                       ) : null}
+                      {actionState.canEditExpiration ? (
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => openExpirationDialog(lot)} disabled={readOnly || saving || busyLotAction !== null}>
+                          Editar vencimiento
+                        </Button>
+                      ) : null}
                       {actionState.canAdjustOut ? (
                         <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "manual_adjustment_out")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
                           Ajustar salida
@@ -422,7 +462,27 @@ export function ProductInventoryLotsPanel({
                           <span className="sr-only">Baja vencido</span>
                         </Button>
                       ) : null}
+                      <Button type="button" size="sm" variant="ghost" className="rounded-2xl" onClick={() => void refreshLotHistory(lot.id)} disabled={saving || busyLotAction !== null}>
+                        Ver historial
+                      </Button>
                     </div>
+                    {lotHistoryById[lot.id]?.length ? (
+                      <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-bg/40 p-3">
+                        <p className="text-sm font-medium text-foreground">Historial reciente</p>
+                        <div className="mt-2 space-y-2 text-sm text-muted">
+                          {lotHistoryById[lot.id].slice(0, 3).map((entry) => (
+                            <div key={entry.id} className="rounded-xl border border-[color:var(--border)] bg-surface/40 p-2">
+                              <p className="font-medium text-foreground">{entry.type || entry.kind || "Movimiento"}</p>
+                              <p className="mt-1">
+                                {formatDateTime(entry.createdAt)}
+                                {entry.createdBy ? ` | ${entry.createdBy}` : ""}
+                              </p>
+                              {entry.reason ? <p className="mt-1">Motivo: {entry.reason}</p> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })
@@ -438,11 +498,19 @@ export function ProductInventoryLotsPanel({
       <Dialog open={Boolean(lotDialog)} onOpenChange={(open) => (!open ? setLotDialog(null) : null)}>
         <DialogContent className="max-w-xl rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(10,18,30,0.98),rgba(8,14,23,0.98))]">
           <DialogHeader>
-            <DialogTitle>{lotDialog?.kind === "block" ? "Bloquear lote" : "Desbloquear lote"}</DialogTitle>
+            <DialogTitle>
+              {lotDialog?.kind === "block"
+                ? "Bloquear lote"
+                : lotDialog?.kind === "unblock"
+                  ? "Desbloquear lote"
+                  : "Editar vencimiento"}
+            </DialogTitle>
             <DialogDescription>
               {lotDialog?.kind === "block"
-                ? "El stock físico se conserva, pero dejará de estar disponible para venta."
-                : "El lote volverá a estar disponible si no está vencido ni agotado."}
+                ? "El stock fisico se conserva, pero dejara de estar disponible para venta."
+                : lotDialog?.kind === "unblock"
+                  ? "El lote volvera a estar disponible si no esta vencido ni agotado."
+                  : "Actualiza la fecha de vencimiento usando el contrato operativo existente de inventario por lotes."}
             </DialogDescription>
           </DialogHeader>
           {lotDialog?.kind === "block" ? (
@@ -453,12 +521,41 @@ export function ProductInventoryLotsPanel({
                 className="min-h-[120px]"
                 value={lotDialog.reason}
                 onChange={(event) => setLotDialog((current) => (current ? { ...current, reason: event.target.value, error: null } : current))}
-                placeholder="Ej. Producto dañado, control de calidad o retiro preventivo"
+                placeholder="Ej. Producto danado, control de calidad o retiro preventivo"
                 disabled={busyLotAction !== null}
                 aria-invalid={lotDialog.error ? true : false}
                 aria-describedby={lotDialog.error ? "lot-dialog-error" : undefined}
               />
             </label>
+          ) : lotDialog?.kind === "expiration" ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+                <p>Lote {lotDialog.lot.lotNumber || "sin numero"}</p>
+                <p className="mt-1">Vencimiento actual: {lotDialog.lot.expiresAt || "Sin fecha"}</p>
+              </div>
+              <label className="block space-y-2 text-sm">
+                <span className="font-medium">Nueva fecha de vencimiento</span>
+                <Input
+                  autoFocus
+                  type="date"
+                  value={lotDialog.expiresAt}
+                  onChange={(event) => setLotDialog((current) => (current ? { ...current, expiresAt: event.target.value, error: null } : current))}
+                  disabled={busyLotAction !== null}
+                  aria-invalid={lotDialog.error ? true : false}
+                  aria-describedby={lotDialog.error ? "lot-dialog-error" : undefined}
+                />
+              </label>
+              <label className="block space-y-2 text-sm">
+                <span className="font-medium">Motivo</span>
+                <Textarea
+                  className="min-h-[120px]"
+                  value={lotDialog.reason}
+                  onChange={(event) => setLotDialog((current) => (current ? { ...current, reason: event.target.value, error: null } : current))}
+                  placeholder="Ej. Correccion operativa, ajuste de proveedor o regularizacion interna"
+                  disabled={busyLotAction !== null}
+                />
+              </label>
+            </div>
           ) : (
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
               <p>Lote {lotDialog?.lot.lotNumber || "sin numero"}</p>
@@ -479,7 +576,9 @@ export function ProductInventoryLotsPanel({
                 ? "Procesando..."
                 : lotDialog?.kind === "block"
                   ? "Confirmar bloqueo"
-                  : "Confirmar desbloqueo"}
+                  : lotDialog?.kind === "unblock"
+                    ? "Confirmar desbloqueo"
+                    : "Guardar vencimiento"}
             </Button>
           </DialogFooter>
         </DialogContent>

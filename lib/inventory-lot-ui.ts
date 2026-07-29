@@ -57,12 +57,14 @@ export function getLotActionAvailability(lot: PortalInventoryLot, context: LotAc
   const isCancelled = status === "cancelled";
   const canBlock = canMutate && status === "active" && lot.expirationStatus !== "expired";
   const canUnblock = canMutate && status === "blocked";
+  const canEditExpiration = canMutate && !isWrittenOff && !isCancelled;
   const canAdjustOut = canMutate && !isWrittenOff && !isCancelled && available > 0;
   const canWriteOff = canMutate && !isWrittenOff && !isCancelled && available > 0;
 
   return {
     canBlock,
     canUnblock,
+    canEditExpiration,
     canAdjustOut,
     canWriteOff,
     hideMutations: !canMutate || isWrittenOff,
@@ -83,6 +85,14 @@ export function buildLotMutationPayload(kind: LotMutationKind, lotId: string, re
   return {
     reason: normalizedReason,
     idempotencyKey: `lot-${kind}:${lotId}:${attemptKey}`
+  };
+}
+
+export function buildLotExpirationPayload(lotId: string, expiresAt: string, reason: string, attemptKey: string) {
+  return {
+    expiresAt: expiresAt.trim(),
+    reason: reason.trim(),
+    idempotencyKey: `lot-expiration:${lotId}:${attemptKey}`
   };
 }
 
