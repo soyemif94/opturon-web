@@ -24,8 +24,14 @@ function actorFromTenantContext(tenantContext: Awaited<ReturnType<typeof resolve
   };
 }
 
+async function requireSuppliersReadModuleApi() {
+  const inventoryGuard = await requireAppModuleApi("inventory");
+  if (!inventoryGuard.error) return inventoryGuard;
+  return requireAppModuleApi("catalog");
+}
+
 export async function GET(_request: NextRequest, context: { params: Promise<{ supplierId: string }> }) {
-  const moduleGuard = await requireAppModuleApi("inventory");
+  const moduleGuard = await requireSuppliersReadModuleApi();
   if (moduleGuard.error) return moduleGuard.error;
   const tenantContext = await resolveAppTenant();
   if (tenantContext.error) return tenantContext.error;

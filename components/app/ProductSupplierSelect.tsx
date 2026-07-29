@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { PortalSupplier } from "@/lib/api";
-
-type SupplierOption = Pick<PortalSupplier, "id" | "displayName" | "status">;
+import {
+  buildProductSupplierOptions,
+  normalizeProductSupplierOptions,
+  resolveProductSupplierLabel,
+  type ProductSupplierOption
+} from "@/components/app/product-supplier-select.helpers";
 
 export function ProductSupplierSelect({
   value,
@@ -20,7 +23,8 @@ export function ProductSupplierSelect({
   currentSupplierStatus?: "active" | "inactive" | null;
   legacySupplierLabel?: string | null;
 }) {
-  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [suppliers, setSuppliers] = useState<ProductSupplierOption[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,10 +35,14 @@ export function ProductSupplierSelect({
         const json = await response.json().catch(() => null);
         if (!response.ok) throw new Error(String(json?.error || "suppliers_load_failed"));
         if (!cancelled) {
-          setSuppliers(Array.isArray(json?.items) ? json.items : []);
+          setSuppliers(normalizeProductSupplierOptions(json?.items));
+          setLoadError(null);
         }
       } catch {
-        if (!cancelled) setSuppliers([]);
+        if (!cancelled) {
+          setSuppliers([]);
+          setLoadError("No se pudieron cargar los proveedores.");
+        }
       }
     }
 
@@ -45,12 +53,7 @@ export function ProductSupplierSelect({
   }, []);
 
   const options = useMemo(() => {
-    const selected = suppliers.find((supplier) => supplier.id === value) || null;
-    if (selected) return suppliers;
-    if (value && currentSupplierLabel) {
-      return [{ id: value, displayName: currentSupplierLabel, status: currentSupplierStatus || "inactive" }, ...suppliers];
-    }
-    return suppliers;
+    return buildProductSupplierOptions(suppliers, value, currentSupplierLabel, currentSupplierStatus);
   }, [currentSupplierLabel, currentSupplierStatus, suppliers, value]);
 
   return (
@@ -67,12 +70,13 @@ export function ProductSupplierSelect({
           const isSelected = supplier.id === value;
           return (
             <option key={supplier.id} value={supplier.id} disabled={isInactive && !isSelected}>
-              {supplier.displayName}
+              {resolveProductSupplierLabel(supplier)}
               {isInactive ? " · Inactivo" : ""}
             </option>
           );
         })}
       </select>
+      {loadError ? <p className="text-xs text-amber-200">{loadError}</p> : null}
       {legacySupplierLabel && !value ? (
         <p className="text-xs text-muted">Fallback legacy visible: {legacySupplierLabel}</p>
       ) : null}
