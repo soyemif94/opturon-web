@@ -75,11 +75,14 @@ export default async function InventoryPage() {
       <section className="mb-6">
         <InventorySectionNav />
       </section>
-      <div id="resumen">
-        <InventoryBaseWorkspace initialProducts={products} tenantId={ctx.tenantId || null} readOnly={!ctx.tenantId || readOnly} />
-      </div>
-      <div id="movimientos" />
-      <div id="lotes">
+      <InventoryBaseWorkspace
+        initialProducts={products}
+        tenantId={ctx.tenantId || null}
+        readOnly={!ctx.tenantId || readOnly}
+        summarySectionId="resumen"
+        movementsSectionId="movimientos"
+      />
+      <div id="lotes" className="scroll-mt-28">
         <InventoryLotsWorkspace
           initialLots={lots}
           readOnly={!ctx.tenantId || readOnly}

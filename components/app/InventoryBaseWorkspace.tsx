@@ -17,11 +17,15 @@ const EMPTY_HISTORY: PortalInventoryMovement[] = [];
 export function InventoryBaseWorkspace({
   initialProducts,
   tenantId = null,
-  readOnly = false
+  readOnly = false,
+  summarySectionId,
+  movementsSectionId
 }: {
   initialProducts: PortalInventoryProduct[];
   tenantId?: string | null;
   readOnly?: boolean;
+  summarySectionId?: string;
+  movementsSectionId?: string;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [search, setSearch] = useState("");
@@ -226,13 +230,13 @@ export function InventoryBaseWorkspace({
       description="Base operativa de stock con codigo interno, ubicacion principal y ledger auditable."
       badge="Inventario"
     >
-      <div className="grid gap-4 md:grid-cols-3">
+      <div id={summarySectionId} className="grid scroll-mt-28 gap-4 md:grid-cols-3">
         <SummaryCard label="Productos" value={String(summary.total)} helper="Catalogo visible en inventario" />
         <SummaryCard label="Con stock" value={String(summary.withStock)} helper="Disponibilidad positiva" />
         <SummaryCard label="Sin stock" value={String(summary.withoutStock)} helper="Requieren reposicion o correccion" />
       </div>
 
-      <Card className="mt-6">
+      <Card id={movementsSectionId} className="mt-6 scroll-mt-28">
         <CardHeader>
           <CardTitle>Stock actual</CardTitle>
           <CardDescription>Ubicacion principal unica por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
