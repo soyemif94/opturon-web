@@ -22,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CatalogImportWizard } from "@/components/app/CatalogImportWizard";
-import { ProductSupplierSelect } from "@/components/app/ProductSupplierSelect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -52,9 +51,6 @@ type Product = {
   unitOfMeasure?: string | null;
   cost?: number | null;
   defaultSupplier?: string | null;
-  defaultSupplierId?: string | null;
-  defaultSupplierLegacyName?: string | null;
-  defaultSupplierStatus?: "active" | "inactive" | null;
   weight?: number | null;
   weightUnit?: string | null;
   presentation?: string | null;
@@ -103,7 +99,7 @@ type Draft = {
   barcode: string;
   unitOfMeasure: string;
   cost: string;
-  defaultSupplierId: string;
+  defaultSupplier: string;
   weight: string;
   weightUnit: string;
   presentation: string;
@@ -240,7 +236,7 @@ const EMPTY_DRAFT: Draft = {
   barcode: "",
   unitOfMeasure: "",
   cost: "",
-  defaultSupplierId: "",
+  defaultSupplier: "",
   weight: "",
   weightUnit: "",
   presentation: "",
@@ -470,7 +466,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
       barcode: product?.barcode || "",
       unitOfMeasure: product?.unitOfMeasure || "",
       cost: product?.cost == null ? "" : String(product.cost),
-      defaultSupplierId: product?.defaultSupplierId || "",
+      defaultSupplier: product?.defaultSupplier || "",
       weight: product?.weight == null ? "" : String(product.weight),
       weightUnit: product?.weightUnit || "",
       presentation: product?.presentation || "",
@@ -793,7 +789,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           barcode: draft.barcode.trim() || null,
           unitOfMeasure: draft.unitOfMeasure.trim() || null,
           cost,
-          defaultSupplierId: draft.defaultSupplierId || null,
+          defaultSupplier: draft.defaultSupplier.trim() || null,
           weight,
           weightUnit: draft.weightUnit.trim() || null,
           presentation: draft.presentation.trim() || null,
@@ -1543,14 +1539,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Proveedor habitual</label>
-                        <ProductSupplierSelect
-                          value={draft.defaultSupplierId}
-                          onChange={(value) => setDraft((current) => ({ ...current, defaultSupplierId: value }))}
-                          disabled={readOnly || saving || uploadingImage}
-                          currentSupplierLabel={selectedProduct?.defaultSupplier || null}
-                          currentSupplierStatus={selectedProduct?.defaultSupplierStatus || null}
-                          legacySupplierLabel={selectedProduct?.defaultSupplierLegacyName || null}
-                        />
+                        <Input value={draft.defaultSupplier} onChange={(event) => setDraft((current) => ({ ...current, defaultSupplier: event.target.value }))} placeholder="Ej. Distribuidora Norte" disabled={readOnly || saving || uploadingImage} />
                       </div>
                       <div className="grid gap-3 md:grid-cols-[1fr_0.8fr] xl:col-span-1">
                         <div className="space-y-2">

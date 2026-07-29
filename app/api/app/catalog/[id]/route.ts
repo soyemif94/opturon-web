@@ -67,23 +67,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body?.price !== undefined) payload.price = Number(body.price);
     if (body?.currency !== undefined) payload.currency = String(body.currency || "ARS");
     if (body?.sku !== undefined) payload.sku = body.sku || null;
-    if (body?.brand !== undefined) payload.brand = body.brand || null;
-    if (body?.manufacturer !== undefined) payload.manufacturer = body.manufacturer || null;
-    if (body?.barcode !== undefined) payload.barcode = body.barcode || null;
-    if (body?.unitOfMeasure !== undefined) payload.unitOfMeasure = body.unitOfMeasure || null;
-    if (body?.cost !== undefined) payload.cost = body.cost ?? null;
-    if (body?.defaultSupplierId !== undefined) payload.defaultSupplierId = body.defaultSupplierId || null;
-    if (body?.weight !== undefined) payload.weight = body.weight ?? null;
-    if (body?.weightUnit !== undefined) payload.weightUnit = body.weightUnit || null;
-    if (body?.presentation !== undefined) payload.presentation = body.presentation || null;
     if (body?.categoryId !== undefined) payload.categoryId = body.categoryId || null;
     if (body?.subcategory !== undefined) payload.subcategory = body.subcategory || null;
-    if (body?.attributes !== undefined) payload.attributes = body.attributes && typeof body.attributes === "object" ? body.attributes : {};
+    if (body?.attributes !== undefined) payload.attributes = Array.isArray(body.attributes) ? body.attributes : [];
     if (body?.image !== undefined) payload.image = body.image || null;
     if (body?.expirationDate !== undefined) payload.expirationDate = body.expirationDate || null;
     if (body?.discountPercentage !== undefined) payload.discountPercentage = body.discountPercentage ?? null;
     if (body?.automationAttribution !== undefined) payload.automationAttribution = body.automationAttribution || null;
-    if (body?.vatRate !== undefined) payload.vatRate = Number(body.vatRate);
     if (body?.status !== undefined) payload.status = String(body.status);
     if (body?.active !== undefined && body?.status === undefined) payload.status = body.active ? "active" : "inactive";
 

@@ -1,5 +1,4 @@
 import { InventoryBaseWorkspace } from "@/components/app/InventoryBaseWorkspace";
-import { InventorySectionNav } from "@/components/app/InventorySectionNav";
 import { InventoryLotsWorkspace } from "@/components/app/InventoryLotsWorkspace";
 import { canManageCatalog, canManageInventoryReceipts, canManageInventorySensitive } from "@/lib/app-permissions";
 import {
@@ -72,21 +71,13 @@ export default async function InventoryPage() {
 
   return (
     <>
-      <section className="mb-6">
-        <InventorySectionNav />
-      </section>
-      <div id="resumen">
-        <InventoryBaseWorkspace initialProducts={products} tenantId={ctx.tenantId || null} readOnly={!ctx.tenantId || readOnly} />
-      </div>
-      <div id="movimientos" />
-      <div id="lotes">
-        <InventoryLotsWorkspace
-          initialLots={lots}
-          readOnly={!ctx.tenantId || readOnly}
-          canManageSensitive={canManageSensitive}
-          canManageReceipts={canReceiveLots}
-        />
-      </div>
+      <InventoryBaseWorkspace initialProducts={products} tenantId={ctx.tenantId || null} readOnly={!ctx.tenantId || readOnly} />
+      <InventoryLotsWorkspace
+        initialLots={lots}
+        readOnly={!ctx.tenantId || readOnly}
+        canManageSensitive={canManageSensitive}
+        canManageReceipts={canReceiveLots}
+      />
     </>
   );
 }
