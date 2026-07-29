@@ -1979,6 +1979,9 @@ export type PortalProduct = {
   unitOfMeasure?: string | null;
   cost?: number | null;
   defaultSupplier?: string | null;
+  defaultSupplierId?: string | null;
+  defaultSupplierLegacyName?: string | null;
+  defaultSupplierStatus?: "active" | "inactive" | null;
   weight?: number | null;
   weightUnit?: string | null;
   presentation?: string | null;
@@ -2089,6 +2092,36 @@ export type PortalInventoryMovement = {
   idempotencyKey?: string | null;
   unit?: string | null;
   status?: "posted" | "reversed";
+};
+
+export type PortalSupplierLinkedProduct = {
+  id: string;
+  name: string;
+  sku?: string | null;
+  status: string;
+  updatedAt?: string | null;
+};
+
+export type PortalSupplier = {
+  id: string;
+  tenantId: string;
+  legalName: string;
+  tradeName?: string | null;
+  displayName: string;
+  taxId?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  status: "active" | "inactive";
+  linkedProductsCount?: number;
+  linkedProducts?: PortalSupplierLinkedProduct[];
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  deactivatedAt?: string | null;
+  deactivatedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PortalInventoryLocation = {
@@ -4096,6 +4129,43 @@ export async function getPortalProductCategories(tenantId: string, options?: { i
   }>(`/portal/tenants/${tenantId}/product-categories${suffix}`, undefined, false);
 }
 
+export async function getPortalSuppliers(
+  tenantId: string,
+  options?: {
+    search?: string;
+    status?: "active" | "inactive" | "all";
+    page?: number;
+    pageSize?: number;
+    sort?: "name_asc" | "name_desc" | "updated_asc" | "updated_desc";
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.search) params.set("search", options.search);
+  if (options?.status) params.set("status", options.status);
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  if (options?.sort) params.set("sort", options.sort);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      items: PortalSupplier[];
+      pagination: { page: number; pageSize: number; total: number; totalPages: number };
+      filters: Record<string, unknown>;
+      summary: { total: number; active: number; inactive: number };
+    };
+  }>(`/portal/tenants/${tenantId}/suppliers${suffix}`, undefined, false);
+}
+
+export async function getPortalSupplierDetail(tenantId: string, supplierId: string) {
+  return backendFetch<{ success: boolean; data: PortalSupplier }>(
+    `/portal/tenants/${tenantId}/suppliers/${supplierId}`,
+    undefined,
+    false
+  );
+}
+
 export async function createPortalProduct(
   tenantId: string,
   payload: {
@@ -4114,6 +4184,7 @@ export async function createPortalProduct(
     unitOfMeasure?: string | null;
     cost?: number | null;
     defaultSupplier?: string | null;
+    defaultSupplierId?: string | null;
     weight?: number | null;
     weightUnit?: string | null;
     presentation?: string | null;
@@ -4157,6 +4228,32 @@ export async function createPortalProductCategory(
   );
 }
 
+export async function createPortalSupplier(
+  tenantId: string,
+  payload: {
+    legalName: string;
+    tradeName?: string | null;
+    taxId?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    notes?: string | null;
+  },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalSupplier }>(
+    `/portal/tenants/${tenantId}/suppliers`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
 export async function patchPortalProduct(
   tenantId: string,
   productId: string,
@@ -4176,6 +4273,7 @@ export async function patchPortalProduct(
     unitOfMeasure?: string | null;
     cost?: number | null;
     defaultSupplier?: string | null;
+    defaultSupplierId?: string | null;
     weight?: number | null;
     weightUnit?: string | null;
     presentation?: string | null;
@@ -4205,6 +4303,52 @@ export async function patchPortalProduct(
       body: JSON.stringify(payload)
     },
     false
+  );
+}
+
+export async function patchPortalSupplier(
+  tenantId: string,
+  supplierId: string,
+  payload: {
+    legalName?: string;
+    tradeName?: string | null;
+    taxId?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    notes?: string | null;
+  },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalSupplier }>(
+    `/portal/tenants/${tenantId}/suppliers/${supplierId}`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function patchPortalSupplierStatus(
+  tenantId: string,
+  supplierId: string,
+  payload: { status: "active" | "inactive" },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalSupplier }>(
+    `/portal/tenants/${tenantId}/suppliers/${supplierId}/status`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload)
+    }
   );
 }
 
