@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { type PortalInventoryLocation, type PortalInventoryLot, type PortalInventoryLotHistoryEntry, type PortalProduct } from "@/lib/api";
-import { buildLotExpirationPayload, buildLotMutationPayload, createLotMutationAttemptKey, getLotActionAvailability, getLotActorName, sanitizeLotMutationError } from "@/lib/inventory-lot-ui";
+import { buildLotExpirationPayload, buildLotMutationPayload, buildLotWriteoffPayload, createLotMutationAttemptKey, getLotActionAvailability, getLotActorName, getLotHistoryLabel, sanitizeLotMutationError } from "@/lib/inventory-lot-ui";
 
 type LotDraft = {
   lotNumber: string;
@@ -64,6 +64,14 @@ export function ProductInventoryLotsPanel({
       }
   >(null);
   const [busyLotAction, setBusyLotAction] = useState<string | null>(null);
+  const [writeoffDialog, setWriteoffDialog] = useState<
+    | null
+    | {
+        lot: PortalInventoryLot;
+        reason: string;
+        error: string | null;
+      }
+  >(null);
 
   useEffect(() => {
     void fetchLocations();
@@ -202,15 +210,12 @@ export function ProductInventoryLotsPanel({
     }
   }
 
-  async function adjustLot(lot: PortalInventoryLot, movementType: "manual_adjustment_out" | "expired_writeoff") {
+  async function adjustLot(lot: PortalInventoryLot, movementType: "manual_adjustment_out") {
     const available = Number(lot.availableQuantity || 0);
-    const raw = window.prompt(
-      movementType === "expired_writeoff" ? `Cantidad a dar de baja. Disponible: ${formatQuantity(available)}` : "Cantidad a descontar",
-      movementType === "expired_writeoff" ? String(available) : ""
-    );
+    const raw = window.prompt("Cantidad a descontar", "");
     const quantity = Number(raw);
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > available) return;
-    const defaultReason = movementType === "expired_writeoff" ? "Producto vencido" : "Ajuste de inventario";
+    const defaultReason = "Ajuste de inventario";
     const reason = window.prompt("Motivo", defaultReason) || defaultReason;
 
     setSaving(true);
@@ -235,6 +240,10 @@ export function ProductInventoryLotsPanel({
     } finally {
       setSaving(false);
     }
+  }
+
+  function openWriteoffDialog(lot: PortalInventoryLot) {
+    setWriteoffDialog({ lot, reason: "", error: null });
   }
 
   function openBlockDialog(lot: PortalInventoryLot) {
@@ -313,6 +322,54 @@ export function ProductInventoryLotsPanel({
                     : current.kind === "unblock"
                       ? "No se pudo desbloquear el lote."
                       : "No se pudo actualizar el vencimiento."
+            }
+          : current
+      ));
+    } finally {
+      setBusyLotAction(null);
+    }
+  }
+
+  async function confirmWriteoffAction() {
+    if (!writeoffDialog) return;
+
+    const nextReason = writeoffDialog.reason.trim();
+    if (!nextReason) {
+      setWriteoffDialog((current) => (current ? { ...current, error: "El motivo es obligatorio." } : current));
+      return;
+    }
+
+    const available = Number(writeoffDialog.lot.availableQuantity || 0);
+    if (!Number.isFinite(available) || available <= 0) {
+      setWriteoffDialog((current) => (current ? { ...current, error: "El lote no tiene stock disponible para dar de baja." } : current));
+      return;
+    }
+
+    const payload = buildLotWriteoffPayload(writeoffDialog.lot.id, available, nextReason, createLotMutationAttemptKey());
+    const actionKey = `manualWriteoff:${writeoffDialog.lot.id}`;
+    setBusyLotAction(actionKey);
+    setFeedback(null);
+    setWriteoffDialog((current) => (current ? { ...current, error: null } : current));
+
+    try {
+      const response = await fetch(`/api/app/inventory/lots/${writeoffDialog.lot.id}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(sanitizeLotMutationError(json?.error || null, "No se pudo dar de baja el lote."));
+      }
+      await Promise.all([refreshLots(), refreshLotHistory(writeoffDialog.lot.id)]);
+      setFeedback("Baja manual registrada.");
+      setWriteoffDialog(null);
+    } catch (error) {
+      setWriteoffDialog((current) => (
+        current
+          ? {
+              ...current,
+              error: error instanceof Error ? error.message : "No se pudo dar de baja el lote."
             }
           : current
       ));
@@ -451,15 +508,14 @@ export function ProductInventoryLotsPanel({
                         </Button>
                       ) : null}
                       {actionState.canAdjustOut ? (
-                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "manual_adjustment_out")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "manual_adjustment_out")} disabled={readOnly || saving || busyLotAction !== null || Number(lot.availableQuantity || 0) <= 0}>
                           Ajustar salida
                         </Button>
                       ) : null}
                       {actionState.canWriteOff ? (
-                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot, "expired_writeoff")} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>
+                        <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => openWriteoffDialog(lot)} disabled={readOnly || saving || busyLotAction !== null || Number(lot.availableQuantity || 0) <= 0}>
                           Dar de baja
-                          <span className="sr-only">Dar de baja stock vencido</span>
-                          <span className="sr-only">Baja vencido</span>
+                          <span className="sr-only">Dar de baja manualmente el lote</span>
                         </Button>
                       ) : null}
                       <Button type="button" size="sm" variant="ghost" className="rounded-2xl" onClick={() => void refreshLotHistory(lot.id)} disabled={saving || busyLotAction !== null}>
@@ -472,7 +528,7 @@ export function ProductInventoryLotsPanel({
                         <div className="mt-2 space-y-2 text-sm text-muted">
                           {lotHistoryById[lot.id].slice(0, 3).map((entry) => (
                             <div key={entry.id} className="rounded-xl border border-[color:var(--border)] bg-surface/40 p-2">
-                              <p className="font-medium text-foreground">{entry.type || entry.kind || "Movimiento"}</p>
+                              <p className="font-medium text-foreground">{getLotHistoryLabel(entry)}</p>
                               <p className="mt-1">
                                 {formatDateTime(entry.createdAt)}
                                 {entry.createdBy ? ` | ${entry.createdBy}` : ""}
@@ -579,6 +635,48 @@ export function ProductInventoryLotsPanel({
                   : lotDialog?.kind === "unblock"
                     ? "Confirmar desbloqueo"
                     : "Guardar vencimiento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(writeoffDialog)} onOpenChange={(open) => (!open ? setWriteoffDialog(null) : null)}>
+        <DialogContent className="max-w-xl rounded-[28px] border-white/10 bg-[linear-gradient(180deg,rgba(10,18,30,0.98),rgba(8,14,23,0.98))]">
+          <DialogHeader>
+            <DialogTitle>Dar de baja lote</DialogTitle>
+            <DialogDescription>Registra una baja manual general para este lote sin marcarlo como vencido.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-4 text-sm text-muted">
+              <p>Lote {writeoffDialog?.lot.lotNumber || "sin numero"}</p>
+              <p className="mt-1">Cantidad a dar de baja: {formatQuantity(Number(writeoffDialog?.lot.availableQuantity || 0))}</p>
+              <p className="mt-1">Vencimiento actual: {writeoffDialog?.lot.expiresAt || "Sin fecha"}</p>
+            </div>
+            <label className="block space-y-2 text-sm">
+              <span className="font-medium">Motivo</span>
+              <Textarea
+                autoFocus
+                className="min-h-[120px]"
+                value={writeoffDialog?.reason || ""}
+                onChange={(event) => setWriteoffDialog((current) => (current ? { ...current, reason: event.target.value, error: null } : current))}
+                placeholder="Ej. Cierre QA D3, rotura, merma o retiro preventivo"
+                disabled={busyLotAction !== null}
+                aria-invalid={writeoffDialog?.error ? true : false}
+                aria-describedby={writeoffDialog?.error ? "lot-writeoff-error" : undefined}
+              />
+            </label>
+          </div>
+          {writeoffDialog?.error ? (
+            <div id="lot-writeoff-error" className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-3 text-sm text-rose-100">
+              {writeoffDialog.error}
+            </div>
+          ) : null}
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:flex-wrap">
+            <Button type="button" variant="ghost" onClick={() => setWriteoffDialog(null)} disabled={busyLotAction !== null}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => void confirmWriteoffAction()} disabled={busyLotAction !== null}>
+              {busyLotAction !== null ? "Procesando..." : "Confirmar baja manual"}
             </Button>
           </DialogFooter>
         </DialogContent>

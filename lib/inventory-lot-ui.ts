@@ -1,4 +1,4 @@
-import type { PortalInventoryLot } from "@/lib/api";
+import type { PortalInventoryLot, PortalInventoryLotHistoryEntry } from "@/lib/api";
 
 export type LotMutationKind = "block" | "unblock";
 
@@ -94,6 +94,43 @@ export function buildLotExpirationPayload(lotId: string, expiresAt: string, reas
     reason: reason.trim(),
     idempotencyKey: `lot-expiration:${lotId}:${attemptKey}`
   };
+}
+
+export function buildLotWriteoffPayload(lotId: string, quantity: number, reason: string, attemptKey: string) {
+  return {
+    movementType: "manual_decrease" as const,
+    quantity,
+    reason: reason.trim(),
+    referenceType: "inventory_manual_writeoff" as const,
+    idempotencyKey: `lot-adjust:${lotId}:manual_decrease:${attemptKey}`
+  };
+}
+
+export function getLotHistoryLabel(entry: PortalInventoryLotHistoryEntry) {
+  switch (entry.type) {
+    case "manual_writeoff":
+      return "Baja manual";
+    case "expired_writeoff":
+      return "Baja por vencimiento";
+    case "manual_adjustment_out":
+    case "manual_decrease":
+      return "Ajuste de salida";
+    case "manual_adjustment_in":
+    case "manual_increase":
+      return "Ajuste de ingreso";
+    case "block":
+      return "Bloqueo";
+    case "unblock":
+      return "Desbloqueo";
+    case "change_expiration":
+      return "Cambio de vencimiento";
+    case "purchase_receipt":
+      return "Ingreso";
+    case "writeoff":
+      return "Baja";
+    default:
+      return entry.type || entry.kind || "Movimiento";
+  }
 }
 
 export function sanitizeLotMutationError(message: string | null | undefined, fallback: string) {

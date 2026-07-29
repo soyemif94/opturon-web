@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { type PortalInventoryExpirationSummary, type PortalInventoryExpirationThresholds, type PortalInventoryLot, type PortalInventoryLotHistoryEntry } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { getLotHistoryLabel } from "@/lib/inventory-lot-ui";
 
 const DEFAULT_THRESHOLDS: PortalInventoryExpirationThresholds = {
   criticalDays: 3,
@@ -558,7 +559,7 @@ function LotDetailCard({ lot, history, onWriteOff, readOnly }: { lot: PortalInve
         <p className="text-xs uppercase tracking-[0.16em] text-muted">Historial reciente</p>
         {history.length ? history.map((entry) => (
           <div key={entry.id} className="rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm text-muted">
-            <span className="font-medium text-foreground">{entry.type}</span> | {entry.reason || "Sin motivo"} | {entry.createdAt?.slice(0, 19).replace("T", " ")}
+            <span className="font-medium text-foreground">{getLotHistoryLabel(entry)}</span> | {entry.reason || "Sin motivo"} | {entry.createdAt?.slice(0, 19).replace("T", " ")}
           </div>
         )) : <p className="text-sm text-muted">Todavia no cargamos historial para este lote.</p>}
       </div>

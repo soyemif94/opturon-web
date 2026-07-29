@@ -10,7 +10,8 @@ const bulkWriteoffRoute = fs.readFileSync(path.join(root, "app/api/app/inventory
 
 assert(workspace.includes("expirationStatus"), "inventory list must render expiration status");
 assert(workspace.includes("Vencidos"), "inventory dashboard must show expired metric");
-assert(panel.includes("Baja vencido"), "product lot panel must expose expired writeoff action");
+assert(workspace.includes("Dar de baja stock vencido"), "expiration workspace must expose expired writeoff action");
+assert(panel.includes("Dar de baja lote"), "product lot panel must expose manual writeoff action");
 assert(expirationRoute.includes('permission: "manage_inventory_sensitive"'), "expiration settings must require sensitive inventory permission");
 assert(bulkWriteoffRoute.includes('permission: "manage_inventory_sensitive"'), "bulk writeoff must require sensitive inventory permission");
 
