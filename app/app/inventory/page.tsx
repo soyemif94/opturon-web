@@ -79,8 +79,6 @@ export default async function InventoryPage() {
         initialProducts={products}
         tenantId={ctx.tenantId || null}
         readOnly={!ctx.tenantId || readOnly}
-        summarySectionId="resumen"
-        movementsSectionId="movimientos"
       />
       <div id="lotes" className="scroll-mt-28">
         <InventoryLotsWorkspace

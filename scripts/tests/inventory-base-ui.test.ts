@@ -37,7 +37,7 @@ assert.match(workspace, /setSelectedProduct\(product\)/);
 assert.match(workspace, /No se pudo cargar historial\. Podes registrar el movimiento igual y reintentar mas tarde\./);
 assert.match(workspace, /Reintentar/);
 assert.match(workspace, /historyError/);
-assert.match(workspace, /openPanel\(product, "history"\)/);
+assert.match(workspace, /Link href=\{`\/app\/inventory\/movements\?productId=\$\{encodeURIComponent\(product\.id\)\}`\}>Historial<\/Link>/);
 assert.match(workspace, /openPanel\(product, "movement"\)/);
 assert.match(workspace, /setActivePanel\(null\)/);
 assert.match(workspace, /Cerrar panel/);

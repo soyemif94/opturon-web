@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { ClientPageShell } from "@/components/app/client-page-shell";
@@ -17,15 +18,11 @@ const EMPTY_HISTORY: PortalInventoryMovement[] = [];
 export function InventoryBaseWorkspace({
   initialProducts,
   tenantId = null,
-  readOnly = false,
-  summarySectionId,
-  movementsSectionId
+  readOnly = false
 }: {
   initialProducts: PortalInventoryProduct[];
   tenantId?: string | null;
   readOnly?: boolean;
-  summarySectionId?: string;
-  movementsSectionId?: string;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [search, setSearch] = useState("");
@@ -230,13 +227,13 @@ export function InventoryBaseWorkspace({
       description="Base operativa de stock con codigo interno, ubicacion principal y ledger auditable."
       badge="Inventario"
     >
-      <div id={summarySectionId} className="grid scroll-mt-28 gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard label="Productos" value={String(summary.total)} helper="Catalogo visible en inventario" />
         <SummaryCard label="Con stock" value={String(summary.withStock)} helper="Disponibilidad positiva" />
         <SummaryCard label="Sin stock" value={String(summary.withoutStock)} helper="Requieren reposicion o correccion" />
       </div>
 
-      <Card id={movementsSectionId} className="mt-6 scroll-mt-28">
+      <Card className="mt-6">
         <CardHeader>
           <CardTitle>Stock actual</CardTitle>
           <CardDescription>Ubicacion principal unica por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
@@ -299,8 +296,8 @@ export function InventoryBaseWorkspace({
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" variant="secondary" onClick={() => openPanel(product, "history")}>
-                          Historial
+                        <Button asChild type="button" size="sm" variant="secondary">
+                          <Link href={`/app/inventory/movements?productId=${encodeURIComponent(product.id)}`}>Historial</Link>
                         </Button>
                         <Button type="button" size="sm" onClick={() => openPanel(product, "movement")} disabled={readOnly}>
                           Registrar movimiento

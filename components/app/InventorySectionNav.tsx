@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 
 const items = [
   { href: "/app/inventory", label: "Resumen" },
-  { href: "/app/inventory#movimientos", label: "Movimientos" },
+  { href: "/app/inventory/movements", label: "Movimientos" },
   { href: "/app/inventory#lotes", label: "Lotes" },
   { href: "/app/inventory/suppliers", label: "Proveedores" },
   { href: "/app/inventory/receipts", label: "Recepciones" },
@@ -22,6 +22,8 @@ export function InventorySectionNav() {
         const active =
           item.href === "/app/inventory/suppliers"
             ? pathname.startsWith("/app/inventory/suppliers")
+            : item.href === "/app/inventory/movements"
+              ? pathname.startsWith("/app/inventory/movements")
             : item.href === "/app/inventory/receipts"
               ? pathname.startsWith("/app/inventory/receipts") && !pathname.startsWith("/app/inventory/receipts/new")
               : item.href === "/app/inventory/receipts/new"

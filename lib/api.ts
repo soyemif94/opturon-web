@@ -2094,6 +2094,33 @@ export type PortalInventoryMovement = {
   status?: "posted" | "reversed";
 };
 
+export type PortalInventoryMovementListItem = {
+  id: string;
+  tenantId: string;
+  productId: string;
+  productName?: string | null;
+  productSku?: string | null;
+  internalCode?: string | null;
+  lotId?: string | null;
+  lotNumber?: string | null;
+  locationId?: string | null;
+  locationName?: string | null;
+  movementType: PortalInventoryMovement["movementType"];
+  quantity: string;
+  quantityBefore?: string | null;
+  quantityAfter?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  reason?: string | null;
+  metadata?: Record<string, unknown>;
+  createdBy?: string | null;
+  actorName?: string | null;
+  createdAt: string;
+  idempotencyKey?: string | null;
+  unit?: string | null;
+  status?: "posted" | "reversed";
+};
+
 export type PortalSupplierLinkedProduct = {
   id: string;
   name: string;
@@ -3249,6 +3276,43 @@ export async function getPortalInventoryProducts(
       products: PortalInventoryProduct[];
     };
   }>(`/portal/tenants/${tenantId}/inventory/products${suffix}`, undefined, false);
+}
+
+export async function getPortalInventoryMovements(
+  tenantId: string,
+  options?: {
+    search?: string;
+    movementType?: PortalInventoryMovement["movementType"];
+    locationId?: string;
+    productId?: string;
+    lotNumber?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.search) params.set("search", options.search);
+  if (options?.movementType) params.set("movementType", options.movementType);
+  if (options?.locationId) params.set("locationId", options.locationId);
+  if (options?.productId) params.set("productId", options.productId);
+  if (options?.lotNumber) params.set("lotNumber", options.lotNumber);
+  if (options?.dateFrom) params.set("dateFrom", options.dateFrom);
+  if (options?.dateTo) params.set("dateTo", options.dateTo);
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      page: number;
+      pageSize: number;
+      total: number;
+      items: PortalInventoryMovementListItem[];
+    };
+  }>(`/portal/tenants/${tenantId}/inventory/movements${suffix}`, undefined, false);
 }
 
 export async function getPortalInventoryProductHistory(
