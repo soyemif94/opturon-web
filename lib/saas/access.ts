@@ -40,6 +40,14 @@ function normalizeScope(value?: string) {
   return String(value || "").trim().toLowerCase();
 }
 
+export function isOpturonAdminWorkspaceContext(ctx: {
+  tenantId?: string;
+  globalRole?: Parameters<typeof isStaffRole>[0];
+  accountScope?: string;
+}) {
+  return Boolean(ctx.tenantId && isStaffRole(ctx.globalRole) && normalizeScope(ctx.accountScope) === "opturon_admin");
+}
+
 export function hasOpturonAdminApiAccess(ctx: {
   session?: { user?: { id?: string; portalActorId?: string; accountScope?: string } } | null;
   userId?: string;
@@ -137,10 +145,11 @@ export async function requireOpturonAdminApi() {
 
 async function resolveTenantModulesForContext(ctx: {
   tenantId?: string;
-  globalRole?: string;
+  globalRole?: Parameters<typeof isStaffRole>[0];
   tenantRole?: string;
   accountScope?: string;
 }) {
+  if (isOpturonAdminWorkspaceContext(ctx)) return null;
   if (!ctx.tenantId || !isBackendConfigured()) return null;
   const result = await getPortalTenantContext(ctx.tenantId).catch(() => null);
   return buildTenantAppModules(result?.data?.policy || null);

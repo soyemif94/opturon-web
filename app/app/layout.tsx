@@ -2,7 +2,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CommandPaletteProvider } from "@/components/ui/command-palette";
 import { isStaffRole } from "@/lib/app-permissions";
 import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { isOpturonAdminWorkspaceContext, requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
 import { buildTenantAppModules } from "@/lib/tenant-policy";
 import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
@@ -35,7 +35,7 @@ export default async function ClientPortalLayout({ children }: { children: React
     : undefined;
   const appGlobalRole = ctx.globalRole === "partner" ? undefined : ctx.globalRole;
   const tenantContext =
-    ctx.tenantId && isBackendConfigured()
+    ctx.tenantId && isBackendConfigured() && !isOpturonAdminWorkspaceContext(ctx)
       ? await getPortalTenantContext(ctx.tenantId).catch(() => null)
       : null;
   const tenantModules = buildTenantAppModules(tenantContext?.data?.policy || null);
