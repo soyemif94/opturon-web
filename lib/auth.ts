@@ -351,13 +351,8 @@ export const authOptions: NextAuthOptions = {
               return token;
             }
             const tokenTenantId = String(token.tenantId || "").trim();
-            if (!tokenTenantId) {
-              invalidateTokenAsUnauthenticated(token);
-              token.authSource = "backend";
-              return token;
-            }
             try {
-              const response = await getPortalAuthUserByEmail(String(token.email), tokenTenantId);
+              const response = await getPortalAuthUserByEmail(String(token.email), tokenTenantId || undefined);
               const hydratedUser = response.data;
               if (hydratedUser) {
                 token.userId = hydratedUser.id;
@@ -375,6 +370,10 @@ export const authOptions: NextAuthOptions = {
                 });
                 token.portalActorId = undefined;
                 token.authSource = "backend";
+              } else if (!tokenTenantId) {
+                invalidateTokenAsUnauthenticated(token);
+                token.authSource = "backend";
+                return token;
               } else {
                 token.userId = undefined;
                 token.tenantId = undefined;
