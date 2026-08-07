@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
   const redirectUri = new URL(config.callbackPath, request.nextUrl.origin).toString();
   const statePayload = {
     tenantId: auth.ctx.tenantId,
+    provider: config.provider,
     nonce: crypto.randomUUID(),
     at: Date.now()
   };

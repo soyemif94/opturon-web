@@ -75,6 +75,7 @@ function testInstagramErrorsAndAssetPicker() {
   const hubSource = read("components/app/integrations-hub.tsx");
   const callbackSource = read("app/api/app/integrations/instagram/callback/route.ts");
   const apiRouteSource = read("app/api/app/integrations/instagram/route.ts");
+  const startRoute = read("app/api/app/integrations/instagram/start/route.ts");
 
   assert.match(hubSource, /instagram_business_account_not_found/);
   assert.match(hubSource, /Meta rechazo los permisos solicitados/);
@@ -87,10 +88,22 @@ function testInstagramErrorsAndAssetPicker() {
   assert.match(hubSource, /selectedPageId/);
   assert.match(hubSource, /selectedInstagramUserId/);
   assert.match(callbackSource, /instagram_multiple_assets_found/);
+  assert.match(callbackSource, /oauthProvider:\s*[\s\S]*paramState\?\.provider === "instagram_login" \|\| paramState\?\.provider === "facebook_login"/);
+  assert.match(startRoute, /provider: config\.provider/);
   assert.match(callbackSource, /Buffer\.from\(JSON\.stringify\(candidates\)\)\.toString\("base64url"\)/);
   assert.match(apiRouteSource, /selectionToken/);
   assert.match(apiRouteSource, /selectedPageId/);
   assert.match(apiRouteSource, /selectedInstagramUserId/);
+}
+
+function testCallbackProviderValidation() {
+  const callbackSource = read("app/api/app/integrations/instagram/callback/route.ts");
+
+  assert.match(callbackSource, /rawProvider === ""/);
+  assert.match(callbackSource, /rawProvider === "instagram_login" \|\| rawProvider === "facebook_login"/);
+  assert.match(callbackSource, /cookieState\.provider !== "__invalid__"/);
+  assert.match(callbackSource, /paramState\.provider !== "__invalid__"/);
+  assert.match(callbackSource, /cookieState\.provider === paramState\.provider/);
 }
 
 function testNoInstagramOutboundPromise() {
@@ -106,6 +119,7 @@ function run() {
   testInstagramIntegrationVisible();
   testSafeInstagramOauthLogging();
   testInstagramErrorsAndAssetPicker();
+  testCallbackProviderValidation();
   testNoInstagramOutboundPromise();
   console.log("instagram-connection-ui.test.ts: ok");
 }

@@ -8,9 +8,22 @@ const INSTAGRAM_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 function parseStateValue(value: string | null) {
   if (!value) return null;
   try {
-    const parsed = JSON.parse(value) as { tenantId?: string; nonce?: string; at?: number };
+    const parsed = JSON.parse(value) as {
+      tenantId?: string;
+      provider?: string;
+      nonce?: string;
+      at?: number;
+    };
+    const rawProvider = String(parsed.provider || "").trim().toLowerCase();
+    const provider =
+      rawProvider === ""
+        ? null
+        : rawProvider === "instagram_login" || rawProvider === "facebook_login"
+          ? rawProvider
+          : "__invalid__";
     return {
       tenantId: String(parsed.tenantId || "").trim() || null,
+      provider,
       nonce: String(parsed.nonce || "").trim() || null,
       at: Number(parsed.at || 0)
     };
@@ -70,6 +83,9 @@ export async function GET(request: NextRequest) {
     cookieState?.tenantId &&
     paramState?.tenantId &&
     cookieState.tenantId === paramState.tenantId &&
+    cookieState.provider !== "__invalid__" &&
+    paramState.provider !== "__invalid__" &&
+    cookieState.provider === paramState.provider &&
     cookieState.nonce &&
     paramState.nonce &&
     cookieState.nonce === paramState.nonce &&
@@ -106,7 +122,13 @@ export async function GET(request: NextRequest) {
     });
     await connectPortalInstagram(auth.ctx.tenantId, {
       code,
-      redirectUri
+      redirectUri,
+      oauthProvider:
+        paramState?.provider === "instagram_login" || paramState?.provider === "facebook_login"
+          ? paramState.provider
+          : cookieState?.provider === "instagram_login" || cookieState?.provider === "facebook_login"
+            ? cookieState.provider
+            : undefined
     });
     redirectTarget.searchParams.set("instagram", "connected");
     console.info("[instagram-oauth] callback_connect_succeeded", {

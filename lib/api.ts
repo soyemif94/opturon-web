@@ -639,6 +639,7 @@ export async function connectPortalInstagram(
   payload: {
     code?: string;
     redirectUri?: string;
+    oauthProvider?: string;
     selectionToken?: string;
     selectedPageId?: string;
     selectedInstagramUserId?: string;
@@ -2238,6 +2239,74 @@ export type PortalPurchaseReceiptDetail = {
     totalQuantity: string;
     totalCost: string | null;
   };
+};
+
+export type PortalPurchaseReceiptExtractionLine = {
+  clientLineId: string;
+  rawDescription: string;
+  supplierProductCode: string | null;
+  barcode: string | null;
+  quantity: string;
+  unitCost: string;
+  lineTotal: string | null;
+  lotNumber: string;
+  expiresAt: string;
+  unitOfMeasure: string | null;
+  confidence: number;
+  sourcePage: number | null;
+  matchStatus: "exact" | "suggested" | "ambiguous" | "unresolved";
+  matchedProductId: string | null;
+  candidates: Array<{
+    id: string;
+    name: string;
+    internalCode: string | null;
+    sku: string | null;
+    barcode: string | null;
+    inventoryTrackingMode: "legacy" | "lot_based";
+    status: "active" | "inactive";
+    score: string | null;
+    reason: "barcode_exact" | "internal_code_exact" | "sku_exact" | "name_exact" | "name_similarity";
+  }>;
+  reason: string;
+  warnings?: string[];
+};
+
+export type PortalPurchaseReceiptExtraction = {
+  source: {
+    fileName: string;
+    mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
+    size: number;
+    sha256: string;
+    sourceType: "pdf" | "image";
+    processingMode: "mock" | "openai";
+  };
+  documentType: "invoice" | "delivery_note" | "unknown";
+  header: {
+    supplierName: string | null;
+    supplierTaxId: string | null;
+    documentNumber: string | null;
+    documentDate: string | null;
+    currency: string | null;
+    rawConfidence: number;
+    warnings: string[];
+  };
+  lines: PortalPurchaseReceiptExtractionLine[];
+  supplierMatch: {
+    status: "exact" | "suggested" | "ambiguous" | "unresolved";
+    matchedSupplierId: string | null;
+    candidates: Array<{
+      id: string;
+      legalName: string;
+      tradeName: string | null;
+      taxIdMasked: string | null;
+      status: "active" | "inactive";
+      score: string | null;
+      reason: "tax_id_exact" | "legal_name_exact" | "trade_name_exact" | "name_similarity";
+    }>;
+    reason: string;
+  };
+  requiresReview: boolean;
+  canContinueManually?: boolean;
 };
 
 export type PortalInventoryLotHistoryEntry = {
@@ -4371,6 +4440,27 @@ export async function createPortalPurchaseReceipt(
     method: "POST",
     headers,
     body: JSON.stringify(payload)
+  });
+}
+
+export async function extractPortalPurchaseReceiptDocument(
+  tenantId: string,
+  formData: FormData,
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      tenantId: string;
+      extraction: PortalPurchaseReceiptExtraction;
+    };
+  }>(`/portal/tenants/${tenantId}/purchase-receipt-extractions`, {
+    method: "POST",
+    headers,
+    body: formData
   });
 }
 
