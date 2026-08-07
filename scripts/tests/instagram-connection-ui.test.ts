@@ -30,7 +30,6 @@ function testInstagramScopes() {
   assert.match(startRoute, /"pages_show_list"/);
   assert.match(startRoute, /"instagram_business_basic"/);
   assert.match(startRoute, /"instagram_business_manage_messages"/);
-  assert.match(startRoute, /"instagram_business_manage_comments"/);
   assert.match(startRoute, /"pages_read_engagement"/);
   assert.doesNotMatch(startRoute, /"instagram_basic"/);
   assert.doesNotMatch(startRoute, /"instagram_manage_messages"/);
@@ -38,6 +37,10 @@ function testInstagramScopes() {
 
   const instagramScopes = startRoute.match(/instagramLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
   assert.doesNotMatch(instagramScopes, /pages_/);
+  assert.doesNotMatch(instagramScopes, /instagram_business_manage_comments/);
+
+  const facebookScopes = startRoute.match(/facebookLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
+  assert.match(facebookScopes, /instagram_business_manage_comments/);
 }
 
 function testInstagramIntegrationVisible() {

@@ -56,8 +56,7 @@ export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env
     // Page permissions remain necessary because the backend discovers the linked IG account via /me/accounts.
     instagramLoginScopes: [
       "instagram_business_basic",
-      "instagram_business_manage_messages",
-      "instagram_business_manage_comments"
+      "instagram_business_manage_messages"
     ],
     facebookLoginScopes: [
       "pages_show_list",
