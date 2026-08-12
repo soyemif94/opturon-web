@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Banknote,
+  BellRing,
   Bot,
   Building2,
   CheckCircle2,
@@ -328,6 +329,22 @@ export default async function AppSettingsPage() {
             <StatusRow label="Politica" value={backendReady ? "Persistida en backend" : "Backend requerido"} tone={backendReady ? "success" : "muted"} />
             <StatusRow label="Desactivacion" value="Oculta y bloquea acceso" tone="muted" />
             <StatusRow label="Reactivacion" value="Recupera acceso sobre los datos existentes" tone="success" />
+          </div>
+        </HubCard>
+
+        <HubCard
+          href="/app/settings/operational-alerts"
+          icon={<BellRing className="h-6 w-6 text-brandBright" />}
+          title="Alertas operativas"
+          subtitle="Avisos internos por WhatsApp"
+          description="Configurá avisos automáticos por WhatsApp para responsables de tu operación."
+          cta="Configurar alertas"
+          accent="brand"
+        >
+          <div className="space-y-3">
+            <StatusRow label="Responsables" value="Consentimiento explícito" tone="success" />
+            <StatusRow label="Reglas" value="Activación con controles" tone="success" />
+            <StatusRow label="Historial" value="Entregas auditables" tone="muted" />
           </div>
         </HubCard>
 

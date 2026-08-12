@@ -179,6 +179,32 @@ async function backendPortalFetch<T>(path: string, init?: RequestInit, timeoutMs
   return backendFetch<T>(path, { ...init, headers }, false, timeoutMs);
 }
 
+export async function requestPortalOperationalAlerts<T>(
+  tenantId: string,
+  path: string,
+  options: {
+    method?: "GET" | "POST" | "PATCH" | "PUT";
+    actorUserId: string;
+    body?: unknown;
+  }
+) {
+  const safeTenantId = String(tenantId || "").trim();
+  const safeActorUserId = String(options.actorUserId || "").trim();
+  const safePath = String(path || "").trim();
+  if (!safeTenantId || !safeActorUserId || !safePath.startsWith("/")) {
+    throw new Error("operational_alerts_request_context_invalid");
+  }
+
+  return backendPortalFetch<T>(`/portal/tenants/${encodeURIComponent(safeTenantId)}/operational-alerts${safePath}`, {
+    method: options.method || "GET",
+    headers: {
+      "x-portal-actor-id": safeActorUserId,
+      "x-active-tenant-id": safeTenantId
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+}
+
 export type InboxItem = {
   ts: string;
   type: string;
