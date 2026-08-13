@@ -6,6 +6,7 @@ import {
   getBackendErrorStatus,
   requestAdminTenantOperationalAlerts
 } from "@/lib/api";
+import { sanitizeOperationalAlertsPayload } from "@/lib/operational-alerts";
 import { requireOpturonAdminApi, resolveOpturonAdminActorId } from "@/lib/saas/access";
 
 const TENANT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -66,7 +67,7 @@ export async function proxyAdminTenantOperationalAlertsRead(
       `/${resource}${query}`,
       { method: "GET", actorUserId }
     );
-    return noStore(NextResponse.json(result.data));
+    return noStore(NextResponse.json(sanitizeOperationalAlertsPayload(result.data)));
   } catch (error) {
     return noStore(
       NextResponse.json(

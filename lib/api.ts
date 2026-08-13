@@ -214,7 +214,7 @@ export async function requestAdminTenantOperationalAlerts<T>(
   targetTenantId: string,
   path: string,
   options: {
-    method?: "GET" | "PATCH";
+    method?: "GET" | "POST" | "PATCH" | "PUT";
     actorUserId: string;
     body?: unknown;
   }

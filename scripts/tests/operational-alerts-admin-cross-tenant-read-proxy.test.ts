@@ -24,14 +24,24 @@ function run() {
   assert.match(helper, /history: new Set\(\["eventType", "ruleId", "status", "dateFrom", "dateTo", "recipientId", "page", "pageSize"\]\)/);
   assert.match(helper, /requestAdminTenantOperationalAlerts/);
   assert.match(helper, /\{ method: "GET", actorUserId \}/);
+  assert.match(helper, /sanitizeOperationalAlertsPayload\(result\.data\)/);
   assert.doesNotMatch(helper, /request\.json\(|POST\(|PATCH\(|PUT\(/);
 
   for (const [route, resource] of [[rulesRoute, "rules"], [recipientsRoute, "recipients"], [historyRoute, "history"]] as const) {
     assert.match(route, /proxyAdminTenantOperationalAlertsRead/);
     assert.match(route, new RegExp(`"${resource}"`));
     assert.match(route, /export async function GET/);
-    assert.doesNotMatch(route, /POST\(|PATCH\(|PUT\(|DELETE\(/);
   }
+
+  // Rules and recipients share their collection routes with the separate,
+  // explicitly-scoped canary write proxy. History remains read-only.
+  assert.match(rulesRoute, /proxyAdminTenantOperationalAlertsCanaryWrite/);
+  assert.match(rulesRoute, /"ruleCreate"/);
+  assert.match(recipientsRoute, /proxyAdminTenantOperationalAlertsCanaryWrite/);
+  assert.match(recipientsRoute, /"recipientCreate"/);
+  assert.doesNotMatch(rulesRoute, /export async function PATCH|export async function PUT|export async function DELETE/);
+  assert.doesNotMatch(recipientsRoute, /export async function PATCH|export async function PUT|export async function DELETE/);
+  assert.doesNotMatch(historyRoute, /POST\(|PATCH\(|PUT\(|DELETE\(/);
 
   console.log("operational-alerts-admin-cross-tenant-read-proxy.test.ts: ok");
 }
