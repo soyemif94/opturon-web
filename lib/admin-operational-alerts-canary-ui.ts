@@ -31,7 +31,7 @@ export type AdminCanaryPreflight = {
     digestItemCount?: number;
     truncated?: boolean;
   };
-  reasons?: Array<{ code?: string } | string>;
+  reasons?: Array<{ code?: string; detail?: string } | string>;
 };
 
 export const EXPECTED_PRE_ENABLE_REASON_CODES = [
