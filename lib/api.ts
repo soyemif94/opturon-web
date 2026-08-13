@@ -223,7 +223,7 @@ export async function requestAdminTenantOperationalAlerts<T>(
   const safeTargetTenantId = String(targetTenantId || "").trim();
   const safeActorUserId = String(options.actorUserId || "").trim();
   const safePath = String(path || "").trim();
-  if (!safeAdminWorkspaceTenantId || !safeTargetTenantId || !safeActorUserId || !safePath.startsWith("/")) {
+  if (!safeAdminWorkspaceTenantId || !safeTargetTenantId || !safeActorUserId || !safePath || !safePath.startsWith("/")) {
     throw new Error("admin_operational_alerts_request_context_invalid");
   }
 
@@ -236,6 +236,58 @@ export async function requestAdminTenantOperationalAlerts<T>(
         "x-active-tenant-id": safeTargetTenantId
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    }
+  );
+}
+
+type AdminQaInventoryOperation = "productCreate" | "locationCreate" | "lotCreate" | "lotRollback";
+
+function adminQaInventoryPath(operation: AdminQaInventoryOperation, lotId?: string) {
+  switch (operation) {
+    case "productCreate":
+      return "/products";
+    case "locationCreate":
+      return "/locations";
+    case "lotCreate":
+      return "/lots";
+    case "lotRollback": {
+      const safeLotId = String(lotId || "").trim();
+      return safeLotId ? `/lots/${encodeURIComponent(safeLotId)}/rollback` : null;
+    }
+  }
+}
+
+// This is deliberately separate from the operational-alerts proxy. The Admin
+// workspace remains the URL tenant while the selected client tenant and actor
+// are resolved exclusively on the server for the four tightly-scoped QA
+// inventory setup operations. It cannot issue arbitrary inventory paths.
+export async function requestAdminTenantQaInventory<T>(
+  adminWorkspaceTenantId: string,
+  targetTenantId: string,
+  operation: AdminQaInventoryOperation,
+  options: {
+    actorUserId: string;
+    body: unknown;
+    lotId?: string;
+  }
+) {
+  const safeAdminWorkspaceTenantId = String(adminWorkspaceTenantId || "").trim();
+  const safeTargetTenantId = String(targetTenantId || "").trim();
+  const safeActorUserId = String(options.actorUserId || "").trim();
+  const safePath = adminQaInventoryPath(operation, options.lotId);
+  if (!safeAdminWorkspaceTenantId || !safeTargetTenantId || !safeActorUserId || !safePath || !safePath.startsWith("/")) {
+    throw new Error("admin_qa_inventory_request_context_invalid");
+  }
+
+  return backendPortalFetch<T>(
+    `/portal/tenants/${encodeURIComponent(safeAdminWorkspaceTenantId)}/admin-qa-inventory${safePath}`,
+    {
+      method: "POST",
+      headers: {
+        "x-portal-actor-id": safeActorUserId,
+        "x-active-tenant-id": safeTargetTenantId
+      },
+      body: JSON.stringify(options.body)
     }
   );
 }
