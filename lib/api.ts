@@ -745,7 +745,12 @@ export async function createPortalWhatsAppTemplateFromBlueprint(
   });
 }
 
-export async function syncPortalWhatsAppTemplates(tenantId: string) {
+export async function syncPortalWhatsAppTemplates(tenantId: string, portalActorId: string) {
+  const safePortalActorId = String(portalActorId || "").trim();
+  if (!safePortalActorId) {
+    throw new Error("missing_opturon_admin_actor");
+  }
+
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -755,6 +760,9 @@ export async function syncPortalWhatsAppTemplates(tenantId: string) {
     };
   }>(`/portal/tenants/${tenantId}/whatsapp/templates/sync`, {
     method: "POST",
+    headers: {
+      "x-portal-actor-id": safePortalActorId
+    },
     body: JSON.stringify({})
   });
 }

@@ -7,7 +7,7 @@ import {
   isBackendConfigured,
   syncPortalWhatsAppTemplates
 } from "@/lib/api";
-import { requireAppApi, requireOpturonAdminApi } from "@/lib/saas/access";
+import { requireAppApi, requireOpturonAdminApi, resolveOpturonAdminActorId } from "@/lib/saas/access";
 
 export async function GET() {
   const auth = await requireAppApi({ permission: "manage_workspace" });
@@ -66,7 +66,12 @@ export async function POST(request: NextRequest) {
 
   try {
     if (payload.action === "sync") {
-      const result = await syncPortalWhatsAppTemplates(tenantId);
+      const portalActorId = resolveOpturonAdminActorId(auth.ctx);
+      if (!portalActorId) {
+        return NextResponse.json({ error: "missing_opturon_admin_actor" }, { status: 403 });
+      }
+
+      const result = await syncPortalWhatsAppTemplates(tenantId, portalActorId);
       return NextResponse.json(result);
     }
 
