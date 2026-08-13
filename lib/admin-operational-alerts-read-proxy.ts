@@ -86,6 +86,61 @@ export async function proxyAdminTenantOperationalAlertsRead(
 }
 
 /**
+ * Rule collections intentionally omit recipient links. This narrow detail
+ * proxy lets the Admin canary UI resolve the authoritative, tenant-scoped
+ * recipientIds for each displayed rule without accepting browser-controlled
+ * internal scope or actor headers.
+ */
+export async function proxyAdminTenantOperationalAlertsRuleDetail(
+  request: NextRequest,
+  tenantId: string,
+  ruleId: string
+) {
+  const guard = await requireOpturonAdminApi();
+  if (guard.error || !guard.ctx) {
+    return noStore(guard.error || NextResponse.json({ error: "opturon_admin_alerts_context_unavailable" }, { status: 403 }));
+  }
+  const ctx = guard.ctx;
+
+  const actorUserId = resolveOpturonAdminActorId(ctx);
+  const adminWorkspaceTenantId = String(ctx.tenantId || "").trim();
+  const targetTenantId = String(tenantId || "").trim();
+  const safeRuleId = String(ruleId || "").trim();
+  if (!TENANT_ID_PATTERN.test(targetTenantId)) {
+    return invalidRequest("operational_alerts_tenant_id_invalid");
+  }
+  if (!UUID_PATTERN.test(safeRuleId)) {
+    return invalidRequest("operational_alert_rule_id_invalid");
+  }
+  if (!actorUserId || !adminWorkspaceTenantId) {
+    return invalidRequest("opturon_admin_alerts_context_unavailable", 403);
+  }
+  if (request.method.toUpperCase() !== "GET" || request.nextUrl.search) {
+    return invalidRequest("operational_alert_rule_detail_request_invalid");
+  }
+
+  try {
+    const result = await requestAdminTenantOperationalAlerts<{ success: boolean; data: unknown }>(
+      adminWorkspaceTenantId,
+      targetTenantId,
+      `/rules/${encodeURIComponent(safeRuleId)}`,
+      { method: "GET", actorUserId }
+    );
+    return noStore(NextResponse.json(sanitizeOperationalAlertsPayload(result.data)));
+  } catch (error) {
+    return noStore(
+      NextResponse.json(
+        getBackendErrorBody(error) || {
+          error: "admin_operational_alerts_rule_detail_load_failed",
+          detail: error instanceof Error ? error.message : "No se pudo completar la solicitud."
+        },
+        { status: getBackendErrorStatus(error) || 502 }
+      )
+    );
+  }
+}
+
+/**
  * The backend already has a sanitized, tenant-scoped history detail endpoint.
  * Keep the Admin wrapper narrow so the browser can only request a UUID from
  * the selected tenant and never supply an actor or internal scope header.

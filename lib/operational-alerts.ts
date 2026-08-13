@@ -71,6 +71,12 @@ export type OperationalAlertRule = {
   recipientIds?: string[];
 };
 
+export function operationalAlertRuleRecipientCount(
+  rule: Pick<OperationalAlertRule, "recipientIds"> | null | undefined
+) {
+  return Array.isArray(rule?.recipientIds) ? rule.recipientIds.length : 0;
+}
+
 export type OperationalAlertBlocker = {
   code: string;
   detail: string | null;

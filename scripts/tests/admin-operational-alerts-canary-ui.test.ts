@@ -6,11 +6,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = join(fileURLToPath(new URL("../..", import.meta.url)));
 const read = (relativePath: string) => readFileSync(join(root, relativePath), "utf8");
 const gates = await import(pathToFileURL(join(root, "lib/admin-operational-alerts-canary-ui.ts")).href);
+const operationalAlerts = await import(pathToFileURL(join(root, "lib/operational-alerts.ts")).href);
 
 const page = read("app/app/admin/operational-alerts/page.tsx");
 const workspace = read("components/app/admin-operational-alerts-workspace.tsx");
 const readProxy = read("lib/admin-operational-alerts-read-proxy.ts");
 const historyDetailRoute = read("app/api/app/admin/clients/[tenantId]/operational-alerts/history/[instanceId]/route.ts");
+const ruleDetailRoute = read("app/api/app/admin/clients/[tenantId]/operational-alerts/rules/[ruleId]/route.ts");
 const api = read("lib/api.ts");
 const navigation = read("components/layout/app-shell.tsx");
 
@@ -136,6 +138,17 @@ const checks: Array<[string, () => void]> = [
     assert.match(workspace, /expectedConfigVersion: selectedRule\.configVersion/);
     assert.match(workspace, /consentSource: "opturon_admin_manual_confirmation"/);
     assert.match(workspace, /expectedVersion: recipient\.version/);
+  }],
+  ["Rule cards enrich collection reads with authoritative recipient links", () => {
+    assert.match(ruleDetailRoute, /proxyAdminTenantOperationalAlertsRuleDetail/);
+    assert.match(ruleDetailRoute, /export async function GET/);
+    assert.match(workspace, /const listedRules = asItems<OperationalAlertRule>\(rulesResult\)/);
+    assert.match(workspace, /const rules = await Promise\.all\(listedRules\.map\(\(rule\) => \(/);
+    assert.match(workspace, /adminAlertsRequest<OperationalAlertRule>\(tenantId, `\/rules\/\$\{encodeURIComponent\(rule\.id\)\}`\)/);
+    assert.doesNotMatch(workspace, /adminAlertsRequest<OperationalAlertRule>\(tenantId, `\/rules\/\$\{encodeURIComponent\(rule\.id\)\}`\)\.catch/);
+    assert.match(workspace, /operationalAlertRuleRecipientCount\(rule\)/);
+    assert.equal(operationalAlerts.operationalAlertRuleRecipientCount({ recipientIds: [] }), 0);
+    assert.equal(operationalAlerts.operationalAlertRuleRecipientCount({ recipientIds: ["recipient-a"] }), 1);
   }],
   ["History detail reuses the existing backend endpoint through an Admin-only sanitized proxy", () => {
     assert.match(historyDetailRoute, /proxyAdminTenantOperationalAlertsHistoryDetail/);

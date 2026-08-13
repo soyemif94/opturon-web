@@ -36,6 +36,7 @@ import {
 } from "@/lib/admin-operational-alerts-canary-ui";
 import {
   operationalAlertEventLabel,
+  operationalAlertRuleRecipientCount,
   operationalAlertStatusLabel,
   type OperationalAlertHistoryDetail,
   type OperationalAlertHistoryItem,
@@ -209,7 +210,13 @@ async function loadSnapshot(tenantId: string, preferredRuleId: string | null): P
     adminAlertsRequest<{ items: OperationalAlertRecipient[] }>(tenantId, "/recipients?limit=200"),
     adminAlertsRequest<{ items: OperationalAlertHistoryItem[]; pagination?: { total?: number } }>(tenantId, "/history?page=1&pageSize=25")
   ]);
-  const rules = asItems<OperationalAlertRule>(rulesResult);
+  const listedRules = asItems<OperationalAlertRule>(rulesResult);
+  // The collection response deliberately omits recipientIds. Resolve each
+  // detail through the Admin-only GET proxy so a card never treats an omitted
+  // field as an empty association list after refresh.
+  const rules = await Promise.all(listedRules.map((rule) => (
+    adminAlertsRequest<OperationalAlertRule>(tenantId, `/rules/${encodeURIComponent(rule.id)}`)
+  )));
   const recipients = asItems<OperationalAlertRecipient>(recipientsResult);
   const history = asItems<OperationalAlertHistoryItem>(historyResult);
   const selectedRuleId = rules.some((rule) => rule.id === preferredRuleId)
@@ -668,7 +675,7 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
             <CardContent className="space-y-3">
               {rules.length ? rules.map((rule) => {
                 const selected = selectedRule?.id === rule.id;
-                const recipientCount = rule.recipientIds?.length || 0;
+                const recipientCount = operationalAlertRuleRecipientCount(rule);
                 return <button
                   key={rule.id}
                   type="button"

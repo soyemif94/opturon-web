@@ -9,6 +9,7 @@ function run() {
   const api = read("lib/api.ts");
   const helper = read("lib/admin-operational-alerts-read-proxy.ts");
   const rulesRoute = read("app/api/app/admin/clients/[tenantId]/operational-alerts/rules/route.ts");
+  const ruleDetailRoute = read("app/api/app/admin/clients/[tenantId]/operational-alerts/rules/[ruleId]/route.ts");
   const recipientsRoute = read("app/api/app/admin/clients/[tenantId]/operational-alerts/recipients/route.ts");
   const historyRoute = read("app/api/app/admin/clients/[tenantId]/operational-alerts/history/route.ts");
 
@@ -25,6 +26,10 @@ function run() {
   assert.match(helper, /requestAdminTenantOperationalAlerts/);
   assert.match(helper, /\{ method: "GET", actorUserId \}/);
   assert.match(helper, /sanitizeOperationalAlertsPayload\(result\.data\)/);
+  assert.match(helper, /proxyAdminTenantOperationalAlertsRuleDetail/);
+  assert.match(helper, /operational_alert_rule_id_invalid/);
+  assert.match(helper, /operational_alert_rule_detail_request_invalid/);
+  assert.match(helper, /`\/rules\/\$\{encodeURIComponent\(safeRuleId\)\}`/);
   assert.doesNotMatch(helper, /request\.json\(|POST\(|PATCH\(|PUT\(/);
 
   for (const [route, resource] of [[rulesRoute, "rules"], [recipientsRoute, "recipients"], [historyRoute, "history"]] as const) {
@@ -32,6 +37,10 @@ function run() {
     assert.match(route, new RegExp(`"${resource}"`));
     assert.match(route, /export async function GET/);
   }
+
+  assert.match(ruleDetailRoute, /proxyAdminTenantOperationalAlertsRuleDetail/);
+  assert.match(ruleDetailRoute, /export async function GET/);
+  assert.match(ruleDetailRoute, /export async function PATCH/);
 
   // Rules and recipients share their collection routes with the separate,
   // explicitly-scoped canary write proxy. History remains read-only.
