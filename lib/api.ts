@@ -205,6 +205,41 @@ export async function requestPortalOperationalAlerts<T>(
   });
 }
 
+// This is intentionally separate from requestPortalOperationalAlerts(). An Opturon
+// Admin controls a selected tenant through the backend active-tenant mechanism:
+// the request URL keeps the authenticated Admin workspace, while the controlled
+// tenant travels only in the server-added active-tenant header.
+export async function requestAdminTenantOperationalAlerts<T>(
+  adminWorkspaceTenantId: string,
+  targetTenantId: string,
+  path: string,
+  options: {
+    method?: "GET" | "PATCH";
+    actorUserId: string;
+    body?: unknown;
+  }
+) {
+  const safeAdminWorkspaceTenantId = String(adminWorkspaceTenantId || "").trim();
+  const safeTargetTenantId = String(targetTenantId || "").trim();
+  const safeActorUserId = String(options.actorUserId || "").trim();
+  const safePath = String(path || "").trim();
+  if (!safeAdminWorkspaceTenantId || !safeTargetTenantId || !safeActorUserId || !safePath.startsWith("/")) {
+    throw new Error("admin_operational_alerts_request_context_invalid");
+  }
+
+  return backendPortalFetch<T>(
+    `/portal/tenants/${encodeURIComponent(safeAdminWorkspaceTenantId)}/operational-alerts${safePath}`,
+    {
+      method: options.method || "GET",
+      headers: {
+        "x-portal-actor-id": safeActorUserId,
+        "x-active-tenant-id": safeTargetTenantId
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    }
+  );
+}
+
 export type InboxItem = {
   ts: string;
   type: string;
