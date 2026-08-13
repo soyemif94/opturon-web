@@ -18,6 +18,11 @@ const INVENTORY_LOT_EXPIRING_TEMPLATE_KEY = "inventory_lot_expiring_v1";
 const INVENTORY_LOT_EXPIRING_TEMPLATE_LANGUAGE = "es_AR";
 const INVENTORY_LOT_EXPIRING_FORMATTER_KEY = "inventory_lot_expiring";
 const INVENTORY_LOT_EXPIRING_FORMATTER_VERSION = 1;
+const CANARY_ENABLE_PREFLIGHT_ERROR = "operational_alerts_admin_canary_enable_preflight_required";
+const EXPECTED_POST_SWITCH_PREFLIGHT_REASONS = new Set([
+  "CANARY_RULE_DISABLED",
+  "ENABLED_RULE_COUNT_NOT_ONE"
+]);
 
 const RECIPIENT_CREATE_KEYS = new Set(["name", "phoneE164", "roleLabel", "areaKeys", "staffUserId"]);
 const RECIPIENT_ACTIVE_KEYS = new Set(["active", "expectedVersion"]);
@@ -61,6 +66,11 @@ type WriteRequest = {
   body: Record<string, unknown>;
 };
 
+type BackendSuccessResponse = {
+  success: true;
+  data: unknown;
+};
+
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "private, no-store");
   response.headers.set("Pragma", "no-cache");
@@ -73,6 +83,13 @@ function errorResponse(error: string, status = 400) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getSuccessfulBackendData(value: unknown) {
+  if (!isRecord(value) || value.success !== true || !Object.prototype.hasOwnProperty.call(value, "data")) {
+    return null;
+  }
+  return value.data;
 }
 
 function hasOnlyKeys(payload: Record<string, unknown>, allowedKeys: ReadonlySet<string>) {
@@ -97,6 +114,114 @@ function isE164(value: unknown) {
 
 function hasCanaryName(value: unknown) {
   return typeof value === "string" && value.trim().startsWith(CANARY_NAME_PREFIX) && value.trim().length <= 200;
+}
+
+function isControlledCanaryRuleForEnable(
+  value: unknown,
+  ruleId: string,
+  expectedConfigVersion: number
+) {
+  if (!isRecord(value) || !isRecord(value.deliveryPolicy)) return false;
+  return value.id === ruleId &&
+    hasCanaryName(value.name) &&
+    value.eventType === INVENTORY_LOT_EXPIRING_EVENT_TYPE &&
+    value.eventVersion === INVENTORY_LOT_EXPIRING_EVENT_VERSION &&
+    value.enabled === false &&
+    value.archivedAt === null &&
+    value.configVersion === expectedConfigVersion &&
+    value.deliveryPolicy.maxAttempts === 1;
+}
+
+function hasOnlyExpectedPostSwitchPreflightReasons(value: unknown) {
+  if (!Array.isArray(value) || value.length !== EXPECTED_POST_SWITCH_PREFLIGHT_REASONS.size) return false;
+  const codes = value.map((reason) => isRecord(reason) && typeof reason.code === "string" ? reason.code : null);
+  return codes.every((code) => code !== null && EXPECTED_POST_SWITCH_PREFLIGHT_REASONS.has(code)) &&
+    new Set(codes).size === EXPECTED_POST_SWITCH_PREFLIGHT_REASONS.size;
+}
+
+function isPostSwitchCanaryEnablePreflight(
+  value: unknown,
+  ruleId: string,
+  expectedConfigVersion: number
+) {
+  if (!isRecord(value) || !isRecord(value.enabledRules) || !isRecord(value.recipients) ||
+    !isRecord(value.template) || !isRecord(value.channel) || !isRecord(value.deliveryPolicy) ||
+    !isRecord(value.candidatePreview) || !isRecord(value.worker) || !isRecord(value.backlog)) {
+    return false;
+  }
+
+  const candidatePreview = value.candidatePreview;
+  const candidateRule = isRecord(candidatePreview.rule) ? candidatePreview.rule : null;
+  if (!candidateRule || !isRecord(candidateRule.deliveryPolicy)) return false;
+
+  return value.ruleId === ruleId &&
+    value.operationalAlertsEnabled === true &&
+    value.enabledRules.count === 0 &&
+    value.recipients.count === 1 &&
+    value.recipients.ready === true &&
+    value.template.ready === true &&
+    value.channel.ready === true &&
+    value.deliveryPolicy.maxAttempts === 1 &&
+    value.worker.health === "healthy" &&
+    value.backlog.pending === 0 &&
+    value.backlog.processing === 0 &&
+    value.backlog.retryable === 0 &&
+    value.backlog.unknownDelivery === 0 &&
+    candidatePreview.eventType === INVENTORY_LOT_EXPIRING_EVENT_TYPE &&
+    candidatePreview.eventVersion === INVENTORY_LOT_EXPIRING_EVENT_VERSION &&
+    candidatePreview.evaluable === true &&
+    candidatePreview.candidateCount === 1 &&
+    candidatePreview.expectedEventCount === 1 &&
+    candidatePreview.expectedDigestCount === 1 &&
+    candidatePreview.digestItemCount === 1 &&
+    candidatePreview.truncated === false &&
+    candidateRule.id === ruleId &&
+    candidateRule.enabled === false &&
+    candidateRule.configVersion === expectedConfigVersion &&
+    candidateRule.deliveryPolicy.maxAttempts === 1 &&
+    hasOnlyExpectedPostSwitchPreflightReasons(value.reasons);
+}
+
+/**
+ * Browser calls to the enable route must not be able to skip the narrow
+ * controlled-canary checks enforced by the Admin UI.  The reads execute from
+ * the server with the same resolved actor and active-tenant scope as the
+ * eventual write; every malformed or unavailable response fails closed.
+ */
+async function passesServerSideCanaryEnablePreflight(
+  adminWorkspaceTenantId: string,
+  targetTenantId: string,
+  actorUserId: string,
+  ruleId: string,
+  expectedConfigVersion: number
+) {
+  try {
+    const rulesResult = await requestAdminTenantOperationalAlerts<BackendSuccessResponse>(
+      adminWorkspaceTenantId,
+      targetTenantId,
+      "/rules?eventType=inventory.lot_expiring&enabled=false&includeArchived=false&limit=500",
+      { method: "GET", actorUserId }
+    );
+    const rulesData = getSuccessfulBackendData(rulesResult);
+    if (!isRecord(rulesData) || !Array.isArray(rulesData.items)) return false;
+
+    const currentRule = rulesData.items.find((rule) => isRecord(rule) && rule.id === ruleId);
+    if (!isControlledCanaryRuleForEnable(currentRule, ruleId, expectedConfigVersion)) return false;
+
+    const preflightResult = await requestAdminTenantOperationalAlerts<BackendSuccessResponse>(
+      adminWorkspaceTenantId,
+      targetTenantId,
+      `/rules/${encodeURIComponent(ruleId)}/canary-preflight`,
+      { method: "GET", actorUserId }
+    );
+    return isPostSwitchCanaryEnablePreflight(
+      getSuccessfulBackendData(preflightResult),
+      ruleId,
+      expectedConfigVersion
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isCanaryInventoryRuleConfig(value: unknown) {
@@ -272,6 +397,19 @@ export async function proxyAdminTenantOperationalAlertsCanaryWrite(
   if (!writeRequest) return errorResponse("operational_alerts_admin_canary_write_target_invalid");
   if (request.method.toUpperCase() !== writeRequest.method) {
     return errorResponse("operational_alerts_admin_canary_write_method_invalid", 405);
+  }
+
+  if (operation === "ruleEnable") {
+    const safeRuleId = String(entityId || "").trim();
+    const expectedConfigVersion = Number(payload.expectedConfigVersion);
+    const canEnable = await passesServerSideCanaryEnablePreflight(
+      adminWorkspaceTenantId,
+      targetTenantId,
+      actorUserId,
+      safeRuleId,
+      expectedConfigVersion
+    );
+    if (!canEnable) return errorResponse(CANARY_ENABLE_PREFLIGHT_ERROR, 409);
   }
 
   try {

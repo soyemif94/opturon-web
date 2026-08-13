@@ -198,6 +198,15 @@ const navItems: Array<{
     match: (pathname: string) => pathname.startsWith("/app/client-management")
   },
   {
+    href: "/app/admin/operational-alerts",
+    label: "Canario de alertas",
+    description: "Control manual, preflight e historial de alertas operativas",
+    icon: Shield,
+    module: "settings",
+    adminOnly: true,
+    match: (pathname: string) => pathname.startsWith("/app/admin/operational-alerts")
+  },
+  {
     href: "/app/partners",
     label: "Red de asesores",
     description: "Partners, sponsors, clientes atribuidos y estado comercial",
@@ -532,7 +541,7 @@ export function AppShell({
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
   const accessContext = { globalRole, tenantRole, accountScope, tenantModules };
-  const isOpturonAdmin = globalRole === "superadmin" || globalRole === "ops_admin";
+  const isOpturonAdmin = (globalRole === "superadmin" || globalRole === "ops_admin") && accountScope === "opturon_admin";
   const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module) && (!item.adminOnly || isOpturonAdmin));
   const showManageShortcut = canManageWorkspace(accessContext);
   const showUsersShortcut = canManageUsers(accessContext);

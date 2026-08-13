@@ -15,7 +15,7 @@ function run() {
   assert.match(api, /"x-active-tenant-id": safeTargetTenantId/);
   assert.match(api, /"x-portal-actor-id": safeActorUserId/);
   assert.match(helper, /requireOpturonAdminApi\(\)/);
-  assert.match(helper, /resolveOpturonAdminActorId\(guard\.ctx\)/);
+  assert.match(helper, /resolveOpturonAdminActorId\(ctx\)/);
   assert.match(helper, /TENANT_ID_PATTERN/);
   assert.match(helper, /operational_alerts_tenant_id_invalid/);
   assert.match(helper, /operational_alerts_query_not_allowed/);

@@ -55,6 +55,39 @@ function run() {
   assert.match(helper, /sanitizeOperationalAlertsPayload\(result\.data\)/);
   assert.doesNotMatch(helper, /graph\.facebook\.com|graph\.instagram\.com|whatsapp/i);
 
+  // The enable route is defense in depth: a browser cannot bypass the Admin
+  // UI's preflight sequence. The server re-reads the rule and preflight in the
+  // backend envelope shape before it forwards the enable POST.
+  assert.match(helper, /CANARY_ENABLE_PREFLIGHT_ERROR = "operational_alerts_admin_canary_enable_preflight_required"/);
+  assert.match(helper, /EXPECTED_POST_SWITCH_PREFLIGHT_REASONS = new Set\(\[/);
+  assert.match(helper, /"CANARY_RULE_DISABLED"/);
+  assert.match(helper, /"ENABLED_RULE_COUNT_NOT_ONE"/);
+  assert.match(helper, /async function passesServerSideCanaryEnablePreflight/);
+  assert.match(helper, /"\/rules\?eventType=inventory\.lot_expiring&enabled=false&includeArchived=false&limit=500"/);
+  assert.match(helper, /`\/rules\/\$\{encodeURIComponent\(ruleId\)\}\/canary-preflight`/);
+  assert.match(helper, /getSuccessfulBackendData\(rulesResult\)/);
+  assert.match(helper, /getSuccessfulBackendData\(preflightResult\)/);
+  assert.match(helper, /value\.operationalAlertsEnabled === true/);
+  assert.match(helper, /value\.enabledRules\.count === 0/);
+  assert.match(helper, /value\.worker\.health === "healthy"/);
+  assert.match(helper, /value\.backlog\.pending === 0/);
+  assert.match(helper, /value\.backlog\.processing === 0/);
+  assert.match(helper, /value\.backlog\.retryable === 0/);
+  assert.match(helper, /value\.backlog\.unknownDelivery === 0/);
+  assert.match(helper, /candidatePreview\.candidateCount === 1/);
+  assert.match(helper, /candidatePreview\.expectedEventCount === 1/);
+  assert.match(helper, /candidatePreview\.expectedDigestCount === 1/);
+  assert.match(helper, /candidatePreview\.digestItemCount === 1/);
+  assert.match(helper, /candidatePreview\.truncated === false/);
+  assert.match(helper, /candidateRule\.configVersion === expectedConfigVersion/);
+  assert.match(helper, /hasOnlyExpectedPostSwitchPreflightReasons\(value\.reasons\)/);
+  assert.match(helper, /if \(operation === "ruleEnable"\)/);
+  assert.match(helper, /return errorResponse\(CANARY_ENABLE_PREFLIGHT_ERROR, 409\)/);
+  assert.ok(
+    helper.indexOf('if (operation === "ruleEnable")') < helper.lastIndexOf("writeRequest.path"),
+    "server-side enable preflight must run before the write is forwarded"
+  );
+
   assert.match(recipientsRoute, /export async function POST/);
   assert.match(recipientsRoute, /"recipientCreate"/);
   assert.match(recipientRoute, /export async function PATCH/);
