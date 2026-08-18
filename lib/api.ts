@@ -4,6 +4,7 @@ import type { TenantOperatingProfile, TenantPortalPolicy } from "@/lib/tenant-po
 
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 10000);
 const AUTH_API_TIMEOUT_MS = Number(process.env.AUTH_API_TIMEOUT_MS || 2500);
+const PORTAL_INVENTORY_BULK_ADJUST_TIMEOUT_MS = 120_000;
 const DEBUG_INBOX_MAX_ITEMS = Number(process.env.DEBUG_INBOX_MAX_ITEMS || 200);
 const PROD_BACKEND_FALLBACK = "https://opturon-api.onrender.com";
 
@@ -2465,6 +2466,42 @@ export type PortalInventorySummary = {
   withoutStock: number;
 };
 
+export type PortalInventoryBulkAdjustmentReason = "initial_stock" | "physical_count" | "inventory_correction" | "other";
+
+export type PortalInventoryBulkAdjustmentRequestItem = {
+  productId: string;
+  targetQuantity: number;
+  expectedCurrentQuantity: number;
+};
+
+export type PortalInventoryBulkAdjustmentSummary = {
+  submittedItems: number;
+  changedItems: number;
+  unchangedItems: number;
+  increases: number;
+  reductions: number;
+  unitsAdded: number;
+  unitsRemoved: number;
+};
+
+export type PortalInventoryBulkAdjustmentResultItem = {
+  productId: string;
+  previousQuantity: number;
+  targetQuantity: number;
+  delta: number;
+  status: "updated" | "unchanged" | "idempotent";
+  movementId: string | null;
+};
+
+export type PortalInventoryBulkAdjustmentResult = {
+  operationId: string;
+  idempotent: boolean;
+  reason: PortalInventoryBulkAdjustmentReason;
+  note: string | null;
+  summary: PortalInventoryBulkAdjustmentSummary;
+  items: PortalInventoryBulkAdjustmentResultItem[];
+};
+
 export type PortalInventoryExpirationThresholds = {
   criticalDays: number;
   urgentDays: number;
@@ -3573,6 +3610,33 @@ export async function createPortalInventoryMovement(
       headers,
       body: JSON.stringify(payload)
     }
+  );
+}
+
+export async function createPortalInventoryBulkAdjustment(
+  tenantId: string,
+  payload: {
+    idempotencyKey: string;
+    reason: PortalInventoryBulkAdjustmentReason;
+    note: string | null;
+    items: PortalInventoryBulkAdjustmentRequestItem[];
+  },
+  actor?: { id?: string | null; name?: string | null }
+) {
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalInventoryBulkAdjustmentResult;
+  }>(
+    `/portal/tenants/${tenantId}/inventory/bulk-adjust`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    },
+    PORTAL_INVENTORY_BULK_ADJUST_TIMEOUT_MS
   );
 }
 

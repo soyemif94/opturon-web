@@ -30,13 +30,15 @@ export function InventoryBaseWorkspace({
   initialPagination,
   initialSummary,
   tenantId = null,
-  readOnly = false
+  readOnly = false,
+  canBulkAdjust = false
 }: {
   initialProducts: PortalInventoryProduct[];
   initialPagination: PortalInventoryPagination;
   initialSummary: PortalInventorySummary;
   tenantId?: string | null;
   readOnly?: boolean;
+  canBulkAdjust?: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [pagination, setPagination] = useState(initialPagination);
@@ -272,6 +274,11 @@ export function InventoryBaseWorkspace({
       title="Inventario"
       description="Base operativa de stock con codigo interno, ubicacion principal y ledger auditable."
       badge="Inventario"
+      action={canBulkAdjust ? (
+        <Button asChild type="button">
+          <Link href="/app/inventory/bulk-adjust">Carga inicial / Ajuste masivo</Link>
+        </Button>
+      ) : null}
     >
       <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard label="Productos" value={String(inventorySummary.totalProducts)} helper="Catalogo visible en inventario" />

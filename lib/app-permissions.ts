@@ -152,3 +152,12 @@ export function canManageInventoryReceipts(context: AccessContext) {
 export function canManageInventorySensitive(context: AccessContext) {
   return hasAppPermission(context, "manage_inventory_sensitive");
 }
+
+export function canPerformTenantInventorySensitiveAction(context: AccessContext) {
+  if (String(context.accountScope || "").trim().toLowerCase() === "opturon_admin") return false;
+  const tenantRole = normalizeTenantRole(context.tenantRole);
+  return (
+    canManageInventorySensitive(context) &&
+    (tenantRole === "owner" || tenantRole === "manager")
+  );
+}

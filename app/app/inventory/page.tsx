@@ -1,7 +1,12 @@
 import { InventoryBaseWorkspace } from "@/components/app/InventoryBaseWorkspace";
 import { InventorySectionNav } from "@/components/app/InventorySectionNav";
 import { InventoryLotsWorkspace } from "@/components/app/InventoryLotsWorkspace";
-import { canManageCatalog, canManageInventoryReceipts, canManageInventorySensitive } from "@/lib/app-permissions";
+import {
+  canManageCatalog,
+  canManageInventoryReceipts,
+  canManageInventorySensitive,
+  canPerformTenantInventorySensitiveAction
+} from "@/lib/app-permissions";
 import {
   getBackendErrorBody,
   getBackendErrorStatus,
@@ -103,6 +108,7 @@ export default async function InventoryPage() {
         initialSummary={summary}
         tenantId={ctx.tenantId || null}
         readOnly={!ctx.tenantId || readOnly}
+        canBulkAdjust={Boolean(ctx.tenantId) && canPerformTenantInventorySensitiveAction(ctx)}
       />
       <div id="lotes" className="scroll-mt-28">
         <InventoryLotsWorkspace
