@@ -9,9 +9,13 @@ import {
   getPortalInventoryProducts,
   isBackendConfigured,
   type PortalInventoryLot,
-  type PortalInventoryProduct
+  type PortalInventoryPagination,
+  type PortalInventoryProduct,
+  type PortalInventorySummary
 } from "@/lib/api";
 import { requireAppModulePage } from "@/lib/saas/access";
+
+const INVENTORY_PAGE_SIZE = 50;
 
 export default async function InventoryPage() {
   const ctx = await requireAppModulePage("inventory");
@@ -20,6 +24,17 @@ export default async function InventoryPage() {
   const readOnly = !canReceiveLots && !canManageSensitive;
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: PortalInventoryProduct[] = [];
+  let pagination: PortalInventoryPagination = {
+    page: 1,
+    pageSize: INVENTORY_PAGE_SIZE,
+    totalItems: 0,
+    totalPages: 0
+  };
+  let summary: PortalInventorySummary = {
+    totalProducts: 0,
+    withStock: 0,
+    withoutStock: 0
+  };
   let lots: PortalInventoryLot[] = [];
   let inventoryState: "ready" | "access_restricted" | "error" = "ready";
   let inventoryMessage: string | null = null;
@@ -27,14 +42,21 @@ export default async function InventoryPage() {
   if (ctx.tenantId && backendReady) {
     try {
       const [productsResult, lotsResult] = await Promise.all([
-        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: 100 }),
+        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: INVENTORY_PAGE_SIZE }),
         getPortalInventoryLots(ctx.tenantId, { pageSize: 100 })
       ]);
-      if (!Array.isArray(productsResult.data?.products) || !Array.isArray(lotsResult.data?.lots)) {
+      if (
+        !Array.isArray(productsResult.data?.products) ||
+        !isInventoryPagination(productsResult.data?.pagination) ||
+        !isInventorySummary(productsResult.data?.summary) ||
+        !Array.isArray(lotsResult.data?.lots)
+      ) {
         inventoryState = "error";
         inventoryMessage = "No se pudo interpretar la respuesta de inventario.";
       } else {
         products = productsResult.data.products;
+        pagination = productsResult.data.pagination;
+        summary = productsResult.data.summary;
         lots = lotsResult.data.lots;
       }
     } catch (error) {
@@ -77,6 +99,8 @@ export default async function InventoryPage() {
       </section>
       <InventoryBaseWorkspace
         initialProducts={products}
+        initialPagination={pagination}
+        initialSummary={summary}
         tenantId={ctx.tenantId || null}
         readOnly={!ctx.tenantId || readOnly}
       />
@@ -90,4 +114,34 @@ export default async function InventoryPage() {
       </div>
     </>
   );
+}
+
+function isInventoryPagination(value: unknown): value is PortalInventoryPagination {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PortalInventoryPagination>;
+  return (
+    isPositiveInteger(candidate.page) &&
+    isPositiveInteger(candidate.pageSize) &&
+    isNonNegativeInteger(candidate.totalItems) &&
+    isNonNegativeInteger(candidate.totalPages)
+  );
+}
+
+function isInventorySummary(value: unknown): value is PortalInventorySummary {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PortalInventorySummary>;
+  return (
+    isNonNegativeInteger(candidate.totalProducts) &&
+    isNonNegativeInteger(candidate.withStock) &&
+    isNonNegativeInteger(candidate.withoutStock) &&
+    candidate.withStock + candidate.withoutStock === candidate.totalProducts
+  );
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }

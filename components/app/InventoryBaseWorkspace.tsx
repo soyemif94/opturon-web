@@ -1,32 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { PortalInventoryMovement, PortalInventoryProduct } from "@/lib/api";
+import type {
+  PortalInventoryMovement,
+  PortalInventoryPagination,
+  PortalInventoryProduct,
+  PortalInventorySummary
+} from "@/lib/api";
 
 type MovementMode = "opening_balance" | "manual_increase" | "manual_decrease" | "correction";
 type InventoryActionPanel = "history" | "movement" | null;
+type InventoryProductFilters = {
+  search: string;
+  stockFilter: "all" | "with_stock" | "without_stock";
+};
 
 const EMPTY_HISTORY: PortalInventoryMovement[] = [];
+const INVENTORY_PAGE_SIZE = 50;
 
 export function InventoryBaseWorkspace({
   initialProducts,
+  initialPagination,
+  initialSummary,
   tenantId = null,
   readOnly = false
 }: {
   initialProducts: PortalInventoryProduct[];
+  initialPagination: PortalInventoryPagination;
+  initialSummary: PortalInventorySummary;
   tenantId?: string | null;
   readOnly?: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts);
+  const [pagination, setPagination] = useState(initialPagination);
+  const [inventorySummary, setInventorySummary] = useState(initialSummary);
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "with_stock" | "without_stock">("all");
+  const [appliedFilters, setAppliedFilters] = useState<InventoryProductFilters>({ search: "", stockFilter: "all" });
   const [loading, setLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<PortalInventoryProduct | null>(null);
   const [activePanel, setActivePanel] = useState<InventoryActionPanel>(null);
@@ -43,6 +60,7 @@ export function InventoryBaseWorkspace({
   const detailsSectionRef = useRef<HTMLDivElement | null>(null);
   const detailsHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const historyRequestIdRef = useRef(0);
+  const productsRequestIdRef = useRef(0);
 
   function buildInventoryUrl(path: string, params?: Record<string, string>) {
     const search = new URLSearchParams(params);
@@ -90,24 +108,50 @@ export function InventoryBaseWorkspace({
     }
   }
 
-  async function refreshProducts(nextSearch = search, nextFilter = stockFilter) {
+  async function loadProducts(nextPage: number, filters: InventoryProductFilters): Promise<void> {
+    const requestId = productsRequestIdRef.current + 1;
+    productsRequestIdRef.current = requestId;
     setLoading(true);
     try {
       const params: Record<string, string> = {
-        page: "1",
-        pageSize: "100"
+        page: String(nextPage),
+        pageSize: String(INVENTORY_PAGE_SIZE)
       };
-      if (nextSearch.trim()) params.search = nextSearch.trim();
-      if (nextFilter !== "all") params.stockFilter = nextFilter;
+      const normalizedFilters: InventoryProductFilters = {
+        search: filters.search.trim(),
+        stockFilter: filters.stockFilter
+      };
+      if (normalizedFilters.search) params.search = normalizedFilters.search;
+      if (normalizedFilters.stockFilter !== "all") params.stockFilter = normalizedFilters.stockFilter;
       const response = await fetch(buildInventoryUrl("/api/app/inventory/products", params), { cache: "no-store" });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error || "No se pudo cargar inventario.");
-      setProducts(Array.isArray(json?.products) ? json.products : []);
+      if (!Array.isArray(json?.products) || !isInventoryPagination(json?.pagination) || !isInventorySummary(json?.summary)) {
+        throw new Error("No se pudo interpretar la respuesta de inventario.");
+      }
+      if (productsRequestIdRef.current !== requestId) return;
+      if (json.pagination.totalPages > 0 && json.pagination.page > json.pagination.totalPages) {
+        await loadProducts(json.pagination.totalPages, normalizedFilters);
+        return;
+      }
+      setProducts(json.products);
+      setPagination(json.pagination);
+      setInventorySummary(json.summary);
+      setAppliedFilters(normalizedFilters);
     } catch (error) {
+      if (productsRequestIdRef.current !== requestId) return;
       setFeedback(error instanceof Error ? error.message : "No se pudo cargar inventario.");
     } finally {
-      setLoading(false);
+      if (productsRequestIdRef.current === requestId) setLoading(false);
     }
+  }
+
+  async function applyProductFilters() {
+    await loadProducts(1, { search, stockFilter });
+  }
+
+  async function refreshCurrentPage() {
+    await loadProducts(pagination.page, appliedFilters);
   }
 
   function openPanel(product: PortalInventoryProduct, nextPanel: Exclude<InventoryActionPanel, null>) {
@@ -155,11 +199,13 @@ export function InventoryBaseWorkspace({
       ? countedStockNumber
       : currentStock + (Number.isFinite(deltaPreview) ? deltaPreview : 0);
 
-  const summary = useMemo(() => {
-    const withStock = products.filter((product) => resolveStock(product) > 0).length;
-    const withoutStock = products.length - withStock;
-    return { total: products.length, withStock, withoutStock };
-  }, [products]);
+  const hasPreviousPage = pagination.page > 1;
+  const hasNextPage = pagination.page < pagination.totalPages;
+  const displayedPage = pagination.totalPages > 0 ? pagination.page : 0;
+  const pageStart = pagination.totalItems > 0 ? (pagination.page - 1) * pagination.pageSize + 1 : 0;
+  const pageEnd = pagination.totalItems > 0
+    ? Math.min(pagination.totalItems, pagination.page * pagination.pageSize)
+    : 0;
 
   async function submitMovement() {
     if (!selectedProduct) return;
@@ -203,7 +249,7 @@ export function InventoryBaseWorkspace({
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(resolveMovementSubmitErrorMessage(json?.error));
       setFeedback("Movimiento registrado.");
-      await refreshProducts();
+      await refreshCurrentPage();
       openPanel({ ...selectedProduct, stock: Number(json?.balance?.quantity ?? resultingStock) }, "movement");
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : resolveMovementSubmitErrorMessage());
@@ -228,9 +274,9 @@ export function InventoryBaseWorkspace({
       badge="Inventario"
     >
       <div className="grid gap-4 md:grid-cols-3">
-        <SummaryCard label="Productos" value={String(summary.total)} helper="Catalogo visible en inventario" />
-        <SummaryCard label="Con stock" value={String(summary.withStock)} helper="Disponibilidad positiva" />
-        <SummaryCard label="Sin stock" value={String(summary.withoutStock)} helper="Requieren reposicion o correccion" />
+        <SummaryCard label="Productos" value={String(inventorySummary.totalProducts)} helper="Catalogo visible en inventario" />
+        <SummaryCard label="Con stock" value={String(inventorySummary.withStock)} helper="Disponibilidad positiva" />
+        <SummaryCard label="Sin stock" value={String(inventorySummary.withoutStock)} helper="Requieren reposicion o correccion" />
       </div>
 
       <Card className="mt-6">
@@ -258,7 +304,7 @@ export function InventoryBaseWorkspace({
               <option value="with_stock">Con stock</option>
               <option value="without_stock">Sin stock</option>
             </select>
-            <Button type="button" variant="secondary" onClick={() => refreshProducts()} disabled={loading}>
+            <Button type="button" variant="secondary" onClick={() => void applyProductFilters()} disabled={loading}>
               {loading ? "Actualizando..." : "Actualizar"}
             </Button>
           </div>
@@ -315,6 +361,41 @@ export function InventoryBaseWorkspace({
                 ) : null}
               </tbody>
             </table>
+          </div>
+
+          <div className="overflow-x-auto">
+            <nav
+              aria-label="Paginacion de productos"
+              className="grid min-h-14 min-w-[36rem] grid-cols-[7rem_minmax(16rem,1fr)_7rem] items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-3 py-2"
+            >
+              <div className="flex justify-start">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-28 shrink-0 justify-center"
+                  disabled={!hasPreviousPage || loading}
+                  onClick={() => void loadProducts(pagination.page - 1, appliedFilters)}
+                >
+                  <ChevronLeft aria-hidden="true" className="mr-1 size-4 shrink-0" />
+                  Anterior
+                </Button>
+              </div>
+              <p aria-live="polite" className="min-w-[16rem] whitespace-nowrap text-center text-sm tabular-nums text-muted-foreground">
+                Pagina {displayedPage} de {pagination.totalPages} - {pageStart}-{pageEnd} de {pagination.totalItems} productos
+              </p>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-28 shrink-0 justify-center"
+                  disabled={!hasNextPage || loading}
+                  onClick={() => void loadProducts(pagination.page + 1, appliedFilters)}
+                >
+                  Siguiente
+                  <ChevronRight aria-hidden="true" className="ml-1 size-4 shrink-0" />
+                </Button>
+              </div>
+            </nav>
           </div>
         </CardContent>
       </Card>
@@ -505,6 +586,36 @@ function resolveMovementSubmitErrorMessage(errorCode?: string | null) {
     return "No pudimos registrar el movimiento. El stock no fue modificado. Intentá nuevamente.";
   }
   return "No pudimos registrar el movimiento. El stock no fue modificado. Intentá nuevamente.";
+}
+
+function isInventoryPagination(value: unknown): value is PortalInventoryPagination {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PortalInventoryPagination>;
+  return (
+    isPositiveInteger(candidate.page) &&
+    isPositiveInteger(candidate.pageSize) &&
+    isNonNegativeInteger(candidate.totalItems) &&
+    isNonNegativeInteger(candidate.totalPages)
+  );
+}
+
+function isInventorySummary(value: unknown): value is PortalInventorySummary {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PortalInventorySummary>;
+  return (
+    isNonNegativeInteger(candidate.totalProducts) &&
+    isNonNegativeInteger(candidate.withStock) &&
+    isNonNegativeInteger(candidate.withoutStock) &&
+    candidate.withStock + candidate.withoutStock === candidate.totalProducts
+  );
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 function SummaryCard({ label, value, helper }: { label: string; value: string; helper: string }) {

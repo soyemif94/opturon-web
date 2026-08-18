@@ -2452,6 +2452,19 @@ export type PortalInventoryProduct = PortalProduct & {
   stockState?: "with_stock" | "low_stock" | "without_stock";
 };
 
+export type PortalInventoryPagination = {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type PortalInventorySummary = {
+  totalProducts: number;
+  withStock: number;
+  withoutStock: number;
+};
+
 export type PortalInventoryExpirationThresholds = {
   criticalDays: number;
   urgentDays: number;
@@ -3463,6 +3476,8 @@ export async function getPortalInventoryProducts(
       page: number;
       pageSize: number;
       total: number;
+      pagination: PortalInventoryPagination;
+      summary: PortalInventorySummary;
       products: PortalInventoryProduct[];
     };
   }>(`/portal/tenants/${tenantId}/inventory/products${suffix}`, undefined, false);
