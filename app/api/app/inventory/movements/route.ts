@@ -5,7 +5,7 @@ import {
   getPortalInventoryMovements,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 import { parseInventoryMovementsQuery } from "./query";
 
 function noStore(response: NextResponse) {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
-    const result = await getPortalInventoryMovements(tenantContext.tenantId, parsedQuery.options);
+    const result = await getPortalInventoryMovements(tenantContext.tenantId, parsedQuery.options, getPortalInventoryReadActor(tenantContext.ctx || {}));
     return noStore(
       NextResponse.json({
         readOnly: tenantContext.readOnly,

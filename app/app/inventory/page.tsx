@@ -2,7 +2,6 @@ import { InventoryBaseWorkspace } from "@/components/app/InventoryBaseWorkspace"
 import { InventorySectionNav } from "@/components/app/InventorySectionNav";
 import { InventoryLotsWorkspace } from "@/components/app/InventoryLotsWorkspace";
 import {
-  canManageCatalog,
   canManageInventoryReceipts,
   canManageInventorySensitive,
   canPerformTenantInventorySensitiveAction
@@ -18,7 +17,7 @@ import {
   type PortalInventoryProduct,
   type PortalInventorySummary
 } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 const INVENTORY_PAGE_SIZE = 50;
 
@@ -26,7 +25,8 @@ export default async function InventoryPage() {
   const ctx = await requireAppModulePage("inventory");
   const canReceiveLots = canManageInventoryReceipts(ctx);
   const canManageSensitive = canManageInventorySensitive(ctx);
-  const readOnly = !canReceiveLots && !canManageSensitive;
+  const baseInventoryReadOnly = !canManageSensitive;
+  const lotsReadOnly = !canReceiveLots && !canManageSensitive;
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: PortalInventoryProduct[] = [];
   let pagination: PortalInventoryPagination = {
@@ -46,9 +46,10 @@ export default async function InventoryPage() {
 
   if (ctx.tenantId && backendReady) {
     try {
+      const inventoryReadActor = getPortalInventoryReadActor(ctx);
       const [productsResult, lotsResult] = await Promise.all([
-        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: INVENTORY_PAGE_SIZE }),
-        getPortalInventoryLots(ctx.tenantId, { pageSize: 100 })
+        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: INVENTORY_PAGE_SIZE }, inventoryReadActor),
+        getPortalInventoryLots(ctx.tenantId, { pageSize: 100 }, inventoryReadActor)
       ]);
       if (
         !Array.isArray(productsResult.data?.products) ||
@@ -107,13 +108,13 @@ export default async function InventoryPage() {
         initialPagination={pagination}
         initialSummary={summary}
         tenantId={ctx.tenantId || null}
-        readOnly={!ctx.tenantId || readOnly}
+        readOnly={!ctx.tenantId || baseInventoryReadOnly}
         canBulkAdjust={Boolean(ctx.tenantId) && canPerformTenantInventorySensitiveAction(ctx)}
       />
       <div id="lotes" className="scroll-mt-28">
         <InventoryLotsWorkspace
           initialLots={lots}
-          readOnly={!ctx.tenantId || readOnly}
+          readOnly={!ctx.tenantId || lotsReadOnly}
           canManageSensitive={canManageSensitive}
           canManageReceipts={canReceiveLots}
         />

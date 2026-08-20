@@ -1,5 +1,6 @@
 export const BULK_STOCK_REASONS = ["initial_stock", "physical_count", "inventory_correction", "other"] as const;
 export const MAX_BULK_STOCK_QUANTITY = 2_147_483_647;
+export const MAX_BULK_STOCK_ITEMS = 2_000;
 
 export type BulkStockReason = (typeof BULK_STOCK_REASONS)[number];
 
@@ -26,6 +27,10 @@ export type BulkStockDraft = {
   inventoryTrackingMode: "legacy" | "lot_based";
   expectedCurrentQuantity: number;
   rawTargetQuantity: string;
+  conflict: {
+    previousExpectedQuantity: number;
+    currentQuantity: number;
+  } | null;
 };
 
 export type BulkStockDrafts = Record<string, BulkStockDraft>;
@@ -52,6 +57,7 @@ export type BulkStockSummary = {
   draftItems: number;
   changedItems: number;
   invalidItems: number;
+  conflictItems: number;
   increases: number;
   reductions: number;
   unitsAdded: number;
@@ -99,7 +105,8 @@ export function updateBulkStockDraft(
       status: product.status || null,
       inventoryTrackingMode: product.inventoryTrackingMode === "lot_based" ? "lot_based" : "legacy",
       expectedCurrentQuantity,
-      rawTargetQuantity: normalizedRaw
+      rawTargetQuantity: normalizedRaw,
+      conflict: null
     }
   };
 }
@@ -137,6 +144,7 @@ export function summarizeBulkStockDrafts(drafts: BulkStockDrafts): BulkStockSumm
     draftItems: 0,
     changedItems: 0,
     invalidItems: 0,
+    conflictItems: 0,
     increases: 0,
     reductions: 0,
     unitsAdded: 0,
@@ -145,6 +153,7 @@ export function summarizeBulkStockDrafts(drafts: BulkStockDrafts): BulkStockSumm
 
   Object.values(drafts).forEach((draft) => {
     summary.draftItems += 1;
+    if (draft.conflict) summary.conflictItems += 1;
     const validation = validateBulkStockDraft(draft);
     if (!validation.valid || validation.delta === null) {
       summary.invalidItems += 1;
@@ -162,6 +171,90 @@ export function summarizeBulkStockDrafts(drafts: BulkStockDrafts): BulkStockSumm
   });
 
   return summary;
+}
+
+export function rebaseBulkStockConflict(
+  current: BulkStockDrafts,
+  conflict: { productId: string; currentQuantity: number }
+): BulkStockDrafts {
+  const draft = current[conflict.productId];
+  const currentQuantity = normalizeCurrentQuantity(conflict.currentQuantity);
+  if (!draft) return current;
+  return {
+    ...current,
+    [conflict.productId]: {
+      ...draft,
+      expectedCurrentQuantity: currentQuantity,
+      conflict: {
+        previousExpectedQuantity: draft.expectedCurrentQuantity,
+        currentQuantity
+      }
+    }
+  };
+}
+
+export function isSemanticallyValidBulkStockResult(
+  value: unknown,
+  expectedItems: BulkStockRequestItem[]
+) {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  const summary = result.summary as Record<string, unknown> | null;
+  const items = result.items;
+  if (typeof result.operationId !== "string" || !result.operationId.trim() || typeof result.idempotent !== "boolean") return false;
+  if (!summary || typeof summary !== "object" || !Array.isArray(items) || items.length !== expectedItems.length) return false;
+
+  const summaryFields = ["submittedItems", "changedItems", "unchangedItems", "increases", "reductions", "unitsAdded", "unitsRemoved"];
+  if (!summaryFields.every((field) => isNonNegativeInteger(summary[field]))) return false;
+  if (summary.submittedItems !== expectedItems.length) return false;
+  if ((summary.changedItems as number) + (summary.unchangedItems as number) !== expectedItems.length) return false;
+
+  const expectedById = new Map(expectedItems.map((item) => [item.productId, item]));
+  const seen = new Set<string>();
+  let changedItems = 0;
+  let unchangedItems = 0;
+  let increases = 0;
+  let reductions = 0;
+  let unitsAdded = 0;
+  let unitsRemoved = 0;
+  for (const rawItem of items) {
+    if (!rawItem || typeof rawItem !== "object") return false;
+    const item = rawItem as Record<string, unknown>;
+    const productId = typeof item.productId === "string" ? item.productId : "";
+    const expected = expectedById.get(productId);
+    if (!expected || seen.has(productId)) return false;
+    seen.add(productId);
+    if (!isNonNegativeInteger(item.previousQuantity) || !isNonNegativeInteger(item.targetQuantity)) return false;
+    if (!Number.isInteger(item.delta) || item.delta !== (item.targetQuantity as number) - (item.previousQuantity as number)) return false;
+    if (item.previousQuantity !== expected.expectedCurrentQuantity) return false;
+    if (item.targetQuantity !== expected.targetQuantity) return false;
+    if (!(["updated", "unchanged", "idempotent"] as unknown[]).includes(item.status)) return false;
+    if (item.status === "updated" && (typeof item.movementId !== "string" || !item.movementId.trim())) return false;
+    if (item.status === "unchanged" && item.delta !== 0) return false;
+    if (item.movementId !== null && typeof item.movementId !== "string") return false;
+    const delta = item.delta as number;
+    if (delta === 0) {
+      unchangedItems += 1;
+    } else {
+      changedItems += 1;
+      if (delta > 0) {
+        increases += 1;
+        unitsAdded += delta;
+      } else {
+        reductions += 1;
+        unitsRemoved += Math.abs(delta);
+      }
+    }
+  }
+  return (
+    seen.size === expectedItems.length &&
+    summary.changedItems === changedItems &&
+    summary.unchangedItems === unchangedItems &&
+    summary.increases === increases &&
+    summary.reductions === reductions &&
+    summary.unitsAdded === unitsAdded &&
+    summary.unitsRemoved === unitsRemoved
+  );
 }
 
 export function filterBulkStockDrafts(drafts: BulkStockDrafts, filters: BulkStockFilters): BulkStockDraft[] {
@@ -197,6 +290,13 @@ export function paginateBulkStockDrafts(
     totalItems,
     totalPages
   };
+}
+
+export function resolveInventoryPageCorrection(requestedPage: number, totalPages: number) {
+  const safeRequestedPage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const safeTotalPages = Number.isInteger(totalPages) && totalPages >= 0 ? totalPages : 0;
+  const lastValidPage = Math.max(safeTotalPages, 1);
+  return safeRequestedPage > lastValidPage ? lastValidPage : null;
 }
 
 export function buildBulkStockPayloadFingerprint(input: {
@@ -244,4 +344,8 @@ export function parseBulkStockTarget(rawValue: string): number | null {
 function normalizeCurrentQuantity(value: number) {
   const normalized = Number(value);
   return Number.isSafeInteger(normalized) && normalized >= 0 ? normalized : 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }

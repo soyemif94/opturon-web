@@ -14,6 +14,7 @@ import type {
   PortalInventoryProduct,
   PortalInventorySummary
 } from "@/lib/api";
+import { resolveInventoryPageCorrection } from "@/lib/inventory-bulk-stock";
 
 type MovementMode = "opening_balance" | "manual_increase" | "manual_decrease" | "correction";
 type InventoryActionPanel = "history" | "movement" | null;
@@ -110,7 +111,7 @@ export function InventoryBaseWorkspace({
     }
   }
 
-  async function loadProducts(nextPage: number, filters: InventoryProductFilters): Promise<void> {
+  async function loadProducts(nextPage: number, filters: InventoryProductFilters, allowPageCorrection = true): Promise<void> {
     const requestId = productsRequestIdRef.current + 1;
     productsRequestIdRef.current = requestId;
     setLoading(true);
@@ -132,8 +133,10 @@ export function InventoryBaseWorkspace({
         throw new Error("No se pudo interpretar la respuesta de inventario.");
       }
       if (productsRequestIdRef.current !== requestId) return;
-      if (json.pagination.totalPages > 0 && json.pagination.page > json.pagination.totalPages) {
-        await loadProducts(json.pagination.totalPages, normalizedFilters);
+      const correctionPage = resolveInventoryPageCorrection(nextPage, json.pagination.totalPages);
+      if (correctionPage !== null) {
+        if (!allowPageCorrection) throw new Error("Inventario devolvio una pagina fuera de rango.");
+        await loadProducts(correctionPage, normalizedFilters, false);
         return;
       }
       setProducts(json.products);

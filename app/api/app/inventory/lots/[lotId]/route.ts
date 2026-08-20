@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendErrorBody, getBackendErrorStatus, getPortalInventoryLotDetail, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { lotId } = await params;
   try {
-    const result = await getPortalInventoryLotDetail(tenantContext.tenantId, lotId);
+    const result = await getPortalInventoryLotDetail(tenantContext.tenantId, lotId, getPortalInventoryReadActor(tenantContext.ctx || {}));
     return noStore(NextResponse.json({ lot: result.data.lot, movements: result.data.movements || [] }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

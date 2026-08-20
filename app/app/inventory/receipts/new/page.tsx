@@ -9,7 +9,7 @@ import {
   type PortalProduct,
   type PortalSupplier
 } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 export default async function InventoryReceiptNewPage() {
   const ctx = await requireAppModulePage("inventory");
@@ -20,9 +20,10 @@ export default async function InventoryReceiptNewPage() {
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
+      const inventoryReadActor = getPortalInventoryReadActor(ctx);
       const [suppliersResult, locationsResult, productsResult] = await Promise.all([
         getPortalSuppliers(ctx.tenantId, { page: 1, pageSize: 100, status: "active", sort: "name_asc" }),
-        getPortalInventoryLocations(ctx.tenantId),
+        getPortalInventoryLocations(ctx.tenantId, inventoryReadActor),
         getPortalProducts(ctx.tenantId)
       ]);
       suppliers = Array.isArray(suppliersResult.data?.items) ? suppliersResult.data.items : [];

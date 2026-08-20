@@ -10,7 +10,7 @@ import {
   type PortalInventoryProduct,
   type PortalInventorySummary
 } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 const INVENTORY_PAGE_SIZE = 50;
 
@@ -39,7 +39,11 @@ export default async function InventoryBulkAdjustPage() {
     errorMessage = "La carga masiva de inventario no esta disponible en este entorno.";
   } else if (ctx.tenantId) {
     try {
-      const result = await getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: INVENTORY_PAGE_SIZE });
+      const result = await getPortalInventoryProducts(
+        ctx.tenantId,
+        { page: 1, pageSize: INVENTORY_PAGE_SIZE },
+        getPortalInventoryReadActor(ctx)
+      );
       if (
         !Array.isArray(result.data?.products) ||
         !isInventoryPagination(result.data?.pagination) ||

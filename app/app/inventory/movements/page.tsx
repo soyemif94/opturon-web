@@ -9,7 +9,7 @@ import {
   type PortalInventoryMovementListItem,
   type PortalInventoryProduct
 } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 function parsePositiveInteger(raw: string | string[] | undefined, fallback: number) {
   const value = Number.parseInt(Array.isArray(raw) ? raw[0] || "" : raw || "", 10);
@@ -51,14 +51,15 @@ export default async function InventoryMovementsPage({
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
+      const inventoryReadActor = getPortalInventoryReadActor(ctx);
       const [movementsResult, productsResult, locationsResult] = await Promise.all([
         getPortalInventoryMovements(ctx.tenantId, {
           ...initialFilters,
           page: initialPage,
           pageSize: initialPageSize
-        }),
-        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: 100 }),
-        getPortalInventoryLocations(ctx.tenantId)
+        }, inventoryReadActor),
+        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: 100 }, inventoryReadActor),
+        getPortalInventoryLocations(ctx.tenantId, inventoryReadActor)
       ]);
       items = Array.isArray(movementsResult.data?.items) ? movementsResult.data.items : [];
       total = Number(movementsResult.data?.total || 0);

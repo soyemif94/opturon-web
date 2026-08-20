@@ -19,17 +19,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type {
-  PortalInventoryBulkAdjustmentResult,
   PortalInventoryPagination,
   PortalInventoryProduct,
   PortalInventorySummary
 } from "@/lib/api";
 import {
   BULK_STOCK_REASONS,
+  MAX_BULK_STOCK_ITEMS,
   MAX_BULK_STOCK_QUANTITY,
   buildBulkStockPayloadFingerprint,
   buildBulkStockRequestItems,
+  isSemanticallyValidBulkStockResult,
   paginateBulkStockDrafts,
+  rebaseBulkStockConflict,
+  resolveInventoryPageCorrection,
   resolveBulkStockAttempt,
   summarizeBulkStockDrafts,
   updateBulkStockDraft,
@@ -88,6 +91,7 @@ export function InventoryBulkStockWorkspace({
   const [pendingExitHref, setPendingExitHref] = useState("/app/inventory");
   const productsRequestIdRef = useRef(0);
   const submitInFlightRef = useRef(false);
+  const navigationBypassRef = useRef(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
 
   const draftSummary = useMemo(() => summarizeBulkStockDrafts(drafts), [drafts]);
@@ -114,7 +118,7 @@ export function InventoryBulkStockWorkspace({
   useEffect(() => {
     if (draftSummary.draftItems === 0) return;
     const guardClientNavigation = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (navigationBypassRef.current || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!target || target.target === "_blank" || target.hasAttribute("download")) return;
       const destination = new URL(target.href, window.location.href);
@@ -134,6 +138,31 @@ export function InventoryBulkStockWorkspace({
     return () => document.removeEventListener("click", guardClientNavigation, true);
   }, [draftSummary.draftItems, saving]);
 
+  useEffect(() => {
+    if (draftSummary.draftItems === 0) return;
+    const navigation = (window as unknown as {
+      navigation?: {
+        addEventListener: (type: "navigate", listener: (event: Event) => void) => void;
+        removeEventListener: (type: "navigate", listener: (event: Event) => void) => void;
+      };
+    }).navigation;
+    if (!navigation) return;
+    const guardHistoryNavigation = (rawEvent: Event) => {
+      const event = rawEvent as Event & { destination?: { url?: string }; canIntercept?: boolean };
+      if (navigationBypassRef.current || !event.cancelable || event.canIntercept === false) return;
+      const destinationUrl = event.destination?.url;
+      if (!destinationUrl) return;
+      const destination = new URL(destinationUrl, window.location.href);
+      if (destination.href === window.location.href) return;
+      event.preventDefault();
+      if (saving) return;
+      setPendingExitHref(`${destination.pathname}${destination.search}${destination.hash}`);
+      setDiscardIntent("exit");
+    };
+    navigation.addEventListener("navigate", guardHistoryNavigation);
+    return () => navigation.removeEventListener("navigate", guardHistoryNavigation);
+  }, [draftSummary.draftItems, saving]);
+
   function buildInventoryUrl(path: string, params?: Record<string, string>) {
     const query = new URLSearchParams(params);
     if (tenantId) query.set("tenantId", tenantId);
@@ -141,7 +170,7 @@ export function InventoryBulkStockWorkspace({
     return `${path}${suffix}`;
   }
 
-  async function loadProducts(nextPage: number, filters: BulkStockFilters): Promise<boolean> {
+  async function loadProducts(nextPage: number, filters: BulkStockFilters, allowPageCorrection = true): Promise<boolean> {
     const requestId = productsRequestIdRef.current + 1;
     productsRequestIdRef.current = requestId;
     setLoading(true);
@@ -164,8 +193,10 @@ export function InventoryBulkStockWorkspace({
         throw new Error("No se pudo interpretar la respuesta de inventario.");
       }
       if (productsRequestIdRef.current !== requestId) return false;
-      if (json.pagination.totalPages > 0 && json.pagination.page > json.pagination.totalPages) {
-        return loadProducts(json.pagination.totalPages, normalizedFilters);
+      const correctionPage = resolveInventoryPageCorrection(nextPage, json.pagination.totalPages);
+      if (correctionPage !== null) {
+        if (!allowPageCorrection) throw new Error("Inventario devolvio una pagina fuera de rango.");
+        return loadProducts(correctionPage, normalizedFilters, false);
       }
       setProducts(json.products);
       setPagination(json.pagination);
@@ -210,6 +241,12 @@ export function InventoryBulkStockWorkspace({
   }
 
   function openReview() {
+    if (draftSummary.conflictItems > 0) {
+      const message = `Revisa ${draftSummary.conflictItems} conflicto${draftSummary.conflictItems === 1 ? "" : "s"} de stock antes de continuar.`;
+      setFeedback({ tone: "error", text: message });
+      toast.error("Hay stock actualizado", message);
+      return;
+    }
     if (draftSummary.invalidItems > 0) {
       const message = `Revisa ${draftSummary.invalidItems} cantidad${draftSummary.invalidItems === 1 ? "" : "es"} invalida${draftSummary.invalidItems === 1 ? "" : "s"} antes de continuar.`;
       setFeedback({ tone: "error", text: message });
@@ -220,6 +257,12 @@ export function InventoryBulkStockWorkspace({
       const message = "Ingresa al menos una cantidad diferente al stock actual.";
       setFeedback({ tone: "warning", text: message });
       toast.error("No hay cambios para revisar", message);
+      return;
+    }
+    if (reviewItems.length > MAX_BULK_STOCK_ITEMS) {
+      const message = `El maximo por operacion es ${MAX_BULK_STOCK_ITEMS.toLocaleString("es-AR")} productos. Reduce la seleccion y vuelve a intentar.`;
+      setFeedback({ tone: "error", text: message });
+      toast.error("Demasiados productos", message);
       return;
     }
     setSubmitError(null);
@@ -242,7 +285,7 @@ export function InventoryBulkStockWorkspace({
       setSubmitError("Confirma explicitamente la aplicacion de los ajustes.");
       return;
     }
-    if (draftSummary.invalidItems > 0 || reviewItems.length === 0) {
+    if (draftSummary.invalidItems > 0 || draftSummary.conflictItems > 0 || reviewItems.length === 0 || reviewItems.length > MAX_BULK_STOCK_ITEMS) {
       setSubmitError("Los cambios ya no son validos. Cierra la revision y verifica las cantidades.");
       return;
     }
@@ -268,10 +311,13 @@ export function InventoryBulkStockWorkspace({
       if (!response.ok) {
         throw createBulkStockSubmissionError(
           resolveBulkStockErrorMessage(json?.error, response.status),
-          isConfirmedBulkStockRejection(json?.error, response.status) ? "rejected" : "unknown"
+          isConfirmedBulkStockRejection(json?.error, response.status) ? "rejected" : "unknown",
+          response.status,
+          json?.error,
+          json?.details
         );
       }
-      if (!isBulkAdjustmentResult(json)) {
+      if (!isSemanticallyValidBulkStockResult(json, reviewItems)) {
         throw createBulkStockSubmissionError(
           "El ajuste fue recibido, pero no pudimos confirmar la respuesta. Reintenta con los mismos datos para verificarlo sin duplicar movimientos.",
           "unknown"
@@ -294,6 +340,22 @@ export function InventoryBulkStockWorkspace({
       toast.success("Ajuste masivo aplicado", successText);
     } catch (error) {
       const outcome = getBulkStockSubmissionOutcome(error);
+      const conflicts = getInventoryChangedConflicts(error);
+      if (conflicts.length > 0) {
+        setDrafts((current) => conflicts.reduce((next, conflict) => rebaseBulkStockConflict(next, conflict), current));
+        setAttempt(null);
+        setConfirmed(false);
+        setReviewOpen(false);
+        const conflict = conflicts[0];
+        const draft = drafts[conflict.productId];
+        const extraConflicts = conflicts.length > 1 ? ` Hay ${conflicts.length - 1} producto${conflicts.length === 2 ? "" : "s"} adicional${conflicts.length === 2 ? "" : "es"} con cambios.` : "";
+        const message = `El stock de ${draft?.name || "un producto"} cambio de ${conflict.expectedCurrentQuantity} a ${conflict.currentQuantity}.${extraConflicts} Conservamos los objetivos; revisalos y confirmalos antes de reintentar.`;
+        setSubmitError(null);
+        await loadProducts(pagination.page, appliedFilters);
+        setFeedback({ tone: "error", text: message });
+        toast.error("Stock actualizado", message);
+        return;
+      }
       const message = outcome ? (error as Error).message : BULK_STOCK_UNCONFIRMED_MESSAGE;
       setSubmitError(message);
       setFeedback({ tone: "error", text: message });
@@ -321,7 +383,10 @@ export function InventoryBulkStockWorkspace({
     setShowModifiedOnly(false);
     const shouldExit = discardIntent === "exit";
     setDiscardIntent(null);
-    if (shouldExit) router.push(pendingExitHref);
+    if (shouldExit) {
+      navigationBypassRef.current = true;
+      router.push(pendingExitHref);
+    }
   }
 
   const displayedRows: BulkStockProductSource[] = showModifiedOnly
@@ -382,6 +447,7 @@ export function InventoryBulkStockWorkspace({
         <CardContent className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto_auto]">
             <label className="relative block">
+              <span className="sr-only">Buscar productos</span>
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
@@ -394,16 +460,20 @@ export function InventoryBulkStockWorkspace({
                 disabled={saving}
               />
             </label>
-            <select
-              className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
-              value={stockFilter}
-              onChange={(event) => setStockFilter(event.target.value as BulkStockFilters["stockFilter"])}
-              disabled={saving}
-            >
-              <option value="all">Todos</option>
-              <option value="with_stock">Con stock</option>
-              <option value="without_stock">Sin stock</option>
-            </select>
+            <label className="grid gap-1 text-sm">
+              <span className="sr-only">Filtrar por estado de stock</span>
+              <select
+                aria-label="Filtrar por estado de stock"
+                className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
+                value={stockFilter}
+                onChange={(event) => setStockFilter(event.target.value as BulkStockFilters["stockFilter"])}
+                disabled={saving}
+              >
+                <option value="all">Todos</option>
+                <option value="with_stock">Con stock</option>
+                <option value="without_stock">Sin stock</option>
+              </select>
+            </label>
             <Button type="button" variant="secondary" onClick={() => void applyFilters()} disabled={loading || saving}>
               {loading ? "Actualizando..." : "Aplicar filtros"}
             </Button>
@@ -444,6 +514,7 @@ export function InventoryBulkStockWorkspace({
                   const validation = draft ? validateBulkStockDraft(draft) : null;
                   const currentQuantity = draft?.expectedCurrentQuantity ?? product.currentQuantity;
                   const lotBased = product.inventoryTrackingMode === "lot_based";
+                  const errorId = `bulk-stock-error-${product.productId}`;
                   return (
                     <tr key={product.productId} className="border-t border-[color:var(--border)] align-middle">
                       <td className="px-4 py-3">
@@ -461,7 +532,8 @@ export function InventoryBulkStockWorkspace({
                         <Input
                           data-bulk-stock-input="true"
                           aria-label={`Nueva cantidad para ${product.name}`}
-                          aria-invalid={Boolean(validation && !validation.valid)}
+                          aria-invalid={Boolean((validation && !validation.valid) || draft?.conflict)}
+                          aria-describedby={(validation && !validation.valid) || draft?.conflict ? errorId : undefined}
                           className="w-36 text-right font-medium tabular-nums"
                           type="number"
                           inputMode="numeric"
@@ -478,7 +550,7 @@ export function InventoryBulkStockWorkspace({
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">
                         {validation?.valid && validation.delta !== null ? signed(validation.delta) : "-"}
                       </td>
-                      <td className="px-4 py-3">{renderDraftStatus(draft, validation, lotBased)}</td>
+                      <td id={errorId} className="px-4 py-3">{renderDraftStatus(draft, validation, lotBased)}</td>
                     </tr>
                   );
                 })}
@@ -535,6 +607,12 @@ export function InventoryBulkStockWorkspace({
                 {draftSummary.increases} aumentos · {draftSummary.reductions} reducciones · +{draftSummary.unitsAdded} / -{draftSummary.unitsRemoved} unidades
               </p>
               {draftSummary.invalidItems > 0 ? <p className="mt-1 text-xs text-red-300">{draftSummary.invalidItems} cantidades requieren revision.</p> : null}
+              {draftSummary.conflictItems > 0 ? <p className="mt-1 text-xs text-red-300">{draftSummary.conflictItems} productos cambiaron y requieren una decision nueva.</p> : null}
+              {draftSummary.changedItems >= MAX_BULK_STOCK_ITEMS - 1 ? (
+                <p className={`mt-1 text-xs ${draftSummary.changedItems > MAX_BULK_STOCK_ITEMS ? "text-red-300" : "text-amber-200"}`}>
+                  Limite por operacion: {MAX_BULK_STOCK_ITEMS.toLocaleString("es-AR")} productos ({draftSummary.changedItems} seleccionados).
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -546,7 +624,11 @@ export function InventoryBulkStockWorkspace({
                 <Trash2 className="mr-2 size-4" />
                 Descartar cambios
               </Button>
-              <Button type="button" onClick={openReview} disabled={draftSummary.changedItems === 0 || saving}>
+              <Button
+                type="button"
+                onClick={openReview}
+                disabled={draftSummary.changedItems === 0 || draftSummary.conflictItems > 0 || draftSummary.changedItems > MAX_BULK_STOCK_ITEMS || saving}
+              >
                 <ClipboardCheck className="mr-2 size-4" />
                 Revisar cambios ({draftSummary.changedItems})
               </Button>
@@ -729,6 +811,16 @@ function renderDraftStatus(
 ) {
   if (lotBased) return <Badge variant="warning">Gestionado por lotes</Badge>;
   if (!draft) return <Badge variant="muted">Sin cambios</Badge>;
+  if (draft.conflict) {
+    return (
+      <div>
+        <Badge variant="danger">Stock actualizado</Badge>
+        <p className="mt-1 max-w-60 text-xs text-red-300">
+          Cambio de {draft.conflict.previousExpectedQuantity} a {draft.conflict.currentQuantity}. Objetivo conservado: {draft.rawTargetQuantity}. Edita la cantidad para confirmar tu decision.
+        </p>
+      </div>
+    );
+  }
   if (!validation?.valid) {
     return (
       <div>
@@ -746,11 +838,25 @@ const BULK_STOCK_UNCONFIRMED_MESSAGE =
   "No pudimos confirmar el resultado. El ajuste puede haberse aplicado; reintenta con los mismos datos. Conservaremos la misma clave segura para verificarlo sin duplicar movimientos.";
 
 type BulkStockSubmissionOutcome = "rejected" | "unknown";
-type BulkStockSubmissionError = Error & { bulkStockOutcome: BulkStockSubmissionOutcome };
+type BulkStockSubmissionError = Error & {
+  bulkStockOutcome: BulkStockSubmissionOutcome;
+  status: number | null;
+  code: string | null;
+  details: unknown;
+};
 
-function createBulkStockSubmissionError(message: string, outcome: BulkStockSubmissionOutcome): BulkStockSubmissionError {
+function createBulkStockSubmissionError(
+  message: string,
+  outcome: BulkStockSubmissionOutcome,
+  status: number | null = null,
+  code: unknown = null,
+  details: unknown = null
+): BulkStockSubmissionError {
   const error = new Error(message) as BulkStockSubmissionError;
   error.bulkStockOutcome = outcome;
+  error.status = status;
+  error.code = typeof code === "string" ? code : null;
+  error.details = details;
   return error;
 }
 
@@ -758,6 +864,32 @@ function getBulkStockSubmissionOutcome(error: unknown): BulkStockSubmissionOutco
   if (!(error instanceof Error) || !("bulkStockOutcome" in error)) return null;
   const outcome = (error as Partial<BulkStockSubmissionError>).bulkStockOutcome;
   return outcome === "rejected" || outcome === "unknown" ? outcome : null;
+}
+
+function getInventoryChangedConflicts(error: unknown): Array<{
+  productId: string;
+  expectedCurrentQuantity: number;
+  currentQuantity: number;
+}> {
+  if (!(error instanceof Error) || !("code" in error) || !("details" in error)) return [];
+  const candidate = error as Partial<BulkStockSubmissionError>;
+  if (candidate.code !== "inventory_changed" || !candidate.details || typeof candidate.details !== "object") return [];
+  const details = candidate.details as Record<string, unknown>;
+  const rawConflicts = Array.isArray(details.conflicts) ? details.conflicts : [details];
+  return rawConflicts.flatMap((rawConflict) => {
+    if (!rawConflict || typeof rawConflict !== "object") return [];
+    const conflict = rawConflict as Record<string, unknown>;
+    if (
+      typeof conflict.productId !== "string" ||
+      !isNonNegativeInteger(conflict.expectedCurrentQuantity) ||
+      !isNonNegativeInteger(conflict.currentQuantity)
+    ) return [];
+    return [{
+      productId: conflict.productId,
+      expectedCurrentQuantity: conflict.expectedCurrentQuantity,
+      currentQuantity: conflict.currentQuantity
+    }];
+  });
 }
 
 function isConfirmedBulkStockRejection(errorCode?: string | null, status?: number) {
@@ -809,18 +941,6 @@ function resolveBulkStockErrorMessage(errorCode?: string | null, status?: number
   return BULK_STOCK_UNCONFIRMED_MESSAGE;
 }
 
-function isBulkAdjustmentResult(value: unknown): value is PortalInventoryBulkAdjustmentResult {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<PortalInventoryBulkAdjustmentResult>;
-  return (
-    typeof candidate.operationId === "string" &&
-    typeof candidate.idempotent === "boolean" &&
-    Boolean(candidate.summary) &&
-    Number.isInteger(candidate.summary?.changedItems) &&
-    Array.isArray(candidate.items)
-  );
-}
-
 function isInventoryPagination(value: unknown): value is PortalInventoryPagination {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<PortalInventoryPagination>;
@@ -828,7 +948,9 @@ function isInventoryPagination(value: unknown): value is PortalInventoryPaginati
     isPositiveInteger(candidate.page) &&
     isPositiveInteger(candidate.pageSize) &&
     isNonNegativeInteger(candidate.totalItems) &&
-    isNonNegativeInteger(candidate.totalPages)
+    isNonNegativeInteger(candidate.totalPages) &&
+    candidate.totalPages === (candidate.totalItems > 0 ? Math.ceil(candidate.totalItems / candidate.pageSize) : 0) &&
+    (candidate.totalPages > 0 || candidate.page === 1)
   );
 }
 

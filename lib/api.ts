@@ -3490,14 +3490,29 @@ export async function getPortalProducts(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
 }
 
+export type PortalInventoryReadActor = {
+  id?: string | null;
+  name?: string | null;
+};
+
+function portalInventoryReadFetch<T>(path: string, actor: PortalInventoryReadActor) {
+  const headers = new Headers();
+  const actorId = String(actor?.id || "").trim();
+  if (!actorId) throw new Error("portal_inventory_read_actor_required");
+  headers.set("x-portal-actor-id", actorId);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<T>(path, { headers });
+}
+
 export async function getPortalInventoryProducts(
   tenantId: string,
-  options?: {
+  options: {
     search?: string;
     stockFilter?: "all" | "with_stock" | "without_stock";
     page?: number;
     pageSize?: number;
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.search) params.set("search", options.search);
@@ -3505,11 +3520,11 @@ export async function getPortalInventoryProducts(
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
-      location: { id: string; name: string; code: string };
+      location: { id: string; name: string; code: string } | null;
       page: number;
       pageSize: number;
       total: number;
@@ -3517,12 +3532,12 @@ export async function getPortalInventoryProducts(
       summary: PortalInventorySummary;
       products: PortalInventoryProduct[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/products${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/products${suffix}`, actor);
 }
 
 export async function getPortalInventoryMovements(
   tenantId: string,
-  options?: {
+  options: {
     search?: string;
     movementType?: PortalInventoryMovement["movementType"];
     locationId?: string;
@@ -3532,7 +3547,8 @@ export async function getPortalInventoryMovements(
     dateTo?: string;
     page?: number;
     pageSize?: number;
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.search) params.set("search", options.search);
@@ -3545,7 +3561,7 @@ export async function getPortalInventoryMovements(
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -3554,25 +3570,26 @@ export async function getPortalInventoryMovements(
       total: number;
       items: PortalInventoryMovementListItem[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/movements${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/movements${suffix}`, actor);
 }
 
 export async function getPortalInventoryProductHistory(
   tenantId: string,
   productId: string,
-  options?: { page?: number; pageSize?: number }
+  options: { page?: number; pageSize?: number } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       product: PortalProduct;
       movements: PortalInventoryMovement[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/products/${productId}/movements${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/products/${productId}/movements${suffix}`, actor);
 }
 
 export async function createPortalInventoryMovement(
@@ -3683,7 +3700,7 @@ export async function executePortalCatalogBulkDelete(
 
 export async function getPortalInventoryLots(
   tenantId: string,
-  options?: {
+  options: {
     productId?: string;
     status?: string;
     expirationStatus?: string;
@@ -3698,7 +3715,8 @@ export async function getPortalInventoryLots(
     expiresAfter?: string;
     search?: string;
     pageSize?: number;
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.productId) params.set("productId", options.productId);
@@ -3716,17 +3734,17 @@ export async function getPortalInventoryLots(
   if (options?.search) params.set("search", options.search);
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
       lots: PortalInventoryLot[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/lots${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/lots${suffix}`, actor);
 }
 
-export async function getPortalInventoryExpirationSummary(tenantId: string) {
-  return backendFetch<{
+export async function getPortalInventoryExpirationSummary(tenantId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -3735,11 +3753,11 @@ export async function getPortalInventoryExpirationSummary(tenantId: string) {
       timezone: string;
       today: string;
     };
-  }>(`/portal/tenants/${tenantId}/inventory/expiration-summary`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/expiration-summary`, actor);
 }
 
-export async function getPortalInventoryExpirationSettings(tenantId: string) {
-  return backendFetch<{
+export async function getPortalInventoryExpirationSettings(tenantId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -3747,7 +3765,7 @@ export async function getPortalInventoryExpirationSettings(tenantId: string) {
       timezone: string;
       today: string;
     };
-  }>(`/portal/tenants/${tenantId}/inventory/expiration-settings`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/expiration-settings`, actor);
 }
 
 export async function updatePortalInventoryExpirationSettings(
@@ -3800,36 +3818,41 @@ export async function bulkWriteoffExpiredPortalInventoryLots(
   );
 }
 
-export async function getPortalInventoryLotDetail(tenantId: string, lotId: string) {
-  return backendFetch<{
+export async function getPortalInventoryLotDetail(tenantId: string, lotId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       lot: PortalInventoryLot;
       movements: PortalInventoryMovement[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}`, actor);
 }
 
-export async function getPortalInventoryLotHistory(tenantId: string, lotId: string, options?: { pageSize?: number; offset?: number }) {
+export async function getPortalInventoryLotHistory(
+  tenantId: string,
+  lotId: string,
+  options: { pageSize?: number; offset?: number } | undefined,
+  actor: PortalInventoryReadActor
+) {
   const params = new URLSearchParams();
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.offset) params.set("offset", String(options.offset));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       history: PortalInventoryLotHistoryEntry[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}/history${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/lots/${lotId}/history${suffix}`, actor);
 }
 
-export async function getPortalInventoryLocations(tenantId: string) {
-  return backendFetch<{
+export async function getPortalInventoryLocations(tenantId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       locations: PortalInventoryLocation[];
     };
-  }>(`/portal/tenants/${tenantId}/inventory/locations`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/inventory/locations`, actor);
 }
 
 export async function createPortalInventoryLocation(
@@ -3960,15 +3983,19 @@ export async function setPortalProductInventoryMode(
     warehouseName?: string | null;
     locationName?: string | null;
     notes?: string | null;
-  }
+  },
+  actor?: { id?: string | null; name?: string | null }
 ) {
-  return backendFetch<{ success: boolean; data: PortalProduct }>(
+  const headers = new Headers();
+  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
+  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  return backendPortalFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}/inventory-mode`,
     {
       method: "POST",
+      headers,
       body: JSON.stringify({ mode, initialLot })
-    },
-    false
+    }
   );
 }
 

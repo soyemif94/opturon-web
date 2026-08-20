@@ -6,7 +6,7 @@ import {
   getPortalInventoryLocations,
   isBackendConfigured
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -19,7 +19,7 @@ export async function GET() {
   if (!isBackendConfigured()) return noStore(NextResponse.json({ error: "inventory_backend_unavailable" }, { status: 503 }));
 
   try {
-    const result = await getPortalInventoryLocations(tenantContext.tenantId);
+    const result = await getPortalInventoryLocations(tenantContext.tenantId, getPortalInventoryReadActor(tenantContext.ctx || {}));
     return noStore(NextResponse.json({ locations: result.data.locations || [], readOnly: tenantContext.readOnly }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

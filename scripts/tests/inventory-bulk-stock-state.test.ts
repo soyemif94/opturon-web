@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import {
+  MAX_BULK_STOCK_ITEMS,
   MAX_BULK_STOCK_QUANTITY,
   buildBulkStockPayloadFingerprint,
   buildBulkStockRequestItems,
   createBulkStockIdempotencyKey,
   filterBulkStockDrafts,
+  isSemanticallyValidBulkStockResult,
   paginateBulkStockDrafts,
   parseBulkStockTarget,
+  rebaseBulkStockConflict,
+  resolveInventoryPageCorrection,
   resolveBulkStockAttempt,
   summarizeBulkStockDrafts,
   updateBulkStockDraft,
@@ -49,6 +53,7 @@ assert.deepEqual(summarizeBulkStockDrafts(drafts), {
   draftItems: 3,
   changedItems: 3,
   invalidItems: 0,
+  conflictItems: 0,
   increases: 2,
   reductions: 1,
   unitsAdded: 29,
@@ -74,6 +79,20 @@ assert.equal(summarizeBulkStockDrafts(invalidDrafts).invalidItems, 4);
 assert.deepEqual(buildBulkStockRequestItems(invalidDrafts), []);
 assert.equal(validateBulkStockDraft(invalidDrafts["product-005"]).error, "lot_based");
 
+// A 409 refreshes only the stale snapshot, preserves the operator's target and
+// requires an explicit edit before the operation can be reviewed again.
+const conflictSource = updateBulkStockDraft(drafts, product(7, 1), "3");
+const unaffectedDraft = conflictSource["product-007"];
+const conflicted = rebaseBulkStockConflict(conflictSource, { productId: "product-505", currentQuantity: 9 });
+assert.equal(conflicted["product-505"].expectedCurrentQuantity, 9);
+assert.equal(conflicted["product-505"].rawTargetQuantity, "0");
+assert.deepEqual(conflicted["product-505"].conflict, { previousExpectedQuantity: 12, currentQuantity: 9 });
+assert.equal(summarizeBulkStockDrafts(conflicted).conflictItems, 1);
+assert.equal(conflicted["product-007"], unaffectedDraft, "unrelated drafts must remain untouched");
+const reviewedConflict = updateBulkStockDraft(conflicted, product(505, 9), "0");
+assert.equal(reviewedConflict["product-505"].conflict, null);
+assert.equal(reviewedConflict["product-505"].expectedCurrentQuantity, 9);
+
 assert.equal(parseBulkStockTarget("0"), 0);
 assert.equal(parseBulkStockTarget(String(MAX_BULK_STOCK_QUANTITY)), MAX_BULK_STOCK_QUANTITY);
 assert.equal(parseBulkStockTarget("-1"), null);
@@ -98,6 +117,10 @@ assert.equal(secondPage.items[0].productId, "product-051");
 assert.equal(lastPage.items[0].productId, "product-501");
 assert.equal(summarizeBulkStockDrafts(largeDrafts).changedItems, 505);
 assert.equal(buildBulkStockRequestItems(largeDrafts).length, 505);
+assert.equal(MAX_BULK_STOCK_ITEMS, 2000);
+assert.equal(1999 <= MAX_BULK_STOCK_ITEMS, true);
+assert.equal(2000 <= MAX_BULK_STOCK_ITEMS, true);
+assert.equal(2001 <= MAX_BULK_STOCK_ITEMS, false);
 
 // Search and stock filters operate across all drafts, not only the server page currently visible.
 assert.deepEqual(
@@ -106,6 +129,11 @@ assert.deepEqual(
 );
 assert.equal(filterBulkStockDrafts(largeDrafts, { search: "", stockFilter: "with_stock" }).length, 253);
 assert.equal(filterBulkStockDrafts(largeDrafts, { search: "", stockFilter: "without_stock" }).length, 252);
+
+assert.equal(resolveInventoryPageCorrection(11, 2), 2, "reduced dataset corrects to last page");
+assert.equal(resolveInventoryPageCorrection(11, 0), 1, "empty dataset corrects to logical page one");
+assert.equal(resolveInventoryPageCorrection(2, 2), null, "valid page does not trigger another request");
+assert.equal(resolveInventoryPageCorrection(1, 0), null, "empty page one does not loop");
 
 const items = buildBulkStockRequestItems(drafts);
 const fingerprint = buildBulkStockPayloadFingerprint({ reason: "physical_count", note: "  Deposito  ", items });
@@ -119,5 +147,25 @@ const changedFingerprint = buildBulkStockPayloadFingerprint({ reason: "inventory
 const changedAttempt = resolveBulkStockAttempt(firstAttempt, changedFingerprint, () => "22222222-2222-4222-8222-222222222222");
 assert.notEqual(changedAttempt.idempotencyKey, firstAttempt.idempotencyKey);
 assert.match(createBulkStockIdempotencyKey(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+
+const expectedResultItems = [{ productId: "product-505", targetQuantity: 0, expectedCurrentQuantity: 12 }];
+const validResult = {
+  operationId: "operation-1",
+  idempotent: false,
+  summary: { submittedItems: 1, changedItems: 1, unchangedItems: 0, increases: 0, reductions: 1, unitsAdded: 0, unitsRemoved: 12 },
+  items: [{ productId: "product-505", previousQuantity: 12, targetQuantity: 0, delta: -12, status: "updated", movementId: "movement-1" }]
+};
+assert.equal(isSemanticallyValidBulkStockResult(validResult, expectedResultItems), true);
+assert.equal(isSemanticallyValidBulkStockResult({
+  ...validResult,
+  idempotent: true,
+  items: [{ ...validResult.items[0], status: "idempotent" }]
+}, expectedResultItems), true, "a correlated 200 idempotency replay is valid");
+assert.equal(isSemanticallyValidBulkStockResult({ ...validResult, operationId: "" }, expectedResultItems), false);
+assert.equal(isSemanticallyValidBulkStockResult({ ...validResult, summary: { ...validResult.summary, submittedItems: 2 } }, expectedResultItems), false);
+assert.equal(isSemanticallyValidBulkStockResult({ ...validResult, items: [] }, expectedResultItems), false);
+assert.equal(isSemanticallyValidBulkStockResult({ ...validResult, items: [{ ...validResult.items[0], productId: "other" }] }, expectedResultItems), false);
+assert.equal(isSemanticallyValidBulkStockResult({ ...validResult, items: [{ ...validResult.items[0], status: "mystery" }] }, expectedResultItems), false);
+assert.equal(isSemanticallyValidBulkStockResult({ ...validResult, items: [{ ...validResult.items[0], targetQuantity: 1, delta: -11 }] }, expectedResultItems), false);
 
 console.log("inventory-bulk-stock-state.test.ts passed");

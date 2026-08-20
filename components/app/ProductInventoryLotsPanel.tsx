@@ -386,7 +386,7 @@ export function ProductInventoryLotsPanel({
             product.inventoryTrackingMode === "lot_based" ? (
               <Badge variant="success">lot_based</Badge>
             ) : (
-              <Button type="button" size="sm" className="rounded-2xl" onClick={activateLotMode} disabled={readOnly || saving}>
+              <Button type="button" size="sm" className="rounded-2xl" onClick={activateLotMode} disabled={readOnly || !canManageSensitive || saving}>
                 Activar lotes
               </Button>
             )

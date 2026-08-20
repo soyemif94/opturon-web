@@ -6,7 +6,8 @@ import {
   getPortalInventoryProductHistory,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { canPerformTenantInventorySensitiveAction } from "@/lib/app-permissions";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const result = await getPortalInventoryProductHistory(tenantContext.tenantId, productId, {
       page: Number(url.searchParams.get("page") || 1),
       pageSize: Number(url.searchParams.get("pageSize") || 25)
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx || {}));
     return noStore(NextResponse.json(result.data));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);
@@ -55,9 +56,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ productId: string }> }) {
-  const moduleGuard = await requireAppModuleApi("inventory", { permission: "manage_catalog" });
+  const moduleGuard = await requireAppModuleApi("inventory", { permission: "manage_inventory_sensitive" });
   if (moduleGuard.error) return moduleGuard.error;
-  const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
+  if (!moduleGuard.ctx || !canPerformTenantInventorySensitiveAction(moduleGuard.ctx)) {
+    return noStore(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
+  }
+  const tenantContext = await resolveAppTenant({ permission: "manage_inventory_sensitive", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) {
     return noStore(NextResponse.json({ error: "inventory_backend_unavailable" }, { status: 503 }));

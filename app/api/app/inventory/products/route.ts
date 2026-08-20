@@ -5,7 +5,7 @@ import {
   getPortalInventoryProducts,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       stockFilter: (url.searchParams.get("stockFilter") as "all" | "with_stock" | "without_stock" | null) || undefined,
       page: Number(url.searchParams.get("page") || 1),
       pageSize: Number(url.searchParams.get("pageSize") || 50)
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx || {}));
     return noStore(
       NextResponse.json({
         readOnly: tenantContext.readOnly,

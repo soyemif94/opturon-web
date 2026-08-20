@@ -11,7 +11,7 @@ import {
   isBackendConfigured,
   type PortalBusinessSettings
 } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppPage } from "@/lib/saas/access";
 import { getInboxConversationDetail, listInboxConversations, readSaasData } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
 
@@ -80,7 +80,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         getPortalContacts(ctx.tenantId),
         getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId),
         getPortalBusinessSettings(ctx.tenantId),
-        getPortalInventoryExpirationSummary(ctx.tenantId)
+        getPortalInventoryExpirationSummary(ctx.tenantId, getPortalInventoryReadActor(ctx))
       ]);
 
       if (conversationsResult.status === "fulfilled") {

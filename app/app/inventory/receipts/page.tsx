@@ -9,7 +9,7 @@ import {
   type PortalPurchaseReceiptListItem,
   type PortalSupplier
 } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 export default async function InventoryReceiptsPage() {
   const ctx = await requireAppModulePage("inventory");
@@ -21,10 +21,11 @@ export default async function InventoryReceiptsPage() {
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
+      const inventoryReadActor = getPortalInventoryReadActor(ctx);
       const [receiptsResult, suppliersResult, locationsResult] = await Promise.all([
         getPortalPurchaseReceipts(ctx.tenantId, { page: 1, pageSize: 20, sort: "receivedAt_desc" }),
         getPortalSuppliers(ctx.tenantId, { page: 1, pageSize: 100, status: "all", sort: "name_asc" }),
-        getPortalInventoryLocations(ctx.tenantId)
+        getPortalInventoryLocations(ctx.tenantId, inventoryReadActor)
       ]);
       receipts = Array.isArray(receiptsResult.data?.items) ? receiptsResult.data.items : [];
       total = Number(receiptsResult.data?.total || 0);

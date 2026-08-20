@@ -9,7 +9,7 @@ import { getPortalInventoryLots, getPortalProductDetail, isBackendConfigured, ty
 import { formatMoney, formatDateTimeLabel, titleCaseLabel } from "@/lib/billing";
 import { formatExpirationDate, getExpirationBadgePresentation } from "@/lib/product-expiration";
 import { getDiscountedPrice } from "@/lib/product-pricing";
-import { requireAppPage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppPage } from "@/lib/saas/access";
 
 export default async function CatalogProductDetail({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireAppPage();
@@ -25,7 +25,11 @@ export default async function CatalogProductDetail({ params }: { params: Promise
     try {
       const result = await getPortalProductDetail(ctx.tenantId, id);
       product = result.data;
-      const lotsResult = await getPortalInventoryLots(ctx.tenantId, { productId: id, pageSize: 100 });
+      const lotsResult = await getPortalInventoryLots(
+        ctx.tenantId,
+        { productId: id, pageSize: 100 },
+        getPortalInventoryReadActor(ctx)
+      );
       lots = Array.isArray(lotsResult.data?.lots) ? lotsResult.data.lots : [];
     } catch {
       product = null;

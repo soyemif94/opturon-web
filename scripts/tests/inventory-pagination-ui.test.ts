@@ -26,7 +26,7 @@ assert.match(inventoryApi, /pagination: PortalInventoryPagination;/);
 assert.match(inventoryApi, /summary: PortalInventorySummary;/);
 
 assert.match(page, /const INVENTORY_PAGE_SIZE = 50;/);
-assert.match(page, /getPortalInventoryProducts\(ctx\.tenantId, \{ page: 1, pageSize: INVENTORY_PAGE_SIZE \}\)/);
+assert.match(page, /getPortalInventoryProducts\(ctx\.tenantId, \{ page: 1, pageSize: INVENTORY_PAGE_SIZE \}, inventoryReadActor\)/);
 assert.match(page, /pagination = productsResult\.data\.pagination;/);
 assert.match(page, /summary = productsResult\.data\.summary;/);
 assert.match(page, /initialPagination=\{pagination\}/);
@@ -43,7 +43,7 @@ assert.match(workspace, /pageSize: String\(INVENTORY_PAGE_SIZE\)/);
 assert.match(workspace, /setProducts\(json\.products\);[\s\S]*?setPagination\(json\.pagination\);[\s\S]*?setInventorySummary\(json\.summary\);/);
 assert.match(
   workspace,
-  /json\.pagination\.totalPages > 0 && json\.pagination\.page > json\.pagination\.totalPages[\s\S]*?loadProducts\(json\.pagination\.totalPages, normalizedFilters\)/,
+  /resolveInventoryPageCorrection\(nextPage, json\.pagination\.totalPages\)[\s\S]*?loadProducts\(correctionPage, normalizedFilters, false\)/,
   "a filtered last page that shrinks after a movement must reload the new final page"
 );
 assert.match(workspace, /async function applyProductFilters\(\) \{[\s\S]*?loadProducts\(1, \{ search, stockFilter \}\)/);
