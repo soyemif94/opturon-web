@@ -716,7 +716,7 @@ export function AppShell({
             className={cn(
               "flex min-h-[calc(100vh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100vh-2.5rem)]",
               isInboxRoute
-                ? "overflow-visible rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
+                ? "overflow-visible rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)] xl:h-[calc(100dvh-2.5rem)] xl:min-h-0 xl:overflow-hidden"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
             )}
           >
@@ -769,7 +769,7 @@ export function AppShell({
               className={cn(
                 "flex-1 min-h-0",
                 isInboxRoute
-                  ? "overflow-visible bg-[image:var(--panel-glow)] p-4 xl:p-6"
+                  ? "overflow-visible bg-[image:var(--panel-glow)] p-4 xl:overflow-hidden xl:p-6"
                   : "overflow-x-visible overflow-y-auto bg-[image:var(--panel-glow)] p-5 xl:p-8"
               )}
             >

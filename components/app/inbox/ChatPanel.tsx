@@ -98,7 +98,7 @@ export function ChatPanel({
   }, [detail?.conversation.id, lastTimelineKey, timeline.length]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card/10">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
       <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/45 px-3 py-2.5 backdrop-blur sm:px-4">
         {detail ? (
           <div className="flex items-center justify-between gap-3">
@@ -152,7 +152,9 @@ export function ChatPanel({
 
       <div
         ref={scrollViewportRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] px-3 py-4 sm:px-5"
+        className="app-scroll-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] px-3 py-4 sm:px-5"
+        tabIndex={0}
+        aria-label="Mensajes de la conversación"
       >
         {loading && !detail ? (
           <div className="space-y-3">

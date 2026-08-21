@@ -45,6 +45,8 @@
   --inbox-system-bubble-text: #10233f;
   --inbox-system-bubble-muted: #4e6585;
   --inbox-system-bubble-border: rgba(245, 247, 250, 0.22);
+  --app-scrollbar-thumb: rgba(173, 197, 235, 0.16);
+  --app-scrollbar-thumb-hover: rgba(173, 197, 235, 0.32);
 }
 
 [data-app-theme="light"] {
@@ -90,6 +92,8 @@
   --inbox-system-bubble-text: #FFF9F8;
   --inbox-system-bubble-muted: #DDC9C6;
   --inbox-system-bubble-border: rgba(69, 51, 51, 0.24);
+  --app-scrollbar-thumb: rgba(109, 91, 91, 0.2);
+  --app-scrollbar-thumb-hover: rgba(109, 91, 91, 0.38);
 }
 
 [data-app-theme="light"] {
@@ -130,6 +134,53 @@ body {
 
 * {
   border-color: var(--border);
+}
+
+.app-scroll-surface {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+
+.app-scroll-surface:hover,
+.app-scroll-surface:focus-within {
+  scrollbar-color: var(--app-scrollbar-thumb-hover) transparent;
+}
+
+.app-scroll-surface::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-scroll-surface::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-scroll-surface::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--app-scrollbar-thumb);
+  background-clip: padding-box;
+  transition: background-color 160ms ease;
+}
+
+.app-scroll-surface:hover::-webkit-scrollbar-thumb,
+.app-scroll-surface:focus-within::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+@media (min-width: 768px) {
+  .app-scroll-surface {
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-scroll-surface::-webkit-scrollbar-thumb {
+    transition: none;
+  }
 }
 
 a {

@@ -107,7 +107,7 @@ export function ConversationList({
         : "Cuando entren mensajes o limpies filtros, las conversaciones apareceran aca para operarlas.";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card/25">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
       <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/55 px-3 py-2.5 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -226,7 +226,11 @@ export function ConversationList({
         ) : null}
       </header>
 
-      <div className="relative min-h-0 flex-1 overflow-y-auto p-2">
+      <div
+        className="app-scroll-surface relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-2"
+        tabIndex={0}
+        aria-label="Lista de conversaciones"
+      >
         {loading && !hasLoaded ? <ConversationListSkeleton /> : null}
         {loading && hasLoaded ? (
           <div className="sticky top-0 z-10 mb-1 flex justify-end" role="status">

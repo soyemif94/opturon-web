@@ -22,7 +22,7 @@ export function InboxLayout({
   onCloseContext?: () => void;
 }) {
   return (
-    <div className="relative flex min-h-0 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20 xl:h-[calc(100vh-8.75rem)] xl:min-h-[44rem]">
+    <div className="relative flex min-h-0 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20 xl:h-full">
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(290px,330px)_minmax(0,1fr)_minmax(280px,320px)]">
         <aside
           className={cn(
@@ -61,8 +61,8 @@ export function InboxLayout({
             hasDetail ? "2xl:block" : "2xl:hidden"
           )}
         >
-          <section className="h-full min-h-[320px] overflow-hidden bg-surface/20">
-            <div className="h-full overflow-y-auto">{right}</div>
+          <section className="h-full min-h-[320px] overflow-hidden">
+            <div className="app-scroll-surface h-full overflow-x-hidden overflow-y-auto overscroll-contain" tabIndex={0} aria-label="Contexto de la conversación">{right}</div>
           </section>
         </aside>
       </div>
@@ -80,7 +80,7 @@ export function InboxLayout({
                 <X aria-hidden="true" className="size-4" />
               </button>
             </header>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">{right}</div>
+            <div className="app-scroll-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3" tabIndex={0} aria-label="Contexto de la conversación">{right}</div>
           </aside>
         </div>
       ) : null}
