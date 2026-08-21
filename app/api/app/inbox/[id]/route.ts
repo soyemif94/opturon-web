@@ -307,7 +307,12 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const actorUserId = String(tenantContext.ctx.portalActorId || "").trim();
     if (!actorUserId) return NextResponse.json({ error: "portal_inbox_delete_forbidden" }, { status: 403 });
-    const result = await deletePortalConversation(tenantContext.tenantId, id, actorUserId);
+    const result = await deletePortalConversation(
+      tenantContext.tenantId,
+      id,
+      actorUserId,
+      tenantContext.ctx.globalRole
+    );
     return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json(

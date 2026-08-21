@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const chat = read('components/app/inbox/ChatPanel.tsx');
 const workspace = read('components/app/InboxWorkspace.tsx');
 const route = read('app/api/app/inbox/[id]/route.ts');
+const api = read('lib/api.ts');
 const page = read('app/app/inbox/page.tsx');
 const permissions = read('lib/app-permissions.ts');
 
@@ -21,9 +22,15 @@ assert.match(route, /export async function DELETE/);
 assert.match(route, /resolveAppTenant\([\s\S]*requireWrite: true/);
 assert.match(route, /canDeleteInboxConversation\(tenantContext\.ctx\)/);
 assert.match(route, /tenantContext\.ctx\.portalActorId/);
+assert.match(route, /tenantContext\.ctx\.globalRole/);
+assert.match(api, /"x-portal-actor-global-role": String\(actorGlobalRole \|\| ""\)/);
 assert.match(page, /canDeleteConversation=\{canDeleteInboxConversation\(ctx\)\}/);
-assert.match(permissions, /role === "owner" \|\| role === "manager"/);
-assert.match(permissions, /if \(isStaffRole\(context\.globalRole\)\) return false/);
+assert.match(permissions, /OPTURON_ADMIN_DESTRUCTIVE_ROLES = new Set<GlobalRole>\(\["superadmin", "ops_admin"\]\)/);
+assert.match(permissions, /OPTURON_ADMIN_DESTRUCTIVE_ROLES\.has\(context\.globalRole as GlobalRole\)/);
+assert.match(permissions, /accountScope === "opturon_admin"/);
+assert.match(permissions, /String\(context\.portalActorId \|\| ""\)\.trim\(\)/);
+assert.match(permissions, /hasAppPermission\(context, "manage_workspace"\)/);
+assert.match(chat, /border-t border-\[color:var\(--border\)\][^>]*text-red-300/);
 
 // Approved scroll/composer surfaces stay in their existing components.
 assert.match(chat, /app-scroll-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto/);

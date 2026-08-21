@@ -1687,13 +1687,14 @@ export async function patchPortalConversation(tenantId: string, conversationId: 
     );
   }
 
-export async function deletePortalConversation(tenantId: string, conversationId: string, actorUserId: string) {
+export async function deletePortalConversation(tenantId: string, conversationId: string, actorUserId: string, actorGlobalRole?: string) {
   return backendPortalFetch<{ success: boolean; data: { conversationId: string; deleted: boolean; reason: string } }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}`,
     {
       method: "DELETE",
       headers: {
         "x-portal-actor-id": actorUserId,
+        "x-portal-actor-global-role": String(actorGlobalRole || ""),
         "x-active-tenant-id": tenantId
       }
     }

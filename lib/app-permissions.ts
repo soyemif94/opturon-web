@@ -36,11 +36,13 @@ type AccessContext = {
   globalRole?: AuthGlobalRole;
   tenantRole?: TenantRole;
   accountScope?: string;
+  portalActorId?: string | null;
   tenantModules?: Record<string, boolean> | null;
 };
 
 const STAFF_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
 const STAFF_USER_MANAGERS = new Set<GlobalRole>(["superadmin", "ops_admin"]);
+const OPTURON_ADMIN_DESTRUCTIVE_ROLES = new Set<GlobalRole>(["superadmin", "ops_admin"]);
 
 const TENANT_ROLE_PERMISSIONS: Record<TenantRole, Record<AppPermission, boolean>> = {
   owner: {
@@ -138,10 +140,17 @@ export function canManageWorkspace(context: AccessContext) {
 }
 
 export function canDeleteInboxConversation(context: AccessContext) {
-  if (isStaffRole(context.globalRole)) return false;
-  if (String(context.accountScope || "").trim().toLowerCase() === "opturon_admin") return false;
-  const role = normalizeTenantRole(context.tenantRole);
-  return role === "owner" || role === "manager";
+  const accountScope = String(context.accountScope || "").trim().toLowerCase();
+  if (isStaffRole(context.globalRole)) {
+    return Boolean(
+      context.globalRole &&
+      OPTURON_ADMIN_DESTRUCTIVE_ROLES.has(context.globalRole as GlobalRole) &&
+      accountScope === "opturon_admin" &&
+      String(context.portalActorId || "").trim()
+    );
+  }
+  if (accountScope === "opturon_admin") return false;
+  return hasAppPermission(context, "manage_workspace");
 }
 
 export function canManageUsers(context: AccessContext) {
