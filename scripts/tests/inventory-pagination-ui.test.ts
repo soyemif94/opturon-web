@@ -10,6 +10,7 @@ const api = read("lib/api.ts");
 const page = read("app/app/inventory/page.tsx");
 const workspace = read("components/app/InventoryBaseWorkspace.tsx");
 const productsRoute = read("app/api/app/inventory/products/route.ts");
+const sharedOperationsUi = read("components/app/operations-workspace-ui.tsx");
 
 const inventoryApiStart = api.indexOf("export async function getPortalInventoryProducts");
 const inventoryApiEnd = api.indexOf("export async function getPortalInventoryMovements", inventoryApiStart);
@@ -26,7 +27,7 @@ assert.match(inventoryApi, /pagination: PortalInventoryPagination;/);
 assert.match(inventoryApi, /summary: PortalInventorySummary;/);
 
 assert.match(page, /const INVENTORY_PAGE_SIZE = 50;/);
-assert.match(page, /getPortalInventoryProducts\(ctx\.tenantId, \{ page: 1, pageSize: INVENTORY_PAGE_SIZE \}, inventoryReadActor\)/);
+assert.match(page, /getPortalInventoryProducts\(ctx\.tenantId, \{ \.\.\.initialFilters, page: initialPage, pageSize: INVENTORY_PAGE_SIZE \}, inventoryReadActor\)/);
 assert.match(page, /pagination = productsResult\.data\.pagination;/);
 assert.match(page, /summary = productsResult\.data\.summary;/);
 assert.match(page, /initialPagination=\{pagination\}/);
@@ -34,6 +35,7 @@ assert.match(page, /initialSummary=\{summary\}/);
 
 assert.match(productsRoute, /page: Number\(url\.searchParams\.get\("page"\) \|\| 1\)/);
 assert.match(productsRoute, /pageSize: Number\(url\.searchParams\.get\("pageSize"\) \|\| 50\)/);
+assert.match(productsRoute, /productId: url\.searchParams\.get\("productId"\) \|\| undefined/);
 assert.match(productsRoute, /\.\.\.result\.data/);
 
 assert.match(workspace, /const \[pagination, setPagination\] = useState\(initialPagination\)/);
@@ -43,15 +45,13 @@ assert.match(workspace, /pageSize: String\(INVENTORY_PAGE_SIZE\)/);
 assert.match(workspace, /setProducts\(json\.products\);[\s\S]*?setPagination\(json\.pagination\);[\s\S]*?setInventorySummary\(json\.summary\);/);
 assert.match(
   workspace,
-  /resolveInventoryPageCorrection\(nextPage, json\.pagination\.totalPages\)[\s\S]*?loadProducts\(correctionPage, normalizedFilters, false\)/,
+  /resolveInventoryPageCorrection\(nextPage, json\.pagination\.totalPages\)[\s\S]*?loadProducts\(correctionPage, normalizedFilters, false, urlMode\)/,
   "a filtered last page that shrinks after a movement must reload the new final page"
 );
-assert.match(workspace, /async function applyProductFilters\(\) \{[\s\S]*?loadProducts\(1, \{ search, stockFilter \}\)/);
+assert.match(workspace, /window\.setTimeout\([\s\S]*?}, 300\)/);
 assert.match(workspace, /async function refreshCurrentPage\(\) \{[\s\S]*?loadProducts\(pagination\.page, appliedFilters\)/);
 assert.match(workspace, /await refreshCurrentPage\(\);/, "movement writes must refresh the visible server page");
-assert.match(workspace, /loadProducts\(pagination\.page - 1, appliedFilters\)/);
-assert.match(workspace, /loadProducts\(pagination\.page \+ 1, appliedFilters\)/);
-assert.match(workspace, /const hasNextPage = pagination\.page < pagination\.totalPages;/);
+assert.match(workspace, /OperationsStablePaginator/);
 assert.match(workspace, /Math\.min\(pagination\.totalItems, pagination\.page \* pagination\.pageSize\)/);
 
 assert.match(workspace, /inventorySummary\.totalProducts/);
@@ -60,10 +60,10 @@ assert.match(workspace, /inventorySummary\.withoutStock/);
 assert.doesNotMatch(workspace, /total:\s*products\.length/);
 assert.doesNotMatch(workspace, /products\.length\s*-\s*withStock/);
 
-assert.match(workspace, /aria-label="Paginacion de productos"/);
-assert.match(workspace, /grid-cols-\[7rem_minmax\(16rem,1fr\)_7rem\]/);
-assert.match(workspace, /min-w-\[36rem\]/);
-assert.match(workspace, /className="w-28 shrink-0 justify-center"/);
+assert.match(workspace, /ariaLabel="Paginacion de productos de Inventario"/);
+assert.match(sharedOperationsUi, /grid-cols-\[7rem_minmax\(16rem,1fr\)_7rem\]/);
+assert.match(sharedOperationsUi, /min-w-\[36rem\]/);
+assert.match(sharedOperationsUi, /className="w-28 shrink-0 justify-center"/);
 assert.match(workspace, /tabular-nums/);
 assert.doesNotMatch(workspace, /paginationItems/, "pagination layout must not change its number of controls by page");
 

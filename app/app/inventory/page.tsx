@@ -18,11 +18,14 @@ import {
   type PortalInventorySummary
 } from "@/lib/api";
 import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
+import { parseInventoryOperationsParams } from "@/lib/inventory-operations";
 
 const INVENTORY_PAGE_SIZE = 50;
 
-export default async function InventoryPage() {
+export default async function InventoryPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const ctx = await requireAppModulePage("inventory");
+  const params = (await searchParams) || {};
+  const { filters: initialFilters, page: initialPage } = parseInventoryOperationsParams(params);
   const canReceiveLots = canManageInventoryReceipts(ctx);
   const canManageSensitive = canManageInventorySensitive(ctx);
   const baseInventoryReadOnly = !canManageSensitive;
@@ -30,7 +33,7 @@ export default async function InventoryPage() {
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
   let products: PortalInventoryProduct[] = [];
   let pagination: PortalInventoryPagination = {
-    page: 1,
+    page: initialPage,
     pageSize: INVENTORY_PAGE_SIZE,
     totalItems: 0,
     totalPages: 0
@@ -48,7 +51,7 @@ export default async function InventoryPage() {
     try {
       const inventoryReadActor = getPortalInventoryReadActor(ctx);
       const [productsResult, lotsResult] = await Promise.all([
-        getPortalInventoryProducts(ctx.tenantId, { page: 1, pageSize: INVENTORY_PAGE_SIZE }, inventoryReadActor),
+        getPortalInventoryProducts(ctx.tenantId, { ...initialFilters, page: initialPage, pageSize: INVENTORY_PAGE_SIZE }, inventoryReadActor),
         getPortalInventoryLots(ctx.tenantId, { pageSize: 100 }, inventoryReadActor)
       ]);
       if (
@@ -101,12 +104,13 @@ export default async function InventoryPage() {
   return (
     <>
       <section className="mb-6">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust={canPerformTenantInventorySensitiveAction(ctx)} />
       </section>
       <InventoryBaseWorkspace
         initialProducts={products}
         initialPagination={pagination}
         initialSummary={summary}
+        initialFilters={initialFilters}
         tenantId={ctx.tenantId || null}
         readOnly={!ctx.tenantId || baseInventoryReadOnly}
         canBulkAdjust={Boolean(ctx.tenantId) && canPerformTenantInventorySensitiveAction(ctx)}

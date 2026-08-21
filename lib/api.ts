@@ -3596,6 +3596,7 @@ export async function getPortalInventoryProducts(
   options: {
     search?: string;
     stockFilter?: "all" | "with_stock" | "without_stock";
+    productId?: string;
     page?: number;
     pageSize?: number;
   } | undefined,
@@ -3604,6 +3605,7 @@ export async function getPortalInventoryProducts(
   const params = new URLSearchParams();
   if (options?.search) params.set("search", options.search);
   if (options?.stockFilter) params.set("stockFilter", options.stockFilter);
+  if (options?.productId) params.set("productId", options.productId);
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";

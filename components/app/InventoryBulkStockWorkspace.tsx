@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, ClipboardCheck, Loader2, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Loader2, Search, Trash2 } from "lucide-react";
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import { OperationsFilterChip, OperationsStablePaginator } from "@/components/app/operations-workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -220,6 +221,13 @@ export function InventoryBulkStockWorkspace({
     await loadProducts(1, { search, stockFilter });
   }
 
+  function clearAppliedFilters() {
+    setSearch("");
+    setStockFilter("all");
+    setModifiedPage(1);
+    void loadProducts(1, { search: "", stockFilter: "all" });
+  }
+
   function updateTarget(product: BulkStockProductSource, rawTargetQuantity: string) {
     setDrafts((current) => updateBulkStockDraft(current, product, rawTargetQuantity));
     setFeedback(null);
@@ -400,15 +408,12 @@ export function InventoryBulkStockWorkspace({
         totalPages: modifiedDraftPage.totalPages
       }
     : pagination;
-  const displayedPage = activePagination.totalPages > 0 ? activePagination.page : 0;
   const pageStart = activePagination.totalItems > 0
     ? (activePagination.page - 1) * activePagination.pageSize + 1
     : 0;
   const pageEnd = activePagination.totalItems > 0
     ? Math.min(activePagination.totalItems, activePagination.page * activePagination.pageSize)
     : 0;
-  const hasPreviousPage = activePagination.page > 1;
-  const hasNextPage = activePagination.page < activePagination.totalPages;
 
   function navigatePage(nextPage: number) {
     if (showModifiedOnly) {
@@ -490,6 +495,16 @@ export function InventoryBulkStockWorkspace({
             </Button>
           </div>
 
+          {appliedFilters.search || appliedFilters.stockFilter !== "all" || showModifiedOnly ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--border)] bg-muted/25 px-3 py-2 text-sm">
+              <span className="text-muted">Vista aplicada:</span>
+              {appliedFilters.search ? <OperationsFilterChip label={`Búsqueda: ${appliedFilters.search}`} onClear={() => { setSearch(""); void loadProducts(1, { ...appliedFilters, search: "" }); }} /> : null}
+              {appliedFilters.stockFilter !== "all" ? <OperationsFilterChip label={appliedFilters.stockFilter === "with_stock" ? "Con stock" : "Sin stock"} onClear={() => { setStockFilter("all"); void loadProducts(1, { ...appliedFilters, stockFilter: "all" }); }} /> : null}
+              {showModifiedOnly ? <OperationsFilterChip label="Sólo modificados" onClear={() => { setShowModifiedOnly(false); setModifiedPage(1); }} /> : null}
+              <Button type="button" variant="ghost" size="sm" onClick={clearAppliedFilters} disabled={saving}>Limpiar filtros</Button>
+            </div>
+          ) : null}
+
           {feedback ? (
             <div aria-live="polite" className={feedbackClassName(feedback.tone)}>
               {feedback.text}
@@ -565,40 +580,7 @@ export function InventoryBulkStockWorkspace({
             </table>
           </div>
 
-          <div className="overflow-x-auto">
-            <nav
-              aria-label={showModifiedOnly ? "Paginacion de productos modificados" : "Paginacion de productos"}
-              className="grid min-h-14 min-w-[36rem] grid-cols-[7rem_minmax(16rem,1fr)_7rem] items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-3 py-2"
-            >
-              <div className="flex justify-start">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-28 shrink-0"
-                  disabled={!hasPreviousPage || loading || saving}
-                  onClick={() => navigatePage(activePagination.page - 1)}
-                >
-                  <ChevronLeft className="mr-1 size-4" />
-                  Anterior
-                </Button>
-              </div>
-              <p aria-live="polite" className="min-w-[16rem] whitespace-nowrap text-center text-sm tabular-nums text-muted-foreground">
-                Pagina {displayedPage} de {activePagination.totalPages} · {pageStart}-{pageEnd} de {activePagination.totalItems}
-              </p>
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-28 shrink-0"
-                  disabled={!hasNextPage || loading || saving}
-                  onClick={() => navigatePage(activePagination.page + 1)}
-                >
-                  Siguiente
-                  <ChevronRight className="ml-1 size-4" />
-                </Button>
-              </div>
-            </nav>
-          </div>
+          <OperationsStablePaginator ariaLabel={showModifiedOnly ? "Paginacion de productos modificados" : "Paginacion de productos"} page={activePagination.page} totalPages={activePagination.totalPages} pageStart={pageStart} pageEnd={pageEnd} totalItems={activePagination.totalItems} itemLabel="productos" disabled={loading || saving} onPage={navigatePage} />
 
           <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 p-4 lg:flex-row lg:items-center lg:justify-between">
             <div>

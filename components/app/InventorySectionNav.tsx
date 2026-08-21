@@ -13,21 +13,26 @@ const items = [
   { href: "/app/inventory/receipts/new", label: "Ingresar mercaderia" }
 ];
 
-export function InventorySectionNav() {
+export function InventorySectionNav({ canBulkAdjust = false }: { canBulkAdjust?: boolean }) {
   const pathname = usePathname();
+  const visibleItems = canBulkAdjust
+    ? [...items, { href: "/app/inventory/bulk-adjust", label: "Carga masiva" }]
+    : items;
 
   return (
     <div className="flex flex-wrap gap-2">
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         const active =
           item.href === "/app/inventory/suppliers"
             ? pathname.startsWith("/app/inventory/suppliers")
             : item.href === "/app/inventory/movements"
               ? pathname.startsWith("/app/inventory/movements")
-            : item.href === "/app/inventory/receipts"
+              : item.href === "/app/inventory/receipts"
               ? pathname.startsWith("/app/inventory/receipts") && !pathname.startsWith("/app/inventory/receipts/new")
               : item.href === "/app/inventory/receipts/new"
                 ? pathname.startsWith("/app/inventory/receipts/new")
+                : item.href === "/app/inventory/bulk-adjust"
+                  ? pathname.startsWith("/app/inventory/bulk-adjust")
                 : pathname === "/app/inventory";
         return (
           <Link

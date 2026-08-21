@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const result = await getPortalInventoryProducts(tenantContext.tenantId, {
       search: url.searchParams.get("search") || undefined,
       stockFilter: (url.searchParams.get("stockFilter") as "all" | "with_stock" | "without_stock" | null) || undefined,
+      productId: url.searchParams.get("productId") || undefined,
       page: Number(url.searchParams.get("page") || 1),
       pageSize: Number(url.searchParams.get("pageSize") || 50)
     }, getPortalInventoryReadActor(tenantContext.ctx || {}));

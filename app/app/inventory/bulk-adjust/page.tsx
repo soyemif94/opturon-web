@@ -66,7 +66,7 @@ export default async function InventoryBulkAdjustPage() {
     return (
       <>
         <section className="mb-6">
-          <InventorySectionNav />
+          <InventorySectionNav canBulkAdjust />
         </section>
         <section className="space-y-3 rounded-3xl border border-[color:var(--border)] bg-card/80 p-6">
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Inventario</p>
@@ -80,7 +80,7 @@ export default async function InventoryBulkAdjustPage() {
   return (
     <>
       <section className="mb-6">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust />
       </section>
       <InventoryBulkStockWorkspace
         initialProducts={products}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { InventorySectionNav } from "@/components/app/InventorySectionNav";
+import { OperationsFilterChip, OperationsStablePaginator } from "@/components/app/operations-workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,6 +69,9 @@ export function InventoryMovementsWorkspace({
 
   const products = useMemo(() => initialProducts.filter((product) => product.status === "active"), [initialProducts]);
   const locations = useMemo(() => initialLocations.filter((location) => location.active), [initialLocations]);
+  const focusedMovementProductName = productId
+    ? products.find((product) => product.id === productId)?.name || items.find((item) => item.productId === productId)?.productName || "Producto enfocado"
+    : null;
 
   const summary = useMemo(() => {
     const receipts = items.filter((item) => item.movementType === "purchase_receipt").length;
@@ -101,6 +105,7 @@ export function InventoryMovementsWorkspace({
       setItems(Array.isArray(json?.items) ? json.items : []);
       setPage(Number(json?.page || nextPage));
       setTotal(Number(json?.total || 0));
+      window.history.replaceState(null, "", `/app/inventory/movements?${params.toString()}`);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "inventory_movements_load_failed");
     } finally {
@@ -127,6 +132,7 @@ export function InventoryMovementsWorkspace({
         setItems(Array.isArray(json?.items) ? json.items : []);
         setPage(Number(json?.page || 1));
         setTotal(Number(json?.total || 0));
+        window.history.replaceState(null, "", "/app/inventory/movements");
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "inventory_movements_load_failed");
       } finally {
@@ -135,8 +141,9 @@ export function InventoryMovementsWorkspace({
     })();
   }
 
-  const hasPrevPage = page > 1;
-  const hasNextPage = page * pageSize < total;
+  const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+  const pageStart = total > 0 ? (page - 1) * pageSize + 1 : 0;
+  const pageEnd = total > 0 ? Math.min(total, page * pageSize) : 0;
 
   return (
     <ClientPageShell
@@ -206,6 +213,7 @@ export function InventoryMovementsWorkspace({
                 onChange={(event) => setProductId(event.target.value)}
               >
                 <option value="">Todos</option>
+                {productId && !products.some((product) => product.id === productId) ? <option value={productId}>{focusedMovementProductName}</option> : null}
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.name}
@@ -238,6 +246,13 @@ export function InventoryMovementsWorkspace({
               </Button>
             </div>
           </div>
+
+          {productId ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/25 bg-brand/10 px-3 py-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2"><span>Movimientos enfocados:</span><OperationsFilterChip label={focusedMovementProductName || "Producto"} onClear={resetFilters} /></div>
+              <Button asChild type="button" variant="secondary" size="sm"><Link href={`/app/catalog/${encodeURIComponent(productId)}`}>Abrir en Catálogo</Link></Button>
+            </div>
+          ) : null}
 
           {error ? <div className="rounded-xl border border-[color:var(--border)] bg-muted/30 px-4 py-3 text-sm">{error}</div> : null}
 
@@ -332,19 +347,7 @@ export function InventoryMovementsWorkspace({
             </>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Pagina {page} · {total} movimiento{total === 1 ? "" : "s"}
-            </p>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" disabled={!hasPrevPage || loading} onClick={() => loadMovements(page - 1)}>
-                Anterior
-              </Button>
-              <Button type="button" variant="secondary" disabled={!hasNextPage || loading} onClick={() => loadMovements(page + 1)}>
-                Siguiente
-              </Button>
-            </div>
-          </div>
+          <OperationsStablePaginator ariaLabel="Paginacion de movimientos" page={page} totalPages={totalPages} pageStart={pageStart} pageEnd={pageEnd} totalItems={total} itemLabel={total === 1 ? "movimiento" : "movimientos"} disabled={loading} onPage={(nextPage) => void loadMovements(nextPage)} />
         </CardContent>
       </Card>
     </ClientPageShell>

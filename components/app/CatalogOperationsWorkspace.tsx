@@ -4,20 +4,24 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Archive,
-  ChevronLeft,
-  ChevronRight,
   History,
   ImageIcon,
   Images,
-  Loader2,
   MoreHorizontal,
   PencilLine,
   Search,
   Trash2,
-  Warehouse,
-  X
+  Warehouse
 } from "lucide-react";
 import { CatalogImportWizard } from "@/components/app/CatalogImportWizard";
+import {
+  OperationsFilterChip,
+  OperationsLoadingOverlay,
+  OperationsMetricFilter,
+  OperationsProductThumbnail,
+  OperationsStablePaginator,
+  OperationsStockBadge
+} from "@/components/app/operations-workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +44,6 @@ import {
   type CatalogOperationsFilters
 } from "@/lib/catalog-operations";
 import { getDiscountedPrice } from "@/lib/product-pricing";
-import { getStockState } from "@/lib/stock-state";
 import type { PortalCatalogOperationsData, PortalProduct, PortalProductCategory } from "@/lib/api";
 import { cn } from "@/lib/ui/cn";
 
@@ -211,11 +214,11 @@ export function CatalogOperationsWorkspace({
       </div>
 
       <section className="flex flex-wrap gap-2" aria-label="Indicadores y filtros rápidos de Catálogo">
-        <MetricFilter label="Productos" value={data.summary.totalProducts} active={filters.stockFilter === "all" && filters.imageFilter === "all"} onClick={() => applyFilters({ stockFilter: "all", imageFilter: "all" })} />
-        <MetricFilter label="Con stock" value={data.summary.withStock} active={filters.stockFilter === "with_stock"} onClick={() => applyFilters({ stockFilter: "with_stock" })} tone="success" />
-        <MetricFilter label="Sin stock" value={data.summary.withoutStock} active={filters.stockFilter === "without_stock"} onClick={() => applyFilters({ stockFilter: "without_stock" })} tone="warning" />
-        <MetricFilter label="Con imagen" value={data.summary.withImage} active={filters.imageFilter === "with_image"} onClick={() => applyFilters({ imageFilter: "with_image" })} />
-        <MetricFilter label="Sin imagen" value={data.summary.withoutImage} active={filters.imageFilter === "without_image"} onClick={() => applyFilters({ imageFilter: "without_image" })} tone="warning" />
+        <OperationsMetricFilter label="productos" value={data.summary.totalProducts} active={filters.stockFilter === "all" && filters.imageFilter === "all"} onClick={() => applyFilters({ stockFilter: "all", imageFilter: "all" })} />
+        <OperationsMetricFilter label="con stock" value={data.summary.withStock} active={filters.stockFilter === "with_stock"} onClick={() => applyFilters({ stockFilter: "with_stock" })} tone="success" />
+        <OperationsMetricFilter label="sin stock" value={data.summary.withoutStock} active={filters.stockFilter === "without_stock"} onClick={() => applyFilters({ stockFilter: "without_stock" })} tone="warning" />
+        <OperationsMetricFilter label="con imagen" value={data.summary.withImage} active={filters.imageFilter === "with_image"} onClick={() => applyFilters({ imageFilter: "with_image" })} />
+        <OperationsMetricFilter label="sin imagen" value={data.summary.withoutImage} active={filters.imageFilter === "without_image"} onClick={() => applyFilters({ imageFilter: "without_image" })} tone="warning" />
       </section>
 
       <Card>
@@ -256,11 +259,11 @@ export function CatalogOperationsWorkspace({
           {activeFilterCount > 0 ? (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--border)] bg-muted/25 px-3 py-2 text-sm">
               <span className="text-muted">Filtros activos:</span>
-              {filters.search ? <FilterChip label={`Búsqueda: ${filters.search}`} onClear={() => applyFilters({ search: "" })} /> : null}
-              {filters.stockFilter !== "all" ? <FilterChip label={filters.stockFilter === "with_stock" ? "Con stock" : "Sin stock"} onClear={() => applyFilters({ stockFilter: "all" })} /> : null}
-              {filters.imageFilter !== "all" ? <FilterChip label={filters.imageFilter === "with_image" ? "Con imagen" : "Sin imagen"} onClear={() => applyFilters({ imageFilter: "all" })} /> : null}
-              {filters.statusFilter !== "all" ? <FilterChip label={filters.statusFilter === "active" ? "Activos" : "Archivados"} onClear={() => applyFilters({ statusFilter: "all" })} /> : null}
-              {filters.categoryId ? <FilterChip label={categories.find((category) => category.id === filters.categoryId)?.name || "Categoría"} onClear={() => applyFilters({ categoryId: "" })} /> : null}
+              {filters.search ? <OperationsFilterChip label={`Búsqueda: ${filters.search}`} onClear={() => applyFilters({ search: "" })} /> : null}
+              {filters.stockFilter !== "all" ? <OperationsFilterChip label={filters.stockFilter === "with_stock" ? "Con stock" : "Sin stock"} onClear={() => applyFilters({ stockFilter: "all" })} /> : null}
+              {filters.imageFilter !== "all" ? <OperationsFilterChip label={filters.imageFilter === "with_image" ? "Con imagen" : "Sin imagen"} onClear={() => applyFilters({ imageFilter: "all" })} /> : null}
+              {filters.statusFilter !== "all" ? <OperationsFilterChip label={filters.statusFilter === "active" ? "Activos" : "Archivados"} onClear={() => applyFilters({ statusFilter: "all" })} /> : null}
+              {filters.categoryId ? <OperationsFilterChip label={categories.find((category) => category.id === filters.categoryId)?.name || "Categoría"} onClear={() => applyFilters({ categoryId: "" })} /> : null}
               <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>Limpiar filtros</Button>
             </div>
           ) : null}
@@ -275,7 +278,7 @@ export function CatalogOperationsWorkspace({
           ) : null}
 
           <div className="relative">
-            {loading ? <div className="absolute right-3 top-3 z-20 flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-background px-3 py-1.5 text-xs text-muted" role="status"><Loader2 className="size-3.5 animate-spin" />Actualizando...</div> : null}
+            {loading ? <OperationsLoadingOverlay /> : null}
             <div className={cn("hidden overflow-x-auto rounded-2xl border border-[color:var(--border)] md:block", loading && "opacity-55")}>
               <table className="w-full min-w-[1040px] text-left text-sm">
                 <thead className="bg-muted/40 text-xs uppercase tracking-[0.12em] text-muted">
@@ -310,7 +313,7 @@ export function CatalogOperationsWorkspace({
             </div>
           ) : null}
 
-          <CatalogPagination page={data.pagination.page} totalPages={data.pagination.totalPages} pageStart={pageStart} pageEnd={pageEnd} totalItems={data.pagination.totalItems} loading={loading} onPage={(page) => void loadProducts(page, filters)} />
+          <OperationsStablePaginator ariaLabel="Paginación del Catálogo" page={data.pagination.page} totalPages={data.pagination.totalPages} pageStart={pageStart} pageEnd={pageEnd} totalItems={data.pagination.totalItems} disabled={loading} onPage={(page) => void loadProducts(page, filters)} />
         </CardContent>
       </Card>
 
@@ -343,7 +346,7 @@ export function CatalogOperationsWorkspace({
 function CatalogProductRow({ product, readOnly, statusUpdating, onToggleStatus, onDelete }: RowProps) {
   return (
     <tr className="border-t border-[color:var(--border)] hover:bg-muted/15">
-      <td className="px-3 py-2"><CatalogThumbnail product={product} /></td>
+      <td className="px-3 py-2"><OperationsProductThumbnail product={product} /></td>
       <td className="px-3 py-2"><p className="font-mono text-xs">{product.internalCode || "—"}</p><p className="mt-1 text-xs text-muted">{product.sku || "Sin SKU"}</p></td>
       <td className="px-3 py-2"><Link href={`/app/catalog/${product.id}`} className="font-medium hover:text-brandBright">{product.name}</Link>{product.inventoryTrackingMode === "lot_based" ? <p className="mt-1 text-xs text-muted">Stock administrado por lotes</p> : null}</td>
       <td className="px-3 py-2 text-muted">{product.categoryName || "Sin categoría"}</td>
@@ -357,18 +360,17 @@ function CatalogProductRow({ product, readOnly, statusUpdating, onToggleStatus, 
 
 function CatalogProductMobileRow(props: RowProps) {
   const { product } = props;
-  return <article className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-3"><div className="flex gap-3"><CatalogThumbnail product={product} /><div className="min-w-0 flex-1"><Link href={`/app/catalog/${product.id}`} className="line-clamp-2 font-medium">{product.name}</Link><p className="mt-1 truncate font-mono text-xs text-muted">{product.internalCode || product.sku || "Sin código"}</p><div className="mt-2 flex flex-wrap items-center gap-2"><ProductPrice product={product} /><StockValue product={product} /><Badge variant={product.status === "active" ? "success" : "muted"}>{product.status === "active" ? "Activo" : "Archivado"}</Badge></div></div></div><div className="mt-3"><ProductActions {...props} /></div></article>;
+  return <article className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-3"><div className="flex gap-3"><OperationsProductThumbnail product={product} /><div className="min-w-0 flex-1"><Link href={`/app/catalog/${product.id}`} className="line-clamp-2 font-medium">{product.name}</Link><p className="mt-1 truncate font-mono text-xs text-muted">{product.internalCode || product.sku || "Sin código"}</p><div className="mt-2 flex flex-wrap items-center gap-2"><ProductPrice product={product} /><StockValue product={product} /><Badge variant={product.status === "active" ? "success" : "muted"}>{product.status === "active" ? "Activo" : "Archivado"}</Badge></div></div></div><div className="mt-3"><ProductActions {...props} /></div></article>;
 }
 
 type RowProps = { product: PortalProduct; readOnly: boolean; statusUpdating: boolean; onToggleStatus: () => void; onDelete: () => void };
 
 function ProductActions({ product, readOnly, statusUpdating, onToggleStatus, onDelete }: RowProps) {
   const imageSearch = encodeURIComponent(catalogImageSearchValue(product));
-  return <div className="flex items-center justify-end gap-1.5">{!readOnly ? <Button asChild type="button" variant="secondary" size="sm"><Link href={`/app/catalog/${product.id}/edit`}><PencilLine className="mr-1 size-3.5" />Editar</Link></Button> : null}<Button asChild type="button" variant="ghost" size="sm"><Link href={`/app/catalog/images?search=${imageSearch}`}><ImageIcon className="mr-1 size-3.5" />Imagen</Link></Button><Button asChild type="button" variant="ghost" size="sm"><Link href={`/app/inventory/movements?productId=${encodeURIComponent(product.id)}`}><Warehouse className="mr-1 size-3.5" />Inventario</Link></Button><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="sm" aria-label={`Más acciones para ${product.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem asChild><Link href={`/app/catalog/${product.id}`}>Ver detalle</Link></DropdownMenuItem>{!readOnly ? <><DropdownMenuItem disabled={statusUpdating} onSelect={onToggleStatus}><Archive className="mr-2 size-4" />{statusUpdating ? "Actualizando..." : product.status === "active" ? "Archivar" : "Activar"}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-red-300 focus:bg-red-500/10" onSelect={onDelete}><Trash2 className="mr-2 size-4" />Eliminar</DropdownMenuItem></> : null}</DropdownMenuContent></DropdownMenu></div>;
-}
-
-function CatalogThumbnail({ product }: { product: PortalProduct }) {
-  return product.image?.url ? <img src={product.image.url} alt={product.image.alt || product.name} className="size-11 rounded-xl bg-surface/55 object-contain p-1.5" loading="lazy" /> : <div className="flex size-11 items-center justify-center rounded-xl border border-dashed border-[color:var(--border)] bg-muted/20" aria-label="Sin imagen"><ImageIcon className="size-4 text-muted" /></div>;
+  const inventoryHref = product.inventoryTrackingMode === "lot_based"
+    ? `/app/inventory/movements?productId=${encodeURIComponent(product.id)}`
+    : `/app/inventory?productId=${encodeURIComponent(product.id)}`;
+  return <div className="flex items-center justify-end gap-1.5">{!readOnly ? <Button asChild type="button" variant="secondary" size="sm"><Link href={`/app/catalog/${product.id}/edit`}><PencilLine className="mr-1 size-3.5" />Editar</Link></Button> : null}<Button asChild type="button" variant="ghost" size="sm"><Link href={`/app/catalog/images?search=${imageSearch}`}><ImageIcon className="mr-1 size-3.5" />Imagen</Link></Button><Button asChild type="button" variant="ghost" size="sm"><Link href={inventoryHref}><Warehouse className="mr-1 size-3.5" />Inventario</Link></Button><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="sm" aria-label={`Más acciones para ${product.name}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem asChild><Link href={`/app/catalog/${product.id}`}>Ver detalle</Link></DropdownMenuItem>{!readOnly ? <><DropdownMenuItem disabled={statusUpdating} onSelect={onToggleStatus}><Archive className="mr-2 size-4" />{statusUpdating ? "Actualizando..." : product.status === "active" ? "Archivar" : "Activar"}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-red-300 focus:bg-red-500/10" onSelect={onDelete}><Trash2 className="mr-2 size-4" />Eliminar</DropdownMenuItem></> : null}</DropdownMenuContent></DropdownMenu></div>;
 }
 
 function ProductPrice({ product }: { product: PortalProduct }) {
@@ -377,21 +379,7 @@ function ProductPrice({ product }: { product: PortalProduct }) {
 }
 
 function StockValue({ product }: { product: PortalProduct }) {
-  const state = getStockState(product.stock);
-  return <div><Badge variant={state.variant}><span className="tabular-nums">{product.stock > 0 ? product.stock : "Sin stock"}</span></Badge>{product.inventoryTrackingMode === "lot_based" ? <p className="mt-1 text-[10px] text-muted">Por lotes</p> : null}</div>;
-}
-
-function MetricFilter({ label, value, active, onClick, tone = "neutral" }: { label: string; value: number; active: boolean; onClick: () => void; tone?: "neutral" | "success" | "warning" }) {
-  return <button type="button" onClick={onClick} className={cn("rounded-full border border-[color:var(--border)] bg-card px-3 py-1.5 text-sm transition hover:border-white/20", active && "border-brand/50 bg-brand/10", tone === "success" && "text-emerald-300", tone === "warning" && "text-amber-300")}><span className="font-semibold tabular-nums">{value}</span> {label.toLowerCase()}</button>;
-}
-
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
-  return <button type="button" className="inline-flex items-center gap-1 rounded-full border border-brand/25 bg-brand/10 px-2.5 py-1 text-xs" onClick={onClear}>{label}<X className="size-3" /></button>;
-}
-
-function CatalogPagination({ page, totalPages, pageStart, pageEnd, totalItems, loading, onPage }: { page: number; totalPages: number; pageStart: number; pageEnd: number; totalItems: number; loading: boolean; onPage: (page: number) => void }) {
-  const shownPage = totalPages > 0 ? page : 0;
-  return <div className="overflow-x-auto"><nav aria-label="Paginación del Catálogo" className="grid min-h-14 min-w-[36rem] grid-cols-[7rem_minmax(16rem,1fr)_7rem] items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-3 py-2"><div><Button type="button" variant="secondary" className="w-28" disabled={loading || page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="mr-1 size-4" />Anterior</Button></div><p aria-live="polite" className="min-w-[16rem] whitespace-nowrap text-center text-sm tabular-nums text-muted">Página {shownPage} de {totalPages} · {pageStart}-{pageEnd} de {totalItems}</p><div className="flex justify-end"><Button type="button" variant="secondary" className="w-28" disabled={loading || totalPages === 0 || page >= totalPages} onClick={() => onPage(page + 1)}>Siguiente<ChevronRight className="ml-1 size-4" /></Button></div></nav></div>;
+  return <div><OperationsStockBadge stock={product.stock} />{product.inventoryTrackingMode === "lot_based" ? <p className="mt-1 text-[10px] text-muted">Por lotes</p> : null}</div>;
 }
 
 function formatCurrency(value: number, currency = "ARS") {

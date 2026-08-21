@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { MoreHorizontal, Search } from "lucide-react";
 import { ClientPageShell } from "@/components/app/client-page-shell";
+import {
+  OperationsFilterChip,
+  OperationsLoadingOverlay,
+  OperationsMetricFilter,
+  OperationsProductThumbnail,
+  OperationsStablePaginator,
+  OperationsStockBadge
+} from "@/components/app/operations-workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import type {
   PortalInventoryMovement,
@@ -15,14 +24,16 @@ import type {
   PortalInventorySummary
 } from "@/lib/api";
 import { resolveInventoryPageCorrection } from "@/lib/inventory-bulk-stock";
+import {
+  buildInventoryOperationsQuery,
+  normalizeInventoryOperationsFilters,
+  parseInventoryOperationsParams,
+  type InventoryOperationsFilters
+} from "@/lib/inventory-operations";
+import { cn } from "@/lib/ui/cn";
 
 type MovementMode = "opening_balance" | "manual_increase" | "manual_decrease" | "correction";
 type InventoryActionPanel = "history" | "movement" | null;
-type InventoryProductFilters = {
-  search: string;
-  stockFilter: "all" | "with_stock" | "without_stock";
-};
-
 const EMPTY_HISTORY: PortalInventoryMovement[] = [];
 const INVENTORY_PAGE_SIZE = 50;
 
@@ -30,6 +41,7 @@ export function InventoryBaseWorkspace({
   initialProducts,
   initialPagination,
   initialSummary,
+  initialFilters = { search: "", stockFilter: "all", productId: "" },
   tenantId = null,
   readOnly = false,
   canBulkAdjust = false
@@ -37,6 +49,7 @@ export function InventoryBaseWorkspace({
   initialProducts: PortalInventoryProduct[];
   initialPagination: PortalInventoryPagination;
   initialSummary: PortalInventorySummary;
+  initialFilters?: InventoryOperationsFilters;
   tenantId?: string | null;
   readOnly?: boolean;
   canBulkAdjust?: boolean;
@@ -44,10 +57,11 @@ export function InventoryBaseWorkspace({
   const [products, setProducts] = useState(initialProducts);
   const [pagination, setPagination] = useState(initialPagination);
   const [inventorySummary, setInventorySummary] = useState(initialSummary);
-  const [search, setSearch] = useState("");
-  const [stockFilter, setStockFilter] = useState<"all" | "with_stock" | "without_stock">("all");
-  const [appliedFilters, setAppliedFilters] = useState<InventoryProductFilters>({ search: "", stockFilter: "all" });
+  const [search, setSearch] = useState(initialFilters.search);
+  const [stockFilter, setStockFilter] = useState<"all" | "with_stock" | "without_stock">(initialFilters.stockFilter);
+  const [appliedFilters, setAppliedFilters] = useState<InventoryOperationsFilters>(initialFilters);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<PortalInventoryProduct | null>(null);
   const [activePanel, setActivePanel] = useState<InventoryActionPanel>(null);
   const [history, setHistory] = useState<PortalInventoryMovement[]>(EMPTY_HISTORY);
@@ -70,6 +84,13 @@ export function InventoryBaseWorkspace({
     if (tenantId) search.set("tenantId", tenantId);
     const suffix = search.toString() ? `?${search.toString()}` : "";
     return `${path}${suffix}`;
+  }
+
+  function syncInventoryUrl(page: number, filters: InventoryOperationsFilters, mode: "push" | "replace") {
+    if (typeof window === "undefined") return;
+    const query = buildInventoryOperationsQuery(page, filters);
+    const nextUrl = `/app/inventory${query ? `?${query}` : ""}`;
+    window.history[mode === "push" ? "pushState" : "replaceState"](null, "", nextUrl);
   }
 
   function resetMovementDraft(product: PortalInventoryProduct) {
@@ -111,7 +132,12 @@ export function InventoryBaseWorkspace({
     }
   }
 
-  async function loadProducts(nextPage: number, filters: InventoryProductFilters, allowPageCorrection = true): Promise<void> {
+  async function loadProducts(
+    nextPage: number,
+    filters: InventoryOperationsFilters,
+    allowPageCorrection = true,
+    urlMode: "push" | "replace" | "none" = "none"
+  ): Promise<void> {
     const requestId = productsRequestIdRef.current + 1;
     productsRequestIdRef.current = requestId;
     setLoading(true);
@@ -120,12 +146,10 @@ export function InventoryBaseWorkspace({
         page: String(nextPage),
         pageSize: String(INVENTORY_PAGE_SIZE)
       };
-      const normalizedFilters: InventoryProductFilters = {
-        search: filters.search.trim(),
-        stockFilter: filters.stockFilter
-      };
+      const normalizedFilters = normalizeInventoryOperationsFilters(filters);
       if (normalizedFilters.search) params.search = normalizedFilters.search;
       if (normalizedFilters.stockFilter !== "all") params.stockFilter = normalizedFilters.stockFilter;
+      if (normalizedFilters.productId) params.productId = normalizedFilters.productId;
       const response = await fetch(buildInventoryUrl("/api/app/inventory/products", params), { cache: "no-store" });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error || "No se pudo cargar inventario.");
@@ -136,28 +160,61 @@ export function InventoryBaseWorkspace({
       const correctionPage = resolveInventoryPageCorrection(nextPage, json.pagination.totalPages);
       if (correctionPage !== null) {
         if (!allowPageCorrection) throw new Error("Inventario devolvio una pagina fuera de rango.");
-        await loadProducts(correctionPage, normalizedFilters, false);
+        await loadProducts(correctionPage, normalizedFilters, false, urlMode);
         return;
       }
       setProducts(json.products);
       setPagination(json.pagination);
       setInventorySummary(json.summary);
       setAppliedFilters(normalizedFilters);
+      setLoadError(null);
+      if (urlMode !== "none") syncInventoryUrl(json.pagination.page, normalizedFilters, urlMode);
     } catch (error) {
       if (productsRequestIdRef.current !== requestId) return;
-      setFeedback(error instanceof Error ? error.message : "No se pudo cargar inventario.");
+      setLoadError(error instanceof Error ? error.message : "No se pudo cargar Inventario.");
     } finally {
       if (productsRequestIdRef.current === requestId) setLoading(false);
     }
   }
 
-  async function applyProductFilters() {
-    await loadProducts(1, { search, stockFilter });
+  function applyStockFilter(nextStockFilter: InventoryOperationsFilters["stockFilter"]) {
+    setStockFilter(nextStockFilter);
+    void loadProducts(1, { ...appliedFilters, search: search.trim(), stockFilter: nextStockFilter }, true, "push");
+  }
+
+  function clearProductFocus() {
+    void loadProducts(1, { ...appliedFilters, productId: "" }, true, "push");
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setStockFilter("all");
+    void loadProducts(1, { search: "", stockFilter: "all", productId: "" }, true, "push");
   }
 
   async function refreshCurrentPage() {
     await loadProducts(pagination.page, appliedFilters);
   }
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const normalizedSearch = search.trim();
+      if (normalizedSearch === appliedFilters.search) return;
+      void loadProducts(1, { ...appliedFilters, search: normalizedSearch }, true, "replace");
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [search, appliedFilters]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const parsed = parseInventoryOperationsParams(new URLSearchParams(window.location.search));
+      setSearch(parsed.filters.search);
+      setStockFilter(parsed.filters.stockFilter);
+      void loadProducts(parsed.page, parsed.filters);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   function openPanel(product: PortalInventoryProduct, nextPanel: Exclude<InventoryActionPanel, null>) {
     setFeedback(null);
@@ -204,13 +261,12 @@ export function InventoryBaseWorkspace({
       ? countedStockNumber
       : currentStock + (Number.isFinite(deltaPreview) ? deltaPreview : 0);
 
-  const hasPreviousPage = pagination.page > 1;
-  const hasNextPage = pagination.page < pagination.totalPages;
-  const displayedPage = pagination.totalPages > 0 ? pagination.page : 0;
   const pageStart = pagination.totalItems > 0 ? (pagination.page - 1) * pagination.pageSize + 1 : 0;
   const pageEnd = pagination.totalItems > 0
     ? Math.min(pagination.totalItems, pagination.page * pagination.pageSize)
     : 0;
+  const activeFilterCount = [appliedFilters.search, appliedFilters.stockFilter !== "all", appliedFilters.productId].filter(Boolean).length;
+  const focusedProduct = appliedFilters.productId ? products.find((product) => product.id === appliedFilters.productId) || null : null;
 
   async function submitMovement() {
     if (!selectedProduct) return;
@@ -283,130 +339,113 @@ export function InventoryBaseWorkspace({
         </Button>
       ) : null}
     >
-      <div className="grid gap-4 md:grid-cols-3">
-        <SummaryCard label="Productos" value={String(inventorySummary.totalProducts)} helper="Catalogo visible en inventario" />
-        <SummaryCard label="Con stock" value={String(inventorySummary.withStock)} helper="Disponibilidad positiva" />
-        <SummaryCard label="Sin stock" value={String(inventorySummary.withoutStock)} helper="Requieren reposicion o correccion" />
-      </div>
+      <section className="flex flex-wrap gap-2" aria-label="Indicadores y filtros rápidos de Inventario">
+        <OperationsMetricFilter label="productos" value={inventorySummary.totalProducts} active={stockFilter === "all"} onClick={() => applyStockFilter("all")} />
+        <OperationsMetricFilter label="con stock" value={inventorySummary.withStock} active={stockFilter === "with_stock"} onClick={() => applyStockFilter("with_stock")} tone="success" />
+        <OperationsMetricFilter label="sin stock" value={inventorySummary.withoutStock} active={stockFilter === "without_stock"} onClick={() => applyStockFilter("without_stock")} tone="warning" />
+      </section>
 
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle>Stock actual</CardTitle>
           <CardDescription>Ubicacion principal unica por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
             <label className="relative block">
+              <span className="sr-only">Buscar productos en Inventario</span>
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar por nombre, codigo interno, SKU o barras"
+                aria-label="Buscar productos en Inventario"
               />
             </label>
             <select
+              aria-label="Filtrar Inventario por stock"
               className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
               value={stockFilter}
-              onChange={(event) => setStockFilter(event.target.value as "all" | "with_stock" | "without_stock")}
+              onChange={(event) => applyStockFilter(event.target.value as "all" | "with_stock" | "without_stock")}
             >
-              <option value="all">Todos</option>
+              <option value="all">Todo el stock</option>
               <option value="with_stock">Con stock</option>
               <option value="without_stock">Sin stock</option>
             </select>
-            <Button type="button" variant="secondary" onClick={() => void applyProductFilters()} disabled={loading}>
-              {loading ? "Actualizando..." : "Actualizar"}
-            </Button>
           </div>
 
+          {activeFilterCount > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--border)] bg-muted/25 px-3 py-2 text-sm">
+              <span className="text-muted">Filtros activos:</span>
+              {appliedFilters.productId ? <OperationsFilterChip label={focusedProduct ? `Producto: ${focusedProduct.name}` : "Producto enfocado"} onClear={clearProductFocus} /> : null}
+              {appliedFilters.search ? <OperationsFilterChip label={`Búsqueda: ${appliedFilters.search}`} onClear={() => { setSearch(""); void loadProducts(1, { ...appliedFilters, search: "" }, true, "push"); }} /> : null}
+              {appliedFilters.stockFilter !== "all" ? <OperationsFilterChip label={appliedFilters.stockFilter === "with_stock" ? "Con stock" : "Sin stock"} onClear={() => applyStockFilter("all")} /> : null}
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>Limpiar filtros</Button>
+            </div>
+          ) : null}
+
+          {appliedFilters.productId ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/25 bg-brand/10 px-3 py-2 text-sm">
+              <span>{focusedProduct ? <>Inventario enfocado en <strong>{focusedProduct.name}</strong>.</> : "No encontramos este producto en Inventario Base."}</span>
+              <Button type="button" variant="secondary" size="sm" onClick={clearProductFocus}>Ver todo el Inventario</Button>
+            </div>
+          ) : null}
+
+          {loadError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/25 bg-red-500/10 px-3 py-2 text-sm text-red-100"><span>No se pudo cargar el Inventario. {loadError}</span><Button type="button" variant="secondary" size="sm" onClick={() => void loadProducts(pagination.page, appliedFilters)}>Reintentar</Button></div> : null}
           {feedback ? <div className="rounded-xl border border-[color:var(--border)] bg-muted/40 px-4 py-3 text-sm">{feedback}</div> : null}
 
-          <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
-            <table className="min-w-[980px] w-full text-left text-sm">
+          <div className="relative">
+            {loading ? <OperationsLoadingOverlay /> : null}
+          <div className={cn("hidden overflow-x-auto rounded-2xl border border-[color:var(--border)] md:block", loading && "opacity-55")}>
+            <table className="min-w-[1040px] w-full text-left text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">Codigo</th>
-                  <th className="px-4 py-3">Producto</th>
-                  <th className="px-4 py-3">Categoria</th>
-                  <th className="px-4 py-3">Stock</th>
-                  <th className="px-4 py-3">Ubicacion</th>
-                  <th className="px-4 py-3">Ultimo movimiento</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Acciones</th>
+                  <th className="w-16 px-3 py-2.5">Imagen</th>
+                  <th className="px-3 py-2.5">Codigo / SKU</th>
+                  <th className="px-3 py-2.5">Producto</th>
+                  <th className="px-3 py-2.5">Categoria</th>
+                  <th className="px-3 py-2.5 text-right">Stock</th>
+                  <th className="px-3 py-2.5">Ubicacion</th>
+                  <th className="px-3 py-2.5">Ultimo movimiento</th>
+                  <th className="px-3 py-2.5">Estado</th>
+                  <th className="px-3 py-2.5 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {products.map((product) => (
-                  <tr key={product.id} className="border-t border-[color:var(--border)]">
-                    <td className="px-4 py-4 font-mono text-xs">{product.internalCode || "-"}</td>
-                    <td className="px-4 py-4">
+                  <tr key={product.id} className="border-t border-[color:var(--border)] hover:bg-muted/15">
+                    <td className="px-3 py-2"><OperationsProductThumbnail product={product} /></td>
+                    <td className="px-3 py-2"><p className="font-mono text-xs">{product.internalCode || "Sin codigo"}</p><p className="mt-1 text-xs text-muted">{product.sku || "Sin SKU"}</p></td>
+                    <td className="px-3 py-2">
                       <p className="font-medium">{product.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{product.sku || "Sin SKU"}</p>
                     </td>
-                    <td className="px-4 py-4">{product.categoryName || "-"}</td>
-                    <td className="px-4 py-4 font-semibold">{resolveStock(product)}</td>
-                    <td className="px-4 py-4">{product.locationName || "Principal"}</td>
-                    <td className="px-4 py-4 text-xs text-muted-foreground">{humanizeMovement(product.lastMovementType, product.lastMovementAt)}</td>
-                    <td className="px-4 py-4">
-                      <Badge variant={badgeVariant(product.stockState || "without_stock")}>{badgeLabel(product.stockState || "without_stock")}</Badge>
+                    <td className="px-3 py-2 text-muted">{product.categoryName || "Sin categoria"}</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">{resolveStock(product)}</td>
+                    <td className="px-3 py-2">{product.locationName || "Principal"}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{humanizeMovement(product.lastMovementType, product.lastMovementAt)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1.5"><OperationsStockBadge stock={resolveStock(product)} />{product.status === "archived" ? <Badge variant="muted">Archivado</Badge> : null}</div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Button asChild type="button" size="sm" variant="secondary">
-                          <Link href={`/app/inventory/movements?productId=${encodeURIComponent(product.id)}`}>Historial</Link>
-                        </Button>
-                        <Button type="button" size="sm" onClick={() => openPanel(product, "movement")} disabled={readOnly}>
-                          Registrar movimiento
-                        </Button>
-                      </div>
-                    </td>
+                    <td className="px-3 py-2"><InventoryProductActions product={product} readOnly={readOnly} onMovement={() => openPanel(product, "movement")} /></td>
                   </tr>
                 ))}
                 {!products.length ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                      No hay productos para este filtro.
+                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                      {activeFilterCount > 0 ? "No hay productos con estos filtros." : "Todavia no hay productos en Inventario Base."}
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
           </div>
-
-          <div className="overflow-x-auto">
-            <nav
-              aria-label="Paginacion de productos"
-              className="grid min-h-14 min-w-[36rem] grid-cols-[7rem_minmax(16rem,1fr)_7rem] items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-3 py-2"
-            >
-              <div className="flex justify-start">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-28 shrink-0 justify-center"
-                  disabled={!hasPreviousPage || loading}
-                  onClick={() => void loadProducts(pagination.page - 1, appliedFilters)}
-                >
-                  <ChevronLeft aria-hidden="true" className="mr-1 size-4 shrink-0" />
-                  Anterior
-                </Button>
-              </div>
-              <p aria-live="polite" className="min-w-[16rem] whitespace-nowrap text-center text-sm tabular-nums text-muted-foreground">
-                Pagina {displayedPage} de {pagination.totalPages} - {pageStart}-{pageEnd} de {pagination.totalItems} productos
-              </p>
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-28 shrink-0 justify-center"
-                  disabled={!hasNextPage || loading}
-                  onClick={() => void loadProducts(pagination.page + 1, appliedFilters)}
-                >
-                  Siguiente
-                  <ChevronRight aria-hidden="true" className="ml-1 size-4 shrink-0" />
-                </Button>
-              </div>
-            </nav>
+          <div className={cn("space-y-2 md:hidden", loading && "opacity-55")}>
+            {products.map((product) => <InventoryProductMobileRow key={product.id} product={product} readOnly={readOnly} onMovement={() => openPanel(product, "movement")} />)}
           </div>
+          </div>
+
+          <OperationsStablePaginator ariaLabel="Paginacion de productos de Inventario" page={pagination.page} totalPages={pagination.totalPages} pageStart={pageStart} pageEnd={pageEnd} totalItems={pagination.totalItems} itemLabel="productos" disabled={loading} onPage={(page) => void loadProducts(page, appliedFilters, true, "push")} />
         </CardContent>
       </Card>
 
@@ -546,18 +585,6 @@ function humanizeMovement(type?: string | null, createdAt?: string | null) {
   return `${type || "movimiento"}${createdAt ? ` · ${formatDateTime(createdAt)}` : ""}`;
 }
 
-function badgeVariant(state: string) {
-  if (state === "with_stock") return "success";
-  if (state === "low_stock") return "warning";
-  return "muted";
-}
-
-function badgeLabel(state: string) {
-  if (state === "with_stock") return "Con stock";
-  if (state === "low_stock") return "Bajo";
-  return "Sin stock";
-}
-
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
@@ -628,14 +655,47 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
-function SummaryCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+function InventoryProductActions({
+  product,
+  readOnly,
+  onMovement
+}: {
+  product: PortalInventoryProduct;
+  readOnly: boolean;
+  onMovement: () => void;
+}) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-3xl">{value}</CardTitle>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">{helper}</CardContent>
-    </Card>
+    <div className="flex items-center justify-end gap-1.5">
+      {!readOnly ? <Button type="button" size="sm" onClick={onMovement}>Registrar</Button> : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="sm" aria-label={`Más acciones para ${product.name}`}><MoreHorizontal aria-hidden="true" className="size-4" /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild><Link href={`/app/inventory/movements?productId=${encodeURIComponent(product.id)}`}>Ver movimientos</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href={`/app/catalog/${encodeURIComponent(product.id)}`}>Abrir en Catálogo</Link></DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function InventoryProductMobileRow({ product, readOnly, onMovement }: { product: PortalInventoryProduct; readOnly: boolean; onMovement: () => void }) {
+  return (
+    <article className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-3">
+      <div className="flex gap-3">
+        <OperationsProductThumbnail product={product} />
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 font-medium">{product.name}</p>
+          <p className="mt-1 truncate font-mono text-xs text-muted">{product.internalCode || product.sku || "Sin codigo"}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold tabular-nums">Stock {resolveStock(product)}</span>
+            <OperationsStockBadge stock={resolveStock(product)} />
+            {product.status === "archived" ? <Badge variant="muted">Archivado</Badge> : null}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3"><InventoryProductActions product={product} readOnly={readOnly} onMovement={onMovement} /></div>
+    </article>
   );
 }
