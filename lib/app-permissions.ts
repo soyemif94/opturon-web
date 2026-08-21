@@ -137,6 +137,13 @@ export function canManageWorkspace(context: AccessContext) {
   return hasAppPermission(context, "manage_workspace");
 }
 
+export function canDeleteInboxConversation(context: AccessContext) {
+  if (isStaffRole(context.globalRole)) return false;
+  if (String(context.accountScope || "").trim().toLowerCase() === "opturon_admin") return false;
+  const role = normalizeTenantRole(context.tenantRole);
+  return role === "owner" || role === "manager";
+}
+
 export function canManageUsers(context: AccessContext) {
   return hasAppPermission(context, "manage_users");
 }

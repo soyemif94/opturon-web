@@ -15,6 +15,7 @@ import { normalizeText } from "@/lib/search/normalize";
 import { toast } from "@/components/ui/toast";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { shouldShowInboxChannelEmptyState } from "@/lib/whatsapp-channel-state";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 type InboxListResponse = {
   readOnly: boolean;
@@ -78,12 +79,14 @@ export function InboxWorkspace({
   initialConversationId,
   demo,
   tenantId,
-  currentUserId
+  currentUserId,
+  canDeleteConversation = false
 }: {
   initialConversationId?: string;
   demo?: boolean;
   tenantId?: string;
   currentUserId?: string;
+  canDeleteConversation?: boolean;
 }) {
   const inbox = useInboxContext();
   const setInboxState = inbox.setState;
@@ -116,6 +119,7 @@ export function InboxWorkspace({
   const [leadStatusBusy, setLeadStatusBusy] = useState(false);
   const [nextActionBusy, setNextActionBusy] = useState(false);
   const [resetConversationBusy, setResetConversationBusy] = useState(false);
+  const [deleteConversationOpen, setDeleteConversationOpen] = useState(false);
   const [nextActionAtInput, setNextActionAtInput] = useState("");
   const [nextActionNoteInput, setNextActionNoteInput] = useState("");
   const [onlyUnread, setOnlyUnread] = useState(false);
@@ -1217,6 +1221,27 @@ export function InboxWorkspace({
     }
   }
 
+  async function deleteSelectedConversation() {
+    if (!selectedId || !canDeleteConversation) return;
+    const deletingId = selectedId;
+    const response = await fetch(appendQuery(`/api/app/inbox/${deletingId}`), { method: "DELETE" });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      toast.error(json.error || "No se pudo eliminar la conversación. Intentá nuevamente.");
+      throw new Error(json.error || "conversation_delete_failed");
+    }
+    rowsRequestSeqRef.current += 1;
+    detailRequestSeqRef.current += 1;
+    setRows((current) => current.filter((row) => row.id !== deletingId));
+    setSelectedIds((current) => current.filter((id) => id !== deletingId));
+    setSelectedId(undefined);
+    setDetail(null);
+    setComposer("");
+    setContextOpen(false);
+    toast.success("Conversación eliminada. El contacto y sus datos comerciales se conservaron.");
+    void loadRows();
+  }
+
   function applySuggestion(item: SuggestionItem) {
     if (item.type === "template") {
       setComposer(item.text || item.label);
@@ -1263,6 +1288,7 @@ export function InboxWorkspace({
       {shouldShowConnectionEmptyStateForChannel && channelState ? (
         <InboxConnectionEmptyState status={channelState} />
       ) : (
+        <>
         <InboxLayout
           hasDetail={Boolean(selectedId)}
           contextOpen={contextOpen}
@@ -1345,6 +1371,8 @@ export function InboxWorkspace({
               onToggleBot={() => void runAction("toggle_bot")}
               onTakeConversation={() => void takeConversation()}
               onArchive={() => void runAction("close")}
+              canDeleteConversation={canDeleteConversation && !readOnly}
+              onDeleteConversation={() => setDeleteConversationOpen(true)}
               onOpenContext={() => setContextOpen(true)}
               onBotFlowLockChange={(value) => void changeBotFlowLock(value)}
               onBotDomainOverrideChange={(value) => void changeBotDomainOverride(value)}
@@ -1405,6 +1433,17 @@ export function InboxWorkspace({
             />
           }
         />
+        <ConfirmDialog
+          open={deleteConversationOpen}
+          onOpenChange={setDeleteConversationOpen}
+          title="Eliminar conversación"
+          description="Esta conversación dejará de aparecer en el Inbox y se reiniciará su contexto conversacional. El contacto y su información comercial no se eliminarán. Si el contacto vuelve a escribir, podrá iniciarse una nueva conversación."
+          cancelText="Cancelar"
+          confirmText="Eliminar conversación"
+          variant="destructive"
+          onConfirm={deleteSelectedConversation}
+        />
+        </>
       )}
     </div>
   );

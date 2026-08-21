@@ -1687,6 +1687,19 @@ export async function patchPortalConversation(tenantId: string, conversationId: 
     );
   }
 
+export async function deletePortalConversation(tenantId: string, conversationId: string, actorUserId: string) {
+  return backendPortalFetch<{ success: boolean; data: { conversationId: string; deleted: boolean; reason: string } }>(
+    `/portal/tenants/${tenantId}/conversations/${conversationId}`,
+    {
+      method: "DELETE",
+      headers: {
+        "x-portal-actor-id": actorUserId,
+        "x-active-tenant-id": tenantId
+      }
+    }
+  );
+}
+
 export async function assignPortalConversationSeller(tenantId: string, conversationId: string, sellerUserId: string) {
   return backendFetch<{ success: boolean; data: any }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}/assign-seller`,

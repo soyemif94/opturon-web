@@ -1,7 +1,8 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getBackendErrorStatus, getPortalConversationDetail, isBackendConfigured, patchPortalConversation } from "@/lib/api";
+import { deletePortalConversation, getBackendErrorStatus, getPortalConversationDetail, isBackendConfigured, patchPortalConversation } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
+import { canDeleteInboxConversation } from "@/lib/app-permissions";
 import { appendAuditLog, applyCommercialBotHandoff, getInboxConversationDetail, newId, readSaasData, touchTenantActivity, writeSaasData, inboxQuickReplies, inboxAiEvents } from "@/lib/saas/store";
 
 const patchSchema = z.object({
@@ -286,4 +287,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   touchTenantActivity(tenantContext.tenantId);
 
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const url = new URL(request.url);
+  const tenantContext = await resolveAppTenant({
+    requestedTenantId: url.searchParams.get("tenantId") || undefined,
+    demo: url.searchParams.get("demo") === "1",
+    requireWrite: true
+  });
+  if (tenantContext.error) return tenantContext.error;
+  if (!canDeleteInboxConversation(tenantContext.ctx)) {
+    return NextResponse.json({ error: "portal_inbox_delete_forbidden" }, { status: 403 });
+  }
+  if (!isBackendConfigured()) {
+    return NextResponse.json({ error: "portal_inbox_backend_unavailable" }, { status: 503 });
+  }
+  try {
+    const actorUserId = String(tenantContext.ctx.portalActorId || "").trim();
+    if (!actorUserId) return NextResponse.json({ error: "portal_inbox_delete_forbidden" }, { status: 403 });
+    const result = await deletePortalConversation(tenantContext.tenantId, id, actorUserId);
+    return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "backend_fetch_failed" },
+      { status: getBackendErrorStatus(error) || 502, headers: { "Cache-Control": "no-store" } }
+    );
+  }
 }

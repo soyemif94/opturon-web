@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive, Bot, Clock3, MoreHorizontal, PanelRight, Pause, Play, Sparkles, UserRound } from "lucide-react";
+import { Archive, Bot, Clock3, MoreHorizontal, PanelRight, Pause, Play, Sparkles, Trash2, UserRound } from "lucide-react";
 import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
@@ -30,6 +30,8 @@ type ChatPanelProps = {
   onToggleBot: () => void;
   onTakeConversation: () => void;
   onArchive: () => void;
+  canDeleteConversation: boolean;
+  onDeleteConversation: () => void;
   onOpenContext: () => void;
   onBotFlowLockChange: (value: BotFlowLock) => void;
   onBotDomainOverrideChange: (value: BotDomainOverride) => void;
@@ -50,6 +52,8 @@ export function ChatPanel({
   onToggleBot,
   onTakeConversation,
   onArchive,
+  canDeleteConversation,
+  onDeleteConversation,
   onOpenContext
 }: ChatPanelProps) {
   const COLLAPSED_TIMELINE_ITEMS = 12;
@@ -141,6 +145,7 @@ export function ChatPanel({
                 <div className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-[color:var(--border)] bg-card p-1.5 shadow-xl">
                   <button type="button" onClick={onTakeConversation} disabled={readOnly} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-muted/40 hover:text-text disabled:opacity-40"><UserRound aria-hidden="true" className="size-3.5" />Tomar para mí</button>
                   <button type="button" onClick={onArchive} disabled={readOnly} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-muted/40 hover:text-text disabled:opacity-40"><Archive aria-hidden="true" className="size-3.5" />Archivar</button>
+                  {canDeleteConversation ? <button type="button" onClick={onDeleteConversation} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200"><Trash2 aria-hidden="true" className="size-3.5" />Eliminar conversación</button> : null}
                 </div>
               </details>
             </div>
