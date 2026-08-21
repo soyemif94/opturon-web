@@ -25,7 +25,7 @@ assert.match(bff, /imageFilter/);
 assert.match(bff, /statusFilter/);
 assert.match(bff, /categoryId/);
 assert.match(api, /products\/workspace/);
-assert.match(api, /backendPortalFetch<\{ success: boolean; data: PortalCatalogOperationsData \}>/);
+assert.match(api, /portalInventoryReadFetch<\{ success: boolean; data: PortalCatalogOperationsData \}>/);
 
 for (const label of ["Imagen", "Código / SKU", "Producto", "Categoría", "Precio", "Stock", "Estado", "Acciones"]) assert.match(workspace, new RegExp(label));
 assert.match(sharedOperationsUi, /object-contain/);

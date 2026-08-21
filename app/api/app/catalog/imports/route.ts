@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendErrorStatus, isBackendConfigured, listPortalCatalogImports } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const limit = Number.parseInt(new URL(request.url).searchParams.get("limit") || "8", 10);
 
   try {
-    const result = await listPortalCatalogImports(tenantContext.tenantId, { limit });
+    const result = await listPortalCatalogImports(tenantContext.tenantId, { limit }, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ok: true, imports: result.data.imports || [] }));
   } catch (error) {
     return noStore(

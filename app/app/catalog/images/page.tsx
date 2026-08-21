@@ -9,7 +9,7 @@ import {
   type PortalCatalogImageWorkspaceData
 } from "@/lib/api";
 import { CATALOG_IMAGE_PAGE_SIZE } from "@/lib/catalog-images";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 const EMPTY_DATA: PortalCatalogImageWorkspaceData = {
   tenantId: "",
@@ -32,7 +32,7 @@ export default async function CatalogImagesPage({ searchParams }: { searchParams
         imageFilter: "all",
         page: 1,
         pageSize: CATALOG_IMAGE_PAGE_SIZE
-      });
+      }, getPortalInventoryReadActor(ctx));
       initialData = result.data;
     } catch {
       initialData = { ...EMPTY_DATA, tenantId: ctx.tenantId };

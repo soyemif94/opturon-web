@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executePortalCatalogImportRollback, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -22,10 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       idempotencyKey: String(body?.idempotencyKey || ""),
       force: body?.force === true,
       confirmForceDelete: body?.confirmForceDelete === true,
-      actor: {
-        id: tenantContext.ctx.portalActorId || null,
-        name: tenantContext.ctx.session?.user?.name || null
-      }
+      actor: getPortalInventoryReadActor(tenantContext.ctx)
     });
     return noStore(NextResponse.json({ ok: true, result: result.data }));
   } catch (error) {

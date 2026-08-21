@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { downloadPortalCatalogImportTemplate, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 export async function GET() {
   const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   try {
-    const buffer = await downloadPortalCatalogImportTemplate(tenantContext.tenantId);
+    const buffer = await downloadPortalCatalogImportTemplate(tenantContext.tenantId, getPortalInventoryReadActor(tenantContext.ctx));
     return new NextResponse(buffer, {
       status: 200,
       headers: {

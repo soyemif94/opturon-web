@@ -20,7 +20,8 @@ const readRoutes = [
   "app/api/app/inventory/expiration-settings/route.ts"
 ];
 
-assert.match(api, /function portalInventoryReadFetch<[\s\S]*?portal_inventory_read_actor_required/);
+assert.match(api, /function portalActorHeaders\([\s\S]*?portal_inventory_read_actor_required/);
+assert.match(api, /function portalInventoryReadFetch</);
 assert.match(api, /headers\.set\("x-portal-actor-id", actorId\)/);
 assert.match(api, /return backendPortalFetch<T>\(path, \{ headers \}\)/);
 assert.match(access, /export function getPortalInventoryReadActor/);

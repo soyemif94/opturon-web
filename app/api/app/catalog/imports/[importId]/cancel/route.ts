@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cancelPortalCatalogImport, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -8,12 +8,8 @@ function noStore(response: NextResponse) {
 }
 
 function actorFromTenantContext(tenantContext: Awaited<ReturnType<typeof resolveAppTenant>>) {
-  if (!("ctx" in tenantContext) || !tenantContext.ctx) return undefined;
-  const sessionUser = tenantContext.ctx.session?.user;
-  return {
-    id: tenantContext.ctx.portalActorId || tenantContext.ctx.userId || null,
-    name: sessionUser?.name || null
-  };
+  if (!("ctx" in tenantContext) || !tenantContext.ctx) return {};
+  return getPortalInventoryReadActor(tenantContext.ctx);
 }
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ importId: string }> }) {

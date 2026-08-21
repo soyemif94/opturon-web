@@ -5,7 +5,7 @@ import {
   getPortalPurchaseReceiptDetail,
   isBackendConfigured
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -25,7 +25,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ re
 
   try {
     const { receiptId } = await context.params;
-    const result = await getPortalPurchaseReceiptDetail(tenantContext.tenantId, receiptId);
+    const result = await getPortalPurchaseReceiptDetail(tenantContext.tenantId, receiptId, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ readOnly: tenantContext.readOnly, receipt: result.data }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

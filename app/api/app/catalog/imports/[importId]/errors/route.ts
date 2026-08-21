@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { downloadPortalCatalogImportErrors, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ importId: string }> }) {
   const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
@@ -12,7 +12,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { importId } = await params;
 
   try {
-    const buffer = await downloadPortalCatalogImportErrors(tenantContext.tenantId, importId);
+    const buffer = await downloadPortalCatalogImportErrors(tenantContext.tenantId, importId, getPortalInventoryReadActor(tenantContext.ctx));
     return new NextResponse(buffer, {
       status: 200,
       headers: {

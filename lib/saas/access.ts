@@ -264,10 +264,12 @@ export async function resolveAppTenant(options?: {
 export function getPortalInventoryReadActor(ctx: {
   portalActorId?: string | null;
   userId?: string | null;
+  globalRole?: string | null;
   session?: { user?: { name?: string | null; portalActorId?: string | null; id?: string | null } } | null;
 }) {
   return {
     id: String(ctx.portalActorId || ctx.session?.user?.portalActorId || ctx.userId || ctx.session?.user?.id || "").trim() || null,
-    name: String(ctx.session?.user?.name || "").trim() || null
+    name: String(ctx.session?.user?.name || "").trim() || null,
+    globalRole: String(ctx.globalRole || "").trim() || null
   };
 }

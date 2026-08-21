@@ -1,7 +1,7 @@
 import { SuppliersWorkspace } from "@/components/app/SuppliersWorkspace";
 import { canManageInventoryReceipts } from "@/lib/app-permissions";
 import { getPortalSuppliers, isBackendConfigured, type PortalSupplier } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 export default async function InventorySuppliersPage() {
   const ctx = await requireAppModulePage("inventory");
@@ -15,7 +15,7 @@ export default async function InventorySuppliersPage() {
         page: 1,
         pageSize: 100,
         sort: "name_asc"
-      });
+      }, getPortalInventoryReadActor(ctx));
       suppliers = Array.isArray(result.data?.items) ? result.data.items : [];
     } catch {
       suppliers = [];

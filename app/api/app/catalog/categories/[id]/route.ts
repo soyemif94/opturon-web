@@ -6,7 +6,7 @@ import {
   isBackendConfigured,
   patchPortalProductCategory
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body?.name !== undefined) payload.name = String(body.name || "").trim();
     if (body?.isActive !== undefined) payload.isActive = body.isActive === true;
 
-    const result = await patchPortalProductCategory(tenantContext.tenantId, id, payload);
+    const result = await patchPortalProductCategory(tenantContext.tenantId, id, payload, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ok: true, category: result.data }));
   } catch (error) {
     return noStore(
@@ -52,7 +52,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { id } = await params;
 
   try {
-    const result = await deletePortalProductCategory(tenantContext.tenantId, id);
+    const result = await deletePortalProductCategory(tenantContext.tenantId, id, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ok: true, categoryId: result.data.categoryId }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

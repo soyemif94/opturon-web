@@ -20,8 +20,8 @@ assert.match(page, /Imágenes de productos/);
 assert.match(bffList, /requireAppModuleApi\("catalog"/);
 assert.match(bffList, /resolveAppTenant/);
 assert.match(bffUpload, /permission: "manage_catalog"/);
-assert.match(api, /backendPortalFetch<\{ success: boolean; data: PortalCatalogImageWorkspaceData \}>/);
-assert.match(api, /return backendPortalFetch<\{ success: boolean; data: PortalProduct \}>\(/);
+assert.match(api, /portalInventoryReadFetch<\{ success: boolean; data: PortalCatalogImageWorkspaceData \}>/);
+assert.match(api, /return portalInventoryReadFetch<\{ success: boolean; data: PortalProduct \}>\(/);
 
 assert.match(workspace, /Con imagen/);
 assert.match(workspace, /Sin imagen/);

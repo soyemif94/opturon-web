@@ -5,7 +5,7 @@ import {
   isBackendConfigured,
   patchPortalSupplierStatus
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -16,18 +16,12 @@ function backendUnavailable() {
   return noStore(NextResponse.json({ error: "suppliers_backend_unavailable" }, { status: 503 }));
 }
 
-function actorFromTenantContext(tenantContext: Awaited<ReturnType<typeof resolveAppTenant>>) {
-  return {
-    id: tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId || null,
-    name: tenantContext.ctx?.session?.user?.name || null
-  };
-}
-
 export async function PATCH(request: NextRequest, context: { params: Promise<{ supplierId: string }> }) {
   const moduleGuard = await requireAppModuleApi("inventory", { permission: "manage_inventory_receipts" });
   if (moduleGuard.error) return moduleGuard.error;
   const tenantContext = await resolveAppTenant({ permission: "manage_inventory_receipts", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
+  if (!tenantContext.ctx) return noStore(NextResponse.json({ error: "tenant_context_required" }, { status: 403 }));
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
@@ -37,7 +31,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ s
       tenantContext.tenantId,
       supplierId,
       { status: body?.status === "inactive" ? "inactive" : "active" },
-      actorFromTenantContext(tenantContext)
+      getPortalInventoryReadActor(tenantContext.ctx)
     );
     return noStore(NextResponse.json({ ok: true, supplier: result.data }));
   } catch (error) {

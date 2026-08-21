@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendErrorStatus, isBackendConfigured, previewPortalCatalogBulkDelete } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const result = await previewPortalCatalogBulkDelete(tenantContext.tenantId, body || {});
+    const result = await previewPortalCatalogBulkDelete(tenantContext.tenantId, body || {}, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ok: true, preview: result.data }));
   } catch (error) {
     return noStore(

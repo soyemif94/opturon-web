@@ -23,7 +23,7 @@ export default async function CatalogProductDetail({ params }: { params: Promise
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
-      const result = await getPortalProductDetail(ctx.tenantId, id);
+      const result = await getPortalProductDetail(ctx.tenantId, id, getPortalInventoryReadActor(ctx));
       product = result.data;
       const lotsResult = await getPortalInventoryLots(
         ctx.tenantId,

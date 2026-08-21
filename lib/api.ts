@@ -3494,14 +3494,14 @@ export async function validatePortalOrderTransferPayment(
   );
 }
 
-export async function getPortalProducts(tenantId: string) {
-  return backendFetch<{
+export async function getPortalProducts(tenantId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
       products: PortalProduct[];
     };
-  }>(`/portal/tenants/${tenantId}/products`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/products`, actor);
 }
 
 export type PortalCatalogImageFilter = "all" | "with_image" | "without_image";
@@ -3547,12 +3547,13 @@ export type PortalCatalogOperationsData = {
 
 export async function getPortalProductImages(
   tenantId: string,
-  options?: {
+  options: {
     search?: string;
     imageFilter?: PortalCatalogImageFilter;
     page?: number;
     pageSize?: number;
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.search) params.set("search", options.search);
@@ -3560,14 +3561,15 @@ export async function getPortalProductImages(
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendPortalFetch<{ success: boolean; data: PortalCatalogImageWorkspaceData }>(
-    `/portal/tenants/${tenantId}/products/images${suffix}`
+  return portalInventoryReadFetch<{ success: boolean; data: PortalCatalogImageWorkspaceData }>(
+    `/portal/tenants/${tenantId}/products/images${suffix}`,
+    actor
   );
 }
 
 export async function getPortalCatalogWorkspace(
   tenantId: string,
-  options?: {
+  options: {
     search?: string;
     stockFilter?: PortalCatalogStockFilter;
     imageFilter?: PortalCatalogImageFilter;
@@ -3575,7 +3577,8 @@ export async function getPortalCatalogWorkspace(
     categoryId?: string;
     page?: number;
     pageSize?: number;
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.search) params.set("search", options.search);
@@ -3586,22 +3589,30 @@ export async function getPortalCatalogWorkspace(
   if (options?.page) params.set("page", String(options.page));
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendPortalFetch<{ success: boolean; data: PortalCatalogOperationsData }>(
-    `/portal/tenants/${tenantId}/products/workspace${suffix}`
+  return portalInventoryReadFetch<{ success: boolean; data: PortalCatalogOperationsData }>(
+    `/portal/tenants/${tenantId}/products/workspace${suffix}`,
+    actor
   );
 }
 
 export type PortalInventoryReadActor = {
   id?: string | null;
   name?: string | null;
+  globalRole?: string | null;
 };
 
-function portalInventoryReadFetch<T>(path: string, actor: PortalInventoryReadActor) {
+function portalActorHeaders(actor: PortalInventoryReadActor) {
   const headers = new Headers();
   const actorId = String(actor?.id || "").trim();
   if (!actorId) throw new Error("portal_inventory_read_actor_required");
   headers.set("x-portal-actor-id", actorId);
   if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  if (actor?.globalRole) headers.set("x-portal-actor-global-role", actor.globalRole);
+  return headers;
+}
+
+function portalInventoryReadFetch<T>(path: string, actor: PortalInventoryReadActor) {
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<T>(path, { headers });
 }
 
@@ -3762,12 +3773,14 @@ export async function createPortalInventoryBulkAdjustment(
 
 export async function previewPortalCatalogBulkDelete(
   tenantId: string,
-  selection: PortalCatalogBulkDeleteSelection
+  selection: PortalCatalogBulkDeleteSelection,
+  actor: PortalInventoryReadActor
 ) {
   return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeletePreview }>(
     `/portal/tenants/${tenantId}/products/bulk-delete/preview`,
     {
       method: "POST",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(selection || {})
     }
   );
@@ -3780,7 +3793,7 @@ export async function executePortalCatalogBulkDelete(
     idempotencyKey: string;
     force?: boolean;
     confirmForceDelete?: boolean;
-    actor?: { id?: string | null; name?: string | null };
+    actor?: PortalInventoryReadActor;
   }
 ) {
   const headers = new Headers();
@@ -4109,12 +4122,13 @@ export async function deletePortalProduct(
     force?: boolean;
     confirmForceDelete?: boolean;
     acknowledgedReferences?: boolean;
-    actor?: { id?: string | null; name?: string | null };
+    actor?: PortalInventoryReadActor;
   }
 ) {
   const headers = new Headers();
   if (options?.actor?.id) headers.set("x-portal-actor-id", options.actor.id);
   if (options?.actor?.name) headers.set("x-portal-actor-name", options.actor.name);
+  if (options?.actor?.globalRole) headers.set("x-portal-actor-global-role", options.actor.globalRole);
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -4627,11 +4641,10 @@ export async function deletePortalAutomation(tenantId: string, automationId: str
   });
 }
 
-export async function getPortalProductDetail(tenantId: string, productId: string) {
-  return backendFetch<{ success: boolean; data: PortalProduct }>(
+export async function getPortalProductDetail(tenantId: string, productId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}`,
-    undefined,
-    false
+    actor
   );
 }
 
@@ -4655,28 +4668,29 @@ export async function patchPortalOrder(
   );
 }
 
-export async function getPortalProductCategories(tenantId: string, options?: { includeInactive?: boolean }) {
+export async function getPortalProductCategories(tenantId: string, options: { includeInactive?: boolean } | undefined, actor: PortalInventoryReadActor) {
   const params = new URLSearchParams();
   if (options?.includeInactive) params.set("includeInactive", "true");
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
       categories: PortalProductCategory[];
     };
-  }>(`/portal/tenants/${tenantId}/product-categories${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/product-categories${suffix}`, actor);
 }
 
 export async function getPortalSuppliers(
   tenantId: string,
-  options?: {
+  options: {
     search?: string;
     status?: "active" | "inactive" | "all";
     page?: number;
     pageSize?: number;
     sort?: "name_asc" | "name_desc" | "updated_asc" | "updated_desc";
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.search) params.set("search", options.search);
@@ -4685,7 +4699,7 @@ export async function getPortalSuppliers(
   if (options?.pageSize) params.set("pageSize", String(options.pageSize));
   if (options?.sort) params.set("sort", options.sort);
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -4694,12 +4708,12 @@ export async function getPortalSuppliers(
       filters: Record<string, unknown>;
       summary: { total: number; active: number; inactive: number };
     };
-  }>(`/portal/tenants/${tenantId}/suppliers${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/suppliers${suffix}`, actor);
 }
 
 export async function getPortalPurchaseReceipts(
   tenantId: string,
-  options?: {
+  options: {
     page?: number;
     pageSize?: number;
     sort?: "receivedAt_desc" | "receivedAt_asc";
@@ -4707,7 +4721,8 @@ export async function getPortalPurchaseReceipts(
     locationId?: string;
     dateFrom?: string;
     dateTo?: string;
-  }
+  } | undefined,
+  actor: PortalInventoryReadActor
 ) {
   const params = new URLSearchParams();
   if (options?.page) params.set("page", String(options.page));
@@ -4718,7 +4733,7 @@ export async function getPortalPurchaseReceipts(
   if (options?.dateFrom) params.set("dateFrom", options.dateFrom);
   if (options?.dateTo) params.set("dateTo", options.dateTo);
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return backendFetch<{
+  return portalInventoryReadFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -4727,14 +4742,13 @@ export async function getPortalPurchaseReceipts(
       pageSize: number;
       total: number;
     };
-  }>(`/portal/tenants/${tenantId}/purchase-receipts${suffix}`, undefined, false);
+  }>(`/portal/tenants/${tenantId}/purchase-receipts${suffix}`, actor);
 }
 
-export async function getPortalPurchaseReceiptDetail(tenantId: string, receiptId: string) {
-  return backendFetch<{ success: boolean; data: PortalPurchaseReceiptDetail }>(
+export async function getPortalPurchaseReceiptDetail(tenantId: string, receiptId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{ success: boolean; data: PortalPurchaseReceiptDetail }>(
     `/portal/tenants/${tenantId}/purchase-receipts/${receiptId}`,
-    undefined,
-    false
+    actor
   );
 }
 
@@ -4755,11 +4769,9 @@ export async function createPortalPurchaseReceipt(
       expiresAt?: string;
     }>;
   },
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{
     success: boolean;
     data: {
@@ -4794,11 +4806,10 @@ export async function extractPortalPurchaseReceiptDocument(
   });
 }
 
-export async function getPortalSupplierDetail(tenantId: string, supplierId: string) {
-  return backendFetch<{ success: boolean; data: PortalSupplier }>(
+export async function getPortalSupplierDetail(tenantId: string, supplierId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{ success: boolean; data: PortalSupplier }>(
     `/portal/tenants/${tenantId}/suppliers/${supplierId}`,
-    undefined,
-    false
+    actor
   );
 }
 
@@ -4835,15 +4846,16 @@ export async function createPortalProduct(
     discountPercentage?: number | null;
     status?: string;
     metadata?: Record<string, unknown>;
-  }
+  },
+  actor: PortalInventoryReadActor
 ) {
-  return backendFetch<{ success: boolean; data: PortalProduct }>(
+  return backendPortalFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products`,
     {
       method: "POST",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
@@ -4852,15 +4864,16 @@ export async function createPortalProductCategory(
   payload: {
     name: string;
     isActive?: boolean;
-  }
+  },
+  actor: PortalInventoryReadActor
 ) {
-  return backendFetch<{ success: boolean; data: PortalProductCategory }>(
+  return backendPortalFetch<{ success: boolean; data: PortalProductCategory }>(
     `/portal/tenants/${tenantId}/product-categories`,
     {
       method: "POST",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
@@ -4875,11 +4888,9 @@ export async function createPortalSupplier(
     address?: string | null;
     notes?: string | null;
   },
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{ success: boolean; data: PortalSupplier }>(
     `/portal/tenants/${tenantId}/suppliers`,
     {
@@ -4930,12 +4941,14 @@ export async function patchPortalProduct(
     } | null;
     status?: string;
     metadata?: Record<string, unknown>;
-  }
+  },
+  actor: PortalInventoryReadActor
 ) {
   return backendPortalFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}`,
     {
       method: "PATCH",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(payload)
     }
   );
@@ -4953,11 +4966,9 @@ export async function patchPortalSupplier(
     address?: string | null;
     notes?: string | null;
   },
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{ success: boolean; data: PortalSupplier }>(
     `/portal/tenants/${tenantId}/suppliers/${supplierId}`,
     {
@@ -4972,11 +4983,9 @@ export async function patchPortalSupplierStatus(
   tenantId: string,
   supplierId: string,
   payload: { status: "active" | "inactive" },
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{ success: boolean; data: PortalSupplier }>(
     `/portal/tenants/${tenantId}/suppliers/${supplierId}/status`,
     {
@@ -5014,20 +5023,21 @@ export async function patchPortalProductCategory(
   payload: {
     name?: string;
     isActive?: boolean;
-  }
+  },
+  actor: PortalInventoryReadActor
 ) {
-  return backendFetch<{ success: boolean; data: PortalProductCategory }>(
+  return backendPortalFetch<{ success: boolean; data: PortalProductCategory }>(
     `/portal/tenants/${tenantId}/product-categories/${categoryId}`,
     {
       method: "PATCH",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
-export async function deletePortalProductCategory(tenantId: string, categoryId: string) {
-  return backendFetch<{
+export async function deletePortalProductCategory(tenantId: string, categoryId: string, actor: PortalInventoryReadActor) {
+  return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -5036,24 +5046,25 @@ export async function deletePortalProductCategory(tenantId: string, categoryId: 
   }>(
     `/portal/tenants/${tenantId}/product-categories/${categoryId}`,
     {
-      method: "DELETE"
-    },
-    false
+      method: "DELETE",
+      headers: portalActorHeaders(actor)
+    }
   );
 }
 
 export async function patchPortalProductStatus(
   tenantId: string,
   productId: string,
-  payload: { status: string }
+  payload: { status: string },
+  actor: PortalInventoryReadActor
 ) {
-  return backendFetch<{ success: boolean; data: PortalProduct }>(
+  return backendPortalFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}/status`,
     {
       method: "PATCH",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
@@ -5080,9 +5091,10 @@ export async function createPortalProductsBulk(
       attributes?: Record<string, string | number | boolean>;
       currency?: string;
     }>;
-  }
+  },
+  actor: PortalInventoryReadActor
 ) {
-  return backendFetch<{
+  return backendPortalFetch<{
     success: boolean;
     data: {
       tenantId: string;
@@ -5099,20 +5111,18 @@ export async function createPortalProductsBulk(
     `/portal/tenants/${tenantId}/products/bulk`,
     {
       method: "POST",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 
 export async function analyzePortalCatalogImport(
   tenantId: string,
   formData: FormData,
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(`/portal/tenants/${tenantId}/catalog-imports/analyze`, {
     method: "POST",
     headers,
@@ -5195,27 +5205,27 @@ export async function updatePortalInventoryLotExpiration(
   );
 }
 
-export async function listPortalCatalogImports(tenantId: string, options?: { limit?: number }) {
+export async function listPortalCatalogImports(tenantId: string, options: { limit?: number } | undefined, actor: PortalInventoryReadActor) {
   const suffix = options?.limit ? `?limit=${options.limit}` : "";
-  return backendPortalFetch<{ success: boolean; data: { tenantId: string; imports: PortalCatalogImport[] } }>(
-    `/portal/tenants/${tenantId}/catalog-imports${suffix}`
+  return portalInventoryReadFetch<{ success: boolean; data: { tenantId: string; imports: PortalCatalogImport[] } }>(
+    `/portal/tenants/${tenantId}/catalog-imports${suffix}`,
+    actor
   );
 }
 
-export async function getPortalCatalogImport(tenantId: string, importId: string) {
-  return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(
-    `/portal/tenants/${tenantId}/catalog-imports/${importId}`
+export async function getPortalCatalogImport(tenantId: string, importId: string, actor: PortalInventoryReadActor) {
+  return portalInventoryReadFetch<{ success: boolean; data: PortalCatalogImport }>(
+    `/portal/tenants/${tenantId}/catalog-imports/${importId}`,
+    actor
   );
 }
 
 export async function confirmPortalCatalogImport(
   tenantId: string,
   importId: string,
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{ success: boolean; data: PortalCatalogImport & { idempotent?: boolean } }>(
     `/portal/tenants/${tenantId}/catalog-imports/${importId}/confirm`,
     {
@@ -5284,11 +5294,9 @@ export async function confirmPortalWhatsAppChatImport(
 export async function cancelPortalCatalogImport(
   tenantId: string,
   importId: string,
-  actor?: { id?: string | null; name?: string | null }
+  actor: PortalInventoryReadActor
 ) {
-  const headers = new Headers();
-  if (actor?.id) headers.set("x-portal-actor-id", actor.id);
-  if (actor?.name) headers.set("x-portal-actor-name", actor.name);
+  const headers = portalActorHeaders(actor);
   return backendPortalFetch<{ success: boolean; data: PortalCatalogImport }>(
     `/portal/tenants/${tenantId}/catalog-imports/${importId}/cancel`,
     {
@@ -5299,11 +5307,12 @@ export async function cancelPortalCatalogImport(
   );
 }
 
-export async function previewPortalCatalogImportRollback(tenantId: string, importId: string) {
+export async function previewPortalCatalogImportRollback(tenantId: string, importId: string, actor: PortalInventoryReadActor) {
   return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeletePreview }>(
     `/portal/tenants/${tenantId}/catalog-imports/${importId}/rollback/preview`,
     {
       method: "POST",
+      headers: portalActorHeaders(actor),
       body: JSON.stringify({})
     }
   );
@@ -5316,12 +5325,13 @@ export async function executePortalCatalogImportRollback(
     idempotencyKey: string;
     force?: boolean;
     confirmForceDelete?: boolean;
-    actor?: { id?: string | null; name?: string | null };
+    actor?: PortalInventoryReadActor;
   }
 ) {
   const headers = new Headers();
   if (payload?.actor?.id) headers.set("x-portal-actor-id", payload.actor.id);
   if (payload?.actor?.name) headers.set("x-portal-actor-name", payload.actor.name);
+  if (payload?.actor?.globalRole) headers.set("x-portal-actor-global-role", payload.actor.globalRole);
   return backendPortalFetch<{ success: boolean; data: PortalCatalogBulkDeleteExecution }>(
     `/portal/tenants/${tenantId}/catalog-imports/${importId}/rollback`,
     {
@@ -5336,18 +5346,18 @@ export async function executePortalCatalogImportRollback(
   );
 }
 
-export async function downloadPortalCatalogImportErrors(tenantId: string, importId: string) {
+export async function downloadPortalCatalogImportErrors(tenantId: string, importId: string, actor: PortalInventoryReadActor) {
   const apiBase = getApiBase();
   const portalKey = getPortalInternalKey();
   if (!apiBase) throw new Error("API base URL is not configured");
   if (!portalKey) throw new Error("PORTAL_INTERNAL_KEY is not configured");
 
+  const actorHeaders = portalActorHeaders(actor);
+  actorHeaders.set("x-portal-key", portalKey);
   const response = await fetch(`${apiBase}/portal/tenants/${tenantId}/catalog-imports/${importId}/errors`, {
     method: "GET",
     cache: "no-store",
-    headers: {
-      "x-portal-key": portalKey
-    }
+    headers: actorHeaders
   });
 
   if (!response.ok) {
@@ -5358,18 +5368,18 @@ export async function downloadPortalCatalogImportErrors(tenantId: string, import
   return response.arrayBuffer();
 }
 
-export async function downloadPortalCatalogImportTemplate(tenantId: string) {
+export async function downloadPortalCatalogImportTemplate(tenantId: string, actor: PortalInventoryReadActor) {
   const apiBase = getApiBase();
   const portalKey = getPortalInternalKey();
   if (!apiBase) throw new Error("API base URL is not configured");
   if (!portalKey) throw new Error("PORTAL_INTERNAL_KEY is not configured");
 
+  const actorHeaders = portalActorHeaders(actor);
+  actorHeaders.set("x-portal-key", portalKey);
   const response = await fetch(`${apiBase}/portal/tenants/${tenantId}/catalog-imports/template`, {
     method: "GET",
     cache: "no-store",
-    headers: {
-      "x-portal-key": portalKey
-    }
+    headers: actorHeaders
   });
 
   if (!response.ok) {

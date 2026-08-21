@@ -6,7 +6,7 @@ import {
   isBackendConfigured,
   patchPortalSupplier
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -18,10 +18,8 @@ function backendUnavailable() {
 }
 
 function actorFromTenantContext(tenantContext: Awaited<ReturnType<typeof resolveAppTenant>>) {
-  return {
-    id: tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId || null,
-    name: tenantContext.ctx?.session?.user?.name || null
-  };
+  if (!("ctx" in tenantContext) || !tenantContext.ctx) return {};
+  return getPortalInventoryReadActor(tenantContext.ctx);
 }
 
 async function requireSuppliersReadModuleApi() {
@@ -39,7 +37,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ su
 
   try {
     const { supplierId } = await context.params;
-    const result = await getPortalSupplierDetail(tenantContext.tenantId, supplierId);
+    const result = await getPortalSupplierDetail(tenantContext.tenantId, supplierId, actorFromTenantContext(tenantContext));
     return noStore(NextResponse.json({ readOnly: tenantContext.readOnly, supplier: result.data }));
   } catch (error) {
     const backendBody = getBackendErrorBody(error);

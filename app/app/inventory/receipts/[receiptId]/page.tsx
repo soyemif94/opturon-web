@@ -1,6 +1,6 @@
 import { PurchaseReceiptDetail } from "@/components/app/PurchaseReceiptDetail";
 import { getPortalPurchaseReceiptDetail, isBackendConfigured, type PortalPurchaseReceiptDetail } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -21,7 +21,7 @@ export default async function InventoryReceiptDetailPage({ params }: { params: P
 
   let receipt: PortalPurchaseReceiptDetail | null = null;
   try {
-    const result = await getPortalPurchaseReceiptDetail(ctx.tenantId, receiptId);
+    const result = await getPortalPurchaseReceiptDetail(ctx.tenantId, receiptId, getPortalInventoryReadActor(ctx));
     receipt = result.data || null;
   } catch {
     receipt = null;

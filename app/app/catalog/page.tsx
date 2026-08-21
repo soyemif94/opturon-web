@@ -12,7 +12,7 @@ import {
   type PortalProductCategory
 } from "@/lib/api";
 import { CATALOG_OPERATIONS_PAGE_SIZE } from "@/lib/catalog-operations";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
 const EMPTY_DATA: PortalCatalogOperationsData = {
   tenantId: "",
@@ -37,9 +37,10 @@ export default async function CatalogPage() {
   let initialLoadFailed = false;
 
   if (ctx.tenantId && isBackendConfigured()) {
+    const actor = getPortalInventoryReadActor(ctx);
     const [workspaceResult, categoriesResult] = await Promise.allSettled([
-      getPortalCatalogWorkspace(ctx.tenantId, { page: 1, pageSize: CATALOG_OPERATIONS_PAGE_SIZE }),
-      getPortalProductCategories(ctx.tenantId)
+      getPortalCatalogWorkspace(ctx.tenantId, { page: 1, pageSize: CATALOG_OPERATIONS_PAGE_SIZE }, actor),
+      getPortalProductCategories(ctx.tenantId, undefined, actor)
     ]);
     if (workspaceResult.status === "fulfilled") {
       initialData = workspaceResult.value.data;

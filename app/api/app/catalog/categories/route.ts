@@ -7,7 +7,7 @@ import {
   isBackendConfigured,
   type PortalProductCategory
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   try {
     const result = await getPortalProductCategories(tenantContext.tenantId, {
       includeInactive: url.searchParams.get("includeInactive") === "true"
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx));
     const categories = Array.isArray(result.data?.categories) ? result.data.categories.map(serializeCategory) : [];
     return noStore(
       NextResponse.json({
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const result = await createPortalProductCategory(tenantContext.tenantId, {
       name: String(body?.name || "").trim(),
       isActive: body?.isActive !== false
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx));
 
     return noStore(NextResponse.json({ ok: true, category: serializeCategory(result.data) }, { status: 201 }));
   } catch (error) {

@@ -23,8 +23,8 @@ export default async function InventoryReceiptsPage() {
     try {
       const inventoryReadActor = getPortalInventoryReadActor(ctx);
       const [receiptsResult, suppliersResult, locationsResult] = await Promise.all([
-        getPortalPurchaseReceipts(ctx.tenantId, { page: 1, pageSize: 20, sort: "receivedAt_desc" }),
-        getPortalSuppliers(ctx.tenantId, { page: 1, pageSize: 100, status: "all", sort: "name_asc" }),
+        getPortalPurchaseReceipts(ctx.tenantId, { page: 1, pageSize: 20, sort: "receivedAt_desc" }, inventoryReadActor),
+        getPortalSuppliers(ctx.tenantId, { page: 1, pageSize: 100, status: "all", sort: "name_asc" }, inventoryReadActor),
         getPortalInventoryLocations(ctx.tenantId, inventoryReadActor)
       ]);
       receipts = Array.isArray(receiptsResult.data?.items) ? receiptsResult.data.items : [];

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendErrorStatus, isBackendConfigured, patchPortalProductStatus, type PortalProduct } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json().catch(() => null);
     const result = await patchPortalProductStatus(tenantContext.tenantId, id, {
       status: String(body?.status || "")
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ok: true, product: serializeProduct(result.data) }));
   } catch (error) {
     return noStore(

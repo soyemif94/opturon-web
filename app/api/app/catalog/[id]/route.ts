@@ -8,7 +8,7 @@ import {
   patchPortalProduct,
   type PortalProduct
 } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   try {
-    const result = await getPortalProductDetail(tenantContext.tenantId, id);
+    const result = await getPortalProductDetail(tenantContext.tenantId, id, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ product: serializeProduct(result.data) }));
   } catch (error) {
     return noStore(
@@ -87,7 +87,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body?.status !== undefined) payload.status = String(body.status);
     if (body?.active !== undefined && body?.status === undefined) payload.status = body.active ? "active" : "inactive";
 
-    const result = await patchPortalProduct(tenantContext.tenantId, id, payload);
+    const result = await patchPortalProduct(tenantContext.tenantId, id, payload, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ok: true, product: serializeProduct(result.data) }));
   } catch (error) {
     return noStore(
@@ -119,7 +119,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       acknowledgedReferences: body?.acknowledgedReferences === true,
       actor: {
         id: tenantContext.ctx.portalActorId || null,
-        name: tenantContext.ctx.session?.user?.name || null
+        name: tenantContext.ctx.session?.user?.name || null,
+        globalRole: tenantContext.ctx.globalRole || null
       }
     });
     return noStore(NextResponse.json({

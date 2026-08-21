@@ -7,7 +7,7 @@ import {
   isBackendConfigured,
   type PortalProduct
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   if (!isBackendConfigured()) return backendUnavailable();
 
   try {
-    const result = await getPortalProducts(tenantContext.tenantId);
+    const result = await getPortalProducts(tenantContext.tenantId, getPortalInventoryReadActor(tenantContext.ctx));
     const products = Array.isArray(result.data?.products) ? result.data.products.map(serializeProduct) : [];
     return noStore(
       NextResponse.json({
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
           : body?.active === false
             ? "inactive"
             : "active"
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx));
 
     return noStore(NextResponse.json({ ok: true, product: serializeProduct(result.data) }, { status: 201 }));
   } catch (error) {

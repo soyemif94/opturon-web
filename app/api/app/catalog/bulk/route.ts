@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPortalProductsBulk, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => null);
-    const result = await createPortalProductsBulk(tenantContext.tenantId, body || {});
+    const result = await createPortalProductsBulk(tenantContext.tenantId, body || {}, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(
       NextResponse.json({
         ok: true,

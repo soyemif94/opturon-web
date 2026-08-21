@@ -8,7 +8,7 @@ import {
   type PortalCatalogStatusFilter,
   type PortalCatalogStockFilter
 } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       categoryId: url.searchParams.get("categoryId") || undefined,
       page: Number(url.searchParams.get("page") || 1),
       pageSize: Number(url.searchParams.get("pageSize") || 50)
-    });
+    }, getPortalInventoryReadActor(tenantContext.ctx));
     return noStore(NextResponse.json({ ...result.data, readOnly: tenantContext.readOnly }));
   } catch (error) {
     const body = getBackendErrorBody(error);

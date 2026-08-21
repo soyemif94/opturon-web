@@ -2,7 +2,7 @@ import { ClientPageShell } from "@/components/app/client-page-shell";
 import { ProductEditor } from "@/components/app/ProductEditor";
 import { canManageCatalog } from "@/lib/app-permissions";
 import { getPortalProductDetail, isBackendConfigured } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppPage } from "@/lib/saas/access";
 
 export default async function CatalogProductEditPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireAppPage();
@@ -12,7 +12,7 @@ export default async function CatalogProductEditPage({ params }: { params: Promi
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
-      const result = await getPortalProductDetail(ctx.tenantId, id);
+      const result = await getPortalProductDetail(ctx.tenantId, id, getPortalInventoryReadActor(ctx));
       product = result.data;
     } catch {
       product = null;

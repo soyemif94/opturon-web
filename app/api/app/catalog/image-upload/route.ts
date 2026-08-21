@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiBaseUrl, isBackendConfigured } from "@/lib/api";
-import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
+import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
   if (moduleGuard.error) return moduleGuard.error;
   const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
+  if (!tenantContext.ctx) return noStore(NextResponse.json({ error: "tenant_context_required" }, { status: 403 }));
   if (!isBackendConfigured()) return backendUnavailable();
 
   const portalKey = String(process.env.PORTAL_INTERNAL_KEY || "").trim();
@@ -34,10 +35,15 @@ export async function POST(request: NextRequest) {
     const backendFormData = new FormData();
     backendFormData.set("file", file, file.name || "product-image");
 
+    const actor = getPortalInventoryReadActor(tenantContext.ctx);
+    if (!actor.id) return noStore(NextResponse.json({ error: "portal_inventory_read_actor_required" }, { status: 403 }));
     const response = await fetch(`${getApiBaseUrl()}/portal/tenants/${tenantContext.tenantId}/products/image-upload`, {
       method: "POST",
       headers: {
-        "x-portal-key": portalKey
+        "x-portal-key": portalKey,
+        "x-portal-actor-id": actor.id,
+        ...(actor.name ? { "x-portal-actor-name": actor.name } : {}),
+        ...(actor.globalRole ? { "x-portal-actor-global-role": actor.globalRole } : {})
       },
       body: backendFormData,
       cache: "no-store"
