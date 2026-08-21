@@ -14,7 +14,7 @@ assert.match(wizard, /function getGuidedStage\(step: Step\)/);
 assert.match(wizard, /stageNumber === 1 \? \(file \? 2 : 1\) : stageNumber === 2 \? 4 : 5/);
 
 assert.match(wizard, /Importar productos/);
-assert.match(wizard, /Subí tu archivo y Opturon preparará los productos por vos\. Nada se guardará hasta que confirmes\./);
+assert.match(wizard, /Subí tu archivo y Opturon preparará los productos para que los revises antes de confirmar\./);
 assert.doesNotMatch(wizard, /Importación masiva de catálogo/);
 assert.doesNotMatch(wizard, /Actualizar vista previa/);
 assert.doesNotMatch(wizard, /Mapeo manual/);

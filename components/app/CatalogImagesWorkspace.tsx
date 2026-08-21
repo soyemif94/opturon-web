@@ -28,14 +28,16 @@ const FILTERS: Array<{ value: PortalCatalogImageFilter; label: string }> = [
 
 export function CatalogImagesWorkspace({
   initialData,
-  readOnly
+  readOnly,
+  initialSearch = ""
 }: {
   initialData: PortalCatalogImageWorkspaceData;
   readOnly: boolean;
+  initialSearch?: string;
 }) {
   const [data, setData] = useState(initialData);
-  const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [imageFilter, setImageFilter] = useState<PortalCatalogImageFilter>("all");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);

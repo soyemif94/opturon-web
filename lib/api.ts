@@ -3508,6 +3508,29 @@ export type PortalCatalogImageWorkspaceData = {
   products: PortalProduct[];
 };
 
+export type PortalCatalogStockFilter = "all" | "with_stock" | "without_stock";
+export type PortalCatalogStatusFilter = "all" | "active" | "archived";
+
+export type PortalCatalogOperationsData = {
+  tenantId: string;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  summary: {
+    totalProducts: number;
+    withStock: number;
+    withoutStock: number;
+    withImage: number;
+    withoutImage: number;
+    activeProducts: number;
+    archivedProducts: number;
+  };
+  products: PortalProduct[];
+};
+
 export async function getPortalProductImages(
   tenantId: string,
   options?: {
@@ -3525,6 +3548,32 @@ export async function getPortalProductImages(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return backendPortalFetch<{ success: boolean; data: PortalCatalogImageWorkspaceData }>(
     `/portal/tenants/${tenantId}/products/images${suffix}`
+  );
+}
+
+export async function getPortalCatalogWorkspace(
+  tenantId: string,
+  options?: {
+    search?: string;
+    stockFilter?: PortalCatalogStockFilter;
+    imageFilter?: PortalCatalogImageFilter;
+    statusFilter?: PortalCatalogStatusFilter;
+    categoryId?: string;
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.search) params.set("search", options.search);
+  if (options?.stockFilter && options.stockFilter !== "all") params.set("stockFilter", options.stockFilter);
+  if (options?.imageFilter && options.imageFilter !== "all") params.set("imageFilter", options.imageFilter);
+  if (options?.statusFilter && options.statusFilter !== "all") params.set("statusFilter", options.statusFilter);
+  if (options?.categoryId) params.set("categoryId", options.categoryId);
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogOperationsData }>(
+    `/portal/tenants/${tenantId}/products/workspace${suffix}`
   );
 }
 

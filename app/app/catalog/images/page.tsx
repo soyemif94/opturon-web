@@ -18,14 +18,17 @@ const EMPTY_DATA: PortalCatalogImageWorkspaceData = {
   products: []
 };
 
-export default async function CatalogImagesPage() {
+export default async function CatalogImagesPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
   const ctx = await requireAppModulePage("catalog");
+  const params = await searchParams;
+  const initialSearch = String(params.search || "").trim().slice(0, 200);
   const readOnly = !canManageCatalog(ctx);
   let initialData = EMPTY_DATA;
 
   if (ctx.tenantId && isBackendConfigured()) {
     try {
       const result = await getPortalProductImages(ctx.tenantId, {
+        search: initialSearch || undefined,
         imageFilter: "all",
         page: 1,
         pageSize: CATALOG_IMAGE_PAGE_SIZE
@@ -49,7 +52,7 @@ export default async function CatalogImagesPage() {
         </Button>
       }
     >
-      <CatalogImagesWorkspace initialData={initialData} readOnly={readOnly} />
+      <CatalogImagesWorkspace initialData={initialData} readOnly={readOnly} initialSearch={initialSearch} />
     </ClientPageShell>
   );
 }
