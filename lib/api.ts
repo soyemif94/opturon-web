@@ -3490,6 +3490,44 @@ export async function getPortalProducts(tenantId: string) {
   }>(`/portal/tenants/${tenantId}/products`, undefined, false);
 }
 
+export type PortalCatalogImageFilter = "all" | "with_image" | "without_image";
+
+export type PortalCatalogImageWorkspaceData = {
+  tenantId: string;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  summary: {
+    totalProducts: number;
+    withImage: number;
+    withoutImage: number;
+  };
+  products: PortalProduct[];
+};
+
+export async function getPortalProductImages(
+  tenantId: string,
+  options?: {
+    search?: string;
+    imageFilter?: PortalCatalogImageFilter;
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  const params = new URLSearchParams();
+  if (options?.search) params.set("search", options.search);
+  if (options?.imageFilter) params.set("imageFilter", options.imageFilter);
+  if (options?.page) params.set("page", String(options.page));
+  if (options?.pageSize) params.set("pageSize", String(options.pageSize));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return backendPortalFetch<{ success: boolean; data: PortalCatalogImageWorkspaceData }>(
+    `/portal/tenants/${tenantId}/products/images${suffix}`
+  );
+}
+
 export type PortalInventoryReadActor = {
   id?: string | null;
   name?: string | null;
@@ -4829,13 +4867,12 @@ export async function patchPortalProduct(
     metadata?: Record<string, unknown>;
   }
 ) {
-  return backendFetch<{ success: boolean; data: PortalProduct }>(
+  return backendPortalFetch<{ success: boolean; data: PortalProduct }>(
     `/portal/tenants/${tenantId}/products/${productId}`,
     {
       method: "PATCH",
       body: JSON.stringify(payload)
-    },
-    false
+    }
   );
 }
 

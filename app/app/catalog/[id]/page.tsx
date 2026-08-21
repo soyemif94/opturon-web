@@ -215,7 +215,7 @@ function ProductImagePreview({
   name: string;
 }) {
   if (image?.url) {
-    return <img src={image.url} alt={image.alt || name || "Imagen del producto"} className="aspect-[16/10] w-full object-cover" loading="lazy" />;
+    return <img src={image.url} alt={image.alt || name || "Imagen del producto"} className="aspect-[16/10] w-full bg-surface/55 object-contain p-4" loading="lazy" />;
   }
 
   return (

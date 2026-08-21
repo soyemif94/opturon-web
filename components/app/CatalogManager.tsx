@@ -10,6 +10,8 @@ import {
   ChevronUp,
   Download,
   FolderCog,
+  History,
+  Images,
   Package,
   PencilLine,
   Plus,
@@ -279,6 +281,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   const [forceDeleting, setForceDeleting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
+  const [importsHistoryOpen, setImportsHistoryOpen] = useState(false);
+  const [importsHistoryLoading, setImportsHistoryLoading] = useState(false);
   const [bulkDeletePreview, setBulkDeletePreview] = useState<BulkDeletePreview | null>(null);
   const [bulkDeleteSelection, setBulkDeleteSelection] = useState<BulkSelectionPayload | null>(null);
   const [bulkDeletePhrase, setBulkDeletePhrase] = useState("");
@@ -437,9 +441,11 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   }, [currentPage, totalPages]);
 
   useEffect(() => {
+    if (!importsHistoryOpen) return;
     let cancelled = false;
 
     async function loadRecentImports() {
+      setImportsHistoryLoading(true);
       try {
         const response = await fetch("/api/app/catalog/imports?limit=6", { cache: "no-store" });
         const json = await response.json().catch(() => null);
@@ -447,6 +453,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
         if (!cancelled) setRecentImports(Array.isArray(json?.imports) ? json.imports : []);
       } catch {
         if (!cancelled) setRecentImports([]);
+      } finally {
+        if (!cancelled) setImportsHistoryLoading(false);
       }
     }
 
@@ -454,7 +462,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [importsHistoryOpen]);
 
   function hydrateDraft(product?: Product | null): Draft {
     return {
@@ -1789,16 +1797,30 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
           </CardContent>
         </Card>
 
-        {recentImports.length > 0 ? (
+        {importsHistoryOpen ? (
           <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_18px_40px_rgba(3,8,16,0.24)]">
-            <CardHeader>
+            <CardHeader
+              action={
+                <Button type="button" variant="ghost" size="sm" onClick={() => setImportsHistoryOpen(false)}>
+                  Cerrar historial
+                </Button>
+              }
+            >
               <div>
                 <CardTitle className="text-xl">Cargas recientes</CardTitle>
                 <CardDescription>Deshacer carga elimina sólo productos creados por ese batch. No revierte actualizaciones previas en esta fase.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
-              {recentImports.map((item) => (
+              {importsHistoryLoading ? (
+                <div className="rounded-2xl border border-dashed border-white/8 bg-surface/45 p-4 text-sm text-muted">
+                  Cargando historial...
+                </div>
+              ) : recentImports.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/8 bg-surface/45 p-4 text-sm text-muted">
+                  No hay cargas recientes para mostrar.
+                </div>
+              ) : recentImports.map((item) => (
                 <div key={item.importId} className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-surface/45 p-4 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -2138,6 +2160,8 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
               disabled={readOnly}
             />
             <QuickActionButton title="Importar archivo" description="Excel, CSV o TXT" onClick={() => scrollToSection("catalog-file-import")} disabled={readOnly} />
+            <QuickActionButton title="Imágenes de productos" description="Carga rápida en una grilla" href="/app/catalog/images" />
+            <QuickActionButton title="Historial de cargas" description="Revisar y deshacer imports" onClick={() => setImportsHistoryOpen(true)} />
             <QuickActionButton title="Carga rápida por texto" description="Pegá varias líneas" onClick={openWorkspaceForBulkImport} disabled={readOnly} />
             <QuickActionButton title="Exportar catalogo" description="Excel compatible" onClick={exportVisibleProducts} />
             <QuickActionButton title="Gestion de categorias" description="Orden comercial" onClick={() => scrollToSection("catalog-categories")} />
@@ -2404,6 +2428,16 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button asChild type="button" variant="secondary" size="sm">
+              <Link href="/app/catalog/images">
+                <Images className="mr-2 h-4 w-4" />
+                Imágenes de productos
+              </Link>
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setImportsHistoryOpen((current) => !current)}>
+              <History className="mr-2 h-4 w-4" />
+              Historial de cargas
+            </Button>
             <Button type="button" variant="secondary" size="sm" onClick={exportVisibleProducts}>
               <Download className="mr-2 h-4 w-4" />
               Exportar Excel
@@ -2839,10 +2873,10 @@ function CatalogProductImage({
   const alt = image?.alt || product?.name || "Imagen del producto";
   const className =
     size === "detail"
-      ? "aspect-[16/10] w-full object-cover"
+      ? "aspect-[16/10] w-full bg-surface/55 object-contain p-4"
       : size === "lg"
-        ? "h-40 w-full rounded-2xl object-cover"
-        : "h-24 w-24 shrink-0 rounded-[22px] object-cover";
+        ? "h-40 w-full rounded-2xl bg-surface/55 object-contain p-3"
+        : "h-24 w-24 shrink-0 rounded-[22px] bg-surface/55 object-contain p-2";
   const fallbackClassName =
     size === "detail"
       ? "flex aspect-[16/10] w-full items-center justify-center bg-[linear-gradient(135deg,rgba(176,80,0,0.18),rgba(255,255,255,0.04))] text-sm font-medium text-muted"
@@ -2854,7 +2888,7 @@ function CatalogProductImage({
     return <img src={image?.url || ""} alt={alt} className={className} loading="lazy" />;
   }
 
-  return <div className={fallbackClassName}>{size === "sm" ? "Sin imagen" : "Preview no disponible"}</div>;
+  return <div className={fallbackClassName}>Sin imagen</div>;
 }
 
 function formatCurrency(value: number, currency = "ARS") {

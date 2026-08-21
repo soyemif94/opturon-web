@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiBaseUrl, isBackendConfigured } from "@/lib/api";
-import { resolveAppTenant } from "@/lib/saas/access";
+import { requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 function noStore(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
@@ -12,6 +12,8 @@ function backendUnavailable() {
 }
 
 export async function POST(request: NextRequest) {
+  const moduleGuard = await requireAppModuleApi("catalog", { permission: "manage_catalog" });
+  if (moduleGuard.error) return moduleGuard.error;
   const tenantContext = await resolveAppTenant({ permission: "manage_catalog", requireWrite: true });
   if (tenantContext.error) return tenantContext.error;
   if (!isBackendConfigured()) return backendUnavailable();
