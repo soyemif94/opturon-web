@@ -21,7 +21,8 @@ assert.match(list, /FILTERS\.map/);
 assert.match(list, /Limpiar filtros/);
 assert.match(list, /loading && hasLoaded/);
 assert.match(list, /Actualizando…/);
-assert.match(row, /rounded-xl border px-2\.5 py-2\.5/);
+assert.match(row, /min-h-\[4\.5rem\].*border-b/);
+assert.doesNotMatch(row, /<InboxBadge/);
 assert.match(row, /aria-current=\{selected \? "true"/);
 assert.match(row, /profileImageUrl/);
 assert.match(row, /mensajes sin leer/);
@@ -49,20 +50,28 @@ assert.match(composer, /aria-label="Abrir templates"/);
 assert.match(composer, /aria-label="Enviar mensaje"/);
 assert.match(composer, /Enter envía/);
 
-// Context and responsive contracts: persistent at 2xl, drawer below, single-column mobile.
-assert.match(profile, /Identidad y estado/);
-assert.match(profile, /Configuracion del bot/);
-assert.match(profile, /Responsable actual/);
-assert.match(profile, /Proxima accion/);
+// Context and responsive contracts: flat sections, progressive disclosure and responsive drawer.
+assert.doesNotMatch(profile, /<CardSection/);
+assert.match(profile, /Contexto comercial/);
+assert.match(profile, /Configuración del bot/);
+assert.match(profile, /Propietario/);
+assert.match(profile, /Próxima acción/);
 assert.match(profile, /Notas/);
 assert.match(profile, /Tareas/);
-assert.match(layout, /xl:grid-cols-\[minmax\(300px,0\.78fr\)_minmax\(0,1\.72fr\)\]/);
-assert.match(layout, /2xl:grid-cols-\[minmax\(320px,0\.82fr\)_minmax\(0,1\.58fr\)_minmax\(300px,0\.76fr\)\]/);
+assert.match(profile, /<details/);
+assert.match(profile, /Atajos/);
+assert.match(layout, /xl:grid-cols-\[minmax\(280px,320px\)_minmax\(0,1fr\)\]/);
+assert.match(layout, /2xl:grid-cols-\[minmax\(290px,330px\)_minmax\(0,1fr\)_minmax\(280px,320px\)\]/);
+assert.match(layout, /xl:border-r/);
+assert.match(layout, /overflow-hidden border-l border-\[color:var\(--border\)\] 2xl:block/);
 assert.match(layout, /role="dialog"/);
 assert.match(layout, /aria-modal="true"/);
 assert.match(layout, /2xl:hidden/);
 assert.match(layout, /Volver a conversaciones/);
 assert.match(workspace, /contextOpen=\{contextOpen\}/);
 assert.match(workspace, /setContextOpen\(false\)/);
+assert.match(workspace, /headerAction=\{[\s\S]*?<WhatsAppChatImportModal[\s\S]*?compact/);
+assert.doesNotMatch(workspace, /<h1[^>]*>Inbox<\/h1>/);
+assert.match(composer, /bg-transparent/);
 
 console.log("inbox-uiux-harmonization-ui.test.ts passed");

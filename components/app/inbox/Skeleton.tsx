@@ -26,9 +26,9 @@ export function ConversationListSkeleton() {
 
 export function ProfileSkeleton() {
   return (
-    <div className="space-y-2.5">
+    <div className="divide-y divide-[color:var(--border)]">
       {Array.from({ length: 4 }).map((_, idx) => (
-        <div key={`profile-skeleton-${idx}`} className="rounded-xl border border-[color:var(--border)] p-3">
+        <div key={`profile-skeleton-${idx}`} className="px-4 py-4">
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="mt-3 h-3 w-4/5" />
           <Skeleton className="mt-2 h-3 w-3/5" />

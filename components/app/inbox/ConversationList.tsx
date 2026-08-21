@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronUp, MessageSquareText, Search, SlidersHorizontal } from "lucide-react";
+import { MessageSquareText, Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ConversationRow } from "@/components/app/inbox/ConversationRow";
 import { sortConversationsByPriority } from "@/components/app/inbox/conversation-priority";
@@ -21,6 +22,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 
 export function ConversationList({
   rows,
+  headerAction,
   loading,
   hasLoaded,
   errorMessage,
@@ -49,6 +51,7 @@ export function ConversationList({
   restoreBusy
 }: {
   rows: ConversationRowData[];
+  headerAction?: ReactNode;
   loading: boolean;
   hasLoaded: boolean;
   errorMessage?: string | null;
@@ -104,17 +107,20 @@ export function ConversationList({
         : "Cuando entren mensajes o limpies filtros, las conversaciones apareceran aca para operarlas.";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card/65 shadow-[0_18px_55px_rgba(0,0,0,0.2)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card/25">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/55 px-3 py-2.5 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">Conversaciones</h2>
-            <p className="mt-0.5 text-[11px] text-muted">{visibleRows.length} visibles · {selectedIds.length ? `${selectedIds.length} seleccionadas` : channel === "instagram" ? "Instagram" : "WhatsApp"}</p>
+            <h1 className="text-sm font-semibold">Conversaciones</h1>
+            <p className="mt-0.5 text-[10px] text-muted">{visibleRows.length} visibles{selectedIds.length ? ` · ${selectedIds.length} seleccionadas` : ""}</p>
           </div>
-          {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
+          <div className="flex items-center gap-1.5">
+            {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
+            {headerAction}
+          </div>
         </div>
 
-        <label className="mt-3 flex h-9 items-center gap-2 rounded-xl border border-[color:var(--border)] bg-bg/70 px-3 focus-within:border-brand/40">
+        <label className="mt-2.5 flex h-9 items-center gap-2 rounded-lg border border-[color:var(--border)] bg-bg/55 px-3 focus-within:border-brand/40">
           <Search className="h-4 w-4 text-muted" />
           <input
             value={search}
@@ -125,12 +131,12 @@ export function ConversationList({
           />
         </label>
 
-        <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-[color:var(--border)] bg-bg/55 p-1" aria-label="Canal">
+        <div className="mt-2 flex items-center gap-1.5" aria-label="Filtros de conversaciones">
           <button
             type="button"
             onClick={() => onChannelChange("whatsapp")}
-            className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${
-              channel === "whatsapp" ? "bg-card text-text shadow-sm" : "text-muted hover:text-text"
+            className={`inline-flex h-7 items-center rounded-full border px-2.5 text-[10px] font-medium transition ${
+              channel === "whatsapp" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100" : "border-[color:var(--border)] text-muted hover:text-text"
             }`}
           >
             WhatsApp
@@ -138,50 +144,53 @@ export function ConversationList({
           <button
             type="button"
             onClick={() => onChannelChange("instagram")}
-            className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${
-              channel === "instagram" ? "bg-card text-text shadow-sm" : "text-muted hover:text-text"
+            className={`inline-flex h-7 items-center rounded-full border px-2.5 text-[10px] font-medium transition ${
+              channel === "instagram" ? "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-100" : "border-[color:var(--border)] text-muted hover:text-text"
             }`}
           >
             Instagram
           </button>
-        </div>
-
-        <div className="mt-2 flex items-center gap-1.5">
-          <button type="button" onClick={() => onVisibilityChange("active")}><InboxBadge active={!showingArchived}>Activas</InboxBadge></button>
-          <button type="button" onClick={() => onVisibilityChange("archived")}><InboxBadge active={showingArchived}>Archivadas</InboxBadge></button>
-          {(filter !== "all" || search.trim()) ? <button type="button" onClick={onClearFilters} className="ml-auto text-[10px] text-muted underline-offset-2 hover:text-text hover:underline">Limpiar</button> : null}
-        </div>
-
-        <div className="mt-2 rounded-xl border border-[color:var(--border)] bg-card/40">
+          <select
+            value={visibility}
+            onChange={(event) => onVisibilityChange(event.target.value as "active" | "archived")}
+            className="h-7 min-w-0 rounded-full border border-[color:var(--border)] bg-transparent px-2 text-[10px] text-muted outline-none"
+            aria-label="Visibilidad"
+          >
+            <option value="active">Activas</option>
+            <option value="archived">Archivadas</option>
+          </select>
           <button
             type="button"
             onClick={() => setFiltersExpanded((current) => !current)}
-            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+            className={`ml-auto inline-flex size-7 items-center justify-center rounded-full border transition ${filter !== "all" ? "border-brand/40 bg-brand/10 text-text" : "border-[color:var(--border)] text-muted hover:text-text"}`}
+            aria-label="Abrir filtros"
+            aria-expanded={filtersExpanded}
           >
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-muted">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filtros
-            </div>
-            <span className="inline-flex items-center gap-2 text-[10px] text-muted">
-              {FILTERS.find((item) => item.key === filter)?.label || "Todas"}
-              {filtersExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-            </span>
+            <SlidersHorizontal className="h-3.5 w-3.5" />
           </button>
-          {filtersExpanded ? (
-            <div className="border-t border-[color:var(--border)] px-3 pb-3 pt-2">
-              <div className="flex flex-wrap gap-1.5">
-                {FILTERS.map((item) => (
-                  <button key={item.key} type="button" onClick={() => onFilterChange(item.key)}>
-                    <InboxBadge active={filter === item.key}>{item.label}</InboxBadge>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
 
+        {filtersExpanded ? (
+          <div className="mt-2 border-t border-[color:var(--border)] pt-2">
+            <div className="flex flex-wrap gap-1.5">
+              {FILTERS.map((item) => (
+                <button key={item.key} type="button" onClick={() => onFilterChange(item.key)}>
+                  <InboxBadge active={filter === item.key}>{item.label}</InboxBadge>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {(filter !== "all" || search.trim()) ? (
+          <div className="mt-2 flex items-center justify-between border-t border-[color:var(--border)] pt-2 text-[10px] text-muted">
+            <span>{search.trim() ? `Búsqueda: ${search.trim()}` : `Filtro: ${FILTERS.find((item) => item.key === filter)?.label}`}</span>
+            <button type="button" onClick={onClearFilters} className="font-medium text-text hover:underline">Limpiar filtros</button>
+          </div>
+        ) : null}
+
         {selectedIds.length > 0 || showingArchived ? (
-          <div className="mt-2 rounded-xl border border-[color:var(--border)] bg-card/55 px-2.5 py-2">
+          <div className="mt-2 border-t border-[color:var(--border)] pt-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] text-muted">
                 {selectedIds.length > 0

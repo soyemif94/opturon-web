@@ -22,11 +22,11 @@ export function InboxLayout({
   onCloseContext?: () => void;
 }) {
   return (
-    <div className="relative flex min-h-0 flex-col pb-1 xl:h-[calc(100vh-10.75rem)] xl:min-h-[42rem]">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[minmax(300px,0.78fr)_minmax(0,1.72fr)] 2xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.58fr)_minmax(300px,0.76fr)]">
+    <div className="relative flex min-h-0 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20 xl:h-[calc(100vh-8.75rem)] xl:min-h-[44rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(290px,330px)_minmax(0,1fr)_minmax(280px,320px)]">
         <aside
           className={cn(
-            "min-h-[34rem] min-w-0 overflow-hidden xl:min-h-0",
+            "min-h-[34rem] min-w-0 overflow-hidden xl:min-h-0 xl:border-r xl:border-[color:var(--border)]",
             hasDetail ? "hidden xl:block xl:min-h-0" : "block xl:min-h-0"
           )}
         >
@@ -35,16 +35,16 @@ export function InboxLayout({
 
         <main
           className={cn(
-            "min-h-[34rem] min-w-0 flex-col gap-2 overflow-hidden xl:flex xl:min-h-0",
+            "min-h-[34rem] min-w-0 flex-col overflow-hidden xl:flex xl:min-h-0",
             hasDetail ? "flex" : "hidden xl:flex"
           )}
         >
           {onBackToList ? (
-            <div className="xl:hidden">
+            <div className="border-b border-[color:var(--border)] px-3 py-2 xl:hidden">
               <button
                 type="button"
                 onClick={onBackToList}
-                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-card/70 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-text"
+                className="inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted transition-colors hover:bg-muted/25 hover:text-text"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 Volver a conversaciones
@@ -57,12 +57,12 @@ export function InboxLayout({
 
         <aside
           className={cn(
-            "hidden min-h-0 min-w-0 overflow-hidden 2xl:block",
+            "hidden min-h-0 min-w-0 overflow-hidden border-l border-[color:var(--border)] 2xl:block",
             hasDetail ? "2xl:block" : "2xl:hidden"
           )}
         >
-          <section className="h-full min-h-[320px] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card/70 shadow-[0_18px_55px_rgba(0,0,0,0.2)]">
-            <div className="h-full overflow-y-auto p-3">{right}</div>
+          <section className="h-full min-h-[320px] overflow-hidden bg-surface/20">
+            <div className="h-full overflow-y-auto">{right}</div>
           </section>
         </aside>
       </div>

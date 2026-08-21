@@ -40,7 +40,13 @@ function warningLabel(value: { code?: string; message?: string } | string) {
   return value.message || value.code || "Advertencia";
 }
 
-export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversationId?: string | null) => void }) {
+export function WhatsAppChatImportModal({
+  onImported,
+  compact = false
+}: {
+  onImported?: (conversationId?: string | null) => void;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -133,10 +139,13 @@ export function WhatsAppChatImportModal({ onImported }: { onImported?: (conversa
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs font-medium text-muted transition hover:text-text"
+        className={compact
+          ? "inline-flex size-8 items-center justify-center rounded-lg border border-[color:var(--border)] text-muted transition hover:bg-muted/30 hover:text-text"
+          : "inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs font-medium text-muted transition hover:text-text"}
+        aria-label="Importar historial de WhatsApp"
       >
         <Upload className="h-3.5 w-3.5" />
-        Importar historial de WhatsApp
+        <span className={compact ? "sr-only" : ""}>Importar historial de WhatsApp</span>
       </button>
 
       {open ? (

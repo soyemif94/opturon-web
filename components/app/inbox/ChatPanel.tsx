@@ -98,8 +98,8 @@ export function ChatPanel({
   }, [detail?.conversation.id, lastTimelineKey, timeline.length]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card/65 shadow-[0_18px_55px_rgba(0,0,0,0.2)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/94 px-3 py-3 backdrop-blur sm:px-4">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card/10">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/45 px-3 py-2.5 backdrop-blur sm:px-4">
         {detail ? (
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -112,10 +112,11 @@ export function ChatPanel({
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <h2 className="truncate text-base font-semibold">{detail.contact?.name || detail.contact?.phone || "Conversacion"}</h2>
+                  <span className={`hidden h-5 shrink-0 items-center rounded-full border px-2 text-[9px] sm:inline-flex ${isInstagramConversation ? "border-fuchsia-400/25 text-fuchsia-100" : "border-emerald-400/25 text-emerald-100"}`}>{isInstagramConversation ? "Instagram" : "WhatsApp"}</span>
                   <span className={`size-2 shrink-0 rounded-full ${detail.conversation.botEnabled ? "bg-emerald-400" : "bg-amber-400"}`} aria-label={detail.conversation.botEnabled ? "Bot activo" : "Bot pausado"} />
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-muted">
-                  {isInstagramConversation ? "Instagram" : "WhatsApp"} · {statusLabel(detail)} · {detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}
+                  {statusLabel(detail)} · {detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}
                 </p>
               </div>
             </div>
@@ -151,7 +152,7 @@ export function ChatPanel({
 
       <div
         ref={scrollViewportRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.06),transparent_24%),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.02))] px-3 py-4 sm:px-4"
+        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] px-3 py-4 sm:px-5"
       >
         {loading && !detail ? (
           <div className="space-y-3">
@@ -234,7 +235,7 @@ export function ChatPanel({
       </div>
 
       {detail ? (
-        <div className="shrink-0 space-y-1.5 border-t border-[color:var(--border)] bg-surface/92 px-2.5 pb-2.5 pt-2 sm:px-3">
+        <div className="shrink-0 space-y-1.5 border-t border-[color:var(--border)] bg-surface/35 px-2.5 py-2 sm:px-3">
           {isInstagramConversation ? (
             <div className="rounded-[18px] border border-fuchsia-300/25 bg-fuchsia-300/10 px-3 py-2 text-xs text-fuchsia-50">
               Instagram esta disponible en modo lectura en esta etapa. Respuesta desde Instagram todavia no disponible.

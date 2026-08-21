@@ -1253,24 +1253,9 @@ export function InboxWorkspace({
   const shouldShowConnectionEmptyStateForChannel = channel === "whatsapp" && shouldRenderChannelEmptyState;
 
   return (
-    <div className="flex min-h-0 flex-col gap-2.5 text-sm">
-      <header className="shrink-0">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">Inbox</h1>
-            <p className="text-[11px] text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>
-          </div>
-          <WhatsAppChatImportModal
-            onImported={(conversationId) => {
-              void loadRows();
-              if (conversationId) setSelectedId(conversationId);
-            }}
-          />
-        </div>
-      </header>
-
+    <div className="flex min-h-0 flex-col text-sm">
       {readOnly ? (
-        <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 text-xs text-yellow-200">
+        <div className="mb-2 border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 text-xs text-yellow-200">
           Modo demo read-only activo.
         </div>
       ) : null}
@@ -1289,6 +1274,15 @@ export function InboxWorkspace({
           left={
             <ConversationList
               rows={rows}
+              headerAction={
+                <WhatsAppChatImportModal
+                  compact
+                  onImported={(conversationId) => {
+                    void loadRows();
+                    if (conversationId) setSelectedId(conversationId);
+                  }}
+                />
+              }
               loading={rowsLoading}
               hasLoaded={rowsLoaded}
               errorMessage={rowsError}

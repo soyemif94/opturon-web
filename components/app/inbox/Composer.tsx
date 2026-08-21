@@ -32,7 +32,7 @@ export function Composer({
   }, [quickReplies, templateSearch]);
 
   return (
-    <div className="sticky bottom-0 rounded-2xl border border-[color:var(--border)] bg-card/95 p-2 shadow-[0_-10px_28px_rgba(0,0,0,0.12)] backdrop-blur">
+    <div className="sticky bottom-0 bg-transparent">
       <div className="flex items-end gap-2">
         <div className="relative shrink-0">
           <button

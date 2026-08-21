@@ -45,7 +45,8 @@ function testInstagramReadOnlyComposer() {
   assert.match(workspaceSource, /detail\.conversation\.channelType === "instagram"/);
   assert.match(workspaceSource, /Respuesta desde Instagram todavia no disponible/);
   assert.match(rowSource, /row\.channelType === "instagram"/);
-  assert.match(rowSource, /Lectura/);
+  assert.match(rowSource, /const channelLabel = row\.channelType === "instagram" \? "Instagram" : "WhatsApp"/);
+  assert.match(rowSource, /aria-label=\{channelLabel\}/);
 }
 
 function run() {
