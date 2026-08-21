@@ -26,11 +26,21 @@ assert.match(chat, /aria-label="Mensajes de la conversación"/);
 assert.equal((layout.match(/app-scroll-surface/g) || []).length, 2);
 assert.match(layout, /aria-label="Contexto de la conversación"/);
 
-// Header and composer stay outside the thread viewport; desktop shell owns viewport height.
+// Header and composer stay outside the thread viewport.
 const chatViewport = chat.indexOf("ref={scrollViewportRef}");
 assert.ok(chat.indexOf("<header") < chatViewport);
 assert.ok(chat.indexOf("<Composer") > chatViewport);
+assert.match(chat, /flex h-full min-h-0 flex-col overflow-hidden/);
+assert.match(chat, /shrink-0 space-y-1\.5 border-t/);
+
+// Every intermediate desktop ancestor can shrink, so the scroll owners receive a bounded height.
 assert.match(shell, /isInboxRoute[\s\S]*?100dvh[\s\S]*?xl:overflow-hidden/);
-assert.match(layout, /xl:h-full/);
+assert.match(shell, /xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden/);
+assert.match(layout, /flex min-h-0 flex-col[^"]*xl:flex-1/);
+assert.match(layout, /grid min-h-0 flex-1/);
+assert.match(layout, /min-h-\[34rem\][^"]*xl:min-h-0/);
+assert.match(layout, /min-h-\[420px\][^"]*xl:min-h-0 xl:flex-1/);
+assert.match(list, /flex h-full min-h-0 flex-col overflow-hidden/);
+assert.match(list, /app-scroll-surface[^"]*min-h-0 flex-1[^"]*overflow-y-auto/);
 
 console.log("inbox-scroll-surfaces-ui.test.ts passed");

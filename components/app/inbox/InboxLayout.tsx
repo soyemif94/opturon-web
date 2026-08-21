@@ -22,7 +22,7 @@ export function InboxLayout({
   onCloseContext?: () => void;
 }) {
   return (
-    <div className="relative flex min-h-0 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20 xl:h-full">
+    <div className="relative flex min-h-0 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20 xl:flex-1">
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(290px,330px)_minmax(0,1fr)_minmax(280px,320px)]">
         <aside
           className={cn(

@@ -769,7 +769,7 @@ export function AppShell({
               className={cn(
                 "flex-1 min-h-0",
                 isInboxRoute
-                  ? "overflow-visible bg-[image:var(--panel-glow)] p-4 xl:overflow-hidden xl:p-6"
+                  ? "overflow-visible bg-[image:var(--panel-glow)] p-4 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden xl:p-6"
                   : "overflow-x-visible overflow-y-auto bg-[image:var(--panel-glow)] p-5 xl:p-8"
               )}
             >
