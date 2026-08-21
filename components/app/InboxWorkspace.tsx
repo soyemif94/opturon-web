@@ -98,6 +98,7 @@ export function InboxWorkspace({
   const [rowsLoaded, setRowsLoaded] = useState(false);
   const [rowsError, setRowsError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>(initialConversationId);
+  const [contextOpen, setContextOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -294,6 +295,7 @@ export function InboxWorkspace({
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
+      setContextOpen(false);
       return;
     }
     void loadDetail(selectedId);
@@ -1251,12 +1253,12 @@ export function InboxWorkspace({
   const shouldShowConnectionEmptyStateForChannel = channel === "whatsapp" && shouldRenderChannelEmptyState;
 
   return (
-    <div className="flex flex-col gap-3 text-sm">
+    <div className="flex min-h-0 flex-col gap-2.5 text-sm">
       <header className="shrink-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-base font-semibold">Inbox</h1>
-            <p className="text-xs text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>
+            <h1 className="text-lg font-semibold">Inbox</h1>
+            <p className="text-[11px] text-muted">Conversaciones, contexto comercial y seguimiento operativo.</p>
           </div>
           <WhatsAppChatImportModal
             onImported={(conversationId) => {
@@ -1278,7 +1280,12 @@ export function InboxWorkspace({
       ) : (
         <InboxLayout
           hasDetail={Boolean(selectedId)}
-          onBackToList={selectedId ? () => setSelectedId(undefined) : undefined}
+          contextOpen={contextOpen}
+          onCloseContext={() => setContextOpen(false)}
+          onBackToList={selectedId ? () => {
+            setContextOpen(false);
+            setSelectedId(undefined);
+          } : undefined}
           left={
             <ConversationList
               rows={rows}
@@ -1298,7 +1305,10 @@ export function InboxWorkspace({
                 setComposer("");
               }}
               onSearchChange={setSearch}
-              onSelect={setSelectedId}
+              onSelect={(id) => {
+                setContextOpen(false);
+                setSelectedId(id);
+              }}
               onMarkHot={(id) => void rowAction(id, "mark_hot")}
               onClose={(id) => void rowAction(id, "close")}
               readOnly={readOnly}
@@ -1341,6 +1351,7 @@ export function InboxWorkspace({
               onToggleBot={() => void runAction("toggle_bot")}
               onTakeConversation={() => void takeConversation()}
               onArchive={() => void runAction("close")}
+              onOpenContext={() => setContextOpen(true)}
               onBotFlowLockChange={(value) => void changeBotFlowLock(value)}
               onBotDomainOverrideChange={(value) => void changeBotDomainOverride(value)}
             />
@@ -1383,7 +1394,6 @@ export function InboxWorkspace({
                 void saveNextAction(selectedId, { nextActionAt: null, nextActionNote: null });
               }}
               onAssign={() => void reassignConversation()}
-              onToggleBot={() => void runAction("toggle_bot")}
               onMarkHot={() => void runAction("mark_hot")}
               onClose={() => void runAction("close")}
               onBotFlowLockChange={(value) => void changeBotFlowLock(value)}

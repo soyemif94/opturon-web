@@ -1,18 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Sparkles } from "lucide-react";
+import { Archive, Bot, Clock3, MoreHorizontal, PanelRight, Pause, Play, Sparkles, UserRound } from "lucide-react";
 import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
-import { InboxBadge } from "@/components/app/inbox/Badge";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
 import type { BotDomainOverride, BotFlowLock, DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
-
-function stageLabel(value?: string) {
-  if (!value) return "Sin etapa";
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 function statusLabel(detail: DetailPayload) {
   if (detail.conversation.status === "new") return "nueva";
@@ -36,6 +30,7 @@ type ChatPanelProps = {
   onToggleBot: () => void;
   onTakeConversation: () => void;
   onArchive: () => void;
+  onOpenContext: () => void;
   onBotFlowLockChange: (value: BotFlowLock) => void;
   onBotDomainOverrideChange: (value: BotDomainOverride) => void;
 };
@@ -51,7 +46,11 @@ export function ChatPanel({
   suggestions,
   onSelectSuggestion,
   autoSuggestions,
-  onRegenerateAutoSuggestions
+  onRegenerateAutoSuggestions,
+  onToggleBot,
+  onTakeConversation,
+  onArchive,
+  onOpenContext
 }: ChatPanelProps) {
   const COLLAPSED_TIMELINE_ITEMS = 12;
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -99,31 +98,50 @@ export function ChatPanel({
   }, [detail?.conversation.id, lastTimelineKey, timeline.length]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/94 px-4 py-4 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card/65 shadow-[0_18px_55px_rgba(0,0,0,0.2)]">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/94 px-3 py-3 backdrop-blur sm:px-4">
         {detail ? (
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <SimpleAvatar
                 src={detail.contact?.profileImageUrl}
                 name={detail.contact?.name || detail.contact?.phone || "Cliente"}
-                className="h-12 w-12 rounded-full border border-white/10 bg-brand/10 text-sm text-brandBright shadow-[0_14px_30px_rgba(0,0,0,0.2)]"
+                className="size-10 rounded-full border border-white/10 bg-brand/10 text-xs text-brandBright"
                 fallbackClassName="bg-brand/10 text-brandBright"
               />
               <div className="min-w-0">
-                <h2 className="truncate text-xl font-semibold">{detail.contact?.name || detail.contact?.phone || "Conversacion"}</h2>
-                <p className="mt-0.5 text-xs text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <h2 className="truncate text-base font-semibold">{detail.contact?.name || detail.contact?.phone || "Conversacion"}</h2>
+                  <span className={`size-2 shrink-0 rounded-full ${detail.conversation.botEnabled ? "bg-emerald-400" : "bg-amber-400"}`} aria-label={detail.conversation.botEnabled ? "Bot activo" : "Bot pausado"} />
+                </div>
+                <p className="mt-0.5 truncate text-[11px] text-muted">
+                  {isInstagramConversation ? "Instagram" : "WhatsApp"} · {statusLabel(detail)} · {detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}
+                </p>
               </div>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
-              <InboxBadge className={isInstagramConversation ? "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" : ""}>
-                {isInstagramConversation ? "Instagram" : "WhatsApp"}
-              </InboxBadge>
-              {detail.conversation.importedHistory ? <InboxBadge className="border-emerald-300/25 bg-emerald-300/10 text-emerald-100">Historial importado</InboxBadge> : null}
-              <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
-              {!detail.conversation.botEnabled ? <InboxBadge className="border-amber-400/30 bg-amber-400/10 text-amber-100">Bot pausado</InboxBadge> : null}
-              {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onToggleBot}
+                disabled={readOnly}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition disabled:opacity-40 ${detail.conversation.botEnabled ? "border-amber-400/25 bg-amber-400/8 text-amber-100 hover:bg-amber-400/14" : "border-emerald-400/25 bg-emerald-400/8 text-emerald-100 hover:bg-emerald-400/14"}`}
+                aria-label={detail.conversation.botEnabled ? "Pausar bot para esta conversación" : "Retomar bot para esta conversación"}
+              >
+                {detail.conversation.botEnabled ? <Pause aria-hidden="true" className="size-3.5" /> : <Play aria-hidden="true" className="size-3.5" />}
+                <span className="hidden sm:inline">{detail.conversation.botEnabled ? "Pausar bot" : "Retomar bot"}</span>
+              </button>
+              <button type="button" onClick={onOpenContext} className="inline-flex size-8 items-center justify-center rounded-full border border-[color:var(--border)] text-muted hover:text-text 2xl:hidden" aria-label="Abrir contexto del contacto">
+                <PanelRight aria-hidden="true" className="size-4" />
+              </button>
+              <details className="relative">
+                <summary className="inline-flex size-8 cursor-pointer list-none items-center justify-center rounded-full border border-[color:var(--border)] text-muted hover:text-text" aria-label="Más acciones">
+                  <MoreHorizontal aria-hidden="true" className="size-4" />
+                </summary>
+                <div className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-[color:var(--border)] bg-card p-1.5 shadow-xl">
+                  <button type="button" onClick={onTakeConversation} disabled={readOnly} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-muted/40 hover:text-text disabled:opacity-40"><UserRound aria-hidden="true" className="size-3.5" />Tomar para mí</button>
+                  <button type="button" onClick={onArchive} disabled={readOnly} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-muted/40 hover:text-text disabled:opacity-40"><Archive aria-hidden="true" className="size-3.5" />Archivar</button>
+                </div>
+              </details>
             </div>
           </div>
         ) : (
@@ -133,7 +151,7 @@ export function ChatPanel({
 
       <div
         ref={scrollViewportRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.07),transparent_22%),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.02))] px-4 py-5"
+        className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.06),transparent_24%),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.02))] px-3 py-4 sm:px-4"
       >
         {loading && !detail ? (
           <div className="space-y-3">
@@ -158,7 +176,7 @@ export function ChatPanel({
         ) : null}
 
         {detail ? (
-          <div className="space-y-3">
+          <div className="mx-auto max-w-4xl space-y-2.5">
             {loading ? (
               <div className="rounded-[18px] border border-[color:var(--border)] bg-card/55 px-3 py-2 text-[11px] text-muted">
                 Actualizando conversacion...
@@ -185,6 +203,14 @@ export function ChatPanel({
               </div>
             ) : null}
 
+            {!loading && timeline.length === 0 ? (
+              <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-card/35 px-5 text-center">
+                <Bot aria-hidden="true" className="size-6 text-muted" />
+                <p className="mt-3 text-sm font-semibold">Esta conversación todavía no tiene mensajes</p>
+                <p className="mt-1 text-xs text-muted">Cuando llegue o se envíe un mensaje, aparecerá en este hilo.</p>
+              </div>
+            ) : null}
+
             {visibleTimeline.map((item) =>
               item.kind === "message" ? (
                 <MessageBubble
@@ -194,6 +220,7 @@ export function ChatPanel({
                   text={item.payload.text}
                   caption={item.payload.caption}
                   timestamp={item.payload.timestamp}
+                  status={item.payload.status}
                   media={item.payload.media}
                   optimistic={Boolean(item.payload.optimistic)}
                 />
@@ -207,7 +234,7 @@ export function ChatPanel({
       </div>
 
       {detail ? (
-        <div className="shrink-0 space-y-2 border-t border-[color:var(--border)] bg-surface/90 px-3 pb-3 pt-2">
+        <div className="shrink-0 space-y-1.5 border-t border-[color:var(--border)] bg-surface/92 px-2.5 pb-2.5 pt-2 sm:px-3">
           {isInstagramConversation ? (
             <div className="rounded-[18px] border border-fuchsia-300/25 bg-fuchsia-300/10 px-3 py-2 text-xs text-fuchsia-50">
               Instagram esta disponible en modo lectura en esta etapa. Respuesta desde Instagram todavia no disponible.

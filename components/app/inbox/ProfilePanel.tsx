@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Clock3, Flag, History, PauseCircle, Phone, RotateCcw, Settings2, Tag, UserRound } from "lucide-react";
+import { Archive, Clock3, Flag, History, Phone, RotateCcw, Settings2, Tag, UserRound } from "lucide-react";
 import { CardSection } from "@/components/app/inbox/CardSection";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
@@ -84,7 +84,6 @@ type ProfilePanelProps = {
   assigningSeller?: boolean;
   onAssign: () => void;
   onTakeConversation: () => void;
-  onToggleBot: () => void;
   onMarkHot: () => void;
   onClose: () => void;
   onResetConversation: () => void;
@@ -124,7 +123,6 @@ export function ProfilePanel({
   assigningSeller,
   onAssign,
   onTakeConversation,
-  onToggleBot,
   onMarkHot,
   onClose,
   onResetConversation,
@@ -176,24 +174,24 @@ export function ProfilePanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <CardSection title="Identidad y estado" subtitle="Quien es, en que estado esta y que etiquetas lo describen">
-        <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
+        <div className="rounded-xl border border-[color:var(--border)] bg-surface/50 p-3">
           <div className="flex items-start gap-3">
             <SimpleAvatar
               src={detail.contact?.profileImageUrl}
               name={detail.contact?.name}
-              className="h-14 w-14 rounded-full border border-brand/20 bg-brand/10 text-sm text-brandBright"
+              className="size-12 rounded-full border border-brand/20 bg-brand/10 text-sm text-brandBright"
               fallbackClassName="bg-brand/10 text-brandBright"
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-lg font-semibold">{detail.contact?.name || "Sin nombre"}</p>
+                <p className="truncate text-sm font-semibold">{detail.contact?.name || "Sin nombre"}</p>
                 <InboxBadge className={leadStatusTone(leadStatus)}>{leadStatusLabel(leadStatus)}</InboxBadge>
                 <InboxBadge className={stageTone(detail.deal?.stage)}>{stageLabel(detail.deal?.stage)}</InboxBadge>
                 <InboxBadge className="capitalize">{conversationStatusLabel(detail.conversation.status)}</InboxBadge>
               </div>
-              <div className="mt-2 space-y-1.5 text-sm text-muted">
+              <div className="mt-1.5 space-y-1 text-xs text-muted">
                 <p className="flex items-center gap-2">
                   <Phone className="h-3.5 w-3.5" />
                   {detail.contact?.phone || "Sin telefono"}
@@ -222,23 +220,14 @@ export function ProfilePanel({
         </div>
       </CardSection>
 
-      <CardSection title="Acciones principales" subtitle="Tomar, pausar o archivar sin mezclarlo con configuracion">
+      <CardSection title="Acciones" subtitle="La pausa del bot permanece accesible en el encabezado del chat">
         <div className="grid gap-2">
-          <button
-            type="button"
-            onClick={onToggleBot}
-            disabled={readOnly}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-3 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(176,80,0,0.24)] disabled:opacity-40"
-          >
-            <PauseCircle className="h-4 w-4" />
-            {detail.conversation.botEnabled ? "Pausar bot" : "Retomar bot"}
-          </button>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={readOnly}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-3 py-2.5 text-sm text-muted hover:text-text disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-2.5 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
             >
               <Archive className="h-4 w-4" />
               Archivar
@@ -247,7 +236,7 @@ export function ProfilePanel({
               type="button"
               onClick={onTakeConversation}
               disabled={readOnly}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-3 py-2.5 text-sm text-muted hover:text-text disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-2.5 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
             >
               <UserRound className="h-4 w-4" />
               Tomar para mí
@@ -257,12 +246,12 @@ export function ProfilePanel({
             type="button"
             onClick={onResetConversation}
             disabled={readOnly || resetBusy}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-3 py-2.5 text-sm text-muted hover:text-text disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-2.5 py-2 text-xs text-muted hover:text-text disabled:opacity-40"
           >
             <RotateCcw className="h-4 w-4" />
             {resetBusy ? "Reiniciando..." : "Reiniciar conversacion"}
           </button>
-          <p className="text-xs text-muted">Esto hace que el bot vuelva a empezar limpio con este contacto, sin borrar el historial.</p>
+          <p className="text-[10px] leading-4 text-muted">Reiniciar conserva el historial y sólo limpia el contexto actual del bot.</p>
         </div>
       </CardSection>
 
@@ -307,7 +296,7 @@ export function ProfilePanel({
       </CardSection>
 
       <CardSection title="Contexto" subtitle="Asignacion, estado, notas y proxima accion siempre visibles">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="grid gap-3">
             <div className="rounded-xl border border-[color:var(--border)] bg-bg/70 p-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Responsable actual</p>
@@ -390,8 +379,8 @@ export function ProfilePanel({
             </button>
           </div>
 
-          <div className="space-y-2 rounded-[22px] border border-[color:var(--border)] bg-surface/45 p-4">
-            <p className="text-sm font-semibold">Proxima accion</p>
+          <div className="space-y-2 rounded-xl border border-[color:var(--border)] bg-surface/45 p-3">
+            <p className="text-xs font-semibold">Proxima accion</p>
             <input
               type="datetime-local"
               value={nextActionAt}
@@ -426,8 +415,8 @@ export function ProfilePanel({
             </div>
           </div>
 
-          <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/45 p-4">
-            <p className="text-sm font-semibold">Notas</p>
+          <div className="rounded-xl border border-[color:var(--border)] bg-surface/45 p-3">
+            <p className="text-xs font-semibold">Notas</p>
             <div className="mt-3 flex gap-2">
               <input
                 value={noteText}
@@ -455,8 +444,8 @@ export function ProfilePanel({
             </ul>
           </div>
 
-          <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/45 p-4">
-            <p className="text-sm font-semibold">Tareas</p>
+          <div className="rounded-xl border border-[color:var(--border)] bg-surface/45 p-3">
+            <p className="text-xs font-semibold">Tareas</p>
             <div className="mt-3 flex gap-2">
               <input
                 value={taskTitle}

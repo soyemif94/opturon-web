@@ -104,32 +104,32 @@ export function ConversationList({
         : "Cuando entren mensajes o limpies filtros, las conversaciones apareceran aca para operarlas.";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
-      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/90 p-4 backdrop-blur">
-        <div className="flex items-start justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border)] bg-card/65 shadow-[0_18px_55px_rgba(0,0,0,0.2)]">
+      <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/92 p-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Inbox</p>
-            <h2 className="mt-1 text-xl font-semibold">Conversaciones</h2>
-            <p className="mt-1 text-xs text-muted">Elegí rápido un hilo, revisá estado y entrá a actuar sin ruido extra.</p>
+            <h2 className="text-sm font-semibold">Conversaciones</h2>
+            <p className="mt-0.5 text-[11px] text-muted">{visibleRows.length} visibles · {selectedIds.length ? `${selectedIds.length} seleccionadas` : channel === "instagram" ? "Instagram" : "WhatsApp"}</p>
           </div>
           {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}
         </div>
 
-        <div className="mt-4 flex items-center gap-2 rounded-[20px] border border-[color:var(--border)] bg-bg/70 px-3 py-3">
+        <label className="mt-3 flex h-9 items-center gap-2 rounded-xl border border-[color:var(--border)] bg-bg/70 px-3 focus-within:border-brand/40">
           <Search className="h-4 w-4 text-muted" />
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Buscar por nombre, telefono o mensaje"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted"
+            aria-label="Buscar conversaciones"
           />
-        </div>
+        </label>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-[18px] border border-[color:var(--border)] bg-bg/55 p-1">
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-[color:var(--border)] bg-bg/55 p-1" aria-label="Canal">
           <button
             type="button"
             onClick={() => onChannelChange("whatsapp")}
-            className={`rounded-[14px] px-3 py-2 text-xs font-medium transition ${
+            className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${
               channel === "whatsapp" ? "bg-card text-text shadow-sm" : "text-muted hover:text-text"
             }`}
           >
@@ -138,7 +138,7 @@ export function ConversationList({
           <button
             type="button"
             onClick={() => onChannelChange("instagram")}
-            className={`rounded-[14px] px-3 py-2 text-xs font-medium transition ${
+            className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${
               channel === "instagram" ? "bg-card text-text shadow-sm" : "text-muted hover:text-text"
             }`}
           >
@@ -146,33 +146,30 @@ export function ConversationList({
           </button>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => onVisibilityChange("active")}>
-            <InboxBadge active={!showingArchived}>Activas</InboxBadge>
-          </button>
-          <button type="button" onClick={() => onVisibilityChange("archived")}>
-            <InboxBadge active={showingArchived}>Archivadas</InboxBadge>
-          </button>
+        <div className="mt-2 flex items-center gap-1.5">
+          <button type="button" onClick={() => onVisibilityChange("active")}><InboxBadge active={!showingArchived}>Activas</InboxBadge></button>
+          <button type="button" onClick={() => onVisibilityChange("archived")}><InboxBadge active={showingArchived}>Archivadas</InboxBadge></button>
+          {(filter !== "all" || search.trim()) ? <button type="button" onClick={onClearFilters} className="ml-auto text-[10px] text-muted underline-offset-2 hover:text-text hover:underline">Limpiar</button> : null}
         </div>
 
-        <div className="mt-4 rounded-[22px] border border-[color:var(--border)] bg-card/45">
+        <div className="mt-2 rounded-xl border border-[color:var(--border)] bg-card/40">
           <button
             type="button"
             onClick={() => setFiltersExpanded((current) => !current)}
-            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
           >
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-muted">
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Filtros
             </div>
-            <span className="inline-flex items-center gap-2 text-xs text-muted">
+            <span className="inline-flex items-center gap-2 text-[10px] text-muted">
               {FILTERS.find((item) => item.key === filter)?.label || "Todas"}
               {filtersExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </span>
           </button>
           {filtersExpanded ? (
-            <div className="border-t border-[color:var(--border)] px-4 pb-4 pt-3">
-              <div className="flex flex-wrap gap-2">
+            <div className="border-t border-[color:var(--border)] px-3 pb-3 pt-2">
+              <div className="flex flex-wrap gap-1.5">
                 {FILTERS.map((item) => (
                   <button key={item.key} type="button" onClick={() => onFilterChange(item.key)}>
                     <InboxBadge active={filter === item.key}>{item.label}</InboxBadge>
@@ -184,9 +181,9 @@ export function ConversationList({
         </div>
 
         {selectedIds.length > 0 || showingArchived ? (
-          <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-card/55 px-3 py-3">
+          <div className="mt-2 rounded-xl border border-[color:var(--border)] bg-card/55 px-2.5 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted">
+              <p className="text-[11px] text-muted">
                 {selectedIds.length > 0
                   ? `${selectedIds.length} conversaciones seleccionadas`
                   : showingArchived
@@ -197,7 +194,7 @@ export function ConversationList({
                 <button
                   type="button"
                   onClick={() => (allVisibleSelected ? onClearSelection() : onSelectVisible(visibleIds))}
-                  className="rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted hover:text-text"
+                  className="rounded-full border border-[color:var(--border)] px-2.5 py-1 text-[10px] text-muted hover:text-text"
                   disabled={!visibleIds.length}
                 >
                   {allVisibleSelected ? "Limpiar visibles" : "Seleccionar visibles"}
@@ -205,7 +202,7 @@ export function ConversationList({
                 <button
                   type="button"
                   onClick={showingArchived ? onRestoreSelected : onArchiveSelected}
-                  className={`rounded-full border px-3 py-1.5 text-xs disabled:opacity-40 ${
+                  className={`rounded-full border px-2.5 py-1 text-[10px] disabled:opacity-40 ${
                     showingArchived
                       ? "border-emerald-400/30 text-emerald-100 hover:text-white"
                       : "border-red-400/30 text-red-100 hover:text-white"
@@ -220,8 +217,13 @@ export function ConversationList({
         ) : null}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {loading ? <ConversationListSkeleton /> : null}
+      <div className="relative min-h-0 flex-1 overflow-y-auto p-2">
+        {loading && !hasLoaded ? <ConversationListSkeleton /> : null}
+        {loading && hasLoaded ? (
+          <div className="sticky top-0 z-10 mb-1 flex justify-end" role="status">
+            <span className="rounded-full border border-[color:var(--border)] bg-background/95 px-2.5 py-1 text-[10px] text-muted shadow">Actualizando…</span>
+          </div>
+        ) : null}
 
         {!loading && errorMessage ? (
           <div className="rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-xs text-red-100">
@@ -260,8 +262,8 @@ export function ConversationList({
           </div>
         ) : null}
 
-        {!loading && hasSearchResults ? (
-          <div className="space-y-3">
+        {hasSearchResults ? (
+          <div className="space-y-0.5">
             {visibleRows.map((row) => (
               <ConversationRow
                 key={row.id}

@@ -3,6 +3,7 @@ import { getConversationPriority } from "@/components/app/inbox/conversation-pri
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 import { cn } from "@/lib/cn";
+import { Archive, Flame, MoreHorizontal } from "lucide-react";
 
 function formatAgo(iso: string) {
   const date = new Date(iso).getTime();
@@ -86,27 +87,19 @@ export function ConversationRow({
   const response = responseUi(row);
   const channelLabel = row.channelType === "instagram" ? "Instagram" : "WhatsApp";
   const displayName = row.contact?.name?.trim() || row.contact?.phone || "Sin nombre";
-  const metaLine = row.contact?.name?.trim() ? row.contact?.phone || row.contact?.email || "Sin contacto" : "Sin nombre guardado";
-
-  const priorityAccent =
-    derivedPriority === "high"
-      ? "before:bg-red-400"
-      : derivedPriority === "medium"
-        ? "before:bg-amber-300"
-        : "before:bg-slate-500";
+  const priorityTone = derivedPriority === "high" ? "bg-red-400" : derivedPriority === "medium" ? "bg-amber-300" : "bg-slate-500";
 
   return (
-    <div
+    <article
       className={cn(
-        "group relative overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-4 transition-all duration-200 before:absolute before:left-0 before:top-0 before:h-full before:w-1.5 before:content-[''] hover:border-brand/20 hover:bg-card/90",
-        priorityAccent,
-        selected ? "border-brand/40 bg-brand/8 ring-1 ring-brand/30 shadow-[0_20px_60px_rgba(0,0,0,0.24)]" : "",
-        hasUnread && !selected ? "border-brand/20 bg-brand/5" : ""
+        "group relative rounded-xl border px-2.5 py-2.5 transition-colors",
+        selected ? "border-brand/45 bg-brand/10 ring-1 ring-brand/20" : "border-transparent hover:border-[color:var(--border)] hover:bg-muted/25",
+        hasUnread && !selected ? "bg-brand/[0.045]" : ""
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         {onToggleSelect ? (
-          <label className="mt-1 inline-flex items-center">
+          <label className="mt-2 inline-flex items-center">
             <input
               type="checkbox"
               checked={Boolean(bulkSelected)}
@@ -118,68 +111,54 @@ export function ConversationRow({
           </label>
         ) : null}
 
-        <button onClick={onSelect} className="w-full text-left" type="button">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
+        <button onClick={onSelect} className="min-w-0 flex-1 text-left" type="button" aria-current={selected ? "true" : undefined}>
+          <div className="flex items-center gap-2.5">
+            <div className="relative shrink-0">
               <SimpleAvatar
                 src={row.contact?.profileImageUrl}
                 name={displayName}
-                className="h-12 w-12 rounded-full border border-white/10 bg-brand/10 text-sm text-brandBright shadow-[0_12px_24px_rgba(0,0,0,0.18)]"
+                className="size-10 rounded-full border border-white/10 bg-brand/10 text-xs text-brandBright"
                 fallbackClassName="bg-brand/10 text-brandBright"
               />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="line-clamp-1 text-sm font-semibold">{displayName}</p>
-                  {hasUnread ? (
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-semibold text-white">
-                      {row.unreadCount}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-0.5 text-xs text-muted">{metaLine}</p>
+              <span className={cn("absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background", priorityTone)} aria-label={`Prioridad ${derivedPriority}`} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className={cn("truncate text-sm", hasUnread ? "font-semibold text-text" : "font-medium")}>{displayName}</p>
+                <p className={cn("shrink-0 text-[10px] tabular-nums", hasUnread ? "font-medium text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted">
+                <span className={cn("size-1.5 rounded-full", row.channelType === "instagram" ? "bg-fuchsia-400" : "bg-emerald-400")} />
+                <span>{channelLabel}</span>
+                <span aria-hidden="true">·</span>
+                <span className="truncate">{ownerLabel}</span>
               </div>
             </div>
-            <div className="shrink-0 text-right">
-              <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
-              <p className="mt-1 text-[11px] text-muted">{ownerLabel}</p>
-            </div>
           </div>
 
-          <p className={cn("mt-3 line-clamp-2 text-sm leading-5", hasUnread ? "text-text" : "text-muted")}>{preview}</p>
+          <p className={cn("mt-2 truncate text-xs", hasUnread ? "font-medium text-text" : "text-muted")}>{preview}</p>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <InboxBadge className={row.channelType === "instagram" ? "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-100" : ""}>
-              {channelLabel}
-            </InboxBadge>
-            {row.importedHistory ? <InboxBadge className="border-emerald-300/25 bg-emerald-300/10 text-emerald-100">Historial importado</InboxBadge> : null}
+          <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
             <InboxBadge className={response.className}>{response.label}</InboxBadge>
             <InboxBadge className={leadStatus.className}>{leadStatus.label}</InboxBadge>
-            {row.priority === "hot" ? <InboxBadge className="text-brandBright">Caliente</InboxBadge> : null}
-            {row.deal?.stage === "won" ? <InboxBadge className="border-emerald-400/30 bg-emerald-400/10 text-emerald-100">Ganado</InboxBadge> : null}
             {followUp ? <InboxBadge className={followUp.className}>{followUp.label}</InboxBadge> : null}
+            {row.importedHistory ? <InboxBadge className="border-emerald-300/25 bg-emerald-300/10 text-emerald-100">Historial</InboxBadge> : null}
+            {row.deal?.stage === "won" ? <InboxBadge className="border-emerald-400/30 bg-emerald-400/10 text-emerald-100">Ganado</InboxBadge> : null}
             {row.transferPaymentStatus === "payment_pending_validation" ? <InboxBadge>Pago pendiente</InboxBadge> : null}
+            {hasUnread ? <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-semibold text-white" aria-label={`${row.unreadCount} mensajes sin leer`}>{row.unreadCount}</span> : null}
           </div>
         </button>
-      </div>
 
-      <div className="pointer-events-none mt-3 flex gap-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-        <button
-          type="button"
-          onClick={onMarkHot}
-          disabled={disabled}
-          className="rounded-full border border-[color:var(--border)] px-2.5 py-1 text-xs text-muted hover:text-text disabled:opacity-40"
-        >
-          Marcar caliente
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={disabled}
-          className="rounded-full border border-[color:var(--border)] px-2.5 py-1 text-xs text-muted hover:text-text disabled:opacity-40"
-        >
-          Archivar
-        </button>
+        <details className="relative shrink-0">
+          <summary className="inline-flex size-7 cursor-pointer list-none items-center justify-center rounded-full text-muted opacity-60 transition hover:bg-muted/40 hover:text-text group-hover:opacity-100 focus-visible:opacity-100" aria-label={`Más acciones para ${displayName}`}>
+            <MoreHorizontal aria-hidden="true" className="size-4" />
+          </summary>
+          <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-[color:var(--border)] bg-card p-1.5 shadow-xl">
+            <button type="button" onClick={onMarkHot} disabled={disabled} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-muted/40 hover:text-text disabled:opacity-40"><Flame aria-hidden="true" className="size-3.5" />Marcar caliente</button>
+            <button type="button" onClick={onClose} disabled={disabled} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted hover:bg-muted/40 hover:text-text disabled:opacity-40"><Archive aria-hidden="true" className="size-3.5" />Archivar</button>
+          </div>
+        </details>
       </div>
-    </div>
+    </article>
   );
 }

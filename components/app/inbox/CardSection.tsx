@@ -15,13 +15,13 @@ export function CardSection({
   return (
     <section
       className={cn(
-        "rounded-[24px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02))] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.14)]",
+        "rounded-xl border border-[color:var(--border)] bg-surface/35 p-3",
         className
       )}
     >
-      <header className="mb-3">
-        <h3 className="text-base font-semibold">{title}</h3>
-        {subtitle ? <p className="mt-1 text-xs leading-5 text-muted">{subtitle}</p> : null}
+      <header className="mb-2.5">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">{title}</h3>
+        {subtitle ? <p className="mt-1 text-[11px] leading-4 text-muted/80">{subtitle}</p> : null}
       </header>
       {children}
     </section>

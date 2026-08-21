@@ -13,7 +13,7 @@ export function InboxBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+        "inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full border px-2 text-[10px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
         active
           ? "border-brand/50 bg-brand/12 text-text shadow-[0_0_0_1px_rgba(192,80,0,0.10)]"
           : "border-[color:var(--border)] bg-surface/80 text-muted",

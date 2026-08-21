@@ -1,4 +1,4 @@
-import { Bot, UserRound } from "lucide-react";
+import { Bot, Check, CheckCheck, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 function formatTime(iso: string) {
@@ -13,6 +13,7 @@ export function MessageBubble({
   text,
   caption,
   timestamp,
+  status,
   media,
   optimistic
 }: {
@@ -21,6 +22,7 @@ export function MessageBubble({
   text: string;
   caption?: string;
   timestamp: string;
+  status?: string;
   media?: {
     previewUrl?: string | null;
     downloadUrl?: string | null;
@@ -45,10 +47,10 @@ export function MessageBubble({
     <div className={cn("flex", outbound ? "justify-end" : "justify-start", system ? "justify-center" : "")}>
       <div
         className={cn(
-          "max-w-[82%] rounded-[22px] px-3.5 py-3 text-[13px] shadow-[0_14px_30px_rgba(0,0,0,0.16)]",
+          "max-w-[78%] rounded-2xl px-3 py-2.5 text-[13px] shadow-[0_10px_24px_rgba(0,0,0,0.13)] sm:max-w-[72%]",
           outbound && "border border-[color:var(--whatsapp-accent-border)] bg-[linear-gradient(135deg,rgba(24,100,52,0.98),rgba(16,82,40,0.98))] text-white",
           !outbound && !system && "border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(36,36,36,0.95),rgba(24,24,24,0.98))] text-text",
-          system && "max-w-[82%] border bg-[color:var(--inbox-system-bubble-bg)] text-[color:var(--inbox-system-bubble-text)]",
+          system && "max-w-[86%] border bg-[color:var(--inbox-system-bubble-bg)] text-[color:var(--inbox-system-bubble-text)]",
           optimistic ? "animate-inbox-message" : ""
         )}
         style={system ? { borderColor: "var(--inbox-system-bubble-border)" } : undefined}
@@ -57,7 +59,7 @@ export function MessageBubble({
           className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em]"
           style={{ color: senderTone }}
         >
-          {outbound ? <UserRound className="h-3 w-3" /> : system ? <Bot className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+          {system ? <Bot className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
           <span>{senderLabel}</span>
         </div>
         {isImage ? (
@@ -77,10 +79,13 @@ export function MessageBubble({
           <p className="whitespace-pre-wrap leading-5">{text}</p>
         )}
         <p
-          className="mt-2 text-[10px]"
+          className="mt-1.5 flex items-center justify-end gap-1 text-[10px]"
           style={{ color: senderTone }}
         >
           {formatTime(timestamp)}
+          {outbound && status ? (
+            status === "read" ? <CheckCheck aria-label="Leído" className="size-3" /> : status === "delivered" ? <CheckCheck aria-label="Entregado" className="size-3" /> : <Check aria-label="Enviado" className="size-3" />
+          ) : null}
         </p>
       </div>
     </div>
