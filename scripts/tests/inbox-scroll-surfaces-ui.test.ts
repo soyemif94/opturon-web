@@ -34,12 +34,11 @@ assert.match(chat, /flex h-full min-h-0 flex-col overflow-hidden/);
 assert.match(chat, /shrink-0 space-y-1\.5 border-t/);
 
 // Every intermediate desktop ancestor can shrink, so the scroll owners receive a bounded height.
-assert.match(shell, /isInboxRoute[\s\S]*?100dvh[\s\S]*?xl:overflow-hidden/);
-assert.match(shell, /xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden/);
-assert.match(layout, /flex min-h-0 flex-col[^"]*xl:flex-1/);
-assert.match(layout, /grid min-h-0 flex-1/);
-assert.match(layout, /min-h-\[34rem\][^"]*xl:min-h-0/);
-assert.match(layout, /min-h-\[420px\][^"]*xl:min-h-0 xl:flex-1/);
+assert.match(shell, /isInboxRoute[\s\S]*?h-\[calc\(100dvh-1\.5rem\)\][\s\S]*?overflow-hidden/);
+assert.match(shell, /flex min-h-0 flex-1 flex-col overflow-hidden/);
+assert.match(layout, /relative flex h-full min-h-0 flex-1 flex-col overflow-hidden/);
+assert.match(layout, /relative grid h-full min-h-0 flex-1/);
+assert.doesNotMatch(layout, /min-h-\[34rem\]|min-h-\[420px\]/);
 assert.match(list, /flex h-full min-h-0 flex-col overflow-hidden/);
 assert.match(list, /app-scroll-surface[^"]*min-h-0 flex-1[^"]*overflow-y-auto/);
 

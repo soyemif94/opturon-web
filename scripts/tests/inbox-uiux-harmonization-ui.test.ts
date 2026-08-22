@@ -36,7 +36,7 @@ assert.match(avatar, /initials\(label\)/);
 // Chat: compact operational header, bot state/action, messages and composer.
 assert.match(chat, /Pausar bot para esta conversación/);
 assert.match(chat, /Retomar bot para esta conversación/);
-assert.match(chat, /detail\.conversation\.botEnabled \? "bg-emerald-400" : "bg-amber-400"/);
+assert.match(chat, /headerConversation\.botEnabled \? "bg-emerald-400" : "bg-amber-400"/);
 assert.match(chat, /Abrir contexto del contacto/);
 assert.match(chat, /Más acciones/);
 assert.match(chat, /Esta conversación todavía no tiene mensajes/);

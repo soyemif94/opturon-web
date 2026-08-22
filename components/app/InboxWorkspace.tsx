@@ -16,7 +16,7 @@ import { toast } from "@/components/ui/toast";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { shouldShowInboxChannelEmptyState } from "@/lib/whatsapp-channel-state";
 import { ConfirmDialog } from "@/components/ui/dialog";
-import { shouldAutoSelectFirstConversation } from "@/components/app/inbox/mobile-behavior";
+import { preserveSelectedConversationId, resolveInboxDetailMode } from "@/components/app/inbox/mobile-behavior";
 
 type InboxListResponse = {
   readOnly: boolean;
@@ -28,6 +28,12 @@ type SellerOption = {
   id: string;
   name: string;
   role: string;
+};
+
+type DetailLoadError = {
+  conversationId: string;
+  status: number | null;
+  cause: string;
 };
 
 const DEFAULT_FILTER: FilterKey = "all";
@@ -102,10 +108,12 @@ export function InboxWorkspace({
   const [rowsLoaded, setRowsLoaded] = useState(false);
   const [rowsError, setRowsError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>(initialConversationId);
+  const [selectedConversationSnapshot, setSelectedConversationSnapshot] = useState<ConversationRowData | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<DetailLoadError | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [channelState, setChannelState] = useState<WhatsAppConnectionStatus | null>(null);
   const [archivingSelection, setArchivingSelection] = useState(false);
@@ -132,6 +140,9 @@ export function InboxWorkspace({
   const detailSnapshotRef = useRef("");
   const rowsRequestSeqRef = useRef(0);
   const detailRequestSeqRef = useRef(0);
+  const detailAbortControllerRef = useRef<AbortController | null>(null);
+  const selectedIdRef = useRef<string | undefined>(initialConversationId);
+  const mobileHistoryDetailRef = useRef(false);
   const pollInFlightRef = useRef(false);
   const autoReadInFlightRef = useRef<string | null>(null);
 
@@ -213,7 +224,6 @@ export function InboxWorkspace({
       const nextSnapshot = JSON.stringify({
         readOnly: nextReadOnly,
         channelState: json.channelState || null,
-        selectedId,
         rows: nextRows
       });
       const changed = rowsSnapshotRef.current !== nextSnapshot;
@@ -223,13 +233,20 @@ export function InboxWorkspace({
         setReadOnly(nextReadOnly);
         setRows(nextRows);
         setChannelState(json.channelState || null);
-        if (
-          typeof window !== "undefined" &&
-          shouldAutoSelectFirstConversation({ viewportWidth: window.innerWidth, selectedId, rowCount: nextRows.length })
-        ) {
-          setSelectedId(nextRows[0].id);
-        }
-        if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
+        setSelectedId((currentSelectedId) => {
+          const nextSelectedId = preserveSelectedConversationId({
+            selectedId: currentSelectedId,
+            viewportWidth: typeof window === "undefined" ? 0 : window.innerWidth,
+            nextRowIds: nextRows.map((item) => item.id)
+          });
+          selectedIdRef.current = nextSelectedId;
+          return nextSelectedId;
+        });
+        setSelectedConversationSnapshot((current) => {
+          const activeId = selectedIdRef.current;
+          if (!activeId) return null;
+          return nextRows.find((item) => item.id === activeId) || current;
+        });
         setSelectedIds((current) => current.filter((id) => nextRows.some((item) => item.id === id)));
       }
 
@@ -246,18 +263,37 @@ export function InboxWorkspace({
 
   async function loadDetail(conversationId: string, options?: { silent?: boolean }) {
     const requestSeq = ++detailRequestSeqRef.current;
-    if (!options?.silent) setDetailLoading(true);
+    detailAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    detailAbortControllerRef.current = controller;
+    if (!options?.silent) {
+      setDetailLoading(true);
+      setDetailError(null);
+      setDetail((current) => (current?.conversation.id === conversationId ? current : null));
+    }
     try {
-      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}`), { cache: "no-store" });
-      if (!response.ok) return;
+      const response = await fetch(appendQuery(`/api/app/inbox/${conversationId}`), {
+        cache: "no-store",
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw Object.assign(new Error(String(body?.error || `inbox_detail_failed_${response.status}`)), {
+          status: response.status
+        });
+      }
       const json = (await response.json()) as DetailPayload;
+      if (!json?.conversation?.id || json.conversation.id !== conversationId) {
+        throw Object.assign(new Error("inbox_detail_identity_mismatch"), { status: 502 });
+      }
       const nextReadOnly = Boolean(json.readOnly);
       const nextSnapshot = JSON.stringify(json);
       const changed = detailSnapshotRef.current !== nextSnapshot;
 
-        if (changed && requestSeq === detailRequestSeqRef.current) {
+      if (requestSeq === detailRequestSeqRef.current && selectedIdRef.current === conversationId) {
         detailSnapshotRef.current = nextSnapshot;
-        setDetail(json);
+        setDetail((current) => (changed || current?.conversation.id !== conversationId ? json : current));
+        setDetailError(null);
         setReadOnly(nextReadOnly);
         if ((json.conversation?.channelType === "instagram" || json.conversation?.channelType === "whatsapp") && json.conversation.channelType !== channel) {
           setChannel(json.conversation.channelType);
@@ -292,9 +328,60 @@ export function InboxWorkspace({
           );
         }
       }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : null;
+      const cause = error instanceof Error ? error.message : "inbox_detail_unknown_error";
+      console.error("[inbox] conversation detail load failed", { conversationId, status, cause });
+      if (!options?.silent && requestSeq === detailRequestSeqRef.current && selectedIdRef.current === conversationId) {
+        setDetail(null);
+        setDetailError({ conversationId, status, cause });
+      }
     } finally {
-      if (!options?.silent) setDetailLoading(false);
+      if (!options?.silent && requestSeq === detailRequestSeqRef.current && selectedIdRef.current === conversationId) {
+        setDetailLoading(false);
+      }
     }
+  }
+
+  function closeMobileDetail() {
+    detailAbortControllerRef.current?.abort();
+    detailRequestSeqRef.current += 1;
+    selectedIdRef.current = undefined;
+    setContextOpen(false);
+    setSelectedId(undefined);
+    setSelectedConversationSnapshot(null);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  }
+
+  function openConversation(conversationId: string) {
+    const wasInDetail = Boolean(selectedIdRef.current);
+    selectedIdRef.current = conversationId;
+    setContextOpen(false);
+    setSelectedConversationSnapshot(rows.find((row) => row.id === conversationId) || null);
+    setDetail((current) => (current?.conversation.id === conversationId ? current : null));
+    setDetailError(null);
+    setDetailLoading(true);
+    setSelectedId(conversationId);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      const historyState = { ...(window.history.state || {}), opturonInboxDetail: conversationId };
+      if (wasInDetail && mobileHistoryDetailRef.current) window.history.replaceState(historyState, "", window.location.href);
+      else window.history.pushState(historyState, "", window.location.href);
+      mobileHistoryDetailRef.current = true;
+    }
+  }
+
+  function backToConversationList() {
+    const shouldPopHistory =
+      typeof window !== "undefined" &&
+      mobileHistoryDetailRef.current &&
+      Boolean(window.history.state?.opturonInboxDetail);
+    mobileHistoryDetailRef.current = false;
+    closeMobileDetail();
+    if (shouldPopHistory) window.history.back();
   }
 
   useEffect(() => {
@@ -303,14 +390,26 @@ export function InboxWorkspace({
   }, [channel, filter, onlyUnread, visibility]);
 
   useEffect(() => {
+    selectedIdRef.current = selectedId;
     if (!selectedId) {
       setDetail(null);
+      setDetailError(null);
       setContextOpen(false);
       return;
     }
     void loadDetail(selectedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!selectedIdRef.current) return;
+      mobileHistoryDetailRef.current = false;
+      closeMobileDetail();
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     if (demo || readOnly) return;
@@ -803,11 +902,10 @@ export function InboxWorkspace({
       }
 
       if (selectedId === conversationId && filter === "unassigned") {
-        setSelectedId(undefined);
-        setDetail(null);
+        backToConversationList();
       }
       void loadRows({ silent: true });
-      if (selectedId === conversationId) {
+      if (selectedId === conversationId && filter !== "unassigned") {
         void loadDetail(conversationId, { silent: true });
       }
       return true;
@@ -855,11 +953,10 @@ export function InboxWorkspace({
         filter
       );
       if (!stillVisible && selectedId === conversationId) {
-        setSelectedId(undefined);
-        setDetail(null);
+        backToConversationList();
       }
       void loadRows({ silent: true });
-      if (selectedId === conversationId) {
+      if (selectedId === conversationId && stillVisible) {
         void loadDetail(conversationId, { silent: true });
       }
       return true;
@@ -913,12 +1010,14 @@ export function InboxWorkspace({
           filter
         )
       ) {
-        setSelectedId(undefined);
-        setDetail(null);
+        backToConversationList();
       }
 
       void loadRows({ silent: true });
-      if (selectedId === conversationId) {
+      if (
+        selectedId === conversationId &&
+        matchesInboxFilter({ ...detail.conversation, nextActionAt, nextActionNote }, filter)
+      ) {
         void loadDetail(conversationId, { silent: true });
       }
       return true;
@@ -1019,11 +1118,8 @@ export function InboxWorkspace({
       setRows(remaining);
       setSelectedIds([]);
       if (selectedId && archivedIds.includes(selectedId)) {
-        setSelectedId(remaining[0]?.id);
-        if (!remaining.length) {
-          setSelectedId(undefined);
-          setDetail(null);
-        }
+        if (remaining[0]) openConversation(remaining[0].id);
+        else backToConversationList();
       }
       toast.success("Conversaciones ocultadas", "Ya no aparecen en el inbox, pero el historial sigue preservado.");
       await loadRows();
@@ -1059,11 +1155,8 @@ export function InboxWorkspace({
       setRows(remaining);
       setSelectedIds([]);
       if (selectedId && restoredIds.includes(selectedId)) {
-        setSelectedId(remaining[0]?.id);
-        if (!remaining.length) {
-          setSelectedId(undefined);
-          setDetail(null);
-        }
+        if (remaining[0]) openConversation(remaining[0].id);
+        else backToConversationList();
       }
       toast.success("Conversaciones restauradas", "Ya vuelven a aparecer en el inbox activo.");
       await loadRows();
@@ -1079,7 +1172,7 @@ export function InboxWorkspace({
       applyFilter: (nextFilter) => setFilter(nextFilter as FilterKey),
       toggleOnlyUnread: () => setOnlyUnread((prev) => !prev),
       setSearch: (query) => setSearch(query),
-      openConversation: (conversationId) => setSelectedId(conversationId),
+      openConversation,
       runAction: async (action, payload) => {
         const ok = await runOptimisticAction(action, payload || {});
         if (!ok) toast.error("No se pudo aplicar la accion");
@@ -1240,8 +1333,7 @@ export function InboxWorkspace({
     detailRequestSeqRef.current += 1;
     setRows((current) => current.filter((row) => row.id !== deletingId));
     setSelectedIds((current) => current.filter((id) => id !== deletingId));
-    setSelectedId(undefined);
-    setDetail(null);
+    backToConversationList();
     setComposer("");
     setContextOpen(false);
     toast.success("Conversación eliminada. El contacto y sus datos comerciales se conservaron.");
@@ -1282,6 +1374,11 @@ export function InboxWorkspace({
   const orderHref = detail?.relatedOrder?.id ? `/app/orders?orderId=${encodeURIComponent(detail.relatedOrder.id)}` : undefined;
   const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
   const shouldShowConnectionEmptyStateForChannel = channel === "whatsapp" && shouldRenderChannelEmptyState;
+  const detailMode = resolveInboxDetailMode({
+    selectedId,
+    resolvedConversationId: detail?.conversation.id,
+    errorConversationId: detailError?.conversationId
+  });
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col text-sm">
@@ -1299,10 +1396,7 @@ export function InboxWorkspace({
           hasDetail={Boolean(selectedId)}
           contextOpen={contextOpen}
           onCloseContext={() => setContextOpen(false)}
-          onBackToList={selectedId ? () => {
-            setContextOpen(false);
-            setSelectedId(undefined);
-          } : undefined}
+          onBackToList={selectedId ? backToConversationList : undefined}
           left={
             <ConversationList
               rows={rows}
@@ -1312,7 +1406,7 @@ export function InboxWorkspace({
                   compact
                   onImported={(conversationId) => {
                     void loadRows();
-                    if (conversationId) setSelectedId(conversationId);
+                    if (conversationId) openConversation(conversationId);
                   }}
                 />
               }
@@ -1327,14 +1421,16 @@ export function InboxWorkspace({
               onChannelChange={(value) => {
                 setChannel(value);
                 setSelectedIds([]);
+                selectedIdRef.current = undefined;
                 setSelectedId(undefined);
+                setSelectedConversationSnapshot(null);
                 setDetail(null);
+                setDetailError(null);
                 setComposer("");
               }}
               onSearchChange={setSearch}
               onSelect={(id) => {
-                setContextOpen(false);
-                setSelectedId(id);
+                openConversation(id);
               }}
               onMarkHot={(id) => void rowAction(id, "mark_hot")}
               onClose={(id) => void rowAction(id, "close")}
@@ -1365,7 +1461,11 @@ export function InboxWorkspace({
           center={
             <ChatPanel
               detail={detail}
-              loading={detailLoading}
+              mode={detailMode}
+              loading={detailLoading || detailMode === "DETAIL_LOADING"}
+              selectedConversation={selectedConversationSnapshot || rows.find((row) => row.id === selectedId) || null}
+              error={detailError}
+              onRetry={() => selectedId && void loadDetail(selectedId)}
               composer={composer}
               onComposerChange={setComposer}
               onSend={() => void sendMessage(composer)}

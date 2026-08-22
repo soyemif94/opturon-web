@@ -45,8 +45,9 @@ test("Inbox owns a calculable viewport and separate list/messages scroll surface
 test("mobile list-chat-back flow and permission gates remain explicit", () => {
   const workspace = read("components/app/InboxWorkspace.tsx");
   const layout = read("components/app/inbox/InboxLayout.tsx");
-  assert.match(workspace, /onSelect=\{\(id\) => \{[\s\S]*?setSelectedId\(id\)/);
-  assert.match(workspace, /onBackToList=\{selectedId \? \(\) => \{[\s\S]*?setSelectedId\(undefined\)/);
+  assert.match(workspace, /onSelect=\{\(id\) => \{[\s\S]*?openConversation\(id\)/);
+  assert.match(workspace, /onBackToList=\{selectedId \? backToConversationList : undefined\}/);
+  assert.match(workspace, /function closeMobileDetail\(\)[\s\S]*?setSelectedId\(undefined\)/);
   assert.match(layout, /Volver a conversaciones/);
   assert.match(workspace, /canDeleteConversation=\{canDeleteConversation && !readOnly\}/);
   assert.match(layout, /xl:grid-cols-\[minmax\(280px,320px\)_minmax\(0,1fr\)\]/);

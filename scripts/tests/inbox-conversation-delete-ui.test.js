@@ -33,7 +33,7 @@ assert.match(permissions, /hasAppPermission\(context, "manage_workspace"\)/);
 assert.match(chat, /border-t border-\[color:var\(--border\)\][^>]*text-red-300/);
 
 // Approved scroll/composer surfaces stay in their existing components.
-assert.match(chat, /app-scroll-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto/);
+assert.match(chat, /app-scroll-surface min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto/);
 assert.match(chat, /<Composer/);
 const deleteFlow = workspace.slice(workspace.indexOf('async function deleteSelectedConversation'), workspace.indexOf('async function deleteSelectedConversation') + 2200);
 assert.doesNotMatch(deleteFlow, /window\.confirm/);

@@ -5,7 +5,8 @@ import { Composer } from "@/components/app/inbox/Composer";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
-import type { BotDomainOverride, BotFlowLock, DetailPayload } from "@/components/app/inbox/types";
+import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload } from "@/components/app/inbox/types";
+import type { InboxDetailMode } from "@/components/app/inbox/mobile-behavior";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { shouldStickInboxToBottom } from "@/components/app/inbox/mobile-behavior";
 
@@ -18,7 +19,11 @@ function statusLabel(detail: DetailPayload) {
 
 type ChatPanelProps = {
   detail: DetailPayload | null;
+  mode: InboxDetailMode;
   loading: boolean;
+  selectedConversation: ConversationRowData | null;
+  error: { conversationId: string; status: number | null; cause: string } | null;
+  onRetry: () => void;
   composer: string;
   onComposerChange: (value: string) => void;
   onSend: () => void;
@@ -40,7 +45,11 @@ type ChatPanelProps = {
 
 export function ChatPanel({
   detail,
+  mode,
   loading,
+  selectedConversation,
+  error,
+  onRetry,
   composer,
   onComposerChange,
   onSend,
@@ -79,6 +88,8 @@ export function ChatPanel({
   const lastTimelineKey = visibleTimeline[visibleTimeline.length - 1]?.id || null;
   const isInstagramConversation = detail?.conversation.channelType === "instagram";
   const isComposerDisabled = readOnly || isInstagramConversation;
+  const headerConversation = detail?.conversation || selectedConversation;
+  const headerContact = detail?.contact || selectedConversation?.contact;
 
   useEffect(() => {
     setHistoryExpanded(false);
@@ -105,23 +116,23 @@ export function ChatPanel({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
       <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/45 px-3 py-2.5 backdrop-blur sm:px-4">
-        {detail ? (
+        {headerConversation ? (
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <SimpleAvatar
-                src={detail.contact?.profileImageUrl}
-                name={detail.contact?.name || detail.contact?.phone || "Cliente"}
+                src={headerContact?.profileImageUrl}
+                name={headerContact?.name || headerContact?.phone || "Cliente"}
                 className="size-10 rounded-full border border-white/10 bg-brand/10 text-xs text-brandBright"
                 fallbackClassName="bg-brand/10 text-brandBright"
               />
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <h2 className="truncate text-base font-semibold">{detail.contact?.name || detail.contact?.phone || "Conversacion"}</h2>
-                  <span className={`hidden h-5 shrink-0 items-center rounded-full border px-2 text-[9px] sm:inline-flex ${isInstagramConversation ? "border-fuchsia-400/25 text-fuchsia-100" : "border-emerald-400/25 text-emerald-100"}`}>{isInstagramConversation ? "Instagram" : "WhatsApp"}</span>
-                  <span className={`size-2 shrink-0 rounded-full ${detail.conversation.botEnabled ? "bg-emerald-400" : "bg-amber-400"}`} aria-label={detail.conversation.botEnabled ? "Bot activo" : "Bot pausado"} />
+                  <h2 className="truncate text-base font-semibold">{headerContact?.name || headerContact?.phone || "Conversacion"}</h2>
+                  <span className={`hidden h-5 shrink-0 items-center rounded-full border px-2 text-[9px] sm:inline-flex ${headerConversation.channelType === "instagram" ? "border-fuchsia-400/25 text-fuchsia-100" : "border-emerald-400/25 text-emerald-100"}`}>{headerConversation.channelType === "instagram" ? "Instagram" : "WhatsApp"}</span>
+                  <span className={`size-2 shrink-0 rounded-full ${headerConversation.botEnabled ? "bg-emerald-400" : "bg-amber-400"}`} aria-label={headerConversation.botEnabled ? "Bot activo" : "Bot pausado"} />
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-muted">
-                  {statusLabel(detail)} · {detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}
+                  {detail ? statusLabel(detail) : "cargando"} · {headerContact?.phone || headerContact?.email || "Sin dato de contacto"}
                 </p>
               </div>
             </div>
@@ -129,12 +140,12 @@ export function ChatPanel({
               <button
                 type="button"
                 onClick={onToggleBot}
-                disabled={readOnly}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition disabled:opacity-40 ${detail.conversation.botEnabled ? "border-amber-400/25 bg-amber-400/8 text-amber-100 hover:bg-amber-400/14" : "border-emerald-400/25 bg-emerald-400/8 text-emerald-100 hover:bg-emerald-400/14"}`}
-                aria-label={detail.conversation.botEnabled ? "Pausar bot para esta conversación" : "Retomar bot para esta conversación"}
+                disabled={readOnly || !detail}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition disabled:opacity-40 ${headerConversation.botEnabled ? "border-amber-400/25 bg-amber-400/8 text-amber-100 hover:bg-amber-400/14" : "border-emerald-400/25 bg-emerald-400/8 text-emerald-100 hover:bg-emerald-400/14"}`}
+                aria-label={headerConversation.botEnabled ? "Pausar bot para esta conversación" : "Retomar bot para esta conversación"}
               >
-                {detail.conversation.botEnabled ? <Pause aria-hidden="true" className="size-3.5" /> : <Play aria-hidden="true" className="size-3.5" />}
-                <span className="hidden sm:inline">{detail.conversation.botEnabled ? "Pausar bot" : "Retomar bot"}</span>
+                {headerConversation.botEnabled ? <Pause aria-hidden="true" className="size-3.5" /> : <Play aria-hidden="true" className="size-3.5" />}
+                <span className="hidden sm:inline">{headerConversation.botEnabled ? "Pausar bot" : "Retomar bot"}</span>
               </button>
               <button type="button" onClick={onOpenContext} className="inline-flex size-8 items-center justify-center rounded-full border border-[color:var(--border)] text-muted hover:text-text 2xl:hidden" aria-label="Abrir contexto del contacto">
                 <PanelRight aria-hidden="true" className="size-4" />
@@ -162,7 +173,7 @@ export function ChatPanel({
         tabIndex={0}
         aria-label="Mensajes de la conversación"
       >
-        {loading && !detail ? (
+        {mode === "DETAIL_LOADING" && !detail ? (
           <div className="space-y-3">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
@@ -176,7 +187,20 @@ export function ChatPanel({
           </div>
         ) : null}
 
-        {!loading && !detail ? (
+        {mode === "DETAIL_ERROR" && error ? (
+          <div className="flex h-full min-h-[340px] flex-col items-center justify-center rounded-[28px] border border-red-400/25 bg-red-400/10 px-5 text-center" role="alert">
+            <MessageSquareEmpty />
+            <p className="mt-3 text-base font-semibold">No pudimos cargar esta conversación.</p>
+            <p className="mt-1 max-w-sm text-xs leading-6 text-red-100/80">
+              {error.status ? `El servidor respondió HTTP ${error.status}.` : "Ocurrió un error de red inesperado."}
+            </p>
+            <button type="button" onClick={onRetry} className="mt-4 rounded-full border border-red-300/30 px-3 py-1.5 text-xs font-medium text-red-50 hover:bg-red-300/10">
+              Reintentar
+            </button>
+          </div>
+        ) : null}
+
+        {mode === "LIST" ? (
           <div className="flex h-full min-h-[340px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[color:var(--border)] bg-card/40 text-center">
             <MessageSquareEmpty />
             <p className="mt-3 text-base font-semibold">Selecciona una conversacion</p>
