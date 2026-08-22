@@ -498,8 +498,9 @@ export type PortalWhatsAppCanaryWorkspace = {
     status: string;
   };
   templates: Array<PortalWhatsAppTemplate & {
-    variables: Array<{ key: string; componentType: string; componentIndex: number; position: number; label: string }>;
+    variables: Array<{ key: string; componentType: string; componentIndex: number; buttonIndex?: number; position: number; label: string }>;
     canSend: boolean;
+    unsupportedReason: string | null;
   }>;
   recipients: Array<{ id: string; name: string; phoneMasked: string; consentStatus: string }>;
   attempts: PortalWhatsAppCanaryAttempt[];

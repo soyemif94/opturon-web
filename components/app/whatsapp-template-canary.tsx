@@ -12,6 +12,7 @@ const COPY: Record<string, string> = {
   whatsapp_channel_not_ready: "Falta completar la configuracion segura del canal.",
   whatsapp_template_not_found: "La plantilla ya no existe en este WABA.",
   whatsapp_template_not_sendable: "Meta no permite enviar esta plantilla en su estado actual.",
+  whatsapp_template_component_unsupported: "Esta plantilla requiere un componente multimedia que Canary Phase1 no puede completar de forma segura.",
   whatsapp_template_variables_missing: "Completa todas las variables requeridas.",
   whatsapp_canary_recipient_not_authorized: "El destinatario no esta activo o no tiene consentimiento registrado.",
   whatsapp_canary_send_failed: "Meta rechazo el envio. Revisa el detalle tecnico seguro.",
@@ -20,10 +21,21 @@ const COPY: Record<string, string> = {
 
 function previewParts(template: PortalWhatsAppCanaryWorkspace["templates"][number] | undefined, values: Record<string, string>) {
   const definition = template?.definition || {};
-  const provider = definition.provider as { components?: Array<{ type?: string; text?: string }> } | undefined;
-  const blueprint = definition.blueprint as { components?: Array<{ type?: string; text?: string }> } | undefined;
-  const components = provider?.components || (definition.components as Array<{ type?: string; text?: string }> | undefined) || blueprint?.components || [];
+  type Component = { type?: string; text?: string; buttons?: Array<{ text?: string; url?: string }> };
+  const provider = definition.provider as { components?: Component[] } | undefined;
+  const blueprint = definition.blueprint as { components?: Component[] } | undefined;
+  const components = provider?.components || (definition.components as Component[] | undefined) || blueprint?.components || [];
   return components.map((component, index) => {
+    if (String(component.type || "").toLowerCase() === "buttons") {
+      const text = (component.buttons || []).map((button, buttonIndex) => {
+        let url = String(button.url || "");
+        template?.variables.filter((item) => item.componentIndex === index && item.buttonIndex === buttonIndex).forEach((item) => {
+          url = url.replaceAll(`{{${item.position}}}`, values[item.key] || `{{${item.position}}}`);
+        });
+        return [button.text, url].filter(Boolean).join(" · ");
+      }).filter(Boolean).join("\n");
+      return { type: "button", text };
+    }
     let text = String(component.text || "");
     template?.variables.filter((item) => item.componentIndex === index).forEach((item) => {
       text = text.replaceAll(`{{${item.position}}}`, values[item.key] || `{{${item.position}}}`);
@@ -83,6 +95,7 @@ export function WhatsAppTemplateCanary() {
       <Card><CardHeader><div><CardTitle>Preparar prueba</CardTitle><CardDescription>Solo templates APPROVED habilitan el envio.</CardDescription></div></CardHeader><CardContent className="grid gap-4 pt-0">
         <Field label="Plantilla e idioma"><select className="control" value={templateId} onChange={(event) => { setTemplateId(event.target.value); setValues({}); newAttempt(); }}><option value="">Seleccionar plantilla</option>{workspace?.templates.map((item) => <option key={item.id} value={item.id}>{item.metaTemplateName} · {item.language} · {item.status.toUpperCase()}</option>)}</select></Field>
         {template ? <div className="flex gap-2"><Badge variant={template.canSend ? "success" : "warning"}>{template.status.toUpperCase()}</Badge><Badge variant="outline">{template.category}</Badge></div> : null}
+        {template?.unsupportedReason ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">Template aprobado, pero no enviable en Canary: requiere header multimedia o un boton dinamico no soportado.</p> : null}
         <Field label="Destinatario autorizado"><select className="control" value={recipientId} onChange={(event) => { setRecipientId(event.target.value); newAttempt(); }}><option value="">Seleccionar destinatario</option>{workspace?.recipients.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.phoneMasked}</option>)}</select></Field>
         {template?.variables.map((item) => <Field key={item.key} label={item.label}><input className="control" value={values[item.key] || ""} onChange={(event) => { setValues((current) => ({ ...current, [item.key]: event.target.value })); newAttempt(); }} placeholder={`Valor para ${item.label}`} /></Field>)}
         {!workspace?.recipients.length ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">No hay destinatarios internos activos con consentimiento granted.</p> : null}

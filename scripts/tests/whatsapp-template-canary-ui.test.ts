@@ -19,7 +19,7 @@ test("template and recipient selection are controlled", () => {
   assert.match(ui, /value=\{templateId\}/); assert.match(ui, /value=\{recipientId\}/); assert.match(ui, /phoneMasked/);
 });
 test("real component variables drive ordered inputs and preview", () => {
-  assert.match(ui, /template\?\.variables\.map/); assert.match(ui, /componentIndex/); assert.match(ui, /replaceAll/);
+  assert.match(ui, /template\?\.variables\.map/); assert.match(ui, /componentIndex/); assert.match(ui, /replaceAll/); assert.match(ui, /unsupportedReason/);
 });
 test("send remains disabled until the contract is complete", () => {
   assert.match(ui, /template\.variables\.every/); assert.match(ui, /disabled=\{!ready \|\| busy\}/);
