@@ -251,31 +251,31 @@ function SidebarPanel({
   inventoryAlertCount: number;
 }) {
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/95 p-5 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/95 p-3 shadow-[var(--card-shadow-strong)] backdrop-blur-xl sm:p-5">
       <div className="absolute inset-0 bg-[image:var(--sidebar-overlay)]" />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto pr-1">
-        <div className="rounded-[24px] border border-brand/20 bg-[image:var(--sidebar-hero-gradient)] p-5">
+        <div className="rounded-[20px] border border-brand/20 bg-[image:var(--sidebar-hero-gradient)] p-3 sm:rounded-[24px] sm:p-5">
           <Badge variant="warning" className="border-brand/30 bg-brand/10 text-brandBright">
             Portal cliente
           </Badge>
-          <h2 className="mt-4 text-2xl font-semibold tracking-tight">Espacio de trabajo Opturon</h2>
-          <p className="mt-2 text-sm leading-6 text-muted">
+          <h2 className="mt-2 text-base font-semibold tracking-tight sm:mt-4 sm:text-2xl">Espacio de trabajo Opturon</h2>
+          <p className="mt-2 hidden text-sm leading-6 text-muted sm:block">
             Conversaciones, agenda operativa y canal WhatsApp en una vista simple para el negocio.
           </p>
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2 sm:mt-5">
             {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
             <Badge variant="success">Espacio activo</Badge>
             {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
           </div>
           {buildLabel ? (
-            <p className="mt-3 font-mono text-[11px] font-medium tracking-[0.12em] text-muted" title={buildLabel}>
+            <p className="mt-3 hidden font-mono text-[11px] font-medium tracking-[0.12em] text-muted sm:block" title={buildLabel}>
               {buildLabel}
             </p>
           ) : null}
         </div>
 
-        <nav className="mt-6 space-y-2">
+        <nav className="mt-3 space-y-1 sm:mt-6 sm:space-y-2">
           {visibleNavItems.map((item) => {
             const active = item.match(pathname);
             const Icon = item.icon;
@@ -286,7 +286,7 @@ function SidebarPanel({
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "group flex items-start gap-3 rounded-2xl border px-4 py-3 transition-all duration-200",
+                  "group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-1.5 transition-all duration-200 sm:items-start sm:rounded-2xl sm:px-4 sm:py-3",
                   active
                     ? "border-brand/35 bg-brand/10 text-text shadow-[0_0_0_1px_rgba(192,80,0,0.12)]"
                     : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/70 hover:text-text"
@@ -294,7 +294,7 @@ function SidebarPanel({
               >
                 <span
                   className={cn(
-                    "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors",
+                    "inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-colors sm:mt-0.5 sm:h-10 sm:w-10 sm:rounded-2xl",
                     active
                       ? "border-brand/30 bg-brand/15 text-brandBright"
                       : "border-[color:var(--border)] bg-surface text-muted group-hover:text-text"
@@ -313,14 +313,14 @@ function SidebarPanel({
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" />
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-muted">{item.description}</span>
+                  <span className="mt-1 hidden text-xs leading-5 text-muted sm:block">{item.description}</span>
                 </span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-6 rounded-[24px] border border-[color:var(--border)] bg-surface/75 p-4">
+        <div className="mt-3 rounded-[20px] border border-[color:var(--border)] bg-surface/75 p-3 sm:mt-6 sm:rounded-[24px] sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-muted">Canal principal</p>
@@ -328,7 +328,7 @@ function SidebarPanel({
             </div>
             <Headset className="h-4 w-4 text-brandBright" />
           </div>
-          <div className="mt-4 space-y-3 text-sm text-muted">
+          <div className="mt-3 hidden space-y-3 text-sm text-muted sm:block">
             <div className="flex items-center justify-between">
               <span>Estado del canal</span>
               <span className={sidebarChannelTone}>{sidebarChannelStatusLabel}</span>
@@ -352,7 +352,7 @@ function SidebarPanel({
             <Link
               href="/app/integrations"
               onClick={onNavigate}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-2 text-sm font-medium text-white transition-transform hover:-translate-y-0.5 sm:mt-4 sm:py-3"
             >
               <PhoneCall className="h-4 w-4" />
               {sidebarActionLabel}
@@ -362,7 +362,7 @@ function SidebarPanel({
             <Link
               href="/app/users"
               onClick={onNavigate}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-2 text-sm font-medium text-white transition-transform hover:-translate-y-0.5 sm:mt-4 sm:py-3"
             >
               <PhoneCall className="h-4 w-4" />
               Gestionar usuarios
@@ -373,7 +373,7 @@ function SidebarPanel({
         <button
           type="button"
           onClick={onSignOut}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-3 text-sm font-medium text-muted transition-colors hover:text-text"
+          className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] bg-surface/65 px-4 py-2 text-sm font-medium text-muted transition-colors hover:text-text sm:mt-4 sm:py-3"
         >
           <LogOut className="h-4 w-4" />
           Cerrar sesion
@@ -457,7 +457,7 @@ function DesktopRail({
 }) {
   return (
     <aside className="hidden w-[92px] shrink-0 self-start xl:block">
-      <div className="relative sticky top-3 flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+      <div className="relative sticky top-3 flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl md:max-h-[calc(100dvh-2.5rem)]">
         <div className="absolute inset-0 rounded-[30px] bg-[image:var(--rail-overlay)]" />
         <div className="relative flex h-full min-h-0 flex-col items-center">
           <OpturonMark compact />
@@ -716,11 +716,11 @@ export function AppShell({
             className={cn(
               "flex min-h-[calc(100dvh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100dvh-2.5rem)]",
               isInboxRoute
-                ? "overflow-visible rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)] xl:h-[calc(100dvh-2.5rem)] xl:min-h-0 xl:overflow-hidden"
+                ? "h-[calc(100dvh-1.5rem)] min-h-0 overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)] md:h-[calc(100dvh-2.5rem)]"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
             )}
           >
-            <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/75 px-5 py-4 backdrop-blur xl:px-8">
+            <header className="shrink-0 border-b border-[color:var(--border)] bg-surface/75 px-3 py-2.5 backdrop-blur sm:px-5 sm:py-4 xl:px-8">
               <div className="flex items-start gap-3">
                 <button
                   type="button"
@@ -733,18 +733,19 @@ export function AppShell({
 
                 <div className="min-w-0 flex-1">
                   {topbar || (
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-col gap-2 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-muted">Portal del cliente</p>
-                        <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
-                          Gestiona conversaciones, automatizaciones y crecimiento
+                        <p className="hidden text-xs uppercase tracking-[0.24em] text-muted sm:block">Portal del cliente</p>
+                        <h1 className="text-base font-semibold tracking-tight sm:mt-1 sm:text-xl md:text-2xl">
+                          <span className="sm:hidden">Portal del cliente</span>
+                          <span className="hidden sm:inline">Gestiona conversaciones, automatizaciones y crecimiento</span>
                         </h1>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <ThemeToggleButton />
-                        <Badge variant="muted">Espacio del cliente</Badge>
+                        <Badge variant="muted" className="hidden md:inline-flex">Espacio del cliente</Badge>
                         <Badge variant="success">Portal activo</Badge>
-                        <Badge variant="outline" className="gap-1.5">
+                        <Badge variant="outline" className="hidden gap-1.5 md:inline-flex">
                           <Sparkles className="h-3.5 w-3.5" />
                           Operacion en vivo
                         </Badge>
@@ -758,7 +759,7 @@ export function AppShell({
 
             {buildLabel ? (
               <div
-                className="shrink-0 border-b border-[color:var(--border)] bg-surface/55 px-5 py-2 font-mono text-[11px] font-medium tracking-[0.08em] text-muted xl:px-8"
+                className="hidden shrink-0 border-b border-[color:var(--border)] bg-surface/55 px-5 py-2 font-mono text-[11px] font-medium tracking-[0.08em] text-muted md:block xl:px-8"
                 title={buildLabel}
               >
                 {buildLabel}
@@ -769,7 +770,7 @@ export function AppShell({
               className={cn(
                 "flex-1 min-h-0",
                 isInboxRoute
-                  ? "overflow-visible bg-[image:var(--panel-glow)] p-4 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden xl:p-6"
+                  ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-[image:var(--panel-glow)] p-2 sm:p-4 xl:p-6"
                   : "overflow-x-visible overflow-y-auto bg-[image:var(--panel-glow)] p-5 xl:p-8"
               )}
             >

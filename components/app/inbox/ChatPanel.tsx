@@ -7,6 +7,7 @@ import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
 import type { BotDomainOverride, BotFlowLock, DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
+import { shouldStickInboxToBottom } from "@/components/app/inbox/mobile-behavior";
 
 function statusLabel(detail: DetailPayload) {
   if (detail.conversation.status === "new") return "nueva";
@@ -90,7 +91,7 @@ export function ChatPanel({
     const conversationId = detail?.conversation.id || null;
     const conversationChanged = previousConversationIdRef.current !== conversationId;
     const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    const shouldStickToBottom = conversationChanged || distanceFromBottom < 120;
+    const shouldStickToBottom = shouldStickInboxToBottom({ conversationChanged, distanceFromBottom });
 
     previousConversationIdRef.current = conversationId;
     if (!shouldStickToBottom) return;
@@ -157,7 +158,7 @@ export function ChatPanel({
 
       <div
         ref={scrollViewportRef}
-        className="app-scroll-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] px-3 py-4 sm:px-5"
+        className="app-scroll-surface min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] px-3 py-4 [-webkit-overflow-scrolling:touch] sm:px-5"
         tabIndex={0}
         aria-label="Mensajes de la conversación"
       >

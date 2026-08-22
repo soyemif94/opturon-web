@@ -42,6 +42,7 @@ export function ConversationRow({
   row,
   selected,
   bulkSelected,
+  onSelectStart,
   onSelect,
   onToggleSelect,
   onMarkHot,
@@ -51,6 +52,7 @@ export function ConversationRow({
   row: ConversationRowData;
   selected: boolean;
   bulkSelected?: boolean;
+  onSelectStart?: () => void;
   onSelect: () => void;
   onToggleSelect?: () => void;
   onMarkHot: () => void;
@@ -97,7 +99,7 @@ export function ConversationRow({
           </label>
       ) : null}
 
-      <button onClick={onSelect} className="min-w-0 flex-1 px-3 py-2.5 text-left" type="button" aria-current={selected ? "true" : undefined}>
+      <button onPointerDown={onSelectStart} onClick={onSelect} className="min-w-0 flex-1 px-3 py-2.5 text-left" type="button" aria-current={selected ? "true" : undefined}>
           <div className="flex items-center gap-2.5">
             <div className="relative shrink-0">
               <SimpleAvatar

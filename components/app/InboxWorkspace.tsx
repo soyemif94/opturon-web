@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/toast";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { shouldShowInboxChannelEmptyState } from "@/lib/whatsapp-channel-state";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { shouldAutoSelectFirstConversation } from "@/components/app/inbox/mobile-behavior";
 
 type InboxListResponse = {
   readOnly: boolean;
@@ -222,7 +223,12 @@ export function InboxWorkspace({
         setReadOnly(nextReadOnly);
         setRows(nextRows);
         setChannelState(json.channelState || null);
-        if (!selectedId && nextRows.length) setSelectedId(nextRows[0].id);
+        if (
+          typeof window !== "undefined" &&
+          shouldAutoSelectFirstConversation({ viewportWidth: window.innerWidth, selectedId, rowCount: nextRows.length })
+        ) {
+          setSelectedId(nextRows[0].id);
+        }
         if (selectedId && !nextRows.some((item) => item.id === selectedId)) setSelectedId(nextRows[0]?.id);
         setSelectedIds((current) => current.filter((id) => nextRows.some((item) => item.id === id)));
       }
@@ -1278,7 +1284,7 @@ export function InboxWorkspace({
   const shouldShowConnectionEmptyStateForChannel = channel === "whatsapp" && shouldRenderChannelEmptyState;
 
   return (
-    <div className="flex min-h-0 flex-col text-sm">
+    <div className="flex h-full min-h-0 flex-1 flex-col text-sm">
       {readOnly ? (
         <div className="mb-2 border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 text-xs text-yellow-200">
           Modo demo read-only activo.
@@ -1300,6 +1306,7 @@ export function InboxWorkspace({
           left={
             <ConversationList
               rows={rows}
+              active={!selectedId}
               headerAction={
                 <WhatsAppChatImportModal
                   compact

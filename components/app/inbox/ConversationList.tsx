@@ -1,5 +1,5 @@
 import { MessageSquareText, Search, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ConversationRow } from "@/components/app/inbox/ConversationRow";
@@ -22,6 +22,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 
 export function ConversationList({
   rows,
+  active = true,
   headerAction,
   loading,
   hasLoaded,
@@ -51,6 +52,7 @@ export function ConversationList({
   restoreBusy
 }: {
   rows: ConversationRowData[];
+  active?: boolean;
   headerAction?: ReactNode;
   loading: boolean;
   hasLoaded: boolean;
@@ -80,6 +82,8 @@ export function ConversationList({
   restoreBusy?: boolean;
 }) {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTopRef = useRef(0);
   const normalizedQuery = useMemo(() => normalizeText(search).join(" "), [search]);
 
   const visibleRows = useMemo(() => {
@@ -93,6 +97,14 @@ export function ConversationList({
   const selectedVisibleCount = useMemo(() => visibleIds.filter((id) => selectedIds.includes(id)).length, [selectedIds, visibleIds]);
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
   const showingArchived = visibility === "archived";
+
+  useEffect(() => {
+    if (!active) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (scrollViewportRef.current) scrollViewportRef.current.scrollTop = lastScrollTopRef.current;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [active]);
   const emptyTitle =
     channel === "instagram"
       ? "Todavia no hay conversaciones de Instagram"
@@ -227,7 +239,11 @@ export function ConversationList({
       </header>
 
       <div
-        className="app-scroll-surface relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-2"
+        ref={scrollViewportRef}
+        onScroll={(event) => {
+          if (active) lastScrollTopRef.current = event.currentTarget.scrollTop;
+        }}
+        className="app-scroll-surface relative min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain p-2 [-webkit-overflow-scrolling:touch]"
         tabIndex={0}
         aria-label="Lista de conversaciones"
       >
@@ -283,6 +299,9 @@ export function ConversationList({
                 row={row}
                 selected={selectedId === row.id}
                 bulkSelected={selectedIds.includes(row.id)}
+                onSelectStart={() => {
+                  if (scrollViewportRef.current) lastScrollTopRef.current = scrollViewportRef.current.scrollTop;
+                }}
                 onSelect={() => onSelect(row.id)}
                 onToggleSelect={() => onToggleSelect(row.id)}
                 onMarkHot={() => onMarkHot(row.id)}

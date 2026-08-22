@@ -22,12 +22,12 @@ export function InboxLayout({
   onCloseContext?: () => void;
 }) {
   return (
-    <div className="relative flex min-h-0 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20 xl:flex-1">
-      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(290px,330px)_minmax(0,1fr)_minmax(280px,320px)]">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden border border-[color:var(--border)] bg-card/20">
+      <div className="relative grid h-full min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(290px,330px)_minmax(0,1fr)_minmax(280px,320px)]">
         <aside
           className={cn(
-            "min-h-[34rem] min-w-0 overflow-hidden xl:min-h-0 xl:border-r xl:border-[color:var(--border)]",
-            hasDetail ? "hidden xl:block xl:min-h-0" : "block xl:min-h-0"
+            "h-full min-h-0 min-w-0 overflow-hidden xl:border-r xl:border-[color:var(--border)]",
+            hasDetail ? "invisible pointer-events-none absolute inset-0 xl:visible xl:pointer-events-auto xl:static xl:block" : "block"
           )}
         >
           {left}
@@ -35,7 +35,7 @@ export function InboxLayout({
 
         <main
           className={cn(
-            "min-h-[34rem] min-w-0 flex-col overflow-hidden xl:flex xl:min-h-0",
+            "h-full min-h-0 min-w-0 flex-col overflow-hidden xl:flex",
             hasDetail ? "flex" : "hidden xl:flex"
           )}
         >
@@ -52,7 +52,7 @@ export function InboxLayout({
             </div>
           ) : null}
 
-          <section className="min-h-[420px] min-w-0 overflow-hidden xl:min-h-0 xl:flex-1">{center}</section>
+          <section className="min-h-0 min-w-0 flex-1 overflow-hidden">{center}</section>
         </main>
 
         <aside
