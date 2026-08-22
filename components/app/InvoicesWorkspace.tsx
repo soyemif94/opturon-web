@@ -334,7 +334,7 @@ export function InvoicesWorkspace({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="Comprobantes emitidos"
@@ -373,7 +373,7 @@ export function InvoicesWorkspace({
         />
       </section>
 
-      <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,16,31,0.96),rgba(5,11,22,0.98))] shadow-[0_24px_80px_rgba(2,6,23,0.4)]">
+      <section className="min-w-0 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,16,31,0.96),rgba(5,11,22,0.98))] shadow-[0_24px_80px_rgba(2,6,23,0.4)]">
         <div className="border-b border-white/8 px-4 py-4 sm:px-5 lg:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -395,7 +395,7 @@ export function InvoicesWorkspace({
           </div>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
-            <div className="relative lg:col-span-2 xl:col-span-1">
+            <div className="relative min-w-0 lg:col-span-2 xl:col-span-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <Input
                 className="h-12 rounded-2xl border-white/10 bg-white/[0.03] pl-11 text-sm"
@@ -494,7 +494,7 @@ export function InvoicesWorkspace({
           ) : null}
         </div>
 
-        <div className="grid gap-6 px-4 py-5 sm:px-5 lg:grid-cols-[minmax(0,1.6fr)_320px] lg:px-6">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 px-4 py-5 sm:px-5 lg:grid-cols-[minmax(0,1.6fr)_320px] lg:px-6">
           <div className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-center gap-3 border-b border-white/8 pb-1">
               {(Object.keys(CATEGORY_LABELS) as InvoiceCategoryTab[]).map((tab) => (
@@ -664,7 +664,7 @@ export function InvoicesWorkspace({
             </Card>
           </div>
 
-          <aside className="space-y-4">
+          <aside className="min-w-0 space-y-4">
             <RailCard title="Acciones rapidas">
               <QuickAction href={readOnly ? "/app/invoices" : "/app/invoices/new"} icon={Plus} label="Nuevo comprobante" helper={readOnly ? "Vista protegida" : "Abrir alta de borrador"} />
               <QuickAction href={exportHref} icon={Download} label="Exportar filtrados" helper="Descarga actual en Excel" />
@@ -673,7 +673,7 @@ export function InvoicesWorkspace({
             </RailCard>
 
             <RailCard title="Resumen por tipo" subtitle="Este mes">
-              <div className="flex items-center gap-4">
+              <div className="flex min-w-0 flex-col items-center gap-4 sm:flex-row sm:items-center">
                 <DistributionRing items={summaryByType.items} total={summaryByType.total} />
                 <div className="min-w-0 flex-1 space-y-3">
                   {summaryByType.items.map((item) => (
@@ -753,9 +753,9 @@ function FilterSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <label className="flex flex-col gap-2">
+    <label className="flex min-w-0 flex-col gap-2">
       <span className="text-sm text-slate-400">{label}</span>
-      <select className="h-12 rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-sm text-slate-100 outline-none transition focus:border-[#fb923c]" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select className="h-12 min-w-0 max-w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-sm text-slate-100 outline-none transition focus:border-[#fb923c]" value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -776,7 +776,7 @@ function FilterDate({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-2">
+    <label className="flex min-w-0 flex-col gap-2">
       <span className="text-sm text-slate-400">{label}</span>
       <Input type="date" className="h-12 rounded-2xl border-white/10 bg-white/[0.03] px-4 text-sm" value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
@@ -847,7 +847,7 @@ function RailCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,15,29,0.98),rgba(5,10,20,0.95))] p-5 shadow-[0_18px_60px_rgba(2,6,23,0.32)]">
+    <div className="min-w-0 rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,15,29,0.98),rgba(5,10,20,0.95))] p-5 shadow-[0_18px_60px_rgba(2,6,23,0.32)]">
       <div className="mb-4 flex items-baseline gap-2">
         <p className="text-[1.45rem] font-semibold tracking-tight text-white">{title}</p>
         {subtitle ? <span className="text-sm text-slate-500">{subtitle}</span> : null}
@@ -881,11 +881,11 @@ function QuickAction({
   );
 
   if (href.startsWith("/")) {
-    return <Link href={href}>{content}</Link>;
+    return <Link href={href} className="block min-w-0">{content}</Link>;
   }
 
   return (
-    <a href={href}>
+    <a href={href} className="block min-w-0">
       {content}
     </a>
   );
