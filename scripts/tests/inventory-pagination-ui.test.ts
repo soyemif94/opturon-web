@@ -61,9 +61,10 @@ assert.doesNotMatch(workspace, /total:\s*products\.length/);
 assert.doesNotMatch(workspace, /products\.length\s*-\s*withStock/);
 
 assert.match(workspace, /ariaLabel="Paginacion de productos de Inventario"/);
-assert.match(sharedOperationsUi, /grid-cols-\[7rem_minmax\(16rem,1fr\)_7rem\]/);
-assert.match(sharedOperationsUi, /min-w-\[36rem\]/);
-assert.match(sharedOperationsUi, /className="w-28 shrink-0 justify-center"/);
+assert.match(sharedOperationsUi, /grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);
+assert.match(sharedOperationsUi, /sm:grid-cols-\[7rem_minmax\(16rem,1fr\)_7rem\]/);
+assert.match(sharedOperationsUi, /sm:min-w-\[36rem\]/);
+assert.match(sharedOperationsUi, /className="min-w-0 px-2 sm:w-28 sm:shrink-0 sm:px-4"/);
 assert.match(workspace, /tabular-nums/);
 assert.doesNotMatch(workspace, /paginationItems/, "pagination layout must not change its number of controls by page");
 

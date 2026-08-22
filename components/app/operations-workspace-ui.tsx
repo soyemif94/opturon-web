@@ -112,19 +112,20 @@ export function OperationsStablePaginator({
   const displayedPage = totalPages > 0 ? page : 0;
   const suffix = itemLabel ? ` ${itemLabel}` : "";
   return (
-    <div className="overflow-x-auto">
-      <nav aria-label={ariaLabel} className="grid min-h-14 min-w-[36rem] grid-cols-[7rem_minmax(16rem,1fr)_7rem] items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-3 py-2">
+    <div className="min-w-0">
+      <nav aria-label={ariaLabel} className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-muted/20 px-2 py-2 sm:min-w-[36rem] sm:grid-cols-[7rem_minmax(16rem,1fr)_7rem] sm:gap-3 sm:px-3">
         <div className="flex justify-start">
-          <Button type="button" variant="secondary" className="w-28 shrink-0 justify-center" disabled={disabled || page <= 1} onClick={() => onPage(page - 1)}>
-            <ChevronLeft aria-hidden="true" className="mr-1 size-4 shrink-0" />Anterior
+          <Button type="button" variant="secondary" className="min-w-0 px-2 sm:w-28 sm:shrink-0 sm:px-4" disabled={disabled || page <= 1} onClick={() => onPage(page - 1)}>
+            <ChevronLeft aria-hidden="true" className="size-4 shrink-0 sm:mr-1" /><span className="sr-only sm:not-sr-only">Anterior</span>
           </Button>
         </div>
-        <p aria-live="polite" className="min-w-[16rem] whitespace-nowrap text-center text-sm tabular-nums text-muted">
-          Página {displayedPage} de {totalPages} · {pageStart}-{pageEnd} de {totalItems}{suffix}
+        <p aria-live="polite" className="min-w-0 whitespace-nowrap text-center text-xs tabular-nums text-muted sm:min-w-[16rem] sm:text-sm">
+          <span className="sm:hidden">Pág. {displayedPage}/{totalPages}</span>
+          <span className="hidden sm:inline">Página {displayedPage} de {totalPages} · {pageStart}-{pageEnd} de {totalItems}{suffix}</span>
         </p>
         <div className="flex justify-end">
-          <Button type="button" variant="secondary" className="w-28 shrink-0 justify-center" disabled={disabled || totalPages === 0 || page >= totalPages} onClick={() => onPage(page + 1)}>
-            Siguiente<ChevronRight aria-hidden="true" className="ml-1 size-4 shrink-0" />
+          <Button type="button" variant="secondary" className="min-w-0 px-2 sm:w-28 sm:shrink-0 sm:px-4" disabled={disabled || totalPages === 0 || page >= totalPages} onClick={() => onPage(page + 1)}>
+            <span className="sr-only sm:not-sr-only">Siguiente</span><ChevronRight aria-hidden="true" className="size-4 shrink-0 sm:ml-1" />
           </Button>
         </div>
       </nav>

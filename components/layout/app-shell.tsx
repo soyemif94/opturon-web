@@ -457,7 +457,7 @@ function DesktopRail({
 }) {
   return (
     <aside className="hidden w-[92px] shrink-0 self-start xl:block">
-      <div className="relative sticky top-3 flex max-h-[calc(100vh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
+      <div className="relative sticky top-3 flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl">
         <div className="absolute inset-0 rounded-[30px] bg-[image:var(--rail-overlay)]" />
         <div className="relative flex h-full min-h-0 flex-col items-center">
           <OpturonMark compact />
@@ -702,8 +702,8 @@ export function AppShell({
   const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
-    <section className="min-h-screen w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
-      <div className="flex min-h-[calc(100vh-1.5rem)] w-full items-stretch gap-3 md:min-h-[calc(100vh-2.5rem)] md:gap-5">
+    <section className="min-h-dvh w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
+      <div className="flex min-h-[calc(100dvh-1.5rem)] w-full items-stretch gap-3 md:min-h-[calc(100dvh-2.5rem)] md:gap-5">
         <DesktopRail
           pathname={pathname}
           visibleNavItems={visibleNavItems}
@@ -714,7 +714,7 @@ export function AppShell({
         <div className="flex min-w-0 flex-1">
           <div
             className={cn(
-              "flex min-h-[calc(100vh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100vh-2.5rem)]",
+              "flex min-h-[calc(100dvh-1.5rem)] min-w-0 flex-1 flex-col md:min-h-[calc(100dvh-2.5rem)]",
               isInboxRoute
                 ? "overflow-visible rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)] xl:h-[calc(100dvh-2.5rem)] xl:min-h-0 xl:overflow-hidden"
                 : "overflow-hidden rounded-[32px] border border-[color:var(--border)] bg-[image:var(--shell-gradient)] shadow-[var(--shell-shadow)]"
@@ -780,7 +780,7 @@ export function AppShell({
       </div>
 
       <Dialog open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <DialogContent className="left-0 top-0 h-screen max-w-[340px] translate-x-0 translate-y-0 rounded-none border-l-0 border-t-0 border-b-0 border-r border-[color:var(--border)] bg-transparent p-3 shadow-none sm:max-w-[360px] md:p-5">
+        <DialogContent className="left-0 top-0 h-dvh max-h-dvh max-w-[340px] translate-x-0 translate-y-0 rounded-none border-l-0 border-t-0 border-b-0 border-r border-[color:var(--border)] bg-transparent p-3 shadow-none sm:max-w-[360px] md:p-5">
           <DialogHeader className="sr-only">
             <DialogTitle>Menu del portal</DialogTitle>
             <DialogDescription>Navega por todos los modulos del espacio de trabajo.</DialogDescription>

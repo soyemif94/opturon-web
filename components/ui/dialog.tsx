@@ -20,7 +20,7 @@ export function DialogContent({ className, children, ...props }: React.Component
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[color:var(--border)] bg-card p-6 shadow-[var(--card-shadow-strong)]",
+          "fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[color:var(--border)] bg-card p-4 shadow-[var(--card-shadow-strong)] sm:p-6",
           className
         )}
         {...props}
@@ -44,7 +44,7 @@ export function DialogDescription({ className, ...props }: React.ComponentPropsW
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mt-6 flex justify-end gap-2", className)} {...props} />;
+  return <div className={cn("mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />;
 }
 
 export function ConfirmDialog({
