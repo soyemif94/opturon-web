@@ -31,6 +31,7 @@ export default async function AppAgendaPage({ searchParams }: AgendaPageProps) {
       title="Agenda"
       description="Modulo nativo de Opturon para organizar disponibilidad, seguimientos, notas internas y futura reserva de turnos desde conversaciones."
       badge="Agenda nativa"
+      compactMobile
     >
       <AgendaWorkspace
         currentUserId={ctx.userId}

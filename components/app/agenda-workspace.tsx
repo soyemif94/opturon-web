@@ -898,13 +898,13 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.24),transparent_24%),linear-gradient(180deg,rgba(12,16,24,0.98),rgba(9,13,20,0.96))] p-4 shadow-[var(--card-shadow)] md:p-5">
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.24),transparent_24%),linear-gradient(180deg,rgba(12,16,24,0.98),rgba(9,13,20,0.96))] p-3 shadow-[var(--card-shadow)] sm:p-4 md:p-5">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="hidden flex-col gap-3 sm:flex lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <Badge variant="warning">Agenda nativa</Badge>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Agenda</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-3 sm:text-3xl">Agenda</h2>
+              <p className="mt-2 hidden max-w-3xl text-sm leading-6 text-muted sm:block">
                 Organiza disponibilidad, seguimientos, notas internas y reserva de turnos desde conversaciones.
               </p>
             </div>
@@ -915,7 +915,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
             <AgendaKpiCard
               icon={<CalendarDays className="h-4 w-4" />}
               label="Hoy"
@@ -926,7 +926,9 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
             <AgendaKpiCard icon={<Clock3 className="h-4 w-4" />} label="Turnos hoy" value={todayAppointmentCount} helper={todayAppointmentCount ? "Items reservados hoy" : "Sin turnos"} tone="orange" />
             <AgendaKpiCard icon={<Rows3 className="h-4 w-4" />} label="Pendientes" value={todayPendingCount} helper={todayPendingCount ? "Pendientes del dia" : "Sin items pendientes"} tone="blue" />
             <AgendaKpiCard icon={<CheckCheck className="h-4 w-4" />} label="Confirmadas" value={todayConfirmedCount} helper={todayConfirmedCount ? "Confirmadas hoy" : "Sin confirmadas hoy"} tone="green" />
-            <AgendaKpiCard icon={<Sparkles className="h-4 w-4" />} label="Comerciales" value={todayCommercialCount} helper={todayCommercialCount ? "Activos hoy" : "Sin agenda comercial hoy"} tone="amber" />
+            <div className="col-span-2 md:col-span-1 xl:col-span-1">
+              <AgendaKpiCard icon={<Sparkles className="h-4 w-4" />} label="Comerciales" value={todayCommercialCount} helper={todayCommercialCount ? "Activos hoy" : "Sin agenda comercial hoy"} tone="amber" />
+            </div>
           </div>
         </div>
       </section>
@@ -968,7 +970,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                     className="h-11 rounded-2xl border-white/10 bg-black/15 pl-9"
                   />
                 </div>
-                <div className="inline-flex rounded-2xl border border-white/8 bg-black/15 p-1 text-xs">
+                <div className="grid w-full grid-cols-4 rounded-2xl border border-white/8 bg-black/15 p-1 text-xs xl:inline-flex xl:w-auto">
                   {[
                     { key: "month", label: "Mes" },
                     { key: "week", label: "Semana" },
@@ -980,7 +982,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                       type="button"
                       onClick={() => setViewMode(mode.key as AgendaViewMode)}
                       className={cn(
-                        "rounded-xl px-3 py-2 transition",
+                        "min-h-11 rounded-xl px-2 py-2 transition sm:px-3",
                         viewMode === mode.key ? "bg-brand text-white shadow-[0_10px_25px_rgba(192,80,0,0.22)]" : "text-muted hover:text-white"
                       )}
                     >
@@ -1046,7 +1048,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                   <div className="overflow-hidden rounded-[24px] border border-white/8 bg-black/12">
                     <div className="grid grid-cols-7 gap-px border-b border-white/8 bg-white/6">
                       {weekLabels.map((label) => (
-                        <div key={label} className="px-3 py-3 text-center text-[11px] uppercase tracking-[0.18em] text-muted">
+                        <div key={label} className="px-0.5 py-2 text-center text-[9px] uppercase tracking-[0.08em] text-muted md:px-3 md:py-3 md:text-[11px] md:tracking-[0.18em]">
                           {label}
                         </div>
                       ))}
@@ -1063,16 +1065,21 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                             type="button"
                             onClick={() => setSelectedDateKey(day.dateKey)}
                             className={cn(
-                              "min-h-[132px] bg-[rgba(10,14,22,0.94)] p-3 text-left transition hover:bg-[rgba(16,22,34,0.98)]",
+                              "min-h-[64px] bg-[rgba(10,14,22,0.94)] p-1.5 text-left transition hover:bg-[rgba(16,22,34,0.98)] md:min-h-[132px] md:p-3",
                               day.isSelected && "bg-[rgba(192,80,0,0.10)] shadow-[inset_0_0_0_1px_rgba(192,80,0,0.32)]",
                               !day.inCurrentMonth && "opacity-45"
                             )}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className={cn("text-sm font-medium text-white", day.isToday && "text-brandBright")}>{day.date.getDate()}</span>
-                              {day.isToday ? <Badge variant="warning">Hoy</Badge> : null}
+                              {day.isToday ? <span className="size-1.5 rounded-full bg-brand md:hidden" aria-label="Hoy" /> : null}
+                              {day.isToday ? <Badge variant="warning" className="hidden md:inline-flex">Hoy</Badge> : null}
                             </div>
-                            <div className="mt-3 space-y-2">
+                            <div className="mt-1.5 flex items-center gap-1 md:hidden" aria-label={`${day.count} items`}>
+                              {day.count > 0 ? <span className="size-1.5 rounded-full bg-brandBright" /> : null}
+                              {day.count > 0 ? <span className="text-[9px] text-muted">{day.count}</span> : null}
+                            </div>
+                            <div className="mt-3 hidden space-y-2 md:block">
                               {dayItems.length ? (
                                 dayItems.map((item) => (
                                   <div key={item.id} className={cn("rounded-xl border px-2.5 py-2 text-[11px]", getAgendaItemChipClass(item))}>
@@ -1802,13 +1809,13 @@ function AgendaKpiCard({
   } as const;
 
   return (
-    <div className={cn("rounded-[22px] border p-4", tones[tone])}>
+    <div className={cn("h-full rounded-[18px] border p-3 sm:rounded-[22px] sm:p-4", tones[tone])}>
       <div className="flex items-center gap-2 text-sm">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-black/15">{icon}</span>
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-black/15 sm:h-8 sm:w-8 sm:rounded-xl">{icon}</span>
         <span>{label}</span>
       </div>
-      <p className="mt-3 text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs opacity-80">{helper}</p>
+      <p className="mt-2 text-2xl font-semibold sm:mt-3 sm:text-3xl">{value}</p>
+      <p className="mt-1 hidden text-xs opacity-80 sm:block">{helper}</p>
     </div>
   );
 }
