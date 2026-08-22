@@ -8,8 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { PortalWhatsAppCanaryAttempt, PortalWhatsAppCanaryWorkspace } from "@/lib/api";
 
 const COPY: Record<string, string> = {
-  whatsapp_channel_not_connected: "El numero de WhatsApp no esta conectado.",
-  whatsapp_channel_not_ready: "Falta completar la configuracion segura del canal.",
+  whatsapp_canary_load_failed: "No se pudo cargar el espacio de prueba de WhatsApp.",
+  whatsapp_canary_sync_failed: "No se pudieron actualizar las plantillas desde Meta.",
+  meta_templates_sync_failed: "Meta no respondió correctamente al actualizar las plantillas.",
+  meta_templates_response_invalid: "Meta devolvió una respuesta de plantillas inválida.",
+  meta_templates_pagination_invalid: "Meta devolvió una paginación de plantillas inválida.",
+  meta_templates_pagination_limit_exceeded: "La sincronización alcanzó el límite seguro de páginas de Meta.",
+  whatsapp_channel_provider_invalid: "El canal activo no usa WhatsApp Cloud API.",
+  whatsapp_template_sync_tenant_mapping_missing: "El workspace no tiene un tenant externo válido para sincronizar.",
+  whatsapp_channel_not_found: "No hay un canal de WhatsApp configurado para este workspace.",
+  whatsapp_channel_not_connected: "El canal de WhatsApp no está activo.",
+  whatsapp_channel_not_ready: "El canal de WhatsApp no tiene todas las credenciales requeridas.",
   whatsapp_template_not_found: "La plantilla ya no existe en este WABA.",
   whatsapp_template_not_sendable: "Meta no permite enviar esta plantilla en su estado actual.",
   whatsapp_template_component_unsupported: "Esta plantilla requiere un componente multimedia que Canary Phase1 no puede completar de forma segura.",
@@ -52,6 +61,8 @@ export function WhatsAppTemplateCanary() {
   const [attempt, setAttempt] = useState<PortalWhatsAppCanaryAttempt | null>(null);
   const [key, setKey] = useState(() => `wa-canary-${crypto.randomUUID()}`);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const template = workspace?.templates.find((item) => item.id === templateId);
   const recipient = workspace?.recipients.find((item) => item.id === recipientId);
@@ -62,7 +73,27 @@ export function WhatsAppTemplateCanary() {
     const json = await response.json().catch(() => null);
     if (!response.ok || !json?.data) throw new Error(String(json?.error || "whatsapp_canary_load_failed"));
     setWorkspace(json.data);
+    setError(null);
     if (attempt) setAttempt(json.data.attempts.find((item: PortalWhatsAppCanaryAttempt) => item.id === attempt.id) || attempt);
+  }
+
+  async function refresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setError(null);
+    setRefreshMessage(null);
+    try {
+      const response = await fetch("/api/app/integrations/whatsapp/templates/canary/refresh", { method: "POST" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.data) throw new Error(String(json?.error || "whatsapp_canary_sync_failed"));
+      setWorkspace(json.data);
+      const count = Number(json.data.sync?.syncedCount || 0);
+      setRefreshMessage(count > 0 ? `${count} plantilla${count === 1 ? "" : "s"} actualizada${count === 1 ? "" : "s"} desde Meta.` : "Meta no devolvió plantillas para este WABA.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "whatsapp_canary_sync_failed");
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   useEffect(() => { void load().catch((cause) => setError(cause.message)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -89,16 +120,19 @@ export function WhatsAppTemplateCanary() {
 
   const preview = useMemo(() => previewParts(template, values), [template, values]);
   return <section id="whatsapp-templates-canary" className="space-y-4">
-    <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold">Templates / Canary</h2><p className="text-sm text-muted">Envio real e inmediato, solo a destinatarios internos consentidos.</p></div><Button variant="secondary" onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button></div>
+    <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold">Templates / Canary</h2><p className="text-sm text-muted">Envio real e inmediato, solo a destinatarios internos consentidos.</p></div><Button variant="secondary" disabled={refreshing} onClick={() => void refresh()}><RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />{refreshing ? "Actualizando…" : "Actualizar desde Meta"}</Button></div>
+    {refreshMessage ? <p role="status" className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm text-emerald-100">{refreshMessage}</p> : null}
     {workspace ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="WABA" value={workspace.channel.wabaId} /><Metric label="Numero conectado" value={workspace.channel.displayPhoneNumber || workspace.channel.phoneNumberId} /><Metric label="Display name" value={workspace.channel.verifiedName || "No informado"} /><Metric label="Conexion" value={workspace.channel.status || "Sin estado"} /></div> : null}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,.72fr)]">
       <Card><CardHeader><div><CardTitle>Preparar prueba</CardTitle><CardDescription>Solo templates APPROVED habilitan el envio.</CardDescription></div></CardHeader><CardContent className="grid gap-4 pt-0">
         <Field label="Plantilla e idioma"><select className="control" value={templateId} onChange={(event) => { setTemplateId(event.target.value); setValues({}); newAttempt(); }}><option value="">Seleccionar plantilla</option>{workspace?.templates.map((item) => <option key={item.id} value={item.id}>{item.metaTemplateName} · {item.language} · {item.status.toUpperCase()}</option>)}</select></Field>
+        {workspace && workspace.templates.length === 0 ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">No hay plantillas de Meta disponibles para este WABA. Usá “Actualizar desde Meta”.</p> : null}
+        {workspace && workspace.templates.length > 0 && !workspace.templates.some((item) => item.canSend) ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">No hay plantillas APPROVED compatibles con Canary.</p> : null}
         {template ? <div className="flex gap-2"><Badge variant={template.canSend ? "success" : "warning"}>{template.status.toUpperCase()}</Badge><Badge variant="outline">{template.category}</Badge></div> : null}
         {template?.unsupportedReason ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">Template aprobado, pero no enviable en Canary: requiere header multimedia o un boton dinamico no soportado.</p> : null}
         <Field label="Destinatario autorizado"><select className="control" value={recipientId} onChange={(event) => { setRecipientId(event.target.value); newAttempt(); }}><option value="">Seleccionar destinatario</option>{workspace?.recipients.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.phoneMasked}</option>)}</select></Field>
         {template?.variables.map((item) => <Field key={item.key} label={item.label}><input className="control" value={values[item.key] || ""} onChange={(event) => { setValues((current) => ({ ...current, [item.key]: event.target.value })); newAttempt(); }} placeholder={`Valor para ${item.label}`} /></Field>)}
-        {!workspace?.recipients.length ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">No hay destinatarios internos activos con consentimiento granted.</p> : null}
+        {workspace && workspace.recipients.length === 0 ? <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100">No hay destinatarios internos activos con consentimiento granted.</p> : null}
         {error ? <p role="alert" className="rounded-xl border border-red-400/25 bg-red-400/10 p-3 text-sm text-red-100">{COPY[error] || "No fue posible completar la operacion."}{attempt?.errorDetail ? ` Detalle: ${attempt.errorDetail}` : ""}</p> : null}
         <Button disabled={!ready || busy} onClick={() => void send()}><Send className="mr-2 h-4 w-4" />{busy ? "Enviando…" : "Enviar prueba ahora"}</Button>
       </CardContent></Card>

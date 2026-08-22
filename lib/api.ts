@@ -504,6 +504,10 @@ export type PortalWhatsAppCanaryWorkspace = {
   }>;
   recipients: Array<{ id: string; name: string; phoneMasked: string; consentStatus: string }>;
   attempts: PortalWhatsAppCanaryAttempt[];
+  sync?: {
+    syncedCount: number;
+    summary: Record<string, unknown> | null;
+  };
 };
 
 export type PortalWhatsAppStatus = {
@@ -901,6 +905,13 @@ export async function getPortalWhatsAppTemplateCanary(tenantId: string, portalAc
   return backendPortalFetch<{ success: boolean; data: PortalWhatsAppCanaryWorkspace }>(
     `/portal/tenants/${tenantId}/whatsapp/templates/canary`,
     { headers: { "x-portal-actor-id": portalActorId } }
+  );
+}
+
+export async function refreshPortalWhatsAppTemplateCanary(tenantId: string, portalActorId: string) {
+  return backendPortalFetch<{ success: boolean; data: PortalWhatsAppCanaryWorkspace }>(
+    `/portal/tenants/${tenantId}/whatsapp/templates/canary/refresh`,
+    { method: "POST", headers: { "x-portal-actor-id": portalActorId }, body: JSON.stringify({}) }
   );
 }
 

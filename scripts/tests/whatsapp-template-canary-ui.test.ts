@@ -7,6 +7,7 @@ const root = path.resolve(import.meta.dirname, "../..");
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 const ui = read("components/app/whatsapp-template-canary.tsx");
 const route = read("app/api/app/integrations/whatsapp/templates/canary/route.ts");
+const refreshRoute = read("app/api/app/integrations/whatsapp/templates/canary/refresh/route.ts");
 const hub = read("components/app/integrations-hub.tsx");
 
 test("WABA, connected number and connection identity are visible", () => {
@@ -14,6 +15,19 @@ test("WABA, connected number and connection identity are visible", () => {
 });
 test("real template list renders provider status and language", () => {
   assert.match(ui, /workspace\?\.templates\.map/); assert.match(ui, /item\.language/); assert.match(ui, /item\.status\.toUpperCase/);
+});
+test("refresh queries Meta through the protected backend sync", () => {
+  assert.match(ui, /Actualizar desde Meta/); assert.match(ui, /Actualizando…/); assert.match(ui, /canary\/refresh/);
+  assert.match(refreshRoute, /permission: "manage_workspace"/); assert.match(refreshRoute, /refreshPortalWhatsAppTemplateCanary/);
+  assert.match(refreshRoute, /portalActorId/); assert.doesNotMatch(refreshRoute, /accessToken|WHATSAPP_ACCESS_TOKEN/);
+});
+test("empty templates and recipients have separate semantic states", () => {
+  assert.match(ui, /No hay plantillas de Meta disponibles/); assert.match(ui, /No hay plantillas APPROVED compatibles/);
+  assert.match(ui, /No hay destinatarios internos activos con consentimiento granted/);
+});
+test("safe backend failures no longer collapse into the generic message", () => {
+  assert.match(ui, /whatsapp_canary_load_failed/); assert.match(ui, /whatsapp_canary_sync_failed/);
+  assert.match(ui, /whatsapp_channel_not_found/); assert.match(ui, /meta_templates_sync_failed/);
 });
 test("template and recipient selection are controlled", () => {
   assert.match(ui, /value=\{templateId\}/); assert.match(ui, /value=\{recipientId\}/); assert.match(ui, /phoneMasked/);
