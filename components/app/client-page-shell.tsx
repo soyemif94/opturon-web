@@ -24,10 +24,10 @@ export function ClientPageShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className={compactMobile ? "space-y-4 sm:space-y-6" : "space-y-6"}>
-      <section className={`overflow-hidden border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] shadow-[var(--card-shadow)] ${compactMobile ? "rounded-[22px] p-3 sm:rounded-[28px] sm:p-6 lg:p-8" : "rounded-[28px] p-6 lg:p-8"}`}>
+    <div data-operational-workspace className={`min-w-0 max-w-full ${compactMobile ? "space-y-4 sm:space-y-6" : "space-y-6"}`}>
+      <section className={`min-w-0 max-w-full overflow-hidden border border-[color:var(--border)] bg-[image:var(--page-hero-gradient)] shadow-[var(--card-shadow)] ${compactMobile ? "rounded-[22px] p-3 sm:rounded-[28px] sm:p-6 lg:p-8" : "rounded-[22px] p-4 sm:rounded-[28px] sm:p-6 lg:p-8"}`}>
         <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${compactMobile ? "gap-3 sm:gap-5" : "gap-5"}`}>
-          <div className="max-w-3xl">
+          <div className="min-w-0 max-w-3xl">
             {backHref ? (
               <Button asChild variant="secondary" size="sm" className="rounded-2xl">
                 <Link href={backHref}>
@@ -37,10 +37,10 @@ export function ClientPageShell({
               </Button>
             ) : null}
             {badge ? <Badge variant="warning">{badge}</Badge> : null}
-            <h1 className={`${backHref ? "mt-5" : compactMobile ? "mt-2 sm:mt-4" : "mt-4"} ${compactMobile ? "text-2xl sm:text-3xl" : "text-3xl"} font-semibold tracking-tight`}>{title}</h1>
-            <p className={`mt-3 text-sm leading-7 text-muted lg:text-base ${compactMobile ? "hidden sm:block" : ""}`}>{description}</p>
+            <h1 className={`${backHref ? "mt-5" : compactMobile ? "mt-2 sm:mt-4" : "mt-4"} ${compactMobile ? "text-2xl sm:text-3xl" : "text-2xl sm:text-3xl"} break-words font-semibold tracking-tight`}>{title}</h1>
+            <p className={`mt-3 break-words text-sm leading-6 text-muted sm:leading-7 lg:text-base ${compactMobile ? "hidden sm:block" : ""}`}>{description}</p>
           </div>
-          {action ? <div className="flex shrink-0 items-start">{action}</div> : null}
+          {action ? <div className="flex min-w-0 items-start sm:shrink-0">{action}</div> : null}
         </div>
       </section>
       {children}

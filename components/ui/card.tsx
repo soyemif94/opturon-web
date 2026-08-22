@@ -23,7 +23,7 @@ export function Card({ className, cardGlow, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[color:var(--border)] bg-card shadow-[var(--card-shadow)]",
+        "min-w-0 max-w-full rounded-2xl border border-[color:var(--border)] bg-card shadow-[var(--card-shadow)]",
         getCardGlowClass(cardGlow),
         className
       )}
@@ -54,7 +54,7 @@ export function CardDescription({ className, ...props }: React.HTMLAttributes<HT
 }
 
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4 pt-2", className)} {...props} />;
+  return <div className={cn("min-w-0 max-w-full p-4 pt-2", className)} {...props} />;
 }
 
 export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
