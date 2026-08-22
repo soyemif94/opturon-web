@@ -127,7 +127,7 @@ export function PurchaseReceiptsWorkspace({
         ) : null
       }
     >
-      <div className="space-y-6">
+      <div className="min-w-0 max-w-full space-y-6">
         <InventorySectionNav />
 
         <section className="grid gap-4 md:grid-cols-3">
@@ -143,7 +143,7 @@ export function PurchaseReceiptsWorkspace({
               <CardDescription>Usa los filtros soportados por el backend para revisar ingresos recientes.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-3 pt-0 md:grid-cols-5">
+          <CardContent className="grid min-w-0 gap-3 pt-0 md:grid-cols-5 [&_select]:w-full [&_select]:min-w-0 [&_select]:max-w-full">
             <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
               <option value="">Todos los proveedores</option>
               {suppliers.map((supplier) => (
@@ -162,7 +162,7 @@ export function PurchaseReceiptsWorkspace({
             </select>
             <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
             <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-            <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
               <Button type="button" className="flex-1" onClick={() => void loadReceipts(1)} disabled={loading}>
                 {loading ? "Cargando..." : "Aplicar"}
               </Button>

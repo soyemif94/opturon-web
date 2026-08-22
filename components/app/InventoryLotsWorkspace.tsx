@@ -301,13 +301,13 @@ export function InventoryLotsWorkspace({
       description="Alertas internas de vencimiento, stock comprometido y acciones trazables sobre mercaderia perecedera."
       badge="Inventario"
     >
-      <section className="space-y-4">
-        <div className="flex flex-col gap-2">
+      <section className="min-w-0 max-w-full space-y-4">
+        <div className="flex min-w-0 flex-col gap-2">
           <p className="text-xs uppercase tracking-[0.18em] text-muted">Alertas</p>
           <h2 className="text-2xl font-semibold tracking-tight">Vencimientos</h2>
           <p className="text-sm text-muted">Primero vemos lo que requiere accion: vencidos, hoy y proximos {thresholds.urgentDays} dias.</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 md:grid-cols-5">
           <ExpirationCard icon={TriangleAlert} label="Vencidos" value={activeSummary.expiredLots} helper={`${formatQuantity(activeSummary.unitsExpired)} unidades vencidas`} tone="danger" onClick={() => applyCard("expired")} />
           <ExpirationCard icon={CalendarClock} label="Vencen hoy" value={activeSummary.expiringTodayLots} helper="Revisar ahora" tone="warning" onClick={() => applyCard("today")} />
           <ExpirationCard icon={PackageCheck} label={`Vencen en ${thresholds.urgentDays} dias`} value={activeSummary.criticalLots + activeSummary.urgentLots} helper="Critico + urgente" tone="warning" onClick={() => applyCard("urgent")} />
@@ -316,7 +316,7 @@ export function InventoryLotsWorkspace({
         </div>
       </section>
 
-      <Card className="mt-6 overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(8,18,28,0.96),rgba(7,13,21,0.96))]">
+      <Card className="mt-6 min-w-0 max-w-full overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(8,18,28,0.96),rgba(7,13,21,0.96))]">
         <CardHeader
           action={
             <div className="flex flex-wrap gap-2">
@@ -337,12 +337,12 @@ export function InventoryLotsWorkspace({
           </div>
         </CardHeader>
         <CardContent className="space-y-5 pt-0">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px_auto]">
-            <label className="relative block">
+          <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px_auto]">
+            <label className="relative block min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
               <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar producto, SKU, lote, proveedor..." />
             </label>
-            <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={expirationStatus} onChange={(event) => applyCard(event.target.value)}>
+            <select className="h-10 w-full min-w-0 max-w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={expirationStatus} onChange={(event) => applyCard(event.target.value)}>
               <option value="all">Todos los vencimientos</option>
               <option value="expired">Vencidos</option>
               <option value="today">Vencen hoy</option>
@@ -353,7 +353,7 @@ export function InventoryLotsWorkspace({
               <option value="normal">Normal</option>
               <option value="no_expiration">Sin fecha</option>
             </select>
-            <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
+            <select className="h-10 w-full min-w-0 max-w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
               <option value="with_stock">Con stock</option>
               <option value="without_stock">Sin stock</option>
               <option value="all">Todo stock</option>
@@ -376,7 +376,55 @@ export function InventoryLotsWorkspace({
 
           {feedback ? <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 p-3 text-sm text-muted">{feedback}</div> : null}
 
-          <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
+          <div className="grid min-w-0 gap-3 md:hidden">
+            {visibleLots.length ? visibleLots.map((lot) => (
+              <article key={lot.id} className="min-w-0 max-w-full rounded-2xl border border-[color:var(--border)] bg-surface/50 p-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <input
+                    className="mt-1 size-5 shrink-0"
+                    type="checkbox"
+                    checked={selectedLotIds.includes(lot.id)}
+                    onChange={(event) => setSelectedLotIds((current) => (event.target.checked ? [...current, lot.id] : current.filter((id) => id !== lot.id)))}
+                    disabled={lot.expirationStatus !== "expired" || Number(lot.availableQuantity || 0) <= 0}
+                    aria-label={`Seleccionar lote ${lot.lotNumber || lot.id}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/app/catalog/${lot.productId}`} className="block break-words font-medium text-foreground hover:underline">
+                      {lot.productName || "Producto"}
+                    </Link>
+                    <p className="mt-1 break-all text-xs text-muted">{lot.productSku || "Sin SKU"}</p>
+                    <p className="mt-1 break-all text-xs text-muted">Lote {lot.lotNumber || "Sin numero"}</p>
+                  </div>
+                </div>
+                <dl className="mt-4 grid min-w-0 grid-cols-2 gap-3 text-sm">
+                  <LotMobileStat label="Disponible" value={formatQuantity(Number((lot.availableCommercialQuantity ?? lot.availableQuantity) || 0))} />
+                  <LotMobileStat label="Comprometido" value={formatQuantity(Number(lot.committedQuantity || 0))} />
+                  <LotMobileStat label="Vencimiento" value={formatDate(lot.expiresAt)} />
+                  <LotMobileStat label="Dias restantes" value={remainingDaysLabel(lot)} />
+                  <LotMobileStat label="Deposito" value={lot.warehouseName || "-"} />
+                  <LotMobileStat label="Ubicacion" value={lot.locationName || "Ubicacion historica"} />
+                </dl>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant={lot.status === "active" ? "success" : lot.status === "blocked" ? "warning" : lot.status === "written_off" ? "danger" : "muted"}>{statusLabel(lot.status)}</Badge>
+                  <Badge variant={expirationVariant(lot.expirationStatus)}>{expirationDisplayLabel(lot)}</Badge>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => viewHistory(lot)}>Historial</Button>
+                  {canManageSensitive ? <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => writeOffLot(lot)} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>Dar de baja</Button> : null}
+                  {canManageSensitive ? <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => adjustLot(lot)} disabled={readOnly || saving || Number(lot.availableQuantity || 0) <= 0}>Ajustar stock</Button> : null}
+                  {canManageSensitive && lot.status === "blocked" ? <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => unblockLot(lot)} disabled={readOnly || saving}>Desbloquear</Button> : canManageSensitive ? <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => blockLot(lot)} disabled={readOnly || saving || lot.status === "written_off" || lot.status === "cancelled"}>Bloquear</Button> : null}
+                  {canManageSensitive ? <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => editExpiration(lot)} disabled={readOnly || saving}>Editar venc.</Button> : null}
+                  <Link className="inline-flex items-center gap-1 rounded-2xl border border-[color:var(--border)] px-3 py-2 text-xs font-medium text-muted hover:text-text" href={`/app/catalog/${lot.productId}`}>Ver producto <ArrowRight className="size-3" /></Link>
+                </div>
+              </article>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-4 text-sm text-muted">
+                {readOnly ? "No hay lotes para consultar." : "No encontramos lotes con estos filtros."}
+              </div>
+            )}
+          </div>
+
+          <div data-horizontal-rail="inventory-lots-table" style={{ contain: "inline-size layout paint" }} className="hidden w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-[color:var(--border)] md:block">
             <table className="min-w-[1320px] w-full text-left text-sm">
               <thead className="bg-surface/70 text-xs uppercase tracking-[0.14em] text-muted">
                 <tr>
@@ -485,14 +533,14 @@ export function InventoryLotsWorkspace({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 md:grid-cols-4">
             <ThresholdInput label="Critico" value={draftThresholds.criticalDays} onChange={(value) => setDraftThresholds((current) => ({ ...current, criticalDays: value }))} />
             <ThresholdInput label="Urgente" value={draftThresholds.urgentDays} onChange={(value) => setDraftThresholds((current) => ({ ...current, urgentDays: value }))} />
             <ThresholdInput label="Preventivo" value={draftThresholds.warningDays} onChange={(value) => setDraftThresholds((current) => ({ ...current, warningDays: value }))} />
             <ThresholdInput label="Proximo vencimiento" value={draftThresholds.upcomingDays} onChange={(value) => setDraftThresholds((current) => ({ ...current, upcomingDays: value }))} />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted">
+            <p className="min-w-0 break-words text-sm text-muted">
               Actual: {thresholds.criticalDays} dias critico, {thresholds.urgentDays} urgente, {thresholds.warningDays} preventivo, {thresholds.upcomingDays} proximo.
             </p>
             {canManageSensitive ? (
@@ -504,6 +552,15 @@ export function InventoryLotsWorkspace({
         </CardContent>
       </Card>
     </ClientPageShell>
+  );
+}
+
+function LotMobileStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-[color:var(--border)] bg-bg/35 p-3">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="mt-1 break-words font-medium text-text">{value}</dd>
+    </div>
   );
 }
 
@@ -523,16 +580,16 @@ function ExpirationCard({
   onClick: () => void;
 }) {
   return (
-    <button type="button" onClick={onClick} className="text-left">
+    <button type="button" onClick={onClick} className="min-w-0 max-w-full text-left">
       <Card className={cn("h-full border-white/8 bg-card/90 transition hover:-translate-y-0.5", tone === "warning" && "border-amber-400/25", tone === "danger" && "border-rose-400/25")}>
         <CardContent className="flex items-center gap-4 p-5">
           <div className="rounded-2xl bg-white/8 p-3">
             <Icon className="size-5 text-muted" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-[0.16em] text-muted">{label}</p>
             <p className="mt-1 text-2xl font-semibold">{value}</p>
-            <p className="mt-1 text-xs text-muted">{helper}</p>
+            <p className="mt-1 break-words text-xs text-muted">{helper}</p>
           </div>
         </CardContent>
       </Card>

@@ -132,7 +132,7 @@ export function PurchaseReceiptForm({
       backHref="/app/inventory/receipts"
       backLabel="Volver a Recepciones"
     >
-      <div className="space-y-6">
+      <div className="min-w-0 max-w-full space-y-6">
         <InventorySectionNav />
 
         {!canCreate || readOnly ? (
@@ -141,7 +141,7 @@ export function PurchaseReceiptForm({
           </div>
         ) : null}
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <Card className="border-white/8 bg-card/90">
             <CardHeader>
               <div>
@@ -149,7 +149,7 @@ export function PurchaseReceiptForm({
                 <CardDescription>Proveedor, ubicacion, fecha y metadatos visibles de la recepcion.</CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-3 pt-0 md:grid-cols-2">
+            <CardContent className="grid min-w-0 gap-3 pt-0 md:grid-cols-2 [&_select]:w-full [&_select]:min-w-0 [&_select]:max-w-full">
               <Field label="Proveedor" error={fieldErrors.supplierId}>
                 <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={draft.supplierId} onChange={(event) => setDraft((current) => ({ ...current, supplierId: event.target.value }))} disabled={!canCreate || readOnly || submitting}>
                   <option value="">Seleccionar proveedor</option>
@@ -250,7 +250,7 @@ export function PurchaseReceiptForm({
                     </Button>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-6">
+                  <div className="grid min-w-0 gap-3 md:grid-cols-6 [&_select]:w-full [&_select]:min-w-0 [&_select]:max-w-full">
                     <Field label="Producto" error={fieldErrors[`lines.${index}.productId`]} className="md:col-span-2">
                       <select className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm" value={line.productId} onChange={(event) => updateLine(line.key, { productId: event.target.value })} disabled={!canCreate || readOnly || submitting}>
                         <option value="">Seleccionar producto</option>
@@ -304,7 +304,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`space-y-2 ${className || ""}`}>
+    <div className={`min-w-0 space-y-2 ${className || ""}`}>
       <label className="text-sm font-medium">{label}</label>
       {children}
       {error ? <p className="text-xs text-rose-200">{error}</p> : null}

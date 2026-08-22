@@ -26,10 +26,10 @@ export function PurchaseReceiptDetail({
         </Button>
       }
     >
-      <div className="space-y-6">
+      <div className="min-w-0 max-w-full space-y-6">
         <InventorySectionNav />
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <Card className="border-white/8 bg-card/90">
             <CardHeader>
               <div>
@@ -78,9 +78,9 @@ export function PurchaseReceiptDetail({
             {receipt.items.map((item) => (
               <article key={item.id} className="rounded-3xl border border-[color:var(--border)] bg-surface/45 p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{item.product.name || "Producto sin nombre"}</p>
+                      <p className="break-words font-semibold">{item.product.name || "Producto sin nombre"}</p>
                       {item.product.internalCode ? <Badge variant="outline">{item.product.internalCode}</Badge> : null}
                       <Badge variant={item.product.inventoryTrackingMode === "lot_based" ? "warning" : "muted"}>
                         {item.product.inventoryTrackingMode === "lot_based" ? "lot_based" : "legacy"}

@@ -152,11 +152,11 @@ export function InventoryMovementsWorkspace({
       badge="Inventario"
       backHref="/app/inventory"
     >
-      <section className="space-y-4">
+      <section className="min-w-0 max-w-full space-y-4">
         <InventorySectionNav />
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid min-w-0 gap-4 md:grid-cols-3">
         <SummaryCard label="Movimientos" value={String(summary.total)} helper="Total del filtro actual" />
         <SummaryCard label="Recepciones" value={String(summary.receipts)} helper="Ingresos por recepcion visibles" />
         <SummaryCard label="Con lote" value={String(summary.lotLinked)} helper="Entradas o ajustes trazados por lote" />
@@ -168,7 +168,7 @@ export function InventoryMovementsWorkspace({
           <CardDescription>Mas reciente primero. Usa filtros para acotar por producto, tipo, lote, ubicacion o fecha.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4 [&>label]:min-w-0 [&_select]:w-full [&_select]:min-w-0 [&_select]:max-w-full">
             <label className="grid gap-2 text-sm">
               <span>Buscar</span>
               <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Producto, codigo, SKU o lote" />
@@ -264,7 +264,7 @@ export function InventoryMovementsWorkspace({
 
           {items.length ? (
             <>
-              <div className="hidden overflow-x-auto rounded-2xl border border-[color:var(--border)] md:block">
+              <div className="hidden w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-[color:var(--border)] md:block">
                 <table className="min-w-[1180px] w-full text-left text-sm">
                   <thead className="bg-muted/40 text-xs uppercase tracking-[0.14em] text-muted-foreground">
                     <tr>
@@ -308,9 +308,9 @@ export function InventoryMovementsWorkspace({
                   <Card key={item.id}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base">{item.productName || "Producto"}</CardTitle>
-                          <CardDescription>{item.internalCode || item.productSku || "Sin codigo"}</CardDescription>
+                        <div className="min-w-0">
+                          <CardTitle className="break-words text-base">{item.productName || "Producto"}</CardTitle>
+                          <CardDescription className="break-all">{item.internalCode || item.productSku || "Sin codigo"}</CardDescription>
                         </div>
                         <Badge variant={movementVariant(item.movementType)}>{movementTypeLabel(item.movementType)}</Badge>
                       </div>
@@ -326,15 +326,15 @@ export function InventoryMovementsWorkspace({
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-muted-foreground">Ubicacion</span>
-                        <span>{item.locationName || "Principal"}</span>
+                        <span className="min-w-0 break-words text-right">{item.locationName || "Principal"}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-muted-foreground">Lote</span>
-                        <span>{item.lotNumber || "No aplica"}</span>
+                        <span className="min-w-0 break-all text-right">{item.lotNumber || "No aplica"}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-muted-foreground">Actor</span>
-                        <span>{item.actorName || item.createdBy || "-"}</span>
+                        <span className="min-w-0 break-words text-right">{item.actorName || item.createdBy || "-"}</span>
                       </div>
                       <div className="rounded-xl border border-[color:var(--border)] bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                         <p>{referenceLabel(item.referenceType)}</p>

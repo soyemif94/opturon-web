@@ -339,7 +339,7 @@ export function InventoryBaseWorkspace({
         </Button>
       ) : null}
     >
-      <section className="flex flex-wrap gap-2" aria-label="Indicadores y filtros rápidos de Inventario">
+      <section className="flex min-w-0 max-w-full flex-wrap gap-2" aria-label="Indicadores y filtros rápidos de Inventario">
         <OperationsMetricFilter label="productos" value={inventorySummary.totalProducts} active={stockFilter === "all"} onClick={() => applyStockFilter("all")} />
         <OperationsMetricFilter label="con stock" value={inventorySummary.withStock} active={stockFilter === "with_stock"} onClick={() => applyStockFilter("with_stock")} tone="success" />
         <OperationsMetricFilter label="sin stock" value={inventorySummary.withoutStock} active={stockFilter === "without_stock"} onClick={() => applyStockFilter("without_stock")} tone="warning" />
@@ -351,8 +351,8 @@ export function InventoryBaseWorkspace({
           <CardDescription>Ubicacion principal unica por tenant. Lotes y vencimientos quedan fuera del flujo base de esta fase.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-            <label className="relative block">
+          <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="relative block min-w-0">
               <span className="sr-only">Buscar productos en Inventario</span>
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -365,7 +365,7 @@ export function InventoryBaseWorkspace({
             </label>
             <select
               aria-label="Filtrar Inventario por stock"
-              className="h-10 rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
+              className="h-10 w-full min-w-0 max-w-full rounded-xl border border-[color:var(--border)] bg-background px-3 text-sm"
               value={stockFilter}
               onChange={(event) => applyStockFilter(event.target.value as "all" | "with_stock" | "without_stock")}
             >
@@ -397,7 +397,7 @@ export function InventoryBaseWorkspace({
 
           <div className="relative">
             {loading ? <OperationsLoadingOverlay /> : null}
-          <div className={cn("hidden overflow-x-auto rounded-2xl border border-[color:var(--border)] md:block", loading && "opacity-55")}>
+          <div data-horizontal-rail="inventory-products-table" style={{ contain: "inline-size layout paint" }} className={cn("hidden w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-[color:var(--border)] md:block", loading && "opacity-55")}>
             <table className="min-w-[1040px] w-full text-left text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 <tr>
@@ -682,12 +682,12 @@ function InventoryProductActions({
 
 function InventoryProductMobileRow({ product, readOnly, onMovement }: { product: PortalInventoryProduct; readOnly: boolean; onMovement: () => void }) {
   return (
-    <article className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-3">
+    <article className="min-w-0 max-w-full rounded-2xl border border-[color:var(--border)] bg-card/80 p-3">
       <div className="flex gap-3">
         <OperationsProductThumbnail product={product} />
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 font-medium">{product.name}</p>
-          <p className="mt-1 truncate font-mono text-xs text-muted">{product.internalCode || product.sku || "Sin codigo"}</p>
+          <p className="break-words font-medium">{product.name}</p>
+          <p className="mt-1 break-all font-mono text-xs text-muted">{product.internalCode || product.sku || "Sin codigo"}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold tabular-nums">Stock {resolveStock(product)}</span>
             <OperationsStockBadge stock={resolveStock(product)} />

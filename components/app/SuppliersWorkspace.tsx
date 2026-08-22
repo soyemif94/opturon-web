@@ -204,7 +204,7 @@ export function SuppliersWorkspace({
       backHref="/app/inventory"
       backLabel="Volver a Inventario"
     >
-      <div className="space-y-6">
+      <div className="min-w-0 max-w-full space-y-6">
         <InventorySectionNav />
 
         <section className="grid gap-4 sm:grid-cols-3">
@@ -213,7 +213,7 @@ export function SuppliersWorkspace({
           <MetricCard label="Inactivos" value={String(metrics.inactive)} helper="Mantienen lectura histórica, sin nuevas selecciones." />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <Card className="border-white/8 bg-card/90">
             <CardHeader
               action={
@@ -230,7 +230,7 @@ export function SuppliersWorkspace({
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+              <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] [&_select]:w-full [&_select]:min-w-0 [&_select]:max-w-full">
                 <Input placeholder="Buscar por nombre, fiscal o contacto..." value={search} onChange={(event) => setSearch(event.target.value)} />
                 <select
                   className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
@@ -268,9 +268,9 @@ export function SuppliersWorkspace({
                         onClick={() => setSelectedId(supplier.id)}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="space-y-1">
+                          <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold">{supplier.legalName}</p>
+                              <p className="break-words text-sm font-semibold">{supplier.legalName}</p>
                               {supplier.tradeName ? <Badge variant="outline">{supplier.tradeName}</Badge> : null}
                               <Badge variant={supplier.status === "active" ? "success" : "muted"}>{supplier.status === "active" ? "Activo" : "Inactivo"}</Badge>
                             </div>
@@ -345,7 +345,7 @@ export function SuppliersWorkspace({
                           {selectedDetail.linkedProducts.map((product) => (
                             <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/10 px-3 py-2 text-sm">
                               <span>{product.name}</span>
-                              <span className="text-muted">{product.sku || product.status}</span>
+                              <span className="min-w-0 break-all text-right text-muted">{product.sku || product.status}</span>
                             </div>
                           ))}
                         </div>
@@ -445,7 +445,7 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-surface/50 p-3">
       <p className="text-xs uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="mt-2 text-sm">{value}</p>
+      <p className="mt-2 break-words text-sm">{value}</p>
     </div>
   );
 }
