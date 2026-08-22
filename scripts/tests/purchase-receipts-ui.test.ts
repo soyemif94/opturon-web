@@ -13,6 +13,7 @@ function read(relativePath: string) {
 }
 
 const nav = read("components/app/InventorySectionNav.tsx");
+const navigation = read("components/app/inventory-navigation.ts");
 const listPage = read("app/app/inventory/receipts/page.tsx");
 const newPage = read("app/app/inventory/receipts/new/page.tsx");
 const detailPage = read("app/app/inventory/receipts/[receiptId]/page.tsx");
@@ -22,8 +23,9 @@ const detail = read("components/app/PurchaseReceiptDetail.tsx");
 const listRoute = read("app/api/app/purchase-receipts/route.ts");
 const detailRoute = read("app/api/app/purchase-receipts/[receiptId]/route.ts");
 
-assert.match(nav, /Recepciones/);
-assert.match(nav, /Ingresar mercaderia/);
+assert.match(navigation, /Recepciones/);
+assert.match(navigation, /Ingresar mercaderia/);
+assert.match(nav, /inventoryNavigationItems/);
 
 assert.match(listPage, /PurchaseReceiptsWorkspace/);
 assert.match(newPage, /PurchaseReceiptForm/);

@@ -301,7 +301,7 @@ export function InventoryLotsWorkspace({
       description="Alertas internas de vencimiento, stock comprometido y acciones trazables sobre mercaderia perecedera."
       badge="Inventario"
     >
-      <section className="min-w-0 max-w-full space-y-4">
+      <section id="vencimientos" className="min-w-0 max-w-full scroll-mt-28 space-y-4">
         <div className="flex min-w-0 flex-col gap-2">
           <p className="text-xs uppercase tracking-[0.18em] text-muted">Alertas</p>
           <h2 className="text-2xl font-semibold tracking-tight">Vencimientos</h2>

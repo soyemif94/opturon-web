@@ -1,4 +1,5 @@
 import { PurchaseReceiptDetail } from "@/components/app/PurchaseReceiptDetail";
+import { canPerformTenantInventorySensitiveAction } from "@/lib/app-permissions";
 import { getPortalPurchaseReceiptDetail, isBackendConfigured, type PortalPurchaseReceiptDetail } from "@/lib/api";
 import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
@@ -31,5 +32,5 @@ export default async function InventoryReceiptDetailPage({ params }: { params: P
     return <EmptyState message="La recepcion no existe, no pertenece a este tenant o ya no esta disponible." />;
   }
 
-  return <PurchaseReceiptDetail receipt={receipt} />;
+  return <PurchaseReceiptDetail receipt={receipt} canBulkAdjust={canPerformTenantInventorySensitiveAction(ctx)} />;
 }

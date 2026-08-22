@@ -45,8 +45,12 @@ test("inventory tables are contained rails and mobile lots retain operational ac
   }
 });
 
-test("inventory navigation is a keyboard-accessible contained rail with active reveal", () => {
+test("inventory navigation is an explicit mobile selector and a keyboard-accessible tablet rail", () => {
+  assert.match(nav, /data-inventory-mobile-navigation/);
+  assert.match(nav, /aria-label="Seleccionar seccion de Inventario"/);
+  assert.match(nav, /className="grid gap-2 md:hidden"/);
   assert.match(nav, /data-horizontal-rail="inventory-sections"/);
+  assert.match(nav, /className="hidden max-w-full overflow-x-auto[\s\S]*?md:block/);
   assert.match(nav, /overflow-x-auto overscroll-x-contain/);
   assert.match(nav, /aria-current=\{active \? "page"/);
   assert.match(nav, /scrollIntoView/);

@@ -1,5 +1,5 @@
 import { SuppliersWorkspace } from "@/components/app/SuppliersWorkspace";
-import { canManageInventoryReceipts } from "@/lib/app-permissions";
+import { canManageInventoryReceipts, canPerformTenantInventorySensitiveAction } from "@/lib/app-permissions";
 import { getPortalSuppliers, isBackendConfigured, type PortalSupplier } from "@/lib/api";
 import { getPortalInventoryReadActor, requireAppModulePage } from "@/lib/saas/access";
 
@@ -22,5 +22,11 @@ export default async function InventorySuppliersPage() {
     }
   }
 
-  return <SuppliersWorkspace initialSuppliers={suppliers} readOnly={readOnly} />;
+  return (
+    <SuppliersWorkspace
+      initialSuppliers={suppliers}
+      readOnly={readOnly}
+      canBulkAdjust={canPerformTenantInventorySensitiveAction(ctx)}
+    />
+  );
 }

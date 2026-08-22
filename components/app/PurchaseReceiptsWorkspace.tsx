@@ -18,7 +18,8 @@ export function PurchaseReceiptsWorkspace({
   initialPageSize = 20,
   initialTotal = 0,
   readOnly = false,
-  canCreate = false
+  canCreate = false,
+  canBulkAdjust = false
 }: {
   initialReceipts: PortalPurchaseReceiptListItem[];
   initialSuppliers: PortalSupplier[];
@@ -28,6 +29,7 @@ export function PurchaseReceiptsWorkspace({
   initialTotal?: number;
   readOnly?: boolean;
   canCreate?: boolean;
+  canBulkAdjust?: boolean;
 }) {
   const [receipts, setReceipts] = useState(Array.isArray(initialReceipts) ? initialReceipts : []);
   const [page, setPage] = useState(initialPage);
@@ -128,7 +130,7 @@ export function PurchaseReceiptsWorkspace({
       }
     >
       <div className="min-w-0 max-w-full space-y-6">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust={canBulkAdjust} />
 
         <section className="grid gap-4 md:grid-cols-3">
           <MetricCard label="Recepciones" value={String(summary.receipts)} helper="Total historico segun los filtros activos." />

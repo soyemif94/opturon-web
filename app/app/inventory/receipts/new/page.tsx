@@ -1,5 +1,5 @@
 import { PurchaseReceiptForm } from "@/components/app/PurchaseReceiptForm";
-import { canManageInventoryReceipts } from "@/lib/app-permissions";
+import { canManageInventoryReceipts, canPerformTenantInventorySensitiveAction } from "@/lib/app-permissions";
 import {
   getPortalInventoryLocations,
   getPortalProducts,
@@ -43,6 +43,7 @@ export default async function InventoryReceiptNewPage() {
       initialProducts={products}
       canCreate={canCreate}
       readOnly={!canCreate}
+      canBulkAdjust={canPerformTenantInventorySensitiveAction(ctx)}
     />
   );
 }

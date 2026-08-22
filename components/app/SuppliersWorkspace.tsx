@@ -47,10 +47,12 @@ function buildDraft(supplier?: PortalSupplier | null): SupplierDraft {
 
 export function SuppliersWorkspace({
   initialSuppliers,
-  readOnly = false
+  readOnly = false,
+  canBulkAdjust = false
 }: {
   initialSuppliers: PortalSupplier[];
   readOnly?: boolean;
+  canBulkAdjust?: boolean;
 }) {
   const [suppliers, setSuppliers] = useState(Array.isArray(initialSuppliers) ? initialSuppliers : []);
   const [selectedId, setSelectedId] = useState<string | null>(initialSuppliers[0]?.id || null);
@@ -205,7 +207,7 @@ export function SuppliersWorkspace({
       backLabel="Volver a Inventario"
     >
       <div className="min-w-0 max-w-full space-y-6">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust={canBulkAdjust} />
 
         <section className="grid gap-4 sm:grid-cols-3">
           <MetricCard label="Total" value={String(metrics.total)} helper="Proveedores cargados en este tenant." />

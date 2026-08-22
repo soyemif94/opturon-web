@@ -30,13 +30,15 @@ export function PurchaseReceiptForm({
   initialLocations,
   initialProducts,
   canCreate = false,
-  readOnly = false
+  readOnly = false,
+  canBulkAdjust = false
 }: {
   initialSuppliers: PortalSupplier[];
   initialLocations: PortalInventoryLocation[];
   initialProducts: PortalProduct[];
   canCreate?: boolean;
   readOnly?: boolean;
+  canBulkAdjust?: boolean;
 }) {
   const router = useRouter();
   const suppliers = useMemo(() => normalizeActiveSuppliers(initialSuppliers), [initialSuppliers]);
@@ -133,7 +135,7 @@ export function PurchaseReceiptForm({
       backLabel="Volver a Recepciones"
     >
       <div className="min-w-0 max-w-full space-y-6">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust={canBulkAdjust} />
 
         {!canCreate || readOnly ? (
           <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">

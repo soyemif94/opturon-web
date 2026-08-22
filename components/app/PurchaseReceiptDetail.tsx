@@ -9,9 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { PortalPurchaseReceiptDetail } from "@/lib/api";
 
 export function PurchaseReceiptDetail({
-  receipt
+  receipt,
+  canBulkAdjust = false
 }: {
   receipt: PortalPurchaseReceiptDetail;
+  canBulkAdjust?: boolean;
 }) {
   return (
     <ClientPageShell
@@ -27,7 +29,7 @@ export function PurchaseReceiptDetail({
       }
     >
       <div className="min-w-0 max-w-full space-y-6">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust={canBulkAdjust} />
 
         <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <Card className="border-white/8 bg-card/90">

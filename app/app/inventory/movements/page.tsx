@@ -1,4 +1,5 @@
 import { InventoryMovementsWorkspace } from "@/components/app/InventoryMovementsWorkspace";
+import { canPerformTenantInventorySensitiveAction } from "@/lib/app-permissions";
 import {
   getPortalInventoryLocations,
   getPortalInventoryMovements,
@@ -82,6 +83,7 @@ export default async function InventoryMovementsPage({
       initialPageSize={initialPageSize}
       initialTotal={total}
       initialFilters={initialFilters}
+      canBulkAdjust={canPerformTenantInventorySensitiveAction(ctx)}
     />
   );
 }

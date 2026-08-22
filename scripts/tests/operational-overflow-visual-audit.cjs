@@ -95,17 +95,23 @@ async function main() {
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
       await context.addCookies([{ name: "next-auth.session-token", value: token, url: baseUrl }]);
-      const page = await context.newPage();
       for (const [name, path] of routes) {
+        const page = await context.newPage();
         try {
-          const response = await page.goto(`${baseUrl}${path}`, { waitUntil: "networkidle", timeout: 60_000 });
+          const response = await page.goto(`${baseUrl}${path}`, { waitUntil: "commit", timeout: 60_000 });
+          await page.locator("body").waitFor({ state: "attached", timeout: 15_000 });
+          await page.waitForTimeout(500);
           if (name === "orders-new") {
-            await page.getByRole("button", { name: /Agregar$/ }).last().click().catch(() => undefined);
+            const addButtons = page.getByRole("button", { name: /Agregar$/ });
+            if ((await addButtons.count()) && (await addButtons.last().isEnabled())) await addButtons.last().click();
             await page.waitForTimeout(100);
           }
           results.push({ viewport: viewport.label, route: name, path, status: response?.status() || null, ...(await metrics(page)) });
+          if (process.env.OPERATIONAL_AUDIT_PROGRESS === "1") console.error(`checked ${viewport.label} ${name}`);
         } catch (error) {
           results.push({ viewport: viewport.label, route: name, path, fatal: String(error) });
+        } finally {
+          await page.close();
         }
       }
       await context.close();

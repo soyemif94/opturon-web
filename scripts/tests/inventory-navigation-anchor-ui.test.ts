@@ -7,6 +7,7 @@ function read(relativePath: string) {
 }
 
 const nav = read("components/app/InventorySectionNav.tsx");
+const navigation = read("components/app/inventory-navigation.ts");
 const page = read("app/app/inventory/page.tsx");
 const workspace = read("components/app/InventoryBaseWorkspace.tsx");
 const movementsPage = read("app/app/inventory/movements/page.tsx");
@@ -14,10 +15,11 @@ const movementsWorkspace = read("components/app/InventoryMovementsWorkspace.tsx"
 const movementsRoute = read("app/api/app/inventory/movements/route.ts");
 const movementsQuery = read("app/api/app/inventory/movements/query.ts");
 
-assert.match(nav, /href: "\/app\/inventory\/movements", label: "Movimientos"/);
-assert.match(nav, /href: "\/app\/inventory#lotes", label: "Lotes"/);
-assert.match(nav, /href: "\/app\/inventory\/receipts", label: "Recepciones"/);
-assert.match(nav, /href: "\/app\/inventory\/receipts\/new", label: "Ingresar mercaderia"/);
+assert.match(navigation, /href: "\/app\/inventory\/movements", label: "Movimientos"/);
+assert.match(navigation, /href: "\/app\/inventory#lotes", label: "Lotes"/);
+assert.match(navigation, /href: "\/app\/inventory\/receipts", label: "Recepciones"/);
+assert.match(navigation, /href: "\/app\/inventory#vencimientos", label: "Vencimientos"/);
+assert.match(navigation, /href: "\/app\/inventory\/receipts\/new", label: "Ingresar mercaderia"/);
 assert.doesNotMatch(nav, /#movimientos/);
 
 assert.match(page, /id="lotes"/);

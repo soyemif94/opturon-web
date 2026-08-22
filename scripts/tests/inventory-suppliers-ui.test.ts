@@ -7,16 +7,18 @@ function read(relativePath: string) {
 }
 
 const nav = read("components/app/InventorySectionNav.tsx");
+const navigation = read("components/app/inventory-navigation.ts");
 const page = read("app/app/inventory/suppliers/page.tsx");
 const workspace = read("components/app/SuppliersWorkspace.tsx");
 const listRoute = read("app/api/app/suppliers/route.ts");
 const detailRoute = read("app/api/app/suppliers/[supplierId]/route.ts");
 const statusRoute = read("app/api/app/suppliers/[supplierId]/status/route.ts");
 
-assert.match(nav, /Resumen/);
-assert.match(nav, /Movimientos/);
-assert.match(nav, /Lotes/);
-assert.match(nav, /Proveedores/);
+assert.match(navigation, /Resumen/);
+assert.match(navigation, /Movimientos/);
+assert.match(navigation, /Lotes/);
+assert.match(navigation, /Proveedores/);
+assert.match(nav, /inventoryNavigationItems/);
 
 assert.match(page, /SuppliersWorkspace/);
 assert.match(page, /getPortalSuppliers/);

@@ -35,7 +35,8 @@ export function InventoryMovementsWorkspace({
   initialPage = 1,
   initialPageSize = 25,
   initialTotal = 0,
-  initialFilters
+  initialFilters,
+  canBulkAdjust = false
 }: {
   initialItems: PortalInventoryMovementListItem[];
   initialProducts: PortalInventoryProduct[];
@@ -43,6 +44,7 @@ export function InventoryMovementsWorkspace({
   initialPage?: number;
   initialPageSize?: number;
   initialTotal?: number;
+  canBulkAdjust?: boolean;
   initialFilters?: {
     search?: string;
     movementType?: string;
@@ -153,7 +155,7 @@ export function InventoryMovementsWorkspace({
       backHref="/app/inventory"
     >
       <section className="min-w-0 max-w-full space-y-4">
-        <InventorySectionNav />
+        <InventorySectionNav canBulkAdjust={canBulkAdjust} />
       </section>
 
       <div className="grid min-w-0 gap-4 md:grid-cols-3">
