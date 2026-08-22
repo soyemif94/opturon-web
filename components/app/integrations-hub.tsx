@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { PortalWhatsAppStatus } from "@/lib/api";
 import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
+import { WhatsAppTemplateCanary } from "@/components/app/whatsapp-template-canary";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
 type IntegrationState = "not_connected" | "connecting" | "connected" | "error";
@@ -262,6 +263,8 @@ export function IntegrationsHub({
       </section>
 
       <WhatsAppStatusPanel status={liveWhatsAppStatus} onRefresh={() => void refreshWhatsAppStatus()} />
+
+      <WhatsAppTemplateCanary />
 
       <InstagramConnectionPanel
         status={liveInstagramStatus}

@@ -464,6 +464,47 @@ export type PortalWhatsAppTemplate = {
   updatedAt: string | null;
 };
 
+export type PortalWhatsAppCanaryAttempt = {
+  id: string;
+  templateId: string;
+  templateName: string;
+  language: string;
+  recipientId: string;
+  recipientName: string | null;
+  recipientMasked: string | null;
+  actorId: string;
+  status: "processing" | "sent" | "delivered" | "read" | "failed" | "unknown_delivery";
+  providerMessageId: string | null;
+  conversationId: string | null;
+  errorCode: string | null;
+  errorDetail: string | null;
+  errorMetadata: Record<string, unknown> | null;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PortalWhatsAppCanaryWorkspace = {
+  tenantId: string;
+  channel: {
+    id: string;
+    wabaId: string;
+    phoneNumberId: string;
+    displayPhoneNumber: string | null;
+    verifiedName: string | null;
+    status: string;
+  };
+  templates: Array<PortalWhatsAppTemplate & {
+    variables: Array<{ key: string; componentType: string; componentIndex: number; position: number; label: string }>;
+    canSend: boolean;
+  }>;
+  recipients: Array<{ id: string; name: string; phoneMasked: string; consentStatus: string }>;
+  attempts: PortalWhatsAppCanaryAttempt[];
+};
+
 export type PortalWhatsAppStatus = {
   ok: boolean;
   tenantId: string;
@@ -853,6 +894,24 @@ export async function syncPortalWhatsAppTemplates(tenantId: string, portalActorI
     },
     body: JSON.stringify({})
   });
+}
+
+export async function getPortalWhatsAppTemplateCanary(tenantId: string, portalActorId: string) {
+  return backendPortalFetch<{ success: boolean; data: PortalWhatsAppCanaryWorkspace }>(
+    `/portal/tenants/${tenantId}/whatsapp/templates/canary`,
+    { headers: { "x-portal-actor-id": portalActorId } }
+  );
+}
+
+export async function sendPortalWhatsAppTemplateCanary(
+  tenantId: string,
+  portalActorId: string,
+  payload: { templateId: string; recipientId: string; variables: Record<string, string>; idempotencyKey: string }
+) {
+  return backendPortalFetch<{ success: boolean; data: { replayed: boolean; attempt: PortalWhatsAppCanaryAttempt } }>(
+    `/portal/tenants/${tenantId}/whatsapp/templates/canary`,
+    { method: "POST", headers: { "x-portal-actor-id": portalActorId }, body: JSON.stringify(payload) }
+  );
 }
 
 export type PortalUser = {
