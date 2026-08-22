@@ -76,7 +76,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       tenantIndustry = "Espacio conectado";
 
       const [conversationsResult, contactsResult, onboardingResult, businessResult, expirationResult] = await Promise.allSettled([
-        getPortalConversations(ctx.tenantId),
+        getPortalConversations(ctx.tenantId, { channel: "whatsapp" }),
         getPortalContacts(ctx.tenantId),
         getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId),
         getPortalBusinessSettings(ctx.tenantId),
