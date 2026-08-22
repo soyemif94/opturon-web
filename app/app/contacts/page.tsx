@@ -46,14 +46,14 @@ export default async function AppContactsPage() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[26px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] px-5 py-4 shadow-[var(--card-shadow)] xl:px-6">
+      <section className="rounded-[22px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] px-4 py-3 shadow-[var(--card-shadow)] sm:rounded-[26px] sm:px-5 sm:py-4 xl:px-6">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="warning">CRM comercial</Badge>
-            <Badge variant="muted">Base activa</Badge>
+            <Badge variant="muted" className="hidden sm:inline-flex">Base activa</Badge>
           </div>
-          <h1 className="mt-3 text-[2rem] font-semibold tracking-tight">Contactos</h1>
-          <p className="mt-1.5 text-sm leading-6 text-muted">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:mt-3 sm:text-[2rem]">Contactos</h1>
+          <p className="mt-1.5 hidden text-sm leading-6 text-muted sm:block">
             Ordena actividad, prioridad y contexto comercial en una sola vista para operar rapido.
           </p>
         </div>

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { PortalContactDetail } from "@/lib/api";
 import { formatMoney, relativeDateLabel } from "@/lib/billing";
+import { cn } from "@/lib/ui/cn";
 
 type ContactDraft = {
   name: string;
@@ -305,8 +306,8 @@ export function ContactsWorkspace({
   };
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-3 xl:grid-cols-12">
+    <div className="min-w-0 space-y-4">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-12">
         <div className="xl:col-span-3">
           <MetricCard
             label="Con movimiento"
@@ -354,7 +355,7 @@ export function ContactsWorkspace({
             compact
           />
         </div>
-        <div className="md:col-span-2 xl:col-span-3 xl:col-start-10">
+        <div className="col-span-2 sm:col-span-1 xl:col-span-3 xl:col-start-10">
           <MetricCard
             label="Nuevos registros"
             value={String(kpis.fresh)}
@@ -367,17 +368,17 @@ export function ContactsWorkspace({
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_350px]">
-        <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1.38fr)_350px]">
+        <Card className="min-w-0 overflow-hidden border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
           <CardHeader action={<Badge variant="muted">{visibleContacts.length} visibles</Badge>}>
             <div>
               <CardTitle className="text-xl">Centro CRM</CardTitle>
-              <CardDescription>Lectura comercial rapida para revisar actividad, detectar frios y abrir el contacto correcto sin ruido.</CardDescription>
+              <CardDescription className="hidden sm:block">Lectura comercial rapida para revisar actividad, detectar frios y abrir el contacto correcto sin ruido.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3.5 pt-0">
-            <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-3.5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <CardContent className="min-w-0 space-y-3.5 pt-0">
+            <div className="min-w-0 rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-3.5">
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant={showingArchived ? "ghost" : "secondary"} size="sm" className="rounded-2xl" onClick={() => setViewMode("active")}>
                     Activos
@@ -386,7 +387,7 @@ export function ContactsWorkspace({
                     Archivados
                   </Button>
                 </div>
-                <div className="relative flex-1 lg:max-w-[440px]">
+                <div className="relative min-w-0 flex-1 lg:max-w-[440px]">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                   <Input
                     value={searchQuery}
@@ -398,14 +399,14 @@ export function ContactsWorkspace({
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-3 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="app-scroll-surface -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [-webkit-overflow-scrolling:touch]">
                   {FILTERS.map((filter) => (
                     <button
                       key={filter.id}
                       type="button"
                       onClick={() => setListFilter(filter.id)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
                         listFilter === filter.id
                           ? "border-brand/35 bg-brand/12 text-brandBright"
                           : "border-white/8 bg-bg/45 text-muted hover:border-white/12 hover:text-text"
@@ -433,21 +434,21 @@ export function ContactsWorkspace({
               </div>
             </div>
 
-            <div className="rounded-[20px] border border-[color:var(--border)] bg-surface/45 px-4 py-2.5">
+            <div className="min-w-0 rounded-[20px] border border-[color:var(--border)] bg-surface/45 px-3 py-2.5 sm:px-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm text-muted">
+                <p className={cn("text-sm text-muted", selectedIds.length === 0 && "hidden sm:block")}>
                   {selectedIds.length > 0
                     ? `${selectedIds.length} contactos seleccionados para operar en bloque.`
                     : showingArchived
                       ? "Selecciona archivados para restaurar o depurar sin perder control del historial."
                       : "Selecciona visibles para ocultarlos del panel sin borrar el historial comercial."}
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="rounded-2xl"
+                    className="min-w-0 rounded-2xl"
                     onClick={() => setSelectedIds(allVisibleSelected ? [] : visibleContacts.map((contact) => contact.id))}
                     disabled={visibleContacts.length === 0}
                   >
@@ -457,11 +458,11 @@ export function ContactsWorkspace({
                     type="button"
                     variant={showingArchived ? "secondary" : "destructive"}
                     size="sm"
-                    className="rounded-2xl"
+                    className="min-w-0 rounded-2xl"
                     onClick={() => void (showingArchived ? restoreSelectedContacts() : archiveSelectedContacts())}
                     disabled={readOnly || selectedIds.length === 0 || archiving || restoring || deleting}
                   >
-                    {showingArchived ? restoring ? "Restaurando..." : "Restaurar seleccionados" : archiving ? "Ocultando..." : "Ocultar seleccionados"}
+                    {showingArchived ? restoring ? "Restaurando..." : "Restaurar seleccionados" : archiving ? "Ocultando..." : <><span className="sm:hidden">Ocultar</span><span className="hidden sm:inline">Ocultar seleccionados</span></>}
                   </Button>
                   {showingArchived ? (
                     <Button
@@ -506,15 +507,15 @@ export function ContactsWorkspace({
                   return (
                     <div
                       key={contact.id}
-                      className={`rounded-[22px] border px-3.5 py-3 transition-all ${
+                      className={`min-w-0 overflow-hidden rounded-[18px] border px-2.5 py-2.5 transition-all sm:rounded-[22px] sm:px-3.5 sm:py-3 ${
                         active
                           ? "border-brand/35 bg-[linear-gradient(180deg,rgba(192,80,0,0.12),rgba(255,255,255,0.02))] shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
                           : "border-[color:var(--border)] bg-surface/55 hover:bg-surface/70"
                       }`}
                     >
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-                        <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                          <label className="mt-2.5 inline-flex items-center">
+                        <div className="flex min-w-0 flex-1 items-start gap-2">
+                          <label className="mt-2 inline-flex items-center sm:mt-2.5">
                             <input
                               type="checkbox"
                               checked={selectedIds.includes(contact.id)}
@@ -533,19 +534,19 @@ export function ContactsWorkspace({
                             <SimpleAvatar
                               src={contact.profileImageUrl}
                               name={contact.name}
-                              className="h-12 w-12 rounded-[18px] border border-[color:var(--border)] bg-brand/10 text-brandBright"
+                              className="h-10 w-10 rounded-xl border border-[color:var(--border)] bg-brand/10 text-brandBright sm:h-12 sm:w-12 sm:rounded-[18px]"
                               fallbackClassName="bg-brand/10 text-brandBright"
                             />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="truncate text-[15px] font-semibold text-text">{contact.name}</p>
                                 <Badge variant={contact.status === "archived" ? "danger" : "success"}>{contact.status || "active"}</Badge>
-                                <OperationalBadge tone={commercialRead.tone}>{commercialRead.label}</OperationalBadge>
+                                <span className="hidden sm:inline-flex"><OperationalBadge tone={commercialRead.tone}>{commercialRead.label}</OperationalBadge></span>
                               </div>
                               <p className="mt-0.5 truncate text-sm text-muted">
                                 {contact.phone || contact.whatsappPhone || contact.email || "Sin datos de contacto"}
                               </p>
-                              <div className="mt-2 flex flex-wrap gap-1.5">
+                              <div className="mt-1.5 flex flex-wrap gap-1 sm:mt-2 sm:gap-1.5">
                                 <MetaPill label="Canal" value={getChannelLabel(contact)} />
                                 <MetaPill label="Empresa" value={contact.companyName || "Sin empresa"} />
                                 <MetaPill label="Interacciones" value={String(contact.conversationCount || 0)} />
@@ -554,7 +555,7 @@ export function ContactsWorkspace({
                           </button>
                         </div>
 
-                        <div className="grid flex-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid flex-1 gap-1.5 sm:grid-cols-2 sm:gap-2.5 xl:grid-cols-3">
                           <InfoMiniBlock
                             label="Ultimo movimiento"
                             value={relativeDateLabel(contact.lastInteractionAt || contact.updatedAt || contact.createdAt)}
@@ -573,11 +574,11 @@ export function ContactsWorkspace({
                           />
                         </div>
 
-                        <div className="flex items-center gap-2 self-end xl:self-center">
-                          <Button type="button" variant={active ? "secondary" : "ghost"} size="sm" className="rounded-2xl" onClick={() => setSelectedId(contact.id)}>
+                        <div className="flex w-full items-center justify-end gap-2 self-end xl:w-auto xl:self-center">
+                          <Button type="button" variant={active ? "secondary" : "ghost"} size="sm" className="flex-1 rounded-2xl xl:flex-none" onClick={() => setSelectedId(contact.id)}>
                             Abrir
                           </Button>
-                          <Button asChild variant="ghost" size="sm" className="rounded-2xl">
+                          <Button asChild variant="ghost" size="sm" className="flex-1 rounded-2xl xl:flex-none">
                             <Link href={`/app/contacts/${contact.id}`}>Detalle</Link>
                           </Button>
                         </div>
@@ -754,16 +755,16 @@ function MetricCard({
 }) {
   return (
     <Card className={`${emphasis ? toneSurfaceClass(tone) : "border-white/6 bg-card/90"} shadow-[var(--card-shadow)]`}>
-      <CardContent className={compact ? "p-3.5" : "p-4"}>
+      <CardContent className={compact ? "p-3 sm:p-3.5" : "p-3 sm:p-4"}>
         <div className="flex items-start justify-between gap-3">
-          <span className={`inline-flex ${compact ? "h-11 w-11 rounded-[18px]" : "h-12 w-12 rounded-[20px]"} items-center justify-center border ${toneIconClass(tone)}`}>{icon}</span>
+          <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${compact ? "sm:h-11 sm:w-11 sm:rounded-[18px]" : "sm:h-12 sm:w-12 sm:rounded-[20px]"} ${toneIconClass(tone)}`}>{icon}</span>
           <div className="min-w-0 text-right">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
-            <p className={`mt-2 font-semibold ${compact ? "text-[1.75rem]" : "text-3xl"}`}>{value}</p>
+            <p className={`mt-1 text-2xl font-semibold sm:mt-2 ${compact ? "sm:text-[1.75rem]" : "sm:text-3xl"}`}>{value}</p>
           </div>
         </div>
-        <p className={`${compact ? "mt-3" : "mt-4"} text-sm text-muted`}>{helper}</p>
-        <p className={`mt-2 text-xs font-medium ${toneValueClass(tone)}`}>{foot}</p>
+        <p className={`${compact ? "mt-3" : "mt-4"} hidden text-sm text-muted sm:block`}>{helper}</p>
+        <p className={`mt-2 hidden text-xs font-medium sm:block ${toneValueClass(tone)}`}>{foot}</p>
       </CardContent>
     </Card>
   );
@@ -775,9 +776,9 @@ function OperationalBadge({ tone, children }: { tone: SurfaceTone; children: Rea
 
 function MetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-bg/45 px-2.5 py-1 text-xs text-muted">
-      <span className="text-[10px] uppercase tracking-[0.14em]">{label}</span>
-      <span className="text-text">{value}</span>
+    <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-white/8 bg-bg/45 px-2 py-1 text-[11px] text-muted sm:px-2.5 sm:text-xs">
+      <span className="hidden text-[10px] uppercase tracking-[0.14em] sm:inline">{label}</span>
+      <span className="max-w-[7rem] truncate text-text sm:max-w-[10rem]">{value}</span>
     </span>
   );
 }
@@ -794,10 +795,10 @@ function InfoMiniBlock({
   tone?: SurfaceTone;
 }) {
   return (
-    <div className="rounded-[18px] border border-[color:var(--border)] bg-bg/45 p-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className={`mt-2 text-sm font-semibold ${tone ? toneValueClass(tone) : "text-text"}`}>{value}</p>
-      <p className="mt-1 text-xs text-muted">{helper}</p>
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-[color:var(--border)] bg-bg/45 px-3 py-2 sm:block sm:rounded-[18px] sm:p-3">
+      <p className="min-w-0 truncate text-[10px] uppercase tracking-[0.12em] text-muted sm:text-[11px] sm:tracking-[0.16em]">{label}</p>
+      <p className={`shrink-0 text-sm font-semibold sm:mt-2 ${tone ? toneValueClass(tone) : "text-text"}`}>{value}</p>
+      <p className="mt-1 hidden text-xs text-muted sm:block">{helper}</p>
     </div>
   );
 }
