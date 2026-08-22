@@ -351,15 +351,15 @@ export function OrderCreateEditor() {
   }
 
   return (
-    <form id="order-create-form" className="space-y-6" onSubmit={submitOrder}>
-      <section className="rounded-[30px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(11,18,29,0.96),rgba(8,14,23,0.94))] p-5 shadow-[var(--card-shadow)]">
+    <form id="order-create-form" className="min-w-0 max-w-full space-y-6" onSubmit={submitOrder}>
+      <section className="min-w-0 max-w-full rounded-[22px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(11,18,29,0.96),rgba(8,14,23,0.94))] p-4 shadow-[var(--card-shadow)] sm:rounded-[30px] sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
             <span>Pedidos</span>
             <span>›</span>
             <span className="text-text">Nuevo pedido</span>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex w-full flex-wrap gap-3 sm:w-auto">
             <Button type="button" variant="secondary" className="rounded-2xl" onClick={resetDraft} disabled={saving}>
               Descartar
             </Button>
@@ -367,15 +367,15 @@ export function OrderCreateEditor() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-4">
+      <section className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryChip icon={UserRound} accent="text-sky-300" label="Cliente seleccionado" value={form.customerType === "final_consumer" ? "Consumidor final" : selectedContact?.name || "Pendiente"} helper={selectedContact?.phone || "Sin telefono"} />
         <SummaryChip icon={UserRound} accent="text-orange-300" label="Vendedor responsable" value={selectedSeller?.name || "Pendiente"} helper={selectedSeller?.role || "Sin rol visible"} />
         <SummaryChip icon={CreditCard} accent="text-emerald-300" label="Pago del pedido" value={paymentStatusLabel} helper={form.paymentStatus === "paid" ? `${paymentMethodLabel}${selectedDestination?.name ? ` · ${selectedDestination.name}` : ""}` : "Se registrara sin cobrar"} />
         <SummaryChip icon={Box} accent="text-fuchsia-300" label="Items agregados" value={`${cartItems.length} producto(s)`} helper={`${cartUnits} unidad(es)`} />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
           <SectionCard title="Cliente y responsable" description="Define quien compra, quien responde y donde queda trazado el cobro." badge="Base comercial">
             <div className="grid gap-4">
               <FieldBlock label="Tipo de cliente">
@@ -523,11 +523,11 @@ export function OrderCreateEditor() {
           </SectionCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <SectionCard title="Agregar productos" description="Busca dentro del catalogo actual y usa stock y precio reales." badge="Centro operativo">
             <div className="grid gap-4">
               <div className="flex flex-col gap-3 lg:flex-row">
-                <div className="relative flex-1">
+                <div className="relative min-w-0 flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                   <Input
                     className="pl-10"
@@ -536,9 +536,9 @@ export function OrderCreateEditor() {
                     onChange={(event) => setProductSearch(event.target.value)}
                   />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
                   <select
-                    className="h-10 min-w-[220px] rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text"
+                    className="h-10 w-full min-w-0 max-w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text sm:min-w-[220px]"
                     value={form.productId}
                     onChange={(event) => setForm((current) => ({ ...current, productId: event.target.value }))}
                     disabled={productsLoading || saving}
@@ -574,7 +574,7 @@ export function OrderCreateEditor() {
                       key={product.id}
                       type="button"
                       onClick={() => setForm((current) => ({ ...current, productId: product.id }))}
-                      className={`w-full rounded-[22px] border p-4 text-left transition-colors ${
+                      className={`min-w-0 max-w-full rounded-[22px] border p-4 text-left transition-colors ${
                         isSelected
                           ? "border-brand/30 bg-[linear-gradient(180deg,rgba(255,128,0,0.08),rgba(10,17,30,0.35))]"
                           : "border-[color:var(--border)] bg-surface/45 hover:bg-surface/65"
@@ -584,12 +584,12 @@ export function OrderCreateEditor() {
                         <div className="flex min-w-0 items-center gap-4">
                           <ProductThumb name={product.name} imageUrl={product.image?.url || null} />
                           <div className="min-w-0">
-                            <p className="truncate text-base font-semibold text-text">{product.name}</p>
+                            <p className="break-words text-base font-semibold text-text">{product.name}</p>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
                               <Badge variant={stockState.variant}>{stockState.label}</Badge>
                               <span>Stock disponible: {stock}</span>
                               {product.inventoryTrackingMode === "lot_based" ? <Badge variant="outline">FEFO automatico</Badge> : null}
-                              {product.sku ? <span>{product.sku}</span> : null}
+                              {product.sku ? <span className="break-all">{product.sku}</span> : null}
                             </div>
                             {product.inventoryTrackingMode === "lot_based" ? (
                               <p className="mt-2 text-xs text-emerald-200">
@@ -598,8 +598,8 @@ export function OrderCreateEditor() {
                             ) : null}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-base font-semibold text-text">{formatCurrency(resolveProductPrice(product), product.currency || "ARS")}</p>
+                        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 lg:justify-start">
+                          <p className="break-words text-base font-semibold text-text">{formatCurrency(resolveProductPrice(product), product.currency || "ARS")}</p>
                           <Button type="button" size="sm" className="rounded-2xl" variant={isSelected ? "secondary" : "primary"} onClick={() => setForm((current) => ({ ...current, productId: product.id }))}>
                             {isSelected ? "Agregado" : "Agregar"}
                           </Button>
@@ -619,7 +619,7 @@ export function OrderCreateEditor() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-[minmax(0,1.3fr)_160px_160px_180px_56px] gap-3 rounded-[18px] border border-[color:var(--border)] bg-white/[0.03] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted">
+                <div className="hidden grid-cols-[minmax(0,1.3fr)_160px_160px_180px_80px] gap-3 rounded-[18px] border border-[color:var(--border)] bg-white/[0.03] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted lg:grid">
                   <span>Producto</span>
                   <span>Precio unitario</span>
                   <span>Cantidad</span>
@@ -627,12 +627,12 @@ export function OrderCreateEditor() {
                   <span />
                 </div>
                 {cartItems.map((item) => (
-                  <div key={item.productId} className="grid grid-cols-[minmax(0,1.3fr)_160px_160px_180px_56px] gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/50 px-4 py-4">
+                  <div key={item.productId} className="grid min-w-0 gap-4 rounded-[22px] border border-[color:var(--border)] bg-surface/50 px-4 py-4 lg:grid-cols-[minmax(0,1.3fr)_160px_160px_180px_80px] lg:gap-3">
                     <div className="flex min-w-0 items-center gap-4">
                       <ProductThumb name={item.name} imageUrl={item.imageUrl} />
                       <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-text">{item.name}</p>
-                        <p className="mt-1 text-sm text-muted">{item.sku || "Sin codigo"}</p>
+                        <p className="break-words text-base font-semibold text-text">{item.name}</p>
+                        <p className="mt-1 break-all text-sm text-muted">{item.sku || "Sin codigo"}</p>
                         {item.inventoryTrackingMode === "lot_based" ? (
                           <p className="mt-1 text-xs text-emerald-200">
                             Stock disponible: {item.stockAvailable}. Se descontara de los lotes que vencen primero.
@@ -640,8 +640,12 @@ export function OrderCreateEditor() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex items-center text-sm font-medium text-text">{formatCurrency(item.unitPrice, item.currency)}</div>
-                    <div className="flex items-center">
+                    <div className="flex min-w-0 items-center justify-between gap-3 text-sm font-medium text-text lg:justify-start">
+                      <span className="text-muted lg:hidden">Precio unitario</span>
+                      <span className="break-words text-right lg:text-left">{formatCurrency(item.unitPrice, item.currency)}</span>
+                    </div>
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 lg:justify-start">
+                      <span className="text-sm text-muted lg:hidden">Cantidad</span>
                       <div className="flex h-11 items-center rounded-2xl border border-[color:var(--border)] bg-bg/55 px-2">
                         <button
                           type="button"
@@ -669,8 +673,11 @@ export function OrderCreateEditor() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex items-center text-base font-semibold text-text">{formatCurrency(item.unitPrice * item.quantity, item.currency)}</div>
-                    <div className="flex items-center justify-end">
+                    <div className="flex min-w-0 items-center justify-between gap-3 text-base font-semibold text-text lg:justify-start">
+                      <span className="text-sm font-normal text-muted lg:hidden">Subtotal</span>
+                      <span className="break-words text-right lg:text-left">{formatCurrency(item.unitPrice * item.quantity, item.currency)}</span>
+                    </div>
+                    <div className="flex min-w-0 items-center justify-end">
                       <Button type="button" variant="ghost" className="rounded-2xl text-red-300 hover:text-red-200" onClick={() => removeCartItem(item.productId)}>
                         Quitar
                       </Button>
@@ -686,7 +693,7 @@ export function OrderCreateEditor() {
           </SectionCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card className="border-white/6 bg-[linear-gradient(180deg,rgba(16,24,35,0.92),rgba(18,18,18,0.9))] shadow-[var(--card-shadow)]">
             <CardHeader>
               <div>
@@ -801,7 +808,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
+    <Card className="min-w-0 max-w-full overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.94))] shadow-[0_20px_50px_rgba(3,8,16,0.22)]">
       <CardHeader action={badge ? <Badge variant="warning">{badge}</Badge> : null}>
         <div>
           <CardTitle className="text-xl">{title}</CardTitle>
@@ -821,7 +828,7 @@ function FieldBlock({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2 [&>select]:min-w-0 [&>select]:max-w-full">
       <label className="text-sm font-medium">{label}</label>
       {children}
     </div>
@@ -832,7 +839,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[18px] border border-[color:var(--border)] bg-bg/45 p-3">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted">{label}</p>
-      <p className="mt-2 text-sm font-medium text-text">{value}</p>
+      <p className="mt-2 break-words text-sm font-medium text-text">{value}</p>
     </div>
   );
 }
@@ -858,8 +865,8 @@ function SummaryChip({
         </div>
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted">{label}</p>
-          <p className="mt-2 truncate text-base font-semibold text-text">{value}</p>
-          <p className="mt-1 truncate text-sm text-muted">{helper}</p>
+          <p className="mt-2 break-words text-base font-semibold text-text">{value}</p>
+          <p className="mt-1 break-words text-sm text-muted">{helper}</p>
         </div>
       </CardContent>
     </Card>
@@ -868,11 +875,11 @@ function SummaryChip({
 
 function ProductThumb({ name, imageUrl }: { name: string; imageUrl: string | null }) {
   if (imageUrl) {
-    return <img src={imageUrl} alt={name} className="h-14 w-14 rounded-[16px] border border-[color:var(--border)] object-cover" />;
+    return <img src={imageUrl} alt={name} className="h-14 w-14 shrink-0 rounded-[16px] border border-[color:var(--border)] object-cover" />;
   }
 
   return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-[16px] border border-[color:var(--border)] bg-brand/10 text-sm font-semibold text-brandBright">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] border border-[color:var(--border)] bg-brand/10 text-sm font-semibold text-brandBright">
       {name.slice(0, 2).toUpperCase()}
     </div>
   );
@@ -880,9 +887,9 @@ function ProductThumb({ name, imageUrl }: { name: string; imageUrl: string | nul
 
 function SummaryRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex min-w-0 items-start justify-between gap-3">
       <span className={`text-sm ${emphasis ? "font-semibold text-text" : "text-muted"}`}>{label}</span>
-      <span className={emphasis ? "text-[1.9rem] font-semibold text-brandBright" : "text-sm font-medium text-text"}>{value}</span>
+      <span className={`min-w-0 break-words text-right ${emphasis ? "text-2xl font-semibold text-brandBright sm:text-[1.9rem]" : "text-sm font-medium text-text"}`}>{value}</span>
     </div>
   );
 }
