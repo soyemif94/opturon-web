@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiBaseUrl, isBackendConfigured } from "@/lib/api";
+import { applyPortalInternalAuth } from "@/lib/portal-internal-auth";
 import { resolveAppTenant } from "@/lib/saas/access";
 
 export async function GET(
@@ -44,11 +45,13 @@ export async function GET(
     );
   }
 
+  const backendPath = `/portal/tenants/${tenantContext.tenantId}/conversations/${id}/messages/${messageId}/media`;
   const response = await fetch(
-    `${apiBase}/portal/tenants/${tenantContext.tenantId}/conversations/${id}/messages/${messageId}/media`,
+    `${apiBase}${backendPath}`,
     {
       method: "GET",
-      cache: "no-store"
+      cache: "no-store",
+      headers: applyPortalInternalAuth(backendPath, new Headers())
     }
   );
 

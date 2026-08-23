@@ -1,4 +1,5 @@
 import { readSaasData } from "@/lib/saas/store";
+import { applyPortalInternalAuth } from "@/lib/portal-internal-auth";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import type { TenantOperatingProfile, TenantPortalPolicy } from "@/lib/tenant-policy";
 
@@ -114,6 +115,11 @@ async function backendFetch<T>(path: string, init?: RequestInit, withDebugKey = 
   if (!bodyIsFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+
+  // Every tenant-scoped portal request is a server-to-server BFF call. Keep
+  // the browser session at the BFF boundary and authenticate the downstream
+  // backend hop with the internal credential, failing closed if it is absent.
+  applyPortalInternalAuth(path, headers);
 
   if (withDebugKey) {
     const debugKey = String(process.env.API_DEBUG_KEY || "").trim();
