@@ -6,6 +6,7 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "../..");
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 const ui = read("components/app/whatsapp-template-canary.tsx");
+const styles = read("app/globals.css");
 const route = read("app/api/app/integrations/whatsapp/templates/canary/route.ts");
 const refreshRoute = read("app/api/app/integrations/whatsapp/templates/canary/refresh/route.ts");
 const hub = read("components/app/integrations-hub.tsx");
@@ -67,6 +68,25 @@ test("Canary is integrated in the productive Integrations surface", () => {
 });
 test("responsive layout stacks on mobile and splits only at xl", () => {
   assert.match(ui, /grid gap-4 xl:grid-cols/); assert.doesNotMatch(ui, /min-w-\[[4-9]\d\dpx\]|w-\[[4-9]\d\dpx\]/);
+  assert.match(styles, /\.wa-canary-control\s*\{[\s\S]*?width:\s*100%/);
+});
+test("Canary native selects keep dark surfaces and readable options without hover", () => {
+  assert.match(ui, /<select className="wa-canary-control wa-canary-select" data-canary-control="template"/);
+  assert.match(ui, /<select className="wa-canary-control wa-canary-select" data-canary-control="recipient"/);
+  assert.match(styles, /\.wa-canary-control\s*\{[\s\S]*?background-color:\s*var\(--field-bg\)[\s\S]*?color:\s*var\(--text\)[\s\S]*?color-scheme:\s*dark/);
+  assert.match(styles, /\.wa-canary-select option\s*\{[\s\S]*?background-color:\s*var\(--card\)[\s\S]*?color:\s*var\(--text\)/);
+  assert.doesNotMatch(styles, /\.wa-canary-select option:hover/);
+});
+test("body variable inputs share placeholder, focus and disabled contrast contracts", () => {
+  assert.match(ui, /<input className="wa-canary-control" data-canary-control="variable"/);
+  assert.match(styles, /\.wa-canary-control::placeholder\s*\{[\s\S]*?color:\s*var\(--text-muted\)/);
+  assert.match(styles, /\.wa-canary-control:focus-visible\s*\{[\s\S]*?outline:\s*2px solid var\(--brand\)/);
+  assert.match(styles, /\.wa-canary-control:disabled,[\s\S]*?\.wa-canary-control:read-only[\s\S]*?background-color:\s*var\(--surface-muted\)[\s\S]*?color:\s*var\(--text-muted\)/);
+});
+test("light mode restores native light color scheme without changing semantic colors", () => {
+  assert.match(styles, /\[data-app-theme="light"\] \.wa-canary-control\s*\{[\s\S]*?color-scheme:\s*light/);
+  assert.match(styles, /\[data-app-theme="light"\][\s\S]*?--field-bg:\s*#FFFAF9/);
+  assert.match(styles, /\[data-app-theme="light"\][\s\S]*?--text:\s*#2B2323/);
 });
 test("recipient safety is explicit and phones stay masked", () => {
   assert.match(ui, /destinatarios internos consentidos/); assert.match(ui, /consentimiento granted/); assert.doesNotMatch(ui, /\+549\d{8,}/);
