@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Check, Copy, ExternalLink, Loader2, PauseCircle, PlayCircle, RefreshCw, Save, XCircle } from "lucide-react";
+import { Activity, ArrowLeft, Check, Copy, ExternalLink, Loader2, PauseCircle, PlayCircle, Plus, RefreshCw, Save, Search, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 import type {
   AdminBillingSubscription,
@@ -175,6 +176,16 @@ type NewClientDraft = {
   capabilities: string[];
   enabledModules: Record<string, boolean>;
 };
+
+type ClientWorkspaceTab = "summary" | "modules" | "integrations" | "subscription" | "diagnostics";
+
+const CLIENT_WORKSPACE_TABS: Array<{ id: ClientWorkspaceTab; label: string }> = [
+  { id: "summary", label: "Resumen" },
+  { id: "modules", label: "Módulos" },
+  { id: "integrations", label: "Integraciones" },
+  { id: "subscription", label: "Suscripción" },
+  { id: "diagnostics", label: "Diagnóstico" }
+];
 
 function normalizePolicy(policy: TenantPolicy): TenantPolicy {
   return {
@@ -370,8 +381,21 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   });
   const [newClientDraft, setNewClientDraft] = useState<NewClientDraft>(() => createNewClientDraft("custom"));
   const [creatingClient, setCreatingClient] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newClientOpen, setNewClientOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>("summary");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   const currentSubscription = subscriptions[0] || null;
+  const filteredTenants = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase("es");
+    if (!query) return tenants;
+    return tenants.filter((tenant) =>
+      [getTenantLabel(tenant), tenant.primaryEmail, tenant.tenantId, getPlanLabel(tenant.policy.planCode)]
+        .filter(Boolean)
+        .some((value) => String(value).toLocaleLowerCase("es").includes(query))
+    );
+  }, [searchQuery, tenants]);
 
   useEffect(() => {
     if (!selectedTenant) return;
@@ -456,6 +480,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       primaryEmail: tenant.primaryEmail || ""
     });
     setDraft(clonePolicy(normalizePolicy(tenant.policy)));
+    setActiveTab("summary");
+    setMobileDetailOpen(true);
   }
 
   function patchDraft(patch: Partial<TenantPolicy>) {
@@ -659,6 +685,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
       await reloadTenants(json?.tenantId || null);
       setNewClientDraft(createNewClientDraft("custom"));
+      setNewClientOpen(false);
       toast.success("Cliente creado e invitacion enviada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear el cliente.");
@@ -874,19 +901,42 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     Boolean(currentSubscription?.mercadoPagoPayerEmail);
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+    <div data-client-management-workspace className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
+      <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-card/90 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative block min-w-0 flex-1 sm:max-w-md">
+          <span className="sr-only">Buscar clientes</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            data-client-search
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="h-10 w-full min-w-0 rounded-xl border border-[color:var(--border)] bg-surface pl-9 pr-3 text-sm text-text outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-brandBright"
+            placeholder="Buscar por nombre, email, plan o tenant..."
+          />
+        </label>
+        <Button type="button" onClick={() => setNewClientOpen(true)} className="shrink-0 gap-2">
+          <Plus className="h-4 w-4" />
+          Nuevo cliente
+        </Button>
+      </div>
+
+      <Dialog open={newClientOpen} onOpenChange={setNewClientOpen}>
+        <DialogContent data-new-client-dialog className="app-scroll-surface max-w-5xl overflow-x-hidden">
+          <DialogHeader>
+            <DialogTitle>Nuevo cliente</DialogTitle>
+            <DialogDescription>
+              Provisiona el tenant, guarda su perfil inicial e invita al owner mediante el flujo administrativo existente.
+            </DialogDescription>
+          </DialogHeader>
+      <section className="mt-5 min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">Nuevo cliente</h2>
+            <h3 className="font-semibold">Datos del cliente</h3>
             <p className="mt-1 text-sm text-muted">
-              Alta administrativa real: provisiona tenant, persiste profile inicial e invita al owner en un solo flujo.
+              Los campos y la lógica de provisioning se mantienen sin cambios.
             </p>
           </div>
-          <Button onClick={createClient} disabled={creatingClient} className="gap-2">
-            {creatingClient ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {creatingClient ? "Creando cliente" : "Confirmar alta"}
-          </Button>
         </div>
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
@@ -998,18 +1048,29 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
           </div>
         </div>
       </section>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" disabled={creatingClient}>Cancelar</Button>
+            </DialogClose>
+            <Button type="button" onClick={createClient} disabled={creatingClient} className="gap-2">
+              {creatingClient ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {creatingClient ? "Creando cliente" : "Confirmar alta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(280px,360px)_1fr]">
-      <section className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-4">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+      <section data-client-list className={`${mobileDetailOpen ? "hidden xl:block" : "block"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-4`}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold">Clientes</h2>
-            <p className="text-sm text-muted">{tenants.length} tenants reales</p>
+            <p className="text-sm text-muted">{filteredTenants.length} de {tenants.length} clientes</p>
           </div>
           <Badge variant="muted">Admin</Badge>
         </div>
         <div className="space-y-2">
-          {tenants.map((tenant) => {
+          {filteredTenants.map((tenant) => {
             const active = tenant.tenantId === selectedTenant.tenantId;
             return (
               <button
@@ -1025,9 +1086,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     <p className="truncate font-medium">{getTenantLabel(tenant)}</p>
                     <p className="mt-1 truncate text-xs text-muted">{tenant.primaryEmail || tenant.tenantId}</p>
                   </div>
-                  <Badge variant={tenant.policy.source === "settings.portal.policy" ? "success" : "warning"}>
-                    {getPlanLabel(tenant.policy.planCode)}
-                  </Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge variant={tenant.policy.source === "settings.portal.policy" ? "success" : "warning"}>
+                      {getPlanLabel(tenant.policy.planCode)}
+                    </Badge>
+                    <span className="text-[10px] uppercase tracking-wide text-muted">{tenant.lifecycle?.status || "active"}</span>
+                  </div>
                 </div>
                 <p className="mt-3 text-xs text-muted">
                   {Object.values(tenant.policy.enabledModules).filter(Boolean).length} modulos activos -
@@ -1036,29 +1100,58 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
               </button>
             );
           })}
+          {filteredTenants.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[color:var(--border)] p-5 text-center text-sm text-muted">
+              No encontramos clientes para “{searchQuery.trim()}”.
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <section className="space-y-5">
+      <section data-client-detail className={`${mobileDetailOpen ? "block" : "hidden xl:block"} min-w-0 max-w-full space-y-5`}>
         <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setMobileDetailOpen(false)} className="mb-3 gap-2 xl:hidden">
+                <ArrowLeft className="h-4 w-4" />
+                Volver a clientes
+              </Button>
               <h2 className="text-xl font-semibold">{getTenantLabel(selectedTenant)}</h2>
-              <p className="mt-1 text-xs text-muted">
+              <p className="mt-1 max-w-full truncate text-xs text-muted" title={selectedTenant.tenantId}>
                 {selectedTenant.primaryEmail ? `${selectedTenant.primaryEmail} / ` : ""}
                 <span className="font-mono">{selectedTenant.tenantId}</span>
               </p>
             </div>
-            <Button onClick={savePolicy} disabled={saving} className="gap-2">
-              <Save className="h-4 w-4" />
-              {saving ? "Guardando" : "Guardar policy"}
-            </Button>
+            {activeTab === "summary" || activeTab === "modules" ? (
+              <Button onClick={savePolicy} disabled={saving} className="gap-2">
+                <Save className="h-4 w-4" />
+                {saving ? "Guardando" : activeTab === "modules" ? "Guardar módulos" : "Guardar cambios"}
+              </Button>
+            ) : null}
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[1.4fr_minmax(320px,0.9fr)]">
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+        <div className="grid min-w-0 grid-cols-2 gap-1 rounded-2xl border border-[color:var(--border)] bg-card/90 p-1.5 sm:grid-cols-3 xl:grid-cols-5" role="tablist" aria-label="Secciones del cliente">
+          {CLIENT_WORKSPACE_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              data-client-tab={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`min-w-0 rounded-xl px-2 py-2 text-xs font-medium transition-colors sm:text-sm ${
+                activeTab === tab.id ? "bg-brand/16 text-brandBright" : "text-muted hover:bg-surface hover:text-text"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="min-w-0 max-w-full">
+          <div className="min-w-0 space-y-5">
+            <div className={`${activeTab === "summary" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5`} role="tabpanel">
               <h3 className="font-semibold">Datos base del cliente</h3>
               <p className="mt-2 text-sm text-muted">
                 Corrige el nombre visible y el email principal sin recrear el tenant. El tenant ID tecnico no cambia.
@@ -1083,10 +1176,20 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                   />
                 </label>
               </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <ClientSummaryMetric label="Estado" value={selectedTenant.lifecycle?.status || "active"} />
+                <ClientSummaryMetric label="Plan" value={getPlanLabel(draft.planCode)} />
+                <ClientSummaryMetric label="Módulos activos" value={String(Object.values(draft.enabledModules).filter(Boolean).length)} />
+                <ClientSummaryMetric label="Usuarios activos" value={String(selectedTenant.lifecycle?.activePortalUsers ?? draft.limits.maxPortalUsers)} />
+              </div>
+              <div className="mt-4 rounded-xl border border-[color:var(--border)] bg-surface/55 p-3">
+                <p className="text-xs text-muted">Tenant identifier</p>
+                <p className="mt-1 max-w-full truncate font-mono text-xs text-text" title={selectedTenant.tenantId}>{selectedTenant.tenantId}</p>
+              </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+            <div className={`${activeTab === "summary" || activeTab === "modules" ? "grid" : "hidden"} min-w-0 gap-5 lg:grid-cols-2`} role="tabpanel">
+              <div className={`${activeTab === "summary" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5`}>
                 <h3 className="font-semibold">Perfil operativo</h3>
                 <p className="mt-2 text-sm text-muted">
                   Define el preset inicial editable del tenant. El checklist de capacidades se propone desde este perfil.
@@ -1163,7 +1266,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+              <div className={`${activeTab === "summary" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5`}>
                 <h3 className="font-semibold">Plan y limites</h3>
                 <label className="mt-4 block text-sm text-muted">
                   Plan
@@ -1206,7 +1309,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+              <div className={`${activeTab === "modules" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5 lg:col-span-2`}>
                 <h3 className="font-semibold">Modulos habilitados</h3>
                 <p className="mt-2 text-sm text-muted">
                   Definen que areas del portal quedan disponibles para el cliente en su operacion diaria.
@@ -1237,7 +1340,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+            <div className={`${activeTab === "modules" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5`} role="tabpanel">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-semibold">Capacidades tecnicas</h3>
                 <Badge variant="muted">Interno</Badge>
@@ -1279,7 +1382,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                           })
                         }
                       />
-                      <span>{CAPABILITY_LABELS[capability]}</span>
+                  <span className="min-w-0 break-words">{CAPABILITY_LABELS[capability]}</span>
                       {FUTURE_CAPABILITIES.has(capability) ? <Badge variant="muted">Proximamente</Badge> : null}
                     </label>
                   );
@@ -1288,28 +1391,34 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
             </div>
           </div>
 
-          <aside className="space-y-5">
-            <AdminMetaReadinessCard readiness={metaReadiness} loading={loadingMetaReadiness} onRefresh={() => void loadMetaReadiness()} />
+          <div className="min-w-0 space-y-5">
+            <div className={activeTab === "diagnostics" ? "block" : "hidden"} role="tabpanel">
+              <AdminMetaReadinessCard readiness={metaReadiness} loading={loadingMetaReadiness} onRefresh={() => void loadMetaReadiness()} />
+            </div>
 
-            <AdminWhatsAppCard
-              readiness={metaReadiness}
-              status={whatsappStatus}
-              embeddedSignupStatus={embeddedSignupStatus}
-              loading={loadingWhatsappStatus}
-              onboardingLoading={loadingEmbeddedSignupStatus}
-              connecting={connectingWhatsApp}
-              connectProgressStage={connectProgressStage}
-              connectFeedback={connectFeedback}
-              tenantId={selectedTenant.tenantId}
-              onConnect={() => void handleConnectWhatsApp()}
-              onRefresh={() => {
-                void loadWhatsappStatus();
-                void refreshEmbeddedSignupStatus();
-              }}
-              onCancelCurrent={() => void cancelEmbeddedSignupAttempt()}
-            />
+            <div className={`${activeTab === "integrations" ? "block" : "hidden"} min-w-0 space-y-5`} role="tabpanel">
+              <AdminIntegrationOverview status={whatsappStatus} embeddedSignupStatus={embeddedSignupStatus} />
+              <AdminWhatsAppCard
+                readiness={metaReadiness}
+                status={whatsappStatus}
+                embeddedSignupStatus={embeddedSignupStatus}
+                loading={loadingWhatsappStatus}
+                onboardingLoading={loadingEmbeddedSignupStatus}
+                connecting={connectingWhatsApp}
+                connectProgressStage={connectProgressStage}
+                connectFeedback={connectFeedback}
+                tenantId={selectedTenant.tenantId}
+                onConnect={() => void handleConnectWhatsApp()}
+                onRefresh={() => {
+                  void loadWhatsappStatus();
+                  void refreshEmbeddedSignupStatus();
+                }}
+                onCancelCurrent={() => void cancelEmbeddedSignupAttempt()}
+              />
+              <AdminMetaAdvancedConfiguration readiness={metaReadiness} />
+            </div>
 
-            <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+            <div className={`${activeTab === "subscription" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5`} role="tabpanel">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-semibold">Billing SaaS</h3>
@@ -1417,7 +1526,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
               )}
             </div>
 
-            <div className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+            <div className={`${activeTab === "subscription" ? "block" : "hidden"} min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5`}>
               <h3 className="font-semibold">Crear suscripcion</h3>
               <div className="mt-4 grid gap-3">
                 <label className="text-sm text-muted">
@@ -1479,11 +1588,74 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 </Button>
               </div>
             </div>
-          </aside>
+          </div>
         </div>
       </section>
       </div>
     </div>
+  );
+}
+
+function ClientSummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-[color:var(--border)] bg-surface/55 p-3">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="mt-1 truncate text-sm font-medium text-text" title={value}>{value}</p>
+    </div>
+  );
+}
+
+function AdminIntegrationOverview({
+  status,
+  embeddedSignupStatus
+}: {
+  status: PortalWhatsAppStatus | null;
+  embeddedSignupStatus: PortalWhatsAppEmbeddedSignupStatus | null;
+}) {
+  const connected = Boolean(status?.channel.connected);
+  const onboardingState = String(embeddedSignupStatus?.onboardingState || "").trim().toLowerCase();
+
+  return (
+    <div className="min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold">Estado de integraciones</h3>
+          <p className="mt-1 text-sm text-muted">Vista operativa del canal y su onboarding, sin exponer credenciales.</p>
+        </div>
+        <Badge variant={connected ? "success" : "warning"}>{connected ? "WhatsApp conectado" : "Conexión pendiente"}</Badge>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ClientSummaryMetric label="Canal" value={status?.channel.provider || "Sin canal"} />
+        <ClientSummaryMetric label="Número" value={status?.channel.displayPhoneNumber || "Sin número"} />
+        <ClientSummaryMetric label="Onboarding" value={connected ? "Completado" : onboardingState || "Sin iniciar"} />
+      </div>
+    </div>
+  );
+}
+
+function AdminMetaAdvancedConfiguration({ readiness }: { readiness: MetaEmbeddedSignupReadiness | null }) {
+  const advancedKeys = ["appId", "graphVersion", "publicAppUrl", "redirectUri", "webhookCallback", "verifyToken", "frontendLaunchPayload"];
+  const rows = advancedKeys
+    .map((key) => [key, readiness?.checks?.[key]] as const)
+    .filter((entry): entry is readonly [string, MetaEmbeddedReadinessCheck] => Boolean(entry[1]));
+
+  return (
+    <details className="min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
+      <summary className="cursor-pointer font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright">
+        Configuración avanzada
+      </summary>
+      <p className="mt-2 text-sm text-muted">Identificadores y callbacks de solo lectura usados por la conexión Meta.</p>
+      <div className="mt-4 grid min-w-0 gap-2">
+        {rows.length > 0 ? rows.map(([key, check]) => (
+          <div key={key} className="grid min-w-0 gap-1 rounded-xl border border-[color:var(--border)] bg-surface/60 p-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+            <span className="text-sm text-muted">{normalizeCheckLabel(key)}</span>
+            <span className="min-w-0 break-all text-sm font-medium text-text">{renderAutomaticCheckDetail(check)}</span>
+          </div>
+        )) : (
+          <p className="rounded-xl border border-dashed border-[color:var(--border)] p-4 text-sm text-muted">Sin configuración avanzada disponible.</p>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -1723,15 +1895,22 @@ function AdminWhatsAppCard({
           </div>
         </div>
 
-        <AdminStatusRows
-          rows={[
-            ["Tenant", tenantId],
-            ["Provider", status?.channel.provider || "-"],
-            ["Numero", status?.channel.displayPhoneNumber || "-"],
-            ["Phone Number ID", status?.channel.phoneNumberId || "-"],
-            ["WABA ID", status?.channel.wabaId || "-"]
-          ]}
-        />
+        <details className="min-w-0 rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
+          <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright">
+            Identificadores técnicos
+          </summary>
+          <div className="mt-3 min-w-0">
+            <AdminStatusRows
+              rows={[
+                ["Tenant", tenantId],
+                ["Provider", status?.channel.provider || "-"],
+                ["Numero", status?.channel.displayPhoneNumber || "-"],
+                ["Phone Number ID", status?.channel.phoneNumberId || "-"],
+                ["WABA ID", status?.channel.wabaId || "-"]
+              ]}
+            />
+          </div>
+        </details>
 
         <AdminStatusRows
           rows={[
@@ -1838,9 +2017,9 @@ function AdminStatusRows({ rows }: { rows: Array<[string, string]> }) {
     <div className="rounded-2xl border border-[color:var(--border)] bg-surface/60 p-4">
       <div className="grid gap-2">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex gap-3 text-sm">
-            <span className="w-28 shrink-0 text-muted">{label}</span>
-            <span className="min-w-0 break-words font-medium text-text">{value}</span>
+          <div key={label} className="grid min-w-0 gap-1 text-sm sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-3">
+            <span className="text-muted">{label}</span>
+            <span className="min-w-0 break-all font-medium text-text">{value}</span>
           </div>
         ))}
       </div>

@@ -9,8 +9,8 @@ export default async function ClientManagementPage() {
 
   return (
     <ClientPageShell
-      title="Gestion de clientes"
-      description="Administra plan, limites, modulos y capacidades tecnicas de cada tenant desde la policy central."
+      title="Gestión de clientes"
+      description="Administra clientes, módulos, planes e integraciones"
       badge="Opturon admin"
     >
       <AdminClientConfiguration initialTenants={result.data.tenants || []} />
