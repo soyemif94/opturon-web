@@ -218,6 +218,7 @@ const navItems: Array<{
 ];
 
 const APP_THEME_STORAGE_KEY = "opturon-app-theme";
+const APP_SIDEBAR_STORAGE_KEY = "opturon-desktop-sidebar-expanded";
 
 function SidebarPanel({
   pathname,
@@ -448,21 +449,55 @@ function DesktopRail({
   pathname,
   visibleNavItems,
   onSignOut,
-  inventoryAlertCount
+  inventoryAlertCount,
+  expanded,
+  onToggle
 }: {
   pathname: string;
   visibleNavItems: typeof navItems;
   onSignOut: () => void;
   inventoryAlertCount: number;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <aside className="hidden w-[92px] shrink-0 self-start xl:block">
+    <aside
+      data-desktop-sidebar
+      data-sidebar-state={expanded ? "expanded" : "collapsed"}
+      className={cn(
+        "hidden shrink-0 self-start overflow-x-hidden xl:block",
+        "motion-safe:transition-[width] motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none",
+        expanded ? "w-[272px]" : "w-[92px]"
+      )}
+    >
       <div className="relative sticky top-3 flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full flex-col items-center overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-card/92 px-3 py-4 shadow-[var(--card-shadow-strong)] backdrop-blur-xl md:max-h-[calc(100dvh-2.5rem)]">
         <div className="absolute inset-0 rounded-[30px] bg-[image:var(--rail-overlay)]" />
-        <div className="relative flex h-full min-h-0 flex-col items-center">
-          <OpturonMark compact />
+        <div className="relative flex h-full min-h-0 w-full flex-col items-center overflow-hidden">
+          <button
+            type="button"
+            data-sidebar-toggle
+            onClick={onToggle}
+            className={cn(
+              "flex h-12 w-full shrink-0 items-center rounded-2xl text-left",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+              expanded ? "justify-start px-0.5" : "justify-center"
+            )}
+            aria-label={expanded ? "Contraer navegación" : "Expandir navegación"}
+            aria-expanded={expanded}
+            title={expanded ? "Contraer navegación" : "Expandir navegación"}
+          >
+            <OpturonMark compact={!expanded} />
+          </button>
 
-          <nav className="mt-6 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto overscroll-contain pr-1">
+          <nav
+            data-sidebar-nav
+            aria-label="Navegación principal"
+            className={cn(
+              "mt-6 flex min-h-0 w-full flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto overscroll-contain",
+              "[scrollbar-gutter:stable_both-edges] [scrollbar-width:thin]",
+              expanded ? "items-stretch" : "items-center"
+            )}
+          >
             {visibleNavItems.map((item) => {
               const active = item.match(pathname);
               const Icon = item.icon;
@@ -470,24 +505,40 @@ function DesktopRail({
                 <Link
                   key={item.label}
                   href={item.href}
+                  data-sidebar-nav-item
+                  data-active={active ? "true" : "false"}
                   className={cn(
-                    "group relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition-all duration-200",
+                    "group relative inline-flex h-11 shrink-0 items-center rounded-2xl border",
+                    "transition-[color,background-color,border-color,box-shadow] duration-200 motion-reduce:transition-none",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-1 focus-visible:ring-offset-card",
+                    expanded ? "w-full justify-start gap-3 px-3" : "w-11 justify-center px-0",
                     active
                       ? "border-brand/35 bg-brand/16 text-brandBright shadow-[0_0_0_1px_rgba(192,80,0,0.14),0_18px_40px_rgba(176,80,0,0.18)]"
                       : "border-transparent bg-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface/75 hover:text-text"
                   )}
                   aria-label={item.label}
-                  title={item.label}
+                  aria-current={active ? "page" : undefined}
+                  title={expanded ? undefined : item.label}
                 >
-                  <Icon className="h-4.5 w-4.5" />
+                  <Icon className="h-4.5 w-4.5 shrink-0" />
+                  <span
+                    aria-hidden={!expanded}
+                    className={cn(
+                      "min-w-0 overflow-hidden whitespace-nowrap text-sm font-medium",
+                      "motion-safe:transition-[max-width,opacity] motion-safe:duration-150 motion-reduce:transition-none",
+                      expanded ? "max-w-[172px] opacity-100" : "max-w-0 opacity-0"
+                    )}
+                  >
+                    {item.label}
+                  </span>
                   {item.href === "/app/inventory" && inventoryAlertCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 rounded-full border border-card bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    <span className={cn(
+                      "rounded-full border border-card bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold text-white",
+                      expanded ? "ml-auto" : "absolute right-0 top-0"
+                    )}>
                       {inventoryAlertCount}
                     </span>
                   ) : null}
-                  <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-[color:var(--border)] bg-surface/95 px-3 py-1.5 text-xs font-medium text-text shadow-[0_18px_40px_rgba(0,0,0,0.26)] group-hover:block">
-                    {item.label}
-                  </span>
                 </Link>
               );
             })}
@@ -496,12 +547,24 @@ function DesktopRail({
           <button
             type="button"
             onClick={onSignOut}
-            className="group relative mt-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface/72 text-muted transition-colors hover:text-text"
+            data-sidebar-sign-out
+            className={cn(
+              "group relative mt-4 inline-flex h-11 shrink-0 items-center rounded-2xl border border-[color:var(--border)] bg-surface/72 text-muted transition-colors hover:text-text",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright focus-visible:ring-offset-1 focus-visible:ring-offset-card",
+              expanded ? "w-full justify-start gap-3 px-3" : "w-11 justify-center px-0"
+            )}
             aria-label="Cerrar sesion"
-            title="Cerrar sesion"
+            title={expanded ? undefined : "Cerrar sesion"}
           >
-            <LogOut className="h-4.5 w-4.5" />
-            <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-[color:var(--border)] bg-surface/95 px-3 py-1.5 text-xs font-medium text-text shadow-[0_18px_40px_rgba(0,0,0,0.26)] group-hover:block">
+            <LogOut className="h-4.5 w-4.5 shrink-0" />
+            <span
+              aria-hidden={!expanded}
+              className={cn(
+                "overflow-hidden whitespace-nowrap text-sm font-medium",
+                "motion-safe:transition-[max-width,opacity] motion-safe:duration-150 motion-reduce:transition-none",
+                expanded ? "max-w-[172px] opacity-100" : "max-w-0 opacity-0"
+              )}
+            >
               Cerrar sesion
             </span>
           </button>
@@ -548,6 +611,8 @@ export function AppShell({
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
   const [inventoryAlertCount, setInventoryAlertCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopNavExpanded, setDesktopNavExpanded] = useState(false);
+  const [desktopNavPreferenceLoaded, setDesktopNavPreferenceLoaded] = useState(false);
   const previousPathnameRef = useRef(pathname);
   const activePathnameRef = useRef(pathname);
   const opsLockSentRef = useRef(false);
@@ -583,6 +648,25 @@ export function AppShell({
   useEffect(() => {
     setSidebarStatus(whatsappStatus);
   }, [whatsappStatus]);
+
+  useEffect(() => {
+    try {
+      setDesktopNavExpanded(window.localStorage.getItem(APP_SIDEBAR_STORAGE_KEY) === "true");
+    } catch {
+      setDesktopNavExpanded(false);
+    } finally {
+      setDesktopNavPreferenceLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!desktopNavPreferenceLoaded) return;
+    try {
+      window.localStorage.setItem(APP_SIDEBAR_STORAGE_KEY, String(desktopNavExpanded));
+    } catch {
+      // Navigation remains usable when browser storage is unavailable.
+    }
+  }, [desktopNavExpanded, desktopNavPreferenceLoaded]);
 
   useEffect(() => {
     activePathnameRef.current = pathname;
@@ -702,12 +786,18 @@ export function AppShell({
   const sidebarActionLabel = sidebarWhatsAppState === "connected" ? "Ver integraciones" : "Conectar WhatsApp";
 
   return (
-    <section className="min-h-dvh w-full bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5">
+    <section
+      data-app-shell
+      data-desktop-sidebar-state={desktopNavExpanded ? "expanded" : "collapsed"}
+      className="min-h-dvh w-full overflow-x-hidden bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5"
+    >
       <div className="flex min-h-[calc(100dvh-1.5rem)] w-full items-stretch gap-3 md:min-h-[calc(100dvh-2.5rem)] md:gap-5">
         <DesktopRail
           pathname={pathname}
           visibleNavItems={visibleNavItems}
           inventoryAlertCount={inventoryAlertCount}
+          expanded={desktopNavExpanded}
+          onToggle={() => setDesktopNavExpanded((current) => !current)}
           onSignOut={() => void signOut({ callbackUrl: "/login" })}
         />
 
