@@ -23,6 +23,10 @@ import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api"
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { WhatsAppTemplateCanary } from "@/components/app/whatsapp-template-canary";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
+import {
+  ClientIntegrationsExperience,
+  type ClientInstagramAssetSelection
+} from "@/components/app/client-integrations-experience";
 
 type IntegrationState = "not_connected" | "connecting" | "connected" | "error";
 
@@ -67,11 +71,13 @@ const productCards: ProductCard[] = [
 export function IntegrationsHub({
   whatsapp,
   whatsappStatus,
-  instagramStatus
+  instagramStatus,
+  isOpturonAdmin
 }: {
   whatsapp: WhatsAppConnectionStatus;
   whatsappStatus: PortalWhatsAppStatus | null;
   instagramStatus: PortalInstagramStatus | null;
+  isOpturonAdmin: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -161,6 +167,23 @@ export function IntegrationsHub({
   const connectedNumber = liveWhatsAppStatus?.channel.displayPhoneNumber || liveWhatsApp.connectedNumber || liveWhatsAppStatus?.channel.phoneNumberId || "Pendiente";
   const lastWebhook = formatDateTime(liveWhatsAppStatus?.webhook.lastReceived?.receivedAt || null) || "Sin registro";
   const healthLabel = connected && webhookRecent ? "Canal operativo" : connected ? "Revisar entrega Meta/Webhooks" : "Pendiente de conexion";
+
+  if (!isOpturonAdmin) {
+    return (
+      <ClientIntegrationsExperience
+        whatsapp={liveWhatsApp}
+        instagramStatus={liveInstagramStatus}
+        instagramError={instagramError || searchParams.get("reason")}
+        instagramMode={searchParams.get("instagram")}
+        assetSelection={assetSelection}
+        selectedAssetKey={selectedInstagramAssetKey}
+        instagramBusy={instagramBusy}
+        onSelectedAssetKeyChange={setSelectedInstagramAssetKey}
+        onConnectSelectedAsset={() => void connectSelectedInstagramAsset()}
+        onRefreshInstagram={() => void refreshInstagramStatus()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -650,10 +673,7 @@ function ErrorLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-type InstagramAssetSelection = {
-  selectionToken: string;
-  candidates: PortalInstagramCandidate[];
-};
+type InstagramAssetSelection = ClientInstagramAssetSelection;
 
 function readInstagramAssetSelection(searchParams: { get: (name: string) => string | null }): InstagramAssetSelection | null {
   if (searchParams.get("instagram") !== "select") return null;
