@@ -5,6 +5,7 @@ const test = require("node:test");
 
 const root = path.resolve(__dirname, "../..");
 const source = fs.readFileSync(path.join(root, "components/layout/app-shell.tsx"), "utf8");
+const globals = fs.readFileSync(path.join(root, "app/globals.css"), "utf8");
 
 test("desktop sidebar has immutable collapsed and expanded width contracts", () => {
   assert.match(source, /data-sidebar-state=\{expanded \? "expanded" : "collapsed"\}/);
@@ -15,12 +16,24 @@ test("desktop sidebar has immutable collapsed and expanded width contracts", () 
 
 test("scroll geometry cannot be changed by hover labels or badges", () => {
   assert.match(source, /data-sidebar-nav/);
-  assert.match(source, /overflow-x-hidden overflow-y-auto overscroll-contain/);
+  assert.match(source, /app-scroll-surface[^\"]*overflow-x-hidden overflow-y-auto overscroll-contain/);
   assert.match(source, /scrollbar-gutter:stable_both-edges/);
   assert.doesNotMatch(source, /left-\[calc\(100%\+12px\)\]/);
   assert.doesNotMatch(source, /group-hover:block/);
   assert.doesNotMatch(source, /-right-1|-top-1/);
   assert.match(source, /title=\{expanded \? undefined : item\.label\}/);
+});
+
+test("desktop sidebar reuses the Inbox theme-aware scrollbar contract", () => {
+  assert.match(globals, /:root \{[\s\S]*?--app-scrollbar-thumb: rgba\(173, 197, 235, 0\.16\);/);
+  assert.match(globals, /:root \{[\s\S]*?--app-scrollbar-thumb-hover: rgba\(173, 197, 235, 0\.32\);/);
+  assert.match(globals, /\[data-app-theme="light"\] \{[\s\S]*?--app-scrollbar-thumb: rgba\(109, 91, 91, 0\.2\);/);
+  assert.match(globals, /\[data-app-theme="light"\] \{[\s\S]*?--app-scrollbar-thumb-hover: rgba\(109, 91, 91, 0\.38\);/);
+  assert.match(globals, /\.app-scroll-surface \{[\s\S]*?scrollbar-color: var\(--app-scrollbar-thumb\) transparent;[\s\S]*?scrollbar-width: thin;/);
+  assert.match(globals, /\.app-scroll-surface::-webkit-scrollbar \{[\s\S]*?width: 6px;/);
+  assert.match(globals, /\.app-scroll-surface::-webkit-scrollbar-track \{[\s\S]*?background: transparent;/);
+  assert.match(globals, /\.app-scroll-surface::-webkit-scrollbar-thumb \{[\s\S]*?border-radius: 999px;[\s\S]*?background: var\(--app-scrollbar-thumb\);/);
+  assert.match(globals, /\.app-scroll-surface:hover::-webkit-scrollbar-thumb,[\s\S]*?background: var\(--app-scrollbar-thumb-hover\);/);
 });
 
 test("logo control toggles only explicit state with native keyboard and accessible semantics", () => {

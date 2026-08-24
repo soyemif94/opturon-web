@@ -493,7 +493,7 @@ function DesktopRail({
             data-sidebar-nav
             aria-label="Navegación principal"
             className={cn(
-              "mt-6 flex min-h-0 w-full flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto overscroll-contain",
+              "app-scroll-surface mt-6 flex min-h-0 w-full flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto overscroll-contain",
               "[scrollbar-gutter:stable_both-edges] [scrollbar-width:thin]",
               expanded ? "items-stretch" : "items-center"
             )}
