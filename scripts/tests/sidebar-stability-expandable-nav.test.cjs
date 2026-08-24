@@ -17,7 +17,7 @@ test("desktop sidebar has immutable collapsed and expanded width contracts", () 
 test("scroll geometry cannot be changed by hover labels or badges", () => {
   assert.match(source, /data-sidebar-nav/);
   assert.match(source, /app-scroll-surface[^\"]*overflow-x-hidden overflow-y-auto overscroll-contain/);
-  assert.match(source, /scrollbar-gutter:stable_both-edges/);
+  assert.match(source, /!\[scrollbar-gutter:stable_both-edges\]/);
   assert.doesNotMatch(source, /left-\[calc\(100%\+12px\)\]/);
   assert.doesNotMatch(source, /group-hover:block/);
   assert.doesNotMatch(source, /-right-1|-top-1/);
