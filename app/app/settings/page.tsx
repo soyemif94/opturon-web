@@ -354,10 +354,10 @@ export default async function AppSettingsPage() {
           <HubCard
             href="/app/settings/canary"
             icon={<FlaskConical className="h-6 w-6 text-amber-300" />}
-            title="Canary de WhatsApp"
+            title="Prueba de WhatsApp"
             subtitle="Prueba interna controlada"
-            description="Ejecutá una prueba controlada del canal WhatsApp y verificá plantilla, envío y estados de entrega."
-            cta="Abrir Canary"
+            description="Verificá con un envío controlado que plantillas, entrega y estados del canal WhatsApp estén funcionando correctamente."
+            cta="Abrir prueba"
             accent="brand"
           >
             <div className="space-y-3">

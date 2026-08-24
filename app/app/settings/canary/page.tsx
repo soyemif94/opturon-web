@@ -10,9 +10,9 @@ export default async function AppCanarySettingsPage() {
 
   return (
     <ClientPageShell
-      title="Canary de WhatsApp"
-      description="Ejecutá una prueba controlada del canal WhatsApp y verificá plantilla, envío y estados de entrega."
-      badge="Herramienta interna"
+      title="Prueba de WhatsApp"
+      description="Verificá con un envío controlado que plantillas, entrega y estados del canal WhatsApp estén funcionando correctamente."
+      badge="Canary interno"
       backHref="/app/settings"
       backLabel="Volver a Configuración"
       action={
@@ -24,6 +24,9 @@ export default async function AppCanarySettingsPage() {
         </Button>
       }
     >
+      <p className="rounded-2xl border border-[color:var(--border)] bg-surface/45 px-4 py-3 text-sm leading-6 text-muted">
+        Herramienta interna de diagnóstico. No corresponde al sistema de alertas automáticas de clientes.
+      </p>
       <div className="min-w-0 max-w-full overflow-hidden">
         <WhatsAppTemplateCanary />
       </div>

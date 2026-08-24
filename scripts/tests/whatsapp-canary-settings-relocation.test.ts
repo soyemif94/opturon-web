@@ -25,9 +25,11 @@ test("the direct page and both BFF operations fail closed for clients and review
 });
 
 test("Settings presents the approved internal copy and navigation", () => {
-  assert.match(settings, /title="Canary de WhatsApp"/);
-  assert.match(settings, /Ejecutá una prueba controlada del canal WhatsApp y verificá plantilla, envío y estados de entrega\./);
-  assert.match(settings, /cta="Abrir Canary"/);
+  assert.match(settings, /title="Prueba de WhatsApp"/);
+  assert.match(settings, /Verificá con un envío controlado que plantillas, entrega y estados del canal WhatsApp estén funcionando correctamente\./);
+  assert.match(settings, /cta="Abrir prueba"/);
+  assert.match(canaryPage, /badge="Canary interno"/);
+  assert.match(canaryPage, /Herramienta interna de diagnóstico\. No corresponde al sistema de alertas automáticas de clientes\./);
   assert.match(canaryPage, /Gestionar destinatarios autorizados/);
   assert.match(canaryPage, /href="\/app\/settings\/operational-alerts"/);
 });

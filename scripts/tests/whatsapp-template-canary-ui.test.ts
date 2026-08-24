@@ -70,8 +70,8 @@ test("Canary is removed from Integrations and relocated to admin Settings", () =
   assert.doesNotMatch(hub, /WhatsAppTemplateCanary|whatsapp-template-canary/);
   assert.match(settingsPage, /isOpturonAdminWorkspaceContext\(ctx\)/);
   assert.match(settingsPage, /href="\/app\/settings\/canary"/);
-  assert.match(settingsPage, /title="Canary de WhatsApp"/);
-  assert.match(settingsPage, /cta="Abrir Canary"/);
+  assert.match(settingsPage, /title="Prueba de WhatsApp"/);
+  assert.match(settingsPage, /cta="Abrir prueba"/);
   assert.match(canaryPage, /requireOpturonAdminPage\("\/app\/settings\/canary"\)/);
   assert.match(canaryPage, /<WhatsAppTemplateCanary \/>/);
 });
