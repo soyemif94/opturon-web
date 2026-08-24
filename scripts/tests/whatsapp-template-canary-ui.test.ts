@@ -9,6 +9,8 @@ const ui = read("components/app/whatsapp-template-canary.tsx");
 const route = read("app/api/app/integrations/whatsapp/templates/canary/route.ts");
 const refreshRoute = read("app/api/app/integrations/whatsapp/templates/canary/refresh/route.ts");
 const hub = read("components/app/integrations-hub.tsx");
+const settingsPage = read("app/app/settings/page.tsx");
+const canaryPage = read("app/app/settings/canary/page.tsx");
 
 test("WABA, connected number and connection identity are visible", () => {
   assert.match(ui, /label="WABA"/); assert.match(ui, /label="Numero conectado"/); assert.match(ui, /label="Display name"/); assert.match(ui, /label="Conexion"/);
@@ -16,9 +18,9 @@ test("WABA, connected number and connection identity are visible", () => {
 test("real template list renders provider status and language", () => {
   assert.match(ui, /workspace\?\.templates\.map/); assert.match(ui, /item\.language/); assert.match(ui, /item\.status\.toUpperCase/);
 });
-test("refresh queries Meta through the protected backend sync", () => {
+test("refresh queries Meta through the protected admin-only backend sync", () => {
   assert.match(ui, /Actualizar desde Meta/); assert.match(ui, /Actualizando…/); assert.match(ui, /canary\/refresh/);
-  assert.match(refreshRoute, /permission: "manage_workspace"/); assert.match(refreshRoute, /refreshPortalWhatsAppTemplateCanary/);
+  assert.match(refreshRoute, /requireOpturonAdminApi\(\)/); assert.match(refreshRoute, /refreshPortalWhatsAppTemplateCanary/);
   assert.match(refreshRoute, /portalActorId/); assert.doesNotMatch(refreshRoute, /accessToken|WHATSAPP_ACCESS_TOKEN/);
 });
 test("empty templates and recipients have separate semantic states", () => {
@@ -53,8 +55,10 @@ test("status timeline contains only provider-backed states", () => {
 test("Inbox continuation links to the exact persisted conversation", () => {
   assert.match(ui, /\/app\/inbox\?conversation=\$\{attempt\.conversationId\}/);
 });
-test("read-only users cannot reach either Canary API method", () => {
-  assert.match(route, /permission: "manage_workspace"/); assert.match(route, /async function authority/);
+test("non-admin and read-only users cannot reach either Canary API method", () => {
+  assert.match(route, /requireOpturonAdminApi\(\)/); assert.match(route, /async function authority/);
+  assert.doesNotMatch(route, /requireAppApi|permission: "manage_workspace"/);
+  assert.doesNotMatch(refreshRoute, /requireAppApi|permission: "manage_workspace"/);
 });
 test("actor and tenant come only from the authenticated session", () => {
   assert.match(route, /auth\.ctx\.tenantId/); assert.match(route, /auth\.ctx\.portalActorId/); assert.doesNotMatch(route, /payload\.tenantId|payload\.actorId/);
@@ -62,8 +66,14 @@ test("actor and tenant come only from the authenticated session", () => {
 test("backend absence fails closed with no simulated success", () => {
   assert.match(route, /backend_not_configured/); assert.doesNotMatch(route, /success: true,\s*data: \{\s*tenantId/);
 });
-test("Canary is integrated in the productive Integrations surface", () => {
-  assert.match(hub, /<WhatsAppTemplateCanary \/>/); assert.match(hub, /whatsapp-template-canary/);
+test("Canary is removed from Integrations and relocated to admin Settings", () => {
+  assert.doesNotMatch(hub, /WhatsAppTemplateCanary|whatsapp-template-canary/);
+  assert.match(settingsPage, /isOpturonAdminWorkspaceContext\(ctx\)/);
+  assert.match(settingsPage, /href="\/app\/settings\/canary"/);
+  assert.match(settingsPage, /title="Canary de WhatsApp"/);
+  assert.match(settingsPage, /cta="Abrir Canary"/);
+  assert.match(canaryPage, /requireOpturonAdminPage\("\/app\/settings\/canary"\)/);
+  assert.match(canaryPage, /<WhatsAppTemplateCanary \/>/);
 });
 test("responsive layout stacks on mobile and splits only at xl", () => {
   assert.match(ui, /grid gap-4 xl:grid-cols/); assert.doesNotMatch(ui, /min-w-\[[4-9]\d\dpx\]|w-\[[4-9]\d\dpx\]/);

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendErrorBody, getBackendErrorStatus, getPortalWhatsAppTemplateCanary, isBackendConfigured, sendPortalWhatsAppTemplateCanary } from "@/lib/api";
-import { requireAppApi } from "@/lib/saas/access";
+import { requireOpturonAdminApi } from "@/lib/saas/access";
 
 async function authority() {
-  const auth = await requireAppApi({ permission: "manage_workspace" });
+  const auth = await requireOpturonAdminApi();
   if (auth.error) return { error: auth.error };
   const tenantId = String(auth.ctx.tenantId || "").trim();
   const actorId = String(auth.ctx.portalActorId || auth.ctx.session?.user?.portalActorId || "").trim();

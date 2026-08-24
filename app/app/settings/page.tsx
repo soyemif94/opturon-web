@@ -8,6 +8,7 @@ import {
   Building2,
   CheckCircle2,
   Cog,
+  FlaskConical,
   Landmark,
   ShieldCheck,
   Users
@@ -30,7 +31,7 @@ import {
   type PortalUser,
   type PortalUsersMeta
 } from "@/lib/api";
-import { requireAppPage } from "@/lib/saas/access";
+import { isOpturonAdminWorkspaceContext, requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
 
 const EMPTY_BUSINESS_SETTINGS: PortalBusinessSettings = {
@@ -99,6 +100,7 @@ export default async function AppSettingsPage() {
   const backendReady = tenantId && isBackendConfigured();
   const canUseLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   const allowUsers = canManageUsers(ctx);
+  const isOpturonAdmin = isOpturonAdminWorkspaceContext(ctx);
 
   let clinicName = "Espacio del cliente";
   let businessSettings = EMPTY_BUSINESS_SETTINGS;
@@ -347,6 +349,24 @@ export default async function AppSettingsPage() {
             <StatusRow label="Historial" value="Entregas auditables" tone="muted" />
           </div>
         </HubCard>
+
+        {isOpturonAdmin ? (
+          <HubCard
+            href="/app/settings/canary"
+            icon={<FlaskConical className="h-6 w-6 text-amber-300" />}
+            title="Canary de WhatsApp"
+            subtitle="Prueba interna controlada"
+            description="Ejecutá una prueba controlada del canal WhatsApp y verificá plantilla, envío y estados de entrega."
+            cta="Abrir Canary"
+            accent="brand"
+          >
+            <div className="space-y-3">
+              <StatusRow label="Plantilla" value="Aprobada por Meta" tone="success" />
+              <StatusRow label="Destinatarios" value="Autorizados" tone="success" />
+              <StatusRow label="Entrega" value="Auditable" tone="muted" />
+            </div>
+          </HubCard>
+        ) : null}
 
         <HubCard
           href="/app/settings/bot"

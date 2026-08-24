@@ -64,7 +64,6 @@ test("connected customer identity is friendly and technical Instagram ID is seco
 
 test("internal diagnostics remain available only on the admin branch and Client Management", () => {
   assert.match(hub, /<WhatsAppStatusPanel/);
-  assert.match(hub, /<WhatsAppTemplateCanary \/>/);
   assert.match(hub, /Diagnostico operativo/);
   assert.match(admin, /id: "integrations", label: "Integraciones"/);
   assert.match(admin, /id: "diagnostics", label: "Diagnóstico"/);
