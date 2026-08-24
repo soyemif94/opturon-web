@@ -6,9 +6,10 @@ const INSTAGRAM_STATE_COOKIE = "opturon_instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE_SECONDS = 10 * 60;
 
 export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env) {
-  const provider = String(env.META_INSTAGRAM_OAUTH_PROVIDER || "facebook_login").trim().toLowerCase() === "instagram_login"
-    ? "instagram_login"
-    : "facebook_login";
+  // The review and production CTA intentionally starts Instagram Login. The
+  // callback continues accepting legacy Facebook Login state so existing
+  // channels and already-issued callbacks remain compatible.
+  const provider = "instagram_login";
   // OAuth client_id must be the Meta/Facebook App ID from developers.facebook.com/apps/<id>,
   // not the internal "Instagram App ID" shown inside the Instagram API setup product.
   const facebookAppId = String(
@@ -58,13 +59,7 @@ export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env
       "instagram_business_basic",
       "instagram_business_manage_messages"
     ],
-    facebookLoginScopes: [
-      "pages_show_list",
-      "instagram_business_basic",
-      "instagram_business_manage_messages",
-      "instagram_business_manage_comments",
-      "pages_read_engagement"
-    ]
+    facebookLoginScopes: [] as string[]
   };
 }
 

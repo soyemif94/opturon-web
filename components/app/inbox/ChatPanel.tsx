@@ -27,6 +27,7 @@ type ChatPanelProps = {
   composer: string;
   onComposerChange: (value: string) => void;
   onSend: () => void;
+  sending: boolean;
   readOnly: boolean;
   onSelectTemplate: (text: string) => void;
   suggestions: SuggestionItem[];
@@ -53,6 +54,7 @@ export function ChatPanel({
   composer,
   onComposerChange,
   onSend,
+  sending,
   readOnly,
   onSelectTemplate,
   suggestions,
@@ -87,7 +89,8 @@ export function ChatPanel({
   const visibleTimeline = historyExpanded || !hasCollapsibleHistory ? timeline : timeline.slice(-COLLAPSED_TIMELINE_ITEMS);
   const lastTimelineKey = visibleTimeline[visibleTimeline.length - 1]?.id || null;
   const isInstagramConversation = detail?.conversation.channelType === "instagram";
-  const isComposerDisabled = readOnly || isInstagramConversation;
+  const composerReady = detail?.composerCapability?.enabled === true;
+  const isComposerDisabled = readOnly || sending || !composerReady;
   const headerConversation = detail?.conversation || selectedConversation;
   const headerContact = detail?.contact || selectedConversation?.contact;
 
@@ -268,9 +271,9 @@ export function ChatPanel({
 
       {detail ? (
         <div className="shrink-0 space-y-1.5 border-t border-[color:var(--border)] bg-surface/35 px-2.5 py-2 sm:px-3">
-          {isInstagramConversation ? (
+          {isInstagramConversation && !composerReady ? (
             <div className="rounded-[18px] border border-fuchsia-300/25 bg-fuchsia-300/10 px-3 py-2 text-xs text-fuchsia-50">
-              Instagram esta disponible en modo lectura en esta etapa. Respuesta desde Instagram todavia no disponible.
+              No se puede responder: el canal de Instagram no esta activo o no tiene una credencial valida.
             </div>
           ) : (
             <AutoSuggestBar suggestions={autoSuggestions} onSelect={onSelectSuggestion} onRegenerate={onRegenerateAutoSuggestions} />

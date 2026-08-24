@@ -17,20 +17,14 @@ function testInstagramScopes() {
   );
   assert.match(startRoute, /Meta\/Facebook App ID/);
   assert.match(startRoute, /not the internal "Instagram App ID"/);
-  assert.match(startRoute, /META_INSTAGRAM_LOGIN_CONFIG_ID/);
-  assert.match(startRoute, /META_INSTAGRAM_OAUTH_PROVIDER/);
+  assert.match(startRoute, /const provider = "instagram_login"/);
   assert.match(startRoute, /META_INSTAGRAM_BUSINESS_APP_ID/);
   assert.match(startRoute, /https:\/\/www\.instagram\.com\/oauth\/authorize/);
   assert.match(startRoute, /https:\/\/www\.facebook\.com\/\$\{config\.graphVersion\}\/dialog\/oauth/);
-  assert.match(startRoute, /config_id/);
-  assert.match(startRoute, /Facebook Login for Business uses config_id/);
-  assert.match(startRoute, /url\.searchParams\.set\("config_id", config\.loginConfigId\)/);
   assert.match(startRoute, /config\.instagramLoginScopes\.join\(","\)/);
-  assert.match(startRoute, /config\.facebookLoginScopes\.join\(","\)/);
-  assert.match(startRoute, /"pages_show_list"/);
   assert.match(startRoute, /"instagram_business_basic"/);
   assert.match(startRoute, /"instagram_business_manage_messages"/);
-  assert.match(startRoute, /"pages_read_engagement"/);
+  assert.doesNotMatch(startRoute, /"pages_show_list"/);
   assert.doesNotMatch(startRoute, /"instagram_basic"/);
   assert.doesNotMatch(startRoute, /"instagram_manage_messages"/);
   assert.doesNotMatch(startRoute, /"pages_manage_metadata"/);
@@ -39,8 +33,8 @@ function testInstagramScopes() {
   assert.doesNotMatch(instagramScopes, /pages_/);
   assert.doesNotMatch(instagramScopes, /instagram_business_manage_comments/);
 
-  const facebookScopes = startRoute.match(/facebookLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
-  assert.match(facebookScopes, /instagram_business_manage_comments/);
+  const allScopes = startRoute.match(/instagramLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
+  assert.equal((allScopes.match(/"instagram_business_/g) || []).length, 2);
 }
 
 function testInstagramIntegrationVisible() {
@@ -57,8 +51,7 @@ function testInstagramIntegrationVisible() {
     /<Link href="\/api\/app\/integrations\/instagram\/start">Conectar Instagram<\/Link>/
   );
   assert.doesNotMatch(hubSource, /instagram\/start\?_rsc/);
-  assert.match(hubSource, /Instagram esta disponible inicialmente en modo lectura dentro del Inbox/);
-  assert.match(hubSource, /Las respuestas desde Instagram todavia no estan habilitadas/);
+  assert.match(hubSource, /pueden responderse cuando el canal conectado esta activo/);
   assert.doesNotMatch(hubSource, /Instagram y Messenger quedan fuera del frente principal/);
 }
 

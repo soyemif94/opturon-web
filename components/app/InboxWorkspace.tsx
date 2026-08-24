@@ -119,6 +119,7 @@ export function InboxWorkspace({
   const [archivingSelection, setArchivingSelection] = useState(false);
   const [restoringSelection, setRestoringSelection] = useState(false);
   const [composer, setComposer] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [dealStage, setDealStage] = useState("lead");
@@ -1186,36 +1187,41 @@ export function InboxWorkspace({
   async function sendMessage(value: string) {
     const text = value.trim();
     if (!selectedId || !text || readOnly || !detail) return;
-    if (detail.conversation.channelType === "instagram") {
-      toast.error("Instagram esta en modo lectura", "Respuesta desde Instagram todavia no disponible.");
+    if (detail.composerCapability?.enabled !== true) {
+      toast.error("No se puede enviar", "El canal no esta activo o no tiene una credencial valida.");
       return;
     }
 
-    const optimisticId = `optimistic-msg-${Date.now()}`;
+    if (sendingMessage) return;
+    const idempotencyKey = crypto.randomUUID();
+    const optimisticId = `optimistic-msg-${idempotencyKey}`;
     const optimisticMessage = {
       id: optimisticId,
       direction: "outbound",
       text,
       timestamp: new Date().toISOString(),
-      status: "sent",
+      status: "sending",
       optimistic: true
     };
 
     setDetail((prev) => (prev ? { ...prev, messages: [...prev.messages, optimisticMessage] } : prev));
     setComposer("");
+    setSendingMessage(true);
 
     try {
       const response = await fetch(appendQuery("/api/app/messages"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: selectedId, text })
+        body: JSON.stringify({ conversationId: selectedId, text, idempotencyKey })
       });
       if (!response.ok) throw new Error("message_failed");
       await loadRows();
       await loadDetail(selectedId);
     } catch {
-      setDetail((prev) => (prev ? { ...prev, messages: prev.messages.filter((item) => item.id !== optimisticId) } : prev));
+      setDetail((prev) => (prev ? { ...prev, messages: prev.messages.map((item) => item.id === optimisticId ? { ...item, status: "failed", optimistic: false } : item) } : prev));
       toast.error("No se pudo enviar el mensaje", "Reintenta en unos segundos.");
+    } finally {
+      setSendingMessage(false);
     }
   }
 
@@ -1469,6 +1475,7 @@ export function InboxWorkspace({
               composer={composer}
               onComposerChange={setComposer}
               onSend={() => void sendMessage(composer)}
+              sending={sendingMessage}
               readOnly={readOnly}
               onSelectTemplate={(text) => setComposer(text)}
               suggestions={suggestions}

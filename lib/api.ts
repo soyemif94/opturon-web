@@ -1828,7 +1828,7 @@ export async function restorePortalConversations(tenantId: string, conversationI
 
 export async function sendPortalMessage(
   tenantId: string,
-  payload: { conversationId: string; text: string }
+  payload: { conversationId: string; text: string; idempotencyKey: string }
 ) {
   return backendFetch<{ success: boolean; data: { message: any } }>(
     `/portal/tenants/${tenantId}/messages`,

@@ -413,7 +413,7 @@ function InstagramConnectionPanel({
                   <Badge variant={connected ? "success" : "warning"}>{connected ? "Activo" : "Preparado"}</Badge>
                 </div>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-white/64">
-                  Instagram esta disponible inicialmente en modo lectura dentro del Inbox. Las respuestas desde Instagram todavia no estan habilitadas.
+                  Los mensajes de Instagram aparecen en el Inbox y pueden responderse cuando el canal conectado esta activo.
                 </p>
               </div>
             </div>

@@ -21,7 +21,8 @@ assert.match(workspace, /takeConversation\(\)/);
 assert.match(workspace, /changeBotFlowLock/);
 assert.match(workspace, /changeBotDomainOverride/);
 assert.match(chat, /isInstagramConversation/);
-assert.match(chat, /Instagram esta disponible en modo lectura/);
+assert.match(chat, /composerCapability/);
+assert.match(chat, /readOnly \|\| sending \|\| !composerReady/);
 assert.match(chat, /disabled=\{isComposerDisabled\}/);
 
 // Permissions/read-only and every contextual edit remain guarded.

@@ -6,7 +6,8 @@ import { appendAuditLog, newId, readSaasData, touchTenantActivity, writeSaasData
 
 const schema = z.object({
   conversationId: z.string().min(1),
-  text: z.string().min(1).max(2000)
+  text: z.string().min(1).max(2000),
+  idempotencyKey: z.string().uuid()
 });
 
 export async function POST(request: NextRequest) {

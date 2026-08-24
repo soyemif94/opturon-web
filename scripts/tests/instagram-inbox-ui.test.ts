@@ -33,17 +33,21 @@ function testInboxTabsAndEmptyState() {
   assert.match(workspaceSource, /onChannelChange=\{\(value\) =>/);
 }
 
-function testInstagramReadOnlyComposer() {
+function testInstagramComposerCapability() {
   const chatSource = read("components/app/inbox/ChatPanel.tsx");
   const workspaceSource = read("components/app/InboxWorkspace.tsx");
   const rowSource = read("components/app/inbox/ConversationRow.tsx");
 
   assert.match(chatSource, /isInstagramConversation = detail\?\.conversation\.channelType === "instagram"/);
-  assert.match(chatSource, /Instagram esta disponible en modo lectura en esta etapa/);
+  assert.match(chatSource, /composerReady = detail\?\.composerCapability\?\.enabled === true/);
+  assert.match(chatSource, /readOnly \|\| sending \|\| !composerReady/);
+  assert.match(chatSource, /canal de Instagram no esta activo o no tiene una credencial valida/);
   assert.match(chatSource, /disabled=\{isComposerDisabled\}/);
   assert.match(chatSource, /quickReplies=\{isInstagramConversation \? \[\] : detail\.quickReplies\}/);
-  assert.match(workspaceSource, /detail\.conversation\.channelType === "instagram"/);
-  assert.match(workspaceSource, /Respuesta desde Instagram todavia no disponible/);
+  assert.match(workspaceSource, /detail\.composerCapability\?\.enabled !== true/);
+  assert.match(workspaceSource, /status: "sending"/);
+  assert.match(workspaceSource, /status: "failed"/);
+  assert.match(workspaceSource, /idempotencyKey/);
   assert.match(rowSource, /row\.channelType === "instagram"/);
   assert.match(rowSource, /const channelLabel = row\.channelType === "instagram" \? "Instagram" : "WhatsApp"/);
   assert.match(rowSource, /aria-label=\{channelLabel\}/);
@@ -52,7 +56,7 @@ function testInstagramReadOnlyComposer() {
 function run() {
   testInboxApiForwardsChannelFilter();
   testInboxTabsAndEmptyState();
-  testInstagramReadOnlyComposer();
+  testInstagramComposerCapability();
   console.log("instagram-inbox-ui.test.ts: ok");
 }
 

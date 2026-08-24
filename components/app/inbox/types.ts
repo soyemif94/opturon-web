@@ -36,6 +36,7 @@ export type ConversationRowData = {
 
 export type DetailPayload = {
   readOnly: boolean;
+  composerCapability?: { enabled: boolean; reason: string };
   conversation: ConversationRowData;
   contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; industry?: string; tags: string[] };
   deal?: { id: string; stage: string; value: number; probability: number };
