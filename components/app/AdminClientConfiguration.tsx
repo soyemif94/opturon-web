@@ -604,10 +604,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
         }
       );
       const json = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(json?.error || `billing_subscription_${action}_failed`);
+      if (!response.ok) {
+        throw new Error(json?.message || "La accion no esta disponible para el estado actual de la suscripcion.");
+      }
       const subscription = json?.subscription as AdminBillingSubscription;
       setSubscriptions((current) => [subscription, ...current.filter((item) => item.id !== subscription.id)]);
-      toast.success("Suscripcion actualizada");
+      toast.success(json?.message || "Suscripcion actualizada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la suscripcion.");
     } finally {
@@ -899,6 +901,17 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     Boolean(currentSubscription?.authorizationUrl) &&
     currentSubscription?.localStatus === "pending" &&
     Boolean(currentSubscription?.mercadoPagoPayerEmail);
+  const billingActions = new Set(
+    currentSubscription?.availableActions ||
+      (currentSubscription?.localStatus === "pending"
+        ? ["cancel"]
+        : currentSubscription?.localStatus === "active"
+          ? ["pause", "cancel"]
+          : currentSubscription?.localStatus === "paused"
+            ? ["reactivate", "cancel"]
+            : [])
+  );
+  const billingLinkAvailable = currentSubscription?.localStatus === "pending" && Boolean(currentSubscription.authorizationUrl);
 
   return (
     <div data-client-management-workspace className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
@@ -1452,7 +1465,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       type="button"
                       variant="secondary"
                       onClick={copyAuthorizationLink}
-                      disabled={!currentSubscription.authorizationUrl}
+                      disabled={!billingLinkAvailable}
                       className="justify-start gap-2"
                     >
                       <Copy className="h-4 w-4" />
@@ -1472,7 +1485,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       type="button"
                       variant="secondary"
                       onClick={() => currentSubscription.authorizationUrl && window.open(currentSubscription.authorizationUrl, "_blank")}
-                      disabled={!currentSubscription.authorizationUrl}
+                      disabled={!billingLinkAvailable}
                       className="justify-start gap-2"
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -1486,12 +1499,18 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     </p>
                   ) : null}
 
+                  {currentSubscription.statusMessage ? (
+                    <p className="rounded-xl border border-[color:var(--border)] bg-surface/60 px-3 py-2 text-sm text-muted">
+                      {currentSubscription.statusMessage}
+                    </p>
+                  ) : null}
+
                   <div className="grid gap-2">
                     <Button
                       type="button"
                       variant="secondary"
                       onClick={() => runSubscriptionAction("pause")}
-                      disabled={actingSubscriptionId === currentSubscription.id}
+                      disabled={!billingActions.has("pause") || actingSubscriptionId === currentSubscription.id}
                       className="justify-start gap-2"
                     >
                       <PauseCircle className="h-4 w-4" />
@@ -1501,7 +1520,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       type="button"
                       variant="secondary"
                       onClick={() => runSubscriptionAction("reactivate")}
-                      disabled={actingSubscriptionId === currentSubscription.id}
+                      disabled={!billingActions.has("reactivate") || actingSubscriptionId === currentSubscription.id}
                       className="justify-start gap-2"
                     >
                       <PlayCircle className="h-4 w-4" />
@@ -1511,7 +1530,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       type="button"
                       variant="secondary"
                       onClick={() => runSubscriptionAction("cancel")}
-                      disabled={actingSubscriptionId === currentSubscription.id}
+                      disabled={!billingActions.has("cancel") || actingSubscriptionId === currentSubscription.id}
                       className="justify-start gap-2 text-red-600"
                     >
                       <XCircle className="h-4 w-4" />

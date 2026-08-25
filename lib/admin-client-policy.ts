@@ -52,6 +52,8 @@ export type AdminBillingSubscription = {
   externalReference: string;
   authorizationUrl?: string | null;
   metadata?: Record<string, unknown>;
+  availableActions?: Array<"cancel" | "pause" | "reactivate">;
+  statusMessage?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -266,6 +268,9 @@ export async function createAdminBillingSubscription(payload: CreateAdminBilling
     data: {
       ok: boolean;
       subscription: AdminBillingSubscription;
+      message?: string;
+      reconciled?: boolean;
+      providerActionApplied?: boolean;
     };
   }>("/api/admin/billing/subscriptions", {
     method: "POST",
