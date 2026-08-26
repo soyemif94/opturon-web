@@ -313,6 +313,28 @@ function statusVariant(status?: string | null): "success" | "warning" | "danger"
   return "muted";
 }
 
+function formatClientLifecycleStatus(status?: string | null) {
+  const normalized = String(status || "active").trim().toLowerCase();
+  if (normalized === "active") return "Activo";
+  if (normalized === "pending" || normalized === "trial") return "Pendiente";
+  if (normalized === "suspended") return "Suspendido";
+  if (normalized === "archived") return "Archivado";
+  if (normalized === "cancelled" || normalized === "canceled") return "Cancelado";
+  return normalized || "Activo";
+}
+
+function formatBillingStatus(status?: string | null) {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "pending") return "Suscripción pendiente";
+  if (normalized === "active" || normalized === "authorized") return "Suscripción activa";
+  if (normalized === "paused") return "Suscripción pausada";
+  if (normalized === "canceled" || normalized === "cancelled") return "Suscripción cancelada";
+  if (normalized === "payment_failed") return "Pago con inconvenientes";
+  if (normalized === "suspended" || normalized === "unavailable") return "Suscripción no disponible";
+  if (normalized === "expired") return "Suscripción vencida";
+  return normalized ? `Suscripción: ${normalized}` : "Sin suscripción";
+}
+
 function normalizeSubscriptions(payload: unknown): AdminBillingSubscription[] {
   if (!payload || typeof payload !== "object") return [];
   const list = (payload as { subscriptions?: unknown[] }).subscriptions;
@@ -1103,7 +1125,9 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     <Badge variant={tenant.policy.source === "settings.portal.policy" ? "success" : "warning"}>
                       {getPlanLabel(tenant.policy.planCode)}
                     </Badge>
-                    <span className="text-[10px] uppercase tracking-wide text-muted">{tenant.lifecycle?.status || "active"}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted">
+                      Cliente: {formatClientLifecycleStatus(tenant.lifecycle?.status)}
+                    </span>
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-muted">
@@ -1190,7 +1214,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 </label>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <ClientSummaryMetric label="Estado" value={selectedTenant.lifecycle?.status || "active"} />
+                <ClientSummaryMetric label="Estado del cliente" value={formatClientLifecycleStatus(selectedTenant.lifecycle?.status)} />
                 <ClientSummaryMetric label="Plan" value={getPlanLabel(draft.planCode)} />
                 <ClientSummaryMetric label="Módulos activos" value={String(Object.values(draft.enabledModules).filter(Boolean).length)} />
                 <ClientSummaryMetric label="Usuarios activos" value={String(selectedTenant.lifecycle?.activePortalUsers ?? draft.limits.maxPortalUsers)} />
@@ -1450,7 +1474,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                           {formatMoney(currentSubscription.amount, currentSubscription.currency)} / {currentSubscription.billingInterval}
                         </p>
                       </div>
-                      <Badge variant={statusVariant(currentSubscription.localStatus)}>{currentSubscription.localStatus}</Badge>
+                      <div className="text-right">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Estado de facturación</p>
+                        <Badge variant={statusVariant(currentSubscription.localStatus)}>
+                          {formatBillingStatus(currentSubscription.localStatus)}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="mt-4 grid gap-3 text-sm text-muted">
                       <p>Mercado Pago: {currentSubscription.mercadoPagoStatus || "sin sincronizar"}</p>
