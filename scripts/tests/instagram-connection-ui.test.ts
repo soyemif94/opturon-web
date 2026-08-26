@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fingerprintInstagramOAuthCode } from "../../lib/instagram-oauth-code-telemetry.ts";
 
 const projectRoot = process.cwd();
 
@@ -38,6 +39,26 @@ function testInstagramScopes() {
 
   const allScopes = startRoute.match(/instagramLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
   assert.equal((allScopes.match(/"instagram_business_/g) || []).length, 2);
+}
+
+function testInstagramCodeTelemetryIsFingerprintOnly() {
+  const callbackSource = read("app/api/app/integrations/instagram/callback/route.ts");
+  const telemetrySource = read("lib/instagram-oauth-code-telemetry.ts");
+
+  assert.match(callbackSource, /stage: "CALLBACK_RAW"/);
+  assert.match(callbackSource, /stage: "CALLBACK_PARSED"/);
+  assert.match(callbackSource, /stage: "BFF_FORWARDED"/);
+  assert.match(callbackSource, /codeTelemetryId/);
+  assert.match(telemetrySource, /createHash\("sha256"\)/);
+  assert.doesNotMatch(callbackSource, /code:\s*code/);
+
+  const input = "test-opaque-authorization-code";
+  const first = fingerprintInstagramOAuthCode(input);
+  const second = fingerprintInstagramOAuthCode(input);
+  assert.deepEqual(first, second);
+  assert.equal(first.length, Buffer.byteLength(input, "utf8"));
+  assert.match(first.sha256, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(first), /test-opaque-authorization-code/);
 }
 
 function testInstagramIntegrationVisible() {
@@ -115,6 +136,7 @@ function testNoInstagramOutboundPromise() {
 
 function run() {
   testInstagramScopes();
+  testInstagramCodeTelemetryIsFingerprintOnly();
   testInstagramIntegrationVisible();
   testSafeInstagramOauthLogging();
   testInstagramErrorsAndAssetPicker();

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { connectPortalInstagram, getBackendErrorBody, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
+import { extractRawInstagramOAuthCode, fingerprintInstagramOAuthCode } from "@/lib/instagram-oauth-code-telemetry";
 
 const INSTAGRAM_STATE_COOKIE = "opturon_instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -47,6 +49,8 @@ export async function GET(request: NextRequest) {
   if (auth.error) return auth.error;
 
   const url = new URL(request.url);
+  const codeTelemetryId = crypto.randomUUID();
+  const rawCode = extractRawInstagramOAuthCode(url.search);
   const code = String(url.searchParams.get("code") || "").trim();
   const stateParam = String(url.searchParams.get("state") || "").trim() || null;
   const error = String(url.searchParams.get("error") || "").trim();
@@ -65,6 +69,17 @@ export async function GET(request: NextRequest) {
     });
     return response;
   };
+
+  console.info("[instagram-oauth] code_telemetry", {
+    stage: "CALLBACK_RAW",
+    correlationId: codeTelemetryId,
+    ...fingerprintInstagramOAuthCode(rawCode)
+  });
+  console.info("[instagram-oauth] code_telemetry", {
+    stage: "CALLBACK_PARSED",
+    correlationId: codeTelemetryId,
+    ...fingerprintInstagramOAuthCode(code)
+  });
 
   if (error) {
     console.warn("[instagram-oauth] callback_error", {
@@ -120,8 +135,14 @@ export async function GET(request: NextRequest) {
       tenantId: auth.ctx.tenantId,
       redirectUri
     });
+    console.info("[instagram-oauth] code_telemetry", {
+      stage: "BFF_FORWARDED",
+      correlationId: codeTelemetryId,
+      ...fingerprintInstagramOAuthCode(code)
+    });
     await connectPortalInstagram(auth.ctx.tenantId, {
       code,
+      codeTelemetryId,
       redirectUri,
       oauthProvider:
         paramState?.provider === "instagram_login" || paramState?.provider === "facebook_login"

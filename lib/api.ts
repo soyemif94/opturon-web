@@ -804,6 +804,7 @@ export async function connectPortalInstagram(
   tenantId: string,
   payload: {
     code?: string;
+    codeTelemetryId?: string;
     redirectUri?: string;
     oauthProvider?: string;
     selectionToken?: string;
