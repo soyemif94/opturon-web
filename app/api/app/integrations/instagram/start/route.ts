@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { requireAppApi } from "@/lib/saas/access";
+import { INSTAGRAM_OAUTH_CALLBACK_PATH, resolveInstagramOauthRedirectUri } from "@/lib/instagram-oauth";
 
 const INSTAGRAM_STATE_COOKIE = "opturon_instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE_SECONDS = 10 * 60;
@@ -52,7 +53,7 @@ export function resolveInstagramOauthConfig(env: NodeJS.ProcessEnv = process.env
       env.NEXT_PUBLIC_WHATSAPP_GRAPH_VERSION || env.WHATSAPP_GRAPH_VERSION || "v25.0"
     ).trim(),
     loginConfigId,
-    callbackPath: "/api/app/integrations/instagram/callback",
+    callbackPath: INSTAGRAM_OAUTH_CALLBACK_PATH,
     // Facebook Login for Business uses config_id. These scopes support the classic OAuth fallback.
     // Page permissions remain necessary because the backend discovers the linked IG account via /me/accounts.
     instagramLoginScopes: [
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const redirectUri = new URL(config.callbackPath, request.nextUrl.origin).toString();
+  const redirectUri = resolveInstagramOauthRedirectUri(request.nextUrl.origin);
   const statePayload = {
     tenantId: auth.ctx.tenantId,
     provider: config.provider,

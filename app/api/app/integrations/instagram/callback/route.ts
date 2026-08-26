@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectPortalInstagram, getBackendErrorBody, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
 import { requireAppApi } from "@/lib/saas/access";
+import { resolveInstagramOauthRedirectUri } from "@/lib/instagram-oauth";
 
 const INSTAGRAM_STATE_COOKIE = "opturon_instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
   const error = String(url.searchParams.get("error") || "").trim();
   const errorDescription = String(url.searchParams.get("error_description") || "").trim();
   const redirectTarget = new URL("/app/integrations", request.nextUrl.origin);
-  const redirectUri = new URL("/api/app/integrations/instagram/callback", request.nextUrl.origin).toString();
+  const redirectUri = resolveInstagramOauthRedirectUri(request.nextUrl.origin);
   const cookieState = parseStateValue(request.cookies.get(INSTAGRAM_STATE_COOKIE)?.value || null);
   const paramState = parseStateParam(stateParam);
 

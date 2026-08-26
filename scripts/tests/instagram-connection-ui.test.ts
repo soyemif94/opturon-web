@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolveInstagramOauthRedirectUri } from "../../lib/instagram-oauth.ts";
 
 const projectRoot = process.cwd();
 
@@ -67,6 +69,21 @@ function testSafeInstagramOauthLogging() {
   assert.doesNotMatch(startRoute, /state:\s*state/);
 }
 
+function testInstagramOauthRedirectUriWireContract() {
+  const startRoute = read("app/api/app/integrations/instagram/start/route.ts");
+  const callbackRoute = read("app/api/app/integrations/instagram/callback/route.ts");
+  const redirectUri = resolveInstagramOauthRedirectUri("https://www.opturon.com");
+  const expected = "https://www.opturon.com/api/app/integrations/instagram/callback";
+  const digest = createHash("sha256").update(redirectUri, "utf8").digest("hex");
+
+  assert.equal(redirectUri, expected);
+  assert.equal(Buffer.byteLength(redirectUri, "utf8"), 63);
+  assert.equal(digest, "9666182ef52f09dec2c40d9ca2c25c400d5f75d07b28bacec0affa2ff53d213c");
+  assert.match(startRoute, /resolveInstagramOauthRedirectUri\(request\.nextUrl\.origin\)/);
+  assert.match(callbackRoute, /resolveInstagramOauthRedirectUri\(request\.nextUrl\.origin\)/);
+  assert.doesNotMatch(redirectUri, /%2F|%3A/i);
+}
+
 function testInstagramErrorsAndAssetPicker() {
   const hubSource = read("components/app/integrations-hub.tsx");
   const callbackSource = read("app/api/app/integrations/instagram/callback/route.ts");
@@ -114,6 +131,7 @@ function run() {
   testInstagramScopes();
   testInstagramIntegrationVisible();
   testSafeInstagramOauthLogging();
+  testInstagramOauthRedirectUriWireContract();
   testInstagramErrorsAndAssetPicker();
   testCallbackProviderValidation();
   testNoInstagramOutboundPromise();
