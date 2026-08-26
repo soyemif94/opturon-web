@@ -20,6 +20,7 @@ function testInstagramScopes() {
   assert.match(startRoute, /const provider = "instagram_login"/);
   assert.match(startRoute, /META_INSTAGRAM_BUSINESS_APP_ID/);
   assert.match(startRoute, /https:\/\/www\.instagram\.com\/oauth\/authorize/);
+  assert.match(startRoute, /url\.searchParams\.set\("force_reauth", "true"\)/);
   assert.match(startRoute, /https:\/\/www\.facebook\.com\/\$\{config\.graphVersion\}\/dialog\/oauth/);
   assert.match(startRoute, /config\.instagramLoginScopes\.join\(","\)/);
   assert.match(startRoute, /"instagram_business_basic"/);
@@ -28,6 +29,8 @@ function testInstagramScopes() {
   assert.doesNotMatch(startRoute, /"instagram_basic"/);
   assert.doesNotMatch(startRoute, /"instagram_manage_messages"/);
   assert.doesNotMatch(startRoute, /"pages_manage_metadata"/);
+  assert.equal((startRoute.match(/url\.searchParams\.set\("force_reauth", "true"\)/g) || []).length, 1);
+  assert.match(startRoute, /url\.searchParams\.set\("state", state\)/);
 
   const instagramScopes = startRoute.match(/instagramLoginScopes:\s*\[([\s\S]*?)\]/)?.[1] || "";
   assert.doesNotMatch(instagramScopes, /pages_/);

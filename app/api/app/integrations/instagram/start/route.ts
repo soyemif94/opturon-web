@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("state", state);
   url.searchParams.set("response_type", "code");
   if (config.provider === "instagram_login") {
+    url.searchParams.set("force_reauth", "true");
     url.searchParams.set("scope", config.instagramLoginScopes.join(","));
   } else if (config.loginConfigId) {
     url.searchParams.set("config_id", config.loginConfigId);
