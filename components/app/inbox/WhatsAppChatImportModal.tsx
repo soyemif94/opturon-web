@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Upload, X } from "lucide-react";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 
 type ImportPreview = {
@@ -85,6 +86,11 @@ export function WhatsAppChatImportModal({
     setError(null);
   }
 
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) resetState();
+  }
+
   async function runPreview() {
     if (!file || !fileValid || previewing) return;
     setPreviewing(true);
@@ -148,30 +154,25 @@ export function WhatsAppChatImportModal({
         <span className={compact ? "sr-only" : ""}>Importar historial de WhatsApp</span>
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-[color:var(--border)] bg-surface p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-white">Importar historial de WhatsApp</h2>
-                <p className="mt-1 text-xs leading-5 text-muted">
-                  Esta importación sólo agrega historial. No envía mensajes ni activa el bot.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  resetState();
-                }}
-                className="rounded-full border border-[color:var(--border)] p-2 text-muted hover:text-text"
-                aria-label="Cerrar importador"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-2xl rounded-[24px] bg-surface p-5 sm:p-6">
+          <DialogHeader className="pr-10">
+            <DialogTitle className="text-lg text-white">Importar historial de WhatsApp</DialogTitle>
+            <DialogDescription className="text-xs leading-5 text-muted">
+              Esta importación sólo agrega historial. No envía mensajes ni activa el bot.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogClose asChild>
+            <button
+              type="button"
+              className="absolute right-4 top-4 rounded-full border border-[color:var(--border)] p-2 text-muted transition hover:bg-card hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright"
+              aria-label="Cerrar importador"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </DialogClose>
 
-            <div className="mt-5 space-y-4">
+          <div className="mt-5 space-y-4">
               <label className="block rounded-[18px] border border-dashed border-[color:var(--border)] bg-card/45 p-4">
                 <span className="text-xs font-medium text-text">Archivo exportado .txt</span>
                 <input
@@ -288,10 +289,9 @@ export function WhatsAppChatImportModal({
                   </div>
                 </div>
               ) : null}
-            </div>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
