@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminTenantPolicies, getBackendErrorBody, getBackendErrorStatus } from "@/lib/admin-client-policy";
-import { requireOpturonAdminApi } from "@/lib/saas/access";
+import { requireOpturonAdminApi, resolveOpturonAdminActorId } from "@/lib/saas/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,9 +14,11 @@ function noStore(response: NextResponse) {
 export async function GET() {
   const guard = await requireOpturonAdminApi();
   if (guard.error) return guard.error;
+  const actorUserId = resolveOpturonAdminActorId(guard.ctx);
+  if (!actorUserId) return noStore(NextResponse.json({ error: "opturon_admin_actor_unavailable" }, { status: 403 }));
 
   try {
-    const result = await getAdminTenantPolicies();
+    const result = await getAdminTenantPolicies({ actorUserId });
     return noStore(NextResponse.json({ tenants: result.data.tenants || [] }));
   } catch (error) {
     return noStore(

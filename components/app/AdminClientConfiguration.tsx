@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeft, Check, Copy, ExternalLink, Loader2, PauseCircle, PlayCircle, Plus, RefreshCw, Save, Search, XCircle } from "lucide-react";
+import { Activity, ArrowLeft, Check, Copy, ExternalLink, Loader2, Mail, PauseCircle, PlayCircle, Plus, RefreshCw, Save, Search, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -178,6 +178,7 @@ type NewClientDraft = {
 };
 
 type ClientWorkspaceTab = "summary" | "modules" | "integrations" | "subscription" | "diagnostics";
+type ClientLifecycleFilter = "active" | "pending" | "suspended";
 
 const CLIENT_WORKSPACE_TABS: Array<{ id: ClientWorkspaceTab; label: string }> = [
   { id: "summary", label: "Resumen" },
@@ -407,17 +408,33 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>("summary");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [lifecycleFilter, setLifecycleFilter] = useState<ClientLifecycleFilter>("active");
+  const [clientActionBusy, setClientActionBusy] = useState<string | null>(null);
+  const [lifecycleDialog, setLifecycleDialog] = useState<{ action: "suspend" | "reactivate"; tenantId: string } | null>(null);
+  const [lifecycleReason, setLifecycleReason] = useState("");
 
   const currentSubscription = subscriptions[0] || null;
+  const lifecycleCounts = useMemo(() => tenants.reduce<Record<ClientLifecycleFilter, number>>((counts, tenant) => {
+    const status = String(tenant.lifecycle?.status || "active").toLowerCase();
+    if (status === "pending") counts.pending += 1;
+    else if (status === "suspended") counts.suspended += 1;
+    else counts.active += 1;
+    return counts;
+  }, { active: 0, pending: 0, suspended: 0 }), [tenants]);
   const filteredTenants = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase("es");
-    if (!query) return tenants;
-    return tenants.filter((tenant) =>
+    return tenants.filter((tenant) => {
+      const status = String(tenant.lifecycle?.status || "active").toLowerCase();
+      const bucket = status === "pending" ? "pending" : status === "suspended" ? "suspended" : "active";
+      if (bucket !== lifecycleFilter) return false;
+      if (!query) return true;
+      return (
       [getTenantLabel(tenant), tenant.primaryEmail, tenant.tenantId, getPlanLabel(tenant.policy.planCode)]
         .filter(Boolean)
         .some((value) => String(value).toLocaleLowerCase("es").includes(query))
-    );
-  }, [searchQuery, tenants]);
+      );
+    });
+  }, [lifecycleFilter, searchQuery, tenants]);
 
   useEffect(() => {
     if (!selectedTenant) return;
@@ -708,6 +725,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       }
 
       await reloadTenants(json?.tenantId || null);
+      setLifecycleFilter("pending");
       setNewClientDraft(createNewClientDraft("custom"));
       setNewClientOpen(false);
       toast.success("Cliente creado e invitacion enviada");
@@ -715,6 +733,53 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       toast.error(error instanceof Error ? error.message : "No se pudo crear el cliente.");
     } finally {
       setCreatingClient(false);
+    }
+  }
+
+  async function runInvitationAction(action: "resend" | "copy" | "cancel") {
+    if (!selectedTenant || clientActionBusy) return;
+    setClientActionBusy(action);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(selectedTenant.tenantId)}/invitations/${action}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "client_management" }) }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "client_invitation_action_failed");
+      if (action === "copy") {
+        const acceptLink = String(json?.invitation?.acceptLink || "");
+        if (!acceptLink) throw new Error("invitation_link_missing");
+        await navigator.clipboard.writeText(acceptLink);
+        toast.success("Enlace vigente copiado");
+      } else {
+        toast.success(action === "resend" ? "Invitación reenviada" : "Invitación cancelada");
+      }
+      await reloadTenants(action === "cancel" ? undefined : selectedTenant.tenantId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo completar la acción.");
+    } finally {
+      setClientActionBusy(null);
+    }
+  }
+
+  async function confirmLifecycleAction() {
+    if (!lifecycleDialog || clientActionBusy || !lifecycleReason.trim()) return;
+    setClientActionBusy(lifecycleDialog.action);
+    try {
+      const response = await fetch(
+        `/api/app/admin/clients/${encodeURIComponent(lifecycleDialog.tenantId)}/lifecycle/${lifecycleDialog.action}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: lifecycleReason.trim() }) }
+      );
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "client_lifecycle_action_failed");
+      await reloadTenants(lifecycleDialog.tenantId);
+      toast.success(lifecycleDialog.action === "suspend" ? "Cliente suspendido" : "Cliente reactivado");
+      setLifecycleDialog(null);
+      setLifecycleReason("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el cliente.");
+    } finally {
+      setClientActionBusy(null);
     }
   }
 
@@ -956,6 +1021,33 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
         </Button>
       </div>
 
+      <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[color:var(--border)] bg-card/90 p-1.5" role="tablist" aria-label="Estado de clientes">
+        {(["active", "pending", "suspended"] as ClientLifecycleFilter[]).map((status) => {
+          const label = status === "active" ? "Activos" : status === "pending" ? "Pendientes" : "Suspendidos";
+          return (
+            <button
+              key={status}
+              type="button"
+              role="tab"
+              aria-selected={lifecycleFilter === status}
+              data-lifecycle-tab={status}
+              onClick={() => {
+                setLifecycleFilter(status);
+                const next = tenants.find((tenant) => {
+                  const value = String(tenant.lifecycle?.status || "active").toLowerCase();
+                  return status === "active" ? !["pending", "suspended"].includes(value) : value === status;
+                });
+                if (next) setSelectedTenantId(next.tenantId);
+                setMobileDetailOpen(false);
+              }}
+              className={`rounded-xl px-2 py-2 text-xs font-medium transition-colors sm:text-sm ${lifecycleFilter === status ? "bg-brand/16 text-brandBright" : "text-muted hover:bg-surface hover:text-text"}`}
+            >
+              {label} <span className="ml-1 tabular-nums">{lifecycleCounts[status]}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <Dialog open={newClientOpen} onOpenChange={setNewClientOpen}>
         <DialogContent data-new-client-dialog className="app-scroll-surface max-w-5xl overflow-x-hidden">
           <DialogHeader>
@@ -1122,8 +1214,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     <p className="mt-1 truncate text-xs text-muted">{tenant.primaryEmail || tenant.tenantId}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <Badge variant={tenant.policy.source === "settings.portal.policy" ? "success" : "warning"}>
-                      {getPlanLabel(tenant.policy.planCode)}
+                    <Badge variant={tenant.lifecycle?.status === "suspended" ? "danger" : tenant.lifecycle?.status === "pending" ? "warning" : "success"}>
+                      {formatClientLifecycleStatus(tenant.lifecycle?.status)}
                     </Badge>
                     <span className="text-[10px] uppercase tracking-wide text-muted">
                       Cliente: {formatClientLifecycleStatus(tenant.lifecycle?.status)}
@@ -1154,19 +1246,44 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 Volver a clientes
               </Button>
               <h2 className="text-xl font-semibold">{getTenantLabel(selectedTenant)}</h2>
-              <p className="mt-1 max-w-full truncate text-xs text-muted" title={selectedTenant.tenantId}>
-                {selectedTenant.primaryEmail ? `${selectedTenant.primaryEmail} / ` : ""}
-                <span className="font-mono">{selectedTenant.tenantId}</span>
-              </p>
+              <p className="mt-1 max-w-full truncate text-xs text-muted">{selectedTenant.primaryEmail || "Sin email principal"}</p>
             </div>
-            {activeTab === "summary" || activeTab === "modules" ? (
+            <div className="flex flex-wrap gap-2">
+            {selectedTenant.lifecycle?.status === "pending" ? (
+              <>
+                <Button variant="secondary" onClick={() => void runInvitationAction("resend")} disabled={Boolean(clientActionBusy)} className="gap-2"><Mail className="h-4 w-4" />Reenviar</Button>
+                <Button variant="secondary" onClick={() => void runInvitationAction("copy")} disabled={Boolean(clientActionBusy)} className="gap-2"><Copy className="h-4 w-4" />Copiar enlace</Button>
+                <Button variant="destructive" onClick={() => void runInvitationAction("cancel")} disabled={Boolean(clientActionBusy)}>Cancelar invitación</Button>
+              </>
+            ) : selectedTenant.lifecycle?.status === "suspended" ? (
+              <Button onClick={() => setLifecycleDialog({ action: "reactivate", tenantId: selectedTenant.tenantId })} disabled={Boolean(clientActionBusy)} className="gap-2"><PlayCircle className="h-4 w-4" />Reactivar cliente</Button>
+            ) : (
+              <Button variant="secondary" onClick={() => setLifecycleDialog({ action: "suspend", tenantId: selectedTenant.tenantId })} disabled={Boolean(clientActionBusy)} className="gap-2"><PauseCircle className="h-4 w-4" />Suspender cliente</Button>
+            )}
+            {(activeTab === "summary" || activeTab === "modules") && selectedTenant.lifecycle?.status === "active" ? (
               <Button onClick={savePolicy} disabled={saving} className="gap-2">
                 <Save className="h-4 w-4" />
                 {saving ? "Guardando" : activeTab === "modules" ? "Guardar módulos" : "Guardar cambios"}
               </Button>
             ) : null}
+            </div>
           </div>
         </div>
+
+        {selectedTenant.lifecycle?.status === "pending" ? (
+          <div className="rounded-2xl border border-amber-400/25 bg-amber-400/8 p-4" data-pending-invitation-detail>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><p className="font-medium">Invitación pendiente</p><p className="mt-1 text-sm text-muted">El acceso se activará cuando el owner cree su contraseña.</p></div>
+              <Badge variant="warning">Pendiente</Badge>
+            </div>
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div><dt className="text-xs text-muted">Creado</dt><dd>{formatDate(selectedTenant.createdAt)}</dd></div>
+              <div><dt className="text-xs text-muted">Último envío</dt><dd>{formatDate(selectedTenant.lifecycle?.invitation?.lastSentAt)}</dd></div>
+              <div><dt className="text-xs text-muted">Vence</dt><dd>{formatDate(selectedTenant.lifecycle?.invitation?.expiresAt)}</dd></div>
+              <div><dt className="text-xs text-muted">Reenvíos</dt><dd>{selectedTenant.lifecycle?.invitation?.resendCount ?? 0}</dd></div>
+            </dl>
+          </div>
+        ) : null}
 
         <div className="grid min-w-0 grid-cols-2 gap-1 rounded-2xl border border-[color:var(--border)] bg-card/90 p-1.5 sm:grid-cols-3 xl:grid-cols-5" role="tablist" aria-label="Secciones del cliente">
           {CLIENT_WORKSPACE_TABS.map((tab) => (
@@ -1218,10 +1335,6 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                 <ClientSummaryMetric label="Plan" value={getPlanLabel(draft.planCode)} />
                 <ClientSummaryMetric label="Módulos activos" value={String(Object.values(draft.enabledModules).filter(Boolean).length)} />
                 <ClientSummaryMetric label="Usuarios activos" value={String(selectedTenant.lifecycle?.activePortalUsers ?? draft.limits.maxPortalUsers)} />
-              </div>
-              <div className="mt-4 rounded-xl border border-[color:var(--border)] bg-surface/55 p-3">
-                <p className="text-xs text-muted">Tenant identifier</p>
-                <p className="mt-1 max-w-full truncate font-mono text-xs text-text" title={selectedTenant.tenantId}>{selectedTenant.tenantId}</p>
               </div>
             </div>
 
@@ -1640,6 +1753,37 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
         </div>
       </section>
       </div>
+      <Dialog open={Boolean(lifecycleDialog)} onOpenChange={(open) => { if (!open) { setLifecycleDialog(null); setLifecycleReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{lifecycleDialog?.action === "suspend" ? "Suspender cliente" : "Reactivar cliente"}</DialogTitle>
+            <DialogDescription>
+              {lifecycleDialog?.action === "suspend"
+                ? "El portal y las salidas automáticas quedarán bloqueados. Los datos y la facturación se preservan."
+                : "El acceso operativo se restaurará sin recrear datos ni modificar facturación."}
+            </DialogDescription>
+          </DialogHeader>
+          <label className="text-sm text-muted">
+            Motivo obligatorio
+            <textarea
+              value={lifecycleReason}
+              onChange={(event) => setLifecycleReason(event.target.value)}
+              className="mt-2 min-h-24 w-full rounded-xl border border-[color:var(--border)] bg-surface p-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-brandBright"
+              placeholder="Describe el motivo de esta acción administrativa"
+            />
+          </label>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="secondary">Volver</Button></DialogClose>
+            <Button
+              variant={lifecycleDialog?.action === "suspend" ? "destructive" : "primary"}
+              onClick={() => void confirmLifecycleAction()}
+              disabled={!lifecycleReason.trim() || Boolean(clientActionBusy)}
+            >
+              {clientActionBusy ? "Procesando..." : lifecycleDialog?.action === "suspend" ? "Confirmar suspensión" : "Confirmar reactivación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

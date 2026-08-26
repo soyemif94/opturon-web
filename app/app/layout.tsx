@@ -34,10 +34,26 @@ export default async function ClientPortalLayout({ children }: { children: React
       undefined
     : undefined;
   const appGlobalRole = ctx.globalRole === "partner" ? undefined : ctx.globalRole;
+  let tenantSuspended = false;
   const tenantContext =
     ctx.tenantId && isBackendConfigured() && !isOpturonAdminWorkspaceContext(ctx)
-      ? await getPortalTenantContext(ctx.tenantId).catch(() => null)
+      ? await getPortalTenantContext(ctx.tenantId).catch((error: unknown) => {
+          const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
+          const body = error && typeof error === "object" && "body" in error ? error.body : null;
+          tenantSuspended = status === 423 || Boolean(body && typeof body === "object" && "error" in body && body.error === "tenant_suspended");
+          return null;
+        })
       : null;
+  if (tenantSuspended) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-surface px-5" data-tenant-suspended-screen>
+        <section className="w-full max-w-lg rounded-2xl border border-[color:var(--border)] bg-card p-6 text-center shadow-[var(--card-shadow)]">
+          <h1 className="text-xl font-semibold text-text">Cuenta temporalmente suspendida</h1>
+          <p className="mt-3 text-sm leading-6 text-muted">Tu cuenta está temporalmente suspendida. Contactá al administrador de Opturon.</p>
+        </section>
+      </main>
+    );
+  }
   const tenantModules = buildTenantAppModules(tenantContext?.data?.policy || null);
   const whatsappStatus = buildWhatsAppConnectionStatus({
     fallbackReason: ctx.tenantId

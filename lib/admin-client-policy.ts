@@ -27,6 +27,14 @@ export type AdminTenantPolicyRow = {
     activePortalUsers?: number;
     activeOwners?: number;
     visible?: boolean;
+    invitation?: {
+      id?: string | null;
+      status?: "pending" | "accepted" | "expired" | "cancelled";
+      sentAt?: string | null;
+      lastSentAt?: string | null;
+      expiresAt?: string | null;
+      resendCount?: number;
+    } | null;
   };
   policy: TenantPolicy;
 };
@@ -194,14 +202,44 @@ async function backendPortalFetch<T>(
   }
 }
 
-export async function getAdminTenantPolicies() {
+export async function getAdminTenantPolicies(options?: { actorUserId?: string | null }) {
   return backendPortalFetch<{
     success: boolean;
     data: {
       ok: boolean;
       tenants: AdminTenantPolicyRow[];
     };
-  }>("/api/admin/tenants");
+  }>("/api/admin/tenants", undefined, API_TIMEOUT_MS, options);
+}
+
+export async function postAdminClientInvitationAction(
+  tenantId: string,
+  action: "resend" | "copy" | "cancel",
+  payload: { reason?: string } = {},
+  options?: { actorUserId?: string | null }
+) {
+  return backendPortalFetch<{ success: boolean; data: { ok: boolean; tenantId: string; invitation?: {
+    token?: string; expiresAt?: string; sentAt?: string; email?: string; name?: string | null; tenantName?: string | null; role?: string;
+  }; invitationStatus?: string } }>(
+    `/api/admin/tenants/${encodeURIComponent(tenantId)}/invitations/${action}`,
+    { method: "POST", body: JSON.stringify(payload) },
+    API_TIMEOUT_MS,
+    options
+  );
+}
+
+export async function postAdminClientLifecycleAction(
+  tenantId: string,
+  action: "suspend" | "reactivate",
+  reason: string,
+  options?: { actorUserId?: string | null }
+) {
+  return backendPortalFetch<{ success: boolean; data: { ok: boolean; tenantId: string; lifecycleStatus: string } }>(
+    `/api/admin/tenants/${encodeURIComponent(tenantId)}/lifecycle/${action}`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+    API_TIMEOUT_MS,
+    options
+  );
 }
 
 export async function getAdminTenantPolicy(tenantId: string, options?: { actorUserId?: string | null }) {
