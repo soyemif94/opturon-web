@@ -847,6 +847,7 @@ export async function runPortalInstagramDirectExchangeDiagnostic(code: string) {
     "/portal/instagram/debug-direct-exchange",
     {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ code })
     }
   );

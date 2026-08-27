@@ -22,6 +22,7 @@ assert.doesNotMatch(route, /console\.(log|info|warn|error)/);
 assert.doesNotMatch(route, /connectPortalInstagram|access_token|client_secret|database|INSERT|UPDATE|DELETE/);
 assert.match(api, /runPortalInstagramDirectExchangeDiagnostic/);
 assert.match(api, /"\/portal\/instagram\/debug-direct-exchange"/);
+assert.match(api, /headers: \{ "content-type": "application\/json" \}/);
 assert.match(api, /body: JSON\.stringify\(\{ code \}\)/);
 
 console.log("instagram-debug-callback.test.ts: ok");
