@@ -3,13 +3,14 @@ import { z } from "zod";
 import {
   getBackendErrorStatus,
   getPortalConversations,
+  getPortalInstagramStatus,
   getPortalTenantContext,
   getPortalWhatsAppEmbeddedSignupStatus,
   isBackendConfigured
 } from "@/lib/api";
 import { resolveAppTenant } from "@/lib/saas/access";
 import { applyCommercialBotHandoff, listInboxConversations } from "@/lib/saas/store";
-import { buildWhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
+import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
 
 const filtersSchema = z.object({
   filter: z.enum(["all", "new", "in_conversation", "follow_up", "closed", "unassigned", "with_follow_up", "overdue", "today", "nuevas", "asignadas"]).optional(),
@@ -46,36 +47,56 @@ export async function GET(request: NextRequest) {
   let channelState = buildWhatsAppConnectionStatus({
     fallbackReason: tenantContext.readOnly ? "demo_workspace" : "workspace_without_backend"
   });
+  let availableChannels = {
+    whatsapp: tenantContext.readOnly,
+    instagram: false
+  };
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
-      const [contextResult, conversationsResult, onboardingResult] = await Promise.all([
-        getPortalTenantContext(tenantContext.tenantId),
+      const [contextAttempt, conversationsResult, onboardingResult, instagramResult] = await Promise.all([
+        getPortalTenantContext(tenantContext.tenantId)
+          .then((result) => ({ result, error: null }))
+          .catch((error: unknown) => ({ result: null, error })),
         getPortalConversations(tenantContext.tenantId, { visibility, channel }),
-        getPortalWhatsAppEmbeddedSignupStatus(tenantContext.tenantId).catch(() => null)
+        getPortalWhatsAppEmbeddedSignupStatus(tenantContext.tenantId).catch(() => null),
+        getPortalInstagramStatus(tenantContext.tenantId).catch(() => null)
       ]);
 
-      channelState = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: onboardingResult?.data || null });
+      if (contextAttempt.error) {
+        const reason = contextAttempt.error instanceof Error ? contextAttempt.error.message : "backend_fetch_failed";
+        if (reason !== "mapped_clinic_without_whatsapp_channel" && reason !== "multiple_whatsapp_channels_configured") {
+          throw contextAttempt.error;
+        }
+        channelState = buildWhatsAppConnectionStatus({ fallbackReason: reason, onboarding: onboardingResult?.data || null });
+      } else {
+        channelState = buildWhatsAppConnectionStatus({
+          context: contextAttempt.result?.data,
+          onboarding: onboardingResult?.data || null
+        });
+      }
+
+      availableChannels = {
+        whatsapp: hasOperationalWhatsAppChannel(channelState),
+        instagram:
+          instagramResult?.data?.state === "connected" &&
+          Boolean(instagramResult.data.channel) &&
+          String(instagramResult.data.channel?.status || "").trim().toLowerCase() === "active"
+      };
       conversations = conversationsResult.data.conversations || [];
     } catch (error) {
       const reason = error instanceof Error ? error.message : "backend_fetch_failed";
-
-      if (reason === "mapped_clinic_without_whatsapp_channel" || reason === "multiple_whatsapp_channels_configured") {
-        channelState = buildWhatsAppConnectionStatus({ fallbackReason: reason });
-        conversations = [];
-      } else {
-        return NextResponse.json(
-          {
-            error: reason
-          },
-          {
-            status: getBackendErrorStatus(error) || 502,
-            headers: {
-              "Cache-Control": "no-store"
-            }
+      return NextResponse.json(
+        {
+          error: reason
+        },
+        {
+          status: getBackendErrorStatus(error) || 502,
+          headers: {
+            "Cache-Control": "no-store"
           }
-        );
-      }
+        }
+      );
     }
   }
 
@@ -133,6 +154,7 @@ export async function GET(request: NextRequest) {
       readOnly: tenantContext.readOnly,
       tenantId: tenantContext.tenantId,
       channelState,
+      availableChannels,
       conversations
     },
     {

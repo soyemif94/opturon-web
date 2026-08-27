@@ -17,11 +17,17 @@ import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { shouldShowInboxChannelEmptyState } from "@/lib/whatsapp-channel-state";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { preserveSelectedConversationId, resolveInboxDetailMode } from "@/components/app/inbox/mobile-behavior";
+import {
+  hasInboxChannel,
+  resolveInitialInboxChannel,
+  type InboxChannelAvailability
+} from "@/lib/inbox-channel-access";
 
 type InboxListResponse = {
   readOnly: boolean;
   conversations: ConversationRowData[];
   channelState?: WhatsAppConnectionStatus;
+  availableChannels?: InboxChannelAvailability;
 };
 
 type SellerOption = {
@@ -116,6 +122,10 @@ export function InboxWorkspace({
   const [detailError, setDetailError] = useState<DetailLoadError | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [channelState, setChannelState] = useState<WhatsAppConnectionStatus | null>(null);
+  const [availableChannels, setAvailableChannels] = useState<InboxChannelAvailability>({
+    whatsapp: false,
+    instagram: false
+  });
   const [archivingSelection, setArchivingSelection] = useState(false);
   const [restoringSelection, setRestoringSelection] = useState(false);
   const [composer, setComposer] = useState("");
@@ -146,6 +156,7 @@ export function InboxWorkspace({
   const mobileHistoryDetailRef = useRef(false);
   const pollInFlightRef = useRef(false);
   const autoReadInFlightRef = useRef<string | null>(null);
+  const initialChannelResolvedRef = useRef(false);
 
   const querySuffix = useMemo(() => {
     const params = new URLSearchParams();
@@ -217,6 +228,24 @@ export function InboxWorkspace({
       if (!json || !Array.isArray(json.conversations)) {
         throw new Error("invalid_inbox_list_shape");
       }
+      const nextAvailableChannels: InboxChannelAvailability = {
+        whatsapp: json.availableChannels?.whatsapp === true,
+        instagram: json.availableChannels?.instagram === true
+      };
+      setAvailableChannels(nextAvailableChannels);
+
+      if (!initialChannelResolvedRef.current) {
+        initialChannelResolvedRef.current = true;
+        const initialChannel = resolveInitialInboxChannel(channel, nextAvailableChannels);
+        if (initialChannel !== channel) {
+          rowsSnapshotRef.current = "";
+          setRows([]);
+          setChannelState(null);
+          setChannel(initialChannel);
+          return;
+        }
+      }
+
       let nextRows = [...(json.conversations || [])].sort(
         (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
       );
@@ -225,6 +254,7 @@ export function InboxWorkspace({
       const nextSnapshot = JSON.stringify({
         readOnly: nextReadOnly,
         channelState: json.channelState || null,
+        availableChannels: nextAvailableChannels,
         rows: nextRows
       });
       const changed = rowsSnapshotRef.current !== nextSnapshot;
@@ -1379,7 +1409,8 @@ export function InboxWorkspace({
     : undefined;
   const orderHref = detail?.relatedOrder?.id ? `/app/orders?orderId=${encodeURIComponent(detail.relatedOrder.id)}` : undefined;
   const shouldRenderChannelEmptyState = Boolean(channelState && rows.length === 0 && shouldShowInboxChannelEmptyState(channelState));
-  const shouldShowConnectionEmptyStateForChannel = channel === "whatsapp" && shouldRenderChannelEmptyState;
+  const shouldShowGlobalConnectionEmptyState =
+    !hasInboxChannel(availableChannels) && channel === "whatsapp" && shouldRenderChannelEmptyState;
   const detailMode = resolveInboxDetailMode({
     selectedId,
     resolvedConversationId: detail?.conversation.id,
@@ -1394,7 +1425,7 @@ export function InboxWorkspace({
         </div>
       ) : null}
 
-      {shouldShowConnectionEmptyStateForChannel && channelState ? (
+      {shouldShowGlobalConnectionEmptyState && channelState ? (
         <InboxConnectionEmptyState status={channelState} />
       ) : (
         <>
@@ -1425,6 +1456,7 @@ export function InboxWorkspace({
               search={search}
               onFilterChange={setFilter}
               onChannelChange={(value) => {
+                initialChannelResolvedRef.current = true;
                 setChannel(value);
                 setSelectedIds([]);
                 selectedIdRef.current = undefined;
