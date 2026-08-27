@@ -831,6 +831,27 @@ export async function disconnectPortalInstagram(tenantId: string, payload: { cha
   });
 }
 
+export type InstagramDirectExchangeDiagnostic = {
+  httpStatus: number;
+  tokenExchange: "PASS" | "FAIL";
+  userIdPresent: boolean;
+  accessTokenPresent: boolean;
+  providerErrorType: string | null;
+  providerErrorCode: string | null;
+  providerErrorMessage: string | null;
+};
+
+/** Temporary internal-only bridge for the isolated Instagram token diagnostic. */
+export async function runPortalInstagramDirectExchangeDiagnostic(code: string) {
+  return backendPortalFetch<{ success: boolean; data: InstagramDirectExchangeDiagnostic }>(
+    "/portal/instagram/debug-direct-exchange",
+    {
+      method: "POST",
+      body: JSON.stringify({ code })
+    }
+  );
+}
+
 export type PortalWhatsAppDiscoveredAsset = {
   wabaId: string;
   wabaName: string | null;
