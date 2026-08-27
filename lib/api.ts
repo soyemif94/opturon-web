@@ -821,6 +821,16 @@ export async function connectPortalInstagram(
   });
 }
 
+export async function disconnectPortalInstagram(tenantId: string, payload: { channelId: string }) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: PortalInstagramStatus;
+  }>(`/portal/tenants/${tenantId}/instagram/disconnect`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export type PortalWhatsAppDiscoveredAsset = {
   wabaId: string;
   wabaName: string | null;

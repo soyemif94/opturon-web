@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import type { PortalWhatsAppStatus } from "@/lib/api";
 import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
@@ -160,6 +161,32 @@ export function IntegrationsHub({
     }
   }
 
+  async function disconnectInstagram() {
+    const channelId = String(liveInstagramStatus?.channel?.id || "").trim();
+    if (!channelId || instagramBusy) return;
+
+    setInstagramBusy(true);
+    setInstagramError(null);
+    try {
+      const response = await fetch("/api/app/integrations/instagram", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(String(json?.error || "instagram_disconnect_failed"));
+      }
+      await refreshInstagramStatus();
+      router.replace("/app/integrations?instagram=disconnected");
+      router.refresh();
+    } catch (error) {
+      setInstagramError(error instanceof Error ? error.message : "instagram_disconnect_failed");
+    } finally {
+      setInstagramBusy(false);
+    }
+  }
+
   const connected = liveWhatsApp.state === "connected" || Boolean(liveWhatsAppStatus?.channel.connected);
   const webhookRecent = Number(liveWhatsAppStatus?.webhook.events24h || 0) > 0;
   const handoffsOpen = Number(liveWhatsAppStatus?.handoffs.openCount || 0) > 0;
@@ -180,6 +207,7 @@ export function IntegrationsHub({
         onSelectedAssetKeyChange={setSelectedInstagramAssetKey}
         onConnectSelectedAsset={() => void connectSelectedInstagramAsset()}
         onRefreshInstagram={() => void refreshInstagramStatus()}
+        onDisconnectInstagram={() => disconnectInstagram()}
       />
     );
   }
@@ -296,6 +324,7 @@ export function IntegrationsHub({
         onSelectedAssetKeyChange={setSelectedInstagramAssetKey}
         onConnectSelectedAsset={() => void connectSelectedInstagramAsset()}
         onRefresh={() => void refreshInstagramStatus()}
+        onDisconnect={() => disconnectInstagram()}
       />
 
       <section className="space-y-4">
@@ -371,7 +400,8 @@ function InstagramConnectionPanel({
   busy,
   onSelectedAssetKeyChange,
   onConnectSelectedAsset,
-  onRefresh
+  onRefresh,
+  onDisconnect
 }: {
   status: PortalInstagramStatus | null;
   errorReason?: string | null;
@@ -382,6 +412,7 @@ function InstagramConnectionPanel({
   onSelectedAssetKeyChange: (value: string) => void;
   onConnectSelectedAsset: () => void;
   onRefresh: () => void;
+  onDisconnect: () => void | Promise<void>;
 }) {
   const connected = status?.state === "connected" && Boolean(status.channel);
   const channel = status?.channel || null;
@@ -419,9 +450,21 @@ function InstagramConnectionPanel({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button asChild className="rounded-2xl px-5">
-                <a href="/api/app/integrations/instagram/start">Conectar Instagram</a>
-              </Button>
+              {connected ? (
+                <ConfirmDialog
+                  title={`¿Desconectar ${channel?.instagramUsername ? `@${String(channel.instagramUsername).replace(/^@+/, "")}` : "esta cuenta"}?`}
+                  description="Dejarás de recibir y responder mensajes nuevos de esta cuenta en Opturon. Tus conversaciones e historial no se eliminarán."
+                  confirmText="Desconectar Instagram"
+                  cancelText="Cancelar"
+                  variant="destructive"
+                  onConfirm={onDisconnect}
+                  trigger={<Button type="button" variant="destructive" className="rounded-2xl px-5" disabled={busy}>Desconectar Instagram</Button>}
+                />
+              ) : (
+                <Button asChild className="rounded-2xl px-5">
+                  <a href="/api/app/integrations/instagram/start">Conectar Instagram</a>
+                </Button>
+              )}
               <Button variant="secondary" className="rounded-2xl px-5" onClick={onRefresh}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refrescar

@@ -53,6 +53,9 @@ test("Instagram uses the real OAuth route and keeps selection and errors friendl
   assert.match(client, /Conectar cuenta seleccionada/);
   assert.match(client, /Intentar nuevamente/);
   assert.doesNotMatch(client, /Meta rechazo|invalid_scope|Login Configuration ID/);
+  assert.match(client, /Desconectar Instagram/);
+  assert.match(client, /Tus conversaciones e historial no se eliminarán/);
+  assert.match(client, /onConfirm=\{onDisconnectInstagram\}/);
 });
 
 test("connected customer identity is friendly and technical Instagram ID is secondary", () => {

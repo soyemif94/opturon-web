@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Instagram, Loader2, MessageCircle, RefreshCw
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
@@ -36,7 +37,8 @@ export function ClientIntegrationsExperience({
   instagramBusy,
   onSelectedAssetKeyChange,
   onConnectSelectedAsset,
-  onRefreshInstagram
+  onRefreshInstagram,
+  onDisconnectInstagram
 }: {
   whatsapp: WhatsAppConnectionStatus;
   instagramStatus: PortalInstagramStatus | null;
@@ -48,6 +50,7 @@ export function ClientIntegrationsExperience({
   onSelectedAssetKeyChange: (value: string) => void;
   onConnectSelectedAsset: () => void;
   onRefreshInstagram: () => void;
+  onDisconnectInstagram: () => void | Promise<void>;
 }) {
   const whatsappState = resolveWhatsAppState(whatsapp);
   const instagramState = resolveInstagramState({
@@ -102,9 +105,24 @@ export function ClientIntegrationsExperience({
         detail={instagramState === "connected" ? instagramUsername : undefined}
         actions={
           instagramState === "connected" ? (
-            <Button asChild variant="secondary" className="w-full rounded-xl sm:w-auto">
-              <Link href="/app/inbox">Gestionar</Link>
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Button asChild variant="secondary" className="w-full rounded-xl sm:w-auto">
+                <Link href="/app/inbox">Gestionar</Link>
+              </Button>
+              <ConfirmDialog
+                title={`¿Desconectar ${instagramUsername}?`}
+                description="Dejarás de recibir y responder mensajes nuevos de esta cuenta en Opturon. Tus conversaciones e historial no se eliminarán."
+                confirmText="Desconectar Instagram"
+                cancelText="Cancelar"
+                variant="destructive"
+                onConfirm={onDisconnectInstagram}
+                trigger={
+                  <Button type="button" variant="destructive" className="w-full rounded-xl sm:w-auto" disabled={instagramBusy}>
+                    Desconectar Instagram
+                  </Button>
+                }
+              />
+            </div>
           ) : instagramState === "connecting" ? (
             <Button disabled className="w-full rounded-xl sm:w-auto">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
