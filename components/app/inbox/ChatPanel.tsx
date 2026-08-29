@@ -4,6 +4,7 @@ import { BotEventItem } from "@/components/app/inbox/BotEventItem";
 import { Composer } from "@/components/app/inbox/Composer";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
 import type { DetailPayload } from "@/components/app/inbox/types";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
@@ -98,18 +99,29 @@ export function ChatPanel({
         {detail ? (
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="truncate text-xl font-semibold">{detail.contact?.name || "Conversacion"}</h2>
-                  <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
+              <div className="min-w-0 flex items-start gap-3">
+                <SimpleAvatar
+                  src={detail.contact?.profileImageUrl}
+                  name={detail.contact?.displayName || detail.contact?.name}
+                  className="h-10 w-10 rounded-full border border-[color:var(--border)] bg-brand/10 text-sm text-brandBright"
+                  fallbackClassName="bg-brand/10 text-brandBright"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="truncate text-xl font-semibold">{detail.contact?.displayName || detail.contact?.name || "Conversacion"}</h2>
+                    <InboxBadge className="capitalize">{statusLabel(detail)}</InboxBadge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    {detail.contact?.username || detail.contact?.secondaryText || detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}
+                  </p>
                 </div>
-                <p className="mt-1 text-sm text-muted">{detail.contact?.phone || detail.contact?.email || "Sin dato de contacto"}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <InboxBadge>
                   {responseMode(detail) === "bot" ? <Bot className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
                   {responseMode(detail)}
                 </InboxBadge>
+                <InboxBadge>{detail.conversation.channelType === "instagram" ? "Instagram" : "WhatsApp"}</InboxBadge>
                 <InboxBadge>{stageLabel(detail.deal?.stage)}</InboxBadge>
                 {detail.conversation.priority === "hot" ? <InboxBadge className="text-brandBright">prospecto caliente</InboxBadge> : null}
                 {readOnly ? <InboxBadge active>Demo</InboxBadge> : null}

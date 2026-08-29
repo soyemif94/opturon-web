@@ -1,4 +1,5 @@
 import { InboxBadge } from "@/components/app/inbox/Badge";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { cn } from "@/lib/cn";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 
@@ -43,10 +44,11 @@ export function ConversationRow({
   onClose: () => void;
   disabled?: boolean;
 }) {
-  const contact = row.contact?.name || "Sin nombre";
-  const meta = row.contact?.phone || row.contact?.email || "Sin contacto";
+  const contact = row.contact?.displayName || row.contact?.name || "Sin nombre";
+  const meta = row.contact?.username || row.contact?.secondaryText || row.contact?.phone || row.contact?.email || "Sin contacto";
   const preview = row.lastMessagePreview?.trim() || "Sin mensajes recientes";
   const hasUnread = row.unreadCount > 0;
+  const channelLabel = row.channelType === "instagram" ? "Instagram" : "WhatsApp";
 
   return (
     <div
@@ -58,14 +60,22 @@ export function ConversationRow({
     >
       <button onClick={onSelect} className="w-full text-left" type="button">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
-              <InboxBadge className="text-[11px]">WhatsApp</InboxBadge>
-              <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
-              {row.priority === "hot" ? <InboxBadge className="text-[11px]">Hot</InboxBadge> : null}
+          <div className="min-w-0 flex items-start gap-3">
+            <SimpleAvatar
+              src={row.contact?.profileImageUrl}
+              name={contact}
+              className="h-9 w-9 rounded-full border border-[color:var(--border)] bg-brand/10 text-xs text-brandBright"
+              fallbackClassName="bg-brand/10 text-brandBright"
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="line-clamp-1 text-sm font-semibold">{contact}</p>
+                <InboxBadge className="text-[11px]">{channelLabel}</InboxBadge>
+                <InboxBadge className="text-[11px]">{statusLabel(row.status, row.unreadCount)}</InboxBadge>
+                {row.priority === "hot" ? <InboxBadge className="text-[11px]">Hot</InboxBadge> : null}
+              </div>
+              <p className="mt-0.5 line-clamp-1 text-xs text-muted">{meta}</p>
             </div>
-            <p className="mt-0.5 text-xs text-muted">{meta}</p>
           </div>
           <div className="shrink-0 text-right">
             <p className={cn("text-xs", hasUnread ? "font-semibold text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>

@@ -3,6 +3,7 @@ import { Archive, Clock3, Flag, History, Phone, Tag, UserRound } from "lucide-re
 import { CardSection } from "@/components/app/inbox/CardSection";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
+import { SimpleAvatar } from "@/components/app/simple-avatar";
 import type { DetailPayload } from "@/components/app/inbox/types";
 
 const DEAL_STAGES = [
@@ -27,13 +28,6 @@ function taskStatusLabel(value?: string) {
   if (value === "todo") return "Pendiente";
   if (value === "done") return "Hecha";
   return value;
-}
-
-function initials(name?: string) {
-  const value = (name || "").trim();
-  if (!value) return "CT";
-  const parts = value.split(/\s+/).slice(0, 2);
-  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
 }
 
 function stageTone(stage?: string) {
@@ -116,18 +110,27 @@ export function ProfilePanel({
       <CardSection title="Contacto" subtitle="Perfil rapido para contexto y seguimiento">
         <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-brand/20 bg-brand/10 text-sm font-semibold text-brandBright">
-              {initials(detail.contact?.name)}
-            </span>
+            <SimpleAvatar
+              src={detail.contact?.profileImageUrl}
+              name={detail.contact?.displayName || detail.contact?.name}
+              className="h-14 w-14 rounded-[20px] border border-brand/20 bg-brand/10 text-sm text-brandBright"
+              fallbackClassName="bg-brand/10 text-brandBright"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-lg font-semibold">{detail.contact?.name || "Sin nombre"}</p>
-                <InboxBadge>WhatsApp</InboxBadge>
+                <p className="truncate text-lg font-semibold">{detail.contact?.displayName || detail.contact?.name || "Sin nombre"}</p>
+                <InboxBadge>{detail.conversation.channelType === "instagram" ? "Instagram" : "WhatsApp"}</InboxBadge>
               </div>
               <div className="mt-2 space-y-2 text-sm text-muted">
+                {detail.contact?.username ? (
+                  <p className="flex items-center gap-2">
+                    <UserRound className="h-3.5 w-3.5" />
+                    {detail.contact.username}
+                  </p>
+                ) : null}
                 <p className="flex items-center gap-2">
                   <Phone className="h-3.5 w-3.5" />
-                  {detail.contact?.phone || "Sin telefono"}
+                  {detail.contact?.phone || detail.contact?.technicalIdentifier || "Sin telefono"}
                 </p>
                 <p className="flex items-center gap-2">
                   <UserRound className="h-3.5 w-3.5" />

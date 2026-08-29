@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
   if (q) {
     conversations = conversations.filter((item) => {
-      const text = `${item.contact?.name || ""} ${item.contact?.phone || ""} ${item.contact?.email || ""}`.toLowerCase();
+      const text = `${item.contact?.name || ""} ${item.contact?.displayName || ""} ${item.contact?.username || ""} ${item.contact?.phone || ""} ${item.contact?.email || ""}`.toLowerCase();
       return text.includes(q);
     });
   }
