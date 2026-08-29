@@ -30,14 +30,37 @@ export type ConversationRowData = {
   nextActionNote?: string | null;
   transferPaymentStatus?: string | null;
   transferPaymentOrderId?: string | null;
-  contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; tags?: string[] };
+  contact?: {
+    id: string;
+    name: string;
+    displayName?: string;
+    username?: string;
+    phone?: string;
+    secondaryText?: string;
+    technicalIdentifier?: string;
+    email?: string;
+    profileImageUrl?: string;
+    tags?: string[];
+  };
   deal?: { id: string; stage: string; value: number; probability: number };
 };
 
 export type DetailPayload = {
   readOnly: boolean;
   conversation: ConversationRowData;
-  contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; industry?: string; tags: string[] };
+  contact?: {
+    id: string;
+    name: string;
+    displayName?: string;
+    username?: string;
+    phone?: string;
+    secondaryText?: string;
+    technicalIdentifier?: string;
+    email?: string;
+    profileImageUrl?: string;
+    industry?: string;
+    tags: string[];
+  };
   deal?: { id: string; stage: string; value: number; probability: number };
   messages: Array<{
     id: string;

@@ -65,7 +65,12 @@ export function ConversationRow({
   const derivedPriority = getConversationPriority(row);
   const followUp = followUpUi(row.nextActionAt);
   const channelLabel = row.channelType === "instagram" ? "Instagram" : "WhatsApp";
-  const displayName = row.contact?.name?.trim() || row.contact?.phone || "Sin nombre";
+  const displayName =
+    row.contact?.displayName?.trim() ||
+    row.contact?.name?.trim() ||
+    row.contact?.phone ||
+    "Sin nombre";
+  const subline = row.contact?.username ? `${row.contact.username} · ${preview}` : preview;
   const priorityTone = derivedPriority === "high" ? "bg-red-400" : derivedPriority === "medium" ? "bg-amber-300" : "bg-slate-500";
   const rowSummary = [
     channelLabel,
@@ -116,7 +121,7 @@ export function ConversationRow({
                 <p className={cn("shrink-0 text-[10px] tabular-nums", hasUnread ? "font-medium text-text" : "text-muted")}>{formatAgo(row.lastMessageAt)}</p>
               </div>
               <div className="mt-1 flex items-center gap-2">
-                <p className={cn("min-w-0 flex-1 truncate text-xs", hasUnread ? "font-medium text-text" : "text-muted")}>{preview}</p>
+                <p className={cn("min-w-0 flex-1 truncate text-xs", hasUnread ? "font-medium text-text" : "text-muted")}>{subline}</p>
                 {hasUnread ? <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-semibold text-white" aria-label={`${row.unreadCount} mensajes sin leer`}>{row.unreadCount}</span> : null}
               </div>
               {(followUp || !row.botEnabled || row.priority === "hot") ? (

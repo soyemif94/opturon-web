@@ -116,12 +116,31 @@ export function ProfilePanel({
   onBotFlowLockChange,
   onBotDomainOverrideChange
 }: ProfilePanelProps) {
+  const displayName =
+    detail?.contact?.displayName ||
+    detail?.contact?.name ||
+    detail?.conversation.contact?.displayName ||
+    detail?.conversation.contact?.name ||
+    "Sin nombre";
+  const username = detail?.contact?.username || detail?.conversation.contact?.username || null;
+  const contactPhone =
+    detail?.contact?.phone ||
+    detail?.contact?.technicalIdentifier ||
+    detail?.conversation.contact?.phone ||
+    detail?.conversation.contact?.technicalIdentifier ||
+    "Sin telefono";
+  const contactEmail =
+    detail?.contact?.email ||
+    detail?.contact?.secondaryText ||
+    detail?.conversation.contact?.email ||
+    detail?.conversation.contact?.secondaryText ||
+    "Sin email";
   const commercialActionParams = detail
     ? {
         conversationId: detail.conversation.id,
         contactId: detail.contact?.id || "",
-        contactName: detail.contact?.name || detail.conversation.contact?.name || "",
-        phone: detail.contact?.phone || detail.conversation.contact?.phone || ""
+        contactName: displayName,
+        phone: contactPhone === "Sin telefono" ? "" : contactPhone
       }
     : null;
 
@@ -147,14 +166,18 @@ export function ProfilePanel({
         <div className="flex items-start gap-3">
           <SimpleAvatar
             src={detail.contact?.profileImageUrl}
-            name={detail.contact?.name}
+            name={displayName}
             className="size-14 rounded-full border border-brand/20 bg-brand/10 text-sm text-brandBright"
             fallbackClassName="bg-brand/10 text-brandBright"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-semibold">{detail.contact?.name || "Sin nombre"}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-muted"><Phone className="size-3.5" />{detail.contact?.phone || "Sin telefono"}</p>
-            <p className="mt-1 flex items-center gap-1.5 truncate text-muted"><UserRound className="size-3.5" />{detail.contact?.email || "Sin email"}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="truncate text-base font-semibold">{displayName}</p>
+              {detail.conversation.channelType ? <InboxBadge>{detail.conversation.channelType === "instagram" ? "Instagram" : "WhatsApp"}</InboxBadge> : null}
+            </div>
+            {username ? <p className="mt-1 truncate text-muted">@{String(username).replace(/^@+/, "")}</p> : null}
+            <p className="mt-1 flex items-center gap-1.5 text-muted"><Phone className="size-3.5" />{contactPhone}</p>
+            <p className="mt-1 flex items-center gap-1.5 truncate text-muted"><UserRound className="size-3.5" />{contactEmail}</p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">

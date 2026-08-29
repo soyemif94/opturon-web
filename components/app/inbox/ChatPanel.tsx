@@ -90,6 +90,18 @@ export function ChatPanel({
   const isComposerDisabled = readOnly || isInstagramConversation;
   const headerConversation = detail?.conversation || selectedConversation;
   const headerContact = detail?.contact || selectedConversation?.contact;
+  const headerDisplayName =
+    headerContact?.displayName ||
+    headerContact?.name ||
+    headerContact?.phone ||
+    "Cliente";
+  const headerSecondaryText =
+    headerContact?.username ||
+    headerContact?.secondaryText ||
+    headerContact?.phone ||
+    headerContact?.technicalIdentifier ||
+    headerContact?.email ||
+    "Sin dato de contacto";
 
   useEffect(() => {
     setHistoryExpanded(false);
@@ -121,19 +133,19 @@ export function ChatPanel({
             <div className="flex min-w-0 items-center gap-3">
               <SimpleAvatar
                 src={headerContact?.profileImageUrl}
-                name={headerContact?.name || headerContact?.phone || "Cliente"}
+                name={headerDisplayName}
                 className="size-10 rounded-full border border-white/10 bg-brand/10 text-xs text-brandBright"
                 fallbackClassName="bg-brand/10 text-brandBright"
               />
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <h2 className="truncate text-base font-semibold">{headerContact?.name || headerContact?.phone || "Conversacion"}</h2>
+                  <h2 className="truncate text-base font-semibold">{headerDisplayName || "Conversacion"}</h2>
                   <span className={`hidden h-5 shrink-0 items-center rounded-full border px-2 text-[9px] sm:inline-flex ${headerConversation.channelType === "instagram" ? "border-fuchsia-400/25 text-fuchsia-100" : "border-emerald-400/25 text-emerald-100"}`}>{headerConversation.channelType === "instagram" ? "Instagram" : "WhatsApp"}</span>
                   <span className={`size-2 shrink-0 rounded-full ${headerConversation.botEnabled ? "bg-emerald-400" : "bg-amber-400"}`} aria-label={headerConversation.botEnabled ? "Bot activo" : "Bot pausado"} />
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-muted">
-                  {detail ? statusLabel(detail) : "cargando"} · {headerContact?.phone || headerContact?.email || "Sin dato de contacto"}
-                </p>
+                  {detail ? statusLabel(detail) : "cargando"} · {headerSecondaryText}
+                </div>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">

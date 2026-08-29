@@ -166,8 +166,13 @@ export type Contact = {
   id: string;
   tenantId: string;
   name: string;
+  displayName?: string;
+  username?: string;
   phone?: string;
+  secondaryText?: string;
+  technicalIdentifier?: string;
   email?: string;
+  profileImageUrl?: string;
   industry?: string;
   tags: string[];
 };
