@@ -1186,8 +1186,9 @@ export function InboxWorkspace({
   async function sendMessage(value: string) {
     const text = value.trim();
     if (!selectedId || !text || readOnly || !detail) return;
-    if (detail.conversation.channelType === "instagram") {
-      toast.error("Instagram esta en modo lectura", "Respuesta desde Instagram todavia no disponible.");
+    const composerCapability = (detail as DetailPayload & { composerCapability?: { enabled?: boolean } }).composerCapability;
+    if (composerCapability && !composerCapability.enabled) {
+      toast.error("No se puede enviar el mensaje", "El canal de esta conversacion no esta disponible para responder ahora.");
       return;
     }
 
