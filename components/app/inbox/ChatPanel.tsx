@@ -145,7 +145,7 @@ export function ChatPanel({
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-muted">
                   {detail ? statusLabel(detail) : "cargando"} · {headerSecondaryText}
-                </div>
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
