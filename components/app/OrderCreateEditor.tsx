@@ -83,6 +83,7 @@ export function OrderCreateEditor() {
   const [contactsLoading, setContactsLoading] = useState(true);
   const [metaLoading, setMetaLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
 
   const selectedProduct = useMemo(() => products.find((product) => product.id === form.productId) || null, [form.productId, products]);
   const selectedContact = useMemo(() => contacts.find((contact) => contact.id === form.contactId) || null, [contacts, form.contactId]);
@@ -111,7 +112,10 @@ export function OrderCreateEditor() {
   const visibleTotal = selectedProduct && Number.isInteger(requestedQuantity) && requestedQuantity > 0 ? Number((selectedProductPrice * requestedQuantity).toFixed(2)) : 0;
   const cartUnits = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems]);
   const subtotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0), [cartItems]);
-  const total = subtotal;
+  const hasValidDiscountPercentage = Number.isFinite(discountPercentage) && discountPercentage >= 0 && discountPercentage <= 100;
+  const effectiveDiscountPercentage = hasValidDiscountPercentage ? discountPercentage : 0;
+  const discountAmount = Number(((subtotal * effectiveDiscountPercentage) / 100).toFixed(2));
+  const total = Number((subtotal - discountAmount).toFixed(2));
   const selectedCurrency = cartItems[0]?.currency || selectedProduct?.currency || "ARS";
   const paymentStatusLabel = form.paymentStatus === "paid" ? "Pagado ahora" : "Pendiente de pago";
   const paymentMethodLabel = labelForPaymentMethod(form.paymentMethod);
@@ -210,6 +214,10 @@ export function OrderCreateEditor() {
       toast.error("Carrito vacio", "Agrega al menos un producto para crear el pedido.");
       return;
     }
+    if (!hasValidDiscountPercentage) {
+      toast.error("Descuento invalido", "Ingresa un porcentaje entre 0 y 100.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -226,6 +234,7 @@ export function OrderCreateEditor() {
           paidAt: form.paymentStatus === "paid" ? new Date().toISOString() : null,
           source: "manual",
           notes: form.notes.trim(),
+          discountPercentage: effectiveDiscountPercentage,
           items: cartItems.map((item) => ({
             productId: item.productId,
             quantity: item.quantity
@@ -261,6 +270,7 @@ export function OrderCreateEditor() {
     }));
     setCartItems([]);
     setProductSearch("");
+    setDiscountPercentage(0);
   }
 
   function addSelectedProductToCart() {
@@ -704,8 +714,25 @@ export function OrderCreateEditor() {
             <CardContent className="space-y-3 pt-0">
               <div className="space-y-3 rounded-[20px] border border-[color:var(--border)] bg-surface/55 p-4">
                 <SummaryRow label="Subtotal" value={formatCurrency(subtotal, selectedCurrency)} />
-                <SummaryRow label="Descuentos" value="$ 0,00" />
-                <SummaryRow label="Impuestos" value="$ 0,00" />
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <label className="text-sm text-muted" htmlFor="order-discount-percentage">Descuento</label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="order-discount-percentage"
+                      className="h-9 w-20 text-right"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={Number.isFinite(discountPercentage) ? String(discountPercentage) : ""}
+                      onChange={(event) => setDiscountPercentage(event.target.value === "" ? NaN : Number(event.target.value))}
+                      aria-invalid={!hasValidDiscountPercentage}
+                    />
+                    <span className="text-sm font-medium text-text">%</span>
+                  </div>
+                </div>
+                <SummaryRow label="Descuento aplicado" value={`-${formatCurrency(discountAmount, selectedCurrency)}`} />
                 <div className="border-t border-[color:var(--border)] pt-3">
                   <SummaryRow label="TOTAL" value={formatCurrency(total, selectedCurrency)} emphasis />
                 </div>
