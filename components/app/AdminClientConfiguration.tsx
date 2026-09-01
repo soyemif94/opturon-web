@@ -1430,7 +1430,12 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
           <div className="min-w-0 space-y-5">
             <div className={activeTab === "diagnostics" ? "block" : "hidden"} role="tabpanel">
-              <AdminMetaReadinessCard readiness={metaReadiness} loading={loadingMetaReadiness} onRefresh={() => void loadMetaReadiness()} />
+              <AdminMetaReadinessCard
+                readiness={metaReadiness}
+                loading={loadingMetaReadiness}
+                onRefresh={() => void loadMetaReadiness()}
+                onConnect={() => void handleConnectWhatsApp()}
+              />
             </div>
 
             <div className={`${activeTab === "integrations" ? "block" : "hidden"} min-w-0 space-y-5`} role="tabpanel">
@@ -1778,11 +1783,13 @@ function renderAutomaticCheckDetail(check: MetaEmbeddedReadinessCheck) {
 function AdminMetaReadinessCard({
   readiness,
   loading,
-  onRefresh
+  onRefresh,
+  onConnect
 }: {
   readiness: MetaEmbeddedSignupReadiness | null;
   loading: boolean;
   onRefresh: () => void;
+  onConnect: () => void;
 }) {
   const automaticChecks = Object.entries(readiness?.checks || {}).filter(([, check]) => check.kind === "automatic");
   const manualChecks = Object.entries(readiness?.checks || {}).filter(([, check]) => check.kind === "manual");
@@ -1859,7 +1866,7 @@ function AdminMetaReadinessCard({
               <RefreshCw className="h-4 w-4" />
               Actualizar diagnostico
             </Button>
-            <Button type="button" variant="secondary" className="justify-start gap-2" disabled={!readiness?.readyForTest}>
+            <Button type="button" variant="secondary" className="justify-start gap-2" onClick={onConnect} disabled={!readiness?.readyForTest}>
               Conectar WhatsApp
             </Button>
           </div>
