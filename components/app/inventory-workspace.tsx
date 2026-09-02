@@ -256,18 +256,21 @@ export function InventoryWorkspace({
             value={String(metrics.activeProducts)}
             helper="Productos activos reutilizados desde catalogo."
             icon={Boxes}
+            tone="emerald"
           />
           <MetricCard
             label="Stock bajo"
             value={String(metrics.lowStockCount)}
             helper="Activos con 1 a 5 unidades."
             icon={TriangleAlert}
+            tone="amber"
           />
           <MetricCard
             label="Agotados"
             value={String(metrics.outOfStockCount)}
             helper="Activos sin stock disponible."
             icon={CircleAlert}
+            tone="amber"
           />
           <MetricCard
             label="Valor estimado"
@@ -278,12 +281,14 @@ export function InventoryWorkspace({
                 : "No sumamos inventario en una moneda falsa cuando hay mas de una divisa."
             }
             icon={Sparkles}
+            tone="neutral"
           />
           <MetricCard
             label="Urgencias"
             value={String(metrics.urgentCount)}
             helper="Vencimientos criticos, proximos o vencidos."
             icon={AlertTriangle}
+            tone="amber"
           />
         </section>
 
@@ -486,13 +491,21 @@ function MetricCard({
   label,
   value,
   helper,
-  icon: Icon
+  icon: Icon,
+  tone = "neutral"
 }: {
   label: string;
   value: string;
   helper: string;
   icon: ComponentType<{ className?: string }>;
+  tone?: "neutral" | "emerald" | "amber";
 }) {
+  const valueClasses = {
+    neutral: "[[data-app-theme=light]_&]:text-[color:var(--text)]",
+    emerald: "[[data-app-theme=light]_&]:text-emerald-700",
+    amber: "[[data-app-theme=light]_&]:text-amber-800"
+  } as const;
+
   return (
     <Card className="relative overflow-hidden border-white/8 bg-card/90">
       <CardContent className="relative pt-4">
@@ -500,7 +513,7 @@ function MetricCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.16em] text-muted">{label}</p>
-            <p className="mt-3 text-2xl font-semibold">{value}</p>
+            <p className={`mt-3 text-2xl font-semibold ${valueClasses[tone]}`}>{value}</p>
           </div>
           <div className="rounded-2xl border border-brand/20 bg-brand/10 p-2 text-brandBright">
             <Icon className="h-4 w-4" />

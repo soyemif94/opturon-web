@@ -2775,6 +2775,13 @@ function MetricCard({
     amber: "border-amber-500/20 bg-amber-500/12 text-amber-300",
     violet: "border-violet-500/20 bg-violet-500/12 text-violet-300"
   } as const;
+  const valueClasses = {
+    brand: "[[data-app-theme=light]_&]:text-[color:var(--text)]",
+    emerald: "[[data-app-theme=light]_&]:text-emerald-700",
+    blue: "[[data-app-theme=light]_&]:text-slate-700",
+    amber: "[[data-app-theme=light]_&]:text-amber-800",
+    violet: "[[data-app-theme=light]_&]:text-slate-700"
+  } as const;
   return (
     <Card className="border-white/6 bg-card/90">
       <CardContent className="flex items-start gap-4 p-5">
@@ -2783,7 +2790,7 @@ function MetricCard({
         </span>
         <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</p>
-          <p className="mt-2 text-2xl font-semibold">{value}</p>
+          <p className={`mt-2 text-2xl font-semibold ${valueClasses[accent]}`}>{value}</p>
           <p className="mt-1 text-sm leading-6 text-muted">{helper}</p>
         </div>
       </CardContent>
