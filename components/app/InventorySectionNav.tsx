@@ -67,7 +67,7 @@ export function InventorySectionNav({ canBulkAdjust = false }: { canBulkAdjust?:
                 className={cn(
                   "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
                   active
-                    ? "border-brand/40 bg-brand/15 text-white"
+                    ? "border-brand/40 bg-brand/15 text-white [[data-app-theme=light]_&]:text-[color:var(--text)]"
                     : "border-[color:var(--border)] bg-surface/55 text-muted hover:text-white"
                 )}
               >
