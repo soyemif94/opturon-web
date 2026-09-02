@@ -172,7 +172,7 @@ export function ChatPanel({
 
       <div
         ref={scrollViewportRef}
-        className="app-scroll-surface min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] px-3 py-4 [-webkit-overflow-scrolling:touch] sm:px-5"
+        className="app-scroll-surface min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(176,80,0,0.035),transparent_25%)] [[data-app-theme=light]_&]:bg-[var(--bg)] px-3 py-4 [-webkit-overflow-scrolling:touch] sm:px-5"
         tabIndex={0}
         aria-label="Mensajes de la conversación"
       >
