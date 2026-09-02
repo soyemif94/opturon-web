@@ -503,7 +503,7 @@ export function InvoicesWorkspace({
                   type="button"
                   className={cn(
                     "group inline-flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-medium transition",
-                    categoryTab === tab ? "border-[#f97316] text-[#fb923c]" : "border-transparent text-slate-300 hover:text-white"
+                    categoryTab === tab ? "border-[#f97316] text-[#fb923c]" : "border-transparent text-slate-300 hover:text-white [[data-app-theme=light]_&]:text-slate-700 [[data-app-theme=light]_&]:hover:text-slate-700"
                   )}
                   onClick={() => setCategoryTab(tab)}
                 >
@@ -718,11 +718,11 @@ function MetricCard({
   tone: "success" | "primary" | "violet" | "warning" | "danger";
 }) {
   const accentMap = {
-    success: "from-emerald-500/20 via-emerald-400/10 to-transparent text-emerald-300",
-    primary: "from-blue-500/20 via-blue-400/10 to-transparent text-blue-300",
-    violet: "from-violet-500/20 via-violet-400/10 to-transparent text-violet-300",
-    warning: "from-amber-500/20 via-amber-400/10 to-transparent text-amber-300",
-    danger: "from-rose-500/20 via-rose-400/10 to-transparent text-rose-300"
+    success: "from-emerald-500/20 via-emerald-400/10 to-transparent text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700",
+    primary: "from-blue-500/20 via-blue-400/10 to-transparent text-blue-300 [[data-app-theme=light]_&]:text-blue-700",
+    violet: "from-violet-500/20 via-violet-400/10 to-transparent text-violet-300 [[data-app-theme=light]_&]:text-violet-700",
+    warning: "from-amber-500/20 via-amber-400/10 to-transparent text-amber-300 [[data-app-theme=light]_&]:text-amber-800",
+    danger: "from-rose-500/20 via-rose-400/10 to-transparent text-rose-300 [[data-app-theme=light]_&]:text-rose-700"
   } as const;
 
   return (

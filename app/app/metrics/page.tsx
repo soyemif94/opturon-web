@@ -348,10 +348,10 @@ type Tone = "orange" | "amber" | "green" | "violet" | "sky";
 
 function toneIconClass(tone: Tone) {
   if (tone === "orange") return "border-brand/25 bg-brand/10 text-brandBright";
-  if (tone === "amber") return "border-[#f2a44c]/20 bg-[#f2a44c]/10 text-[#f2a44c]";
-  if (tone === "green") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-300";
-  if (tone === "violet") return "border-violet-500/20 bg-violet-500/10 text-violet-300";
-  return "border-sky-500/20 bg-sky-500/10 text-sky-300";
+  if (tone === "amber") return "border-[#f2a44c]/20 bg-[#f2a44c]/10 text-[#f2a44c] [[data-app-theme=light]_&]:text-[color:var(--brand-deep)]";
+  if (tone === "green") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700";
+  if (tone === "violet") return "border-violet-500/20 bg-violet-500/10 text-violet-300 [[data-app-theme=light]_&]:text-violet-700";
+  return "border-sky-500/20 bg-sky-500/10 text-sky-300 [[data-app-theme=light]_&]:text-sky-700";
 }
 
 function toneSurfaceClass(tone: Tone) {
@@ -364,10 +364,10 @@ function toneSurfaceClass(tone: Tone) {
 
 function toneValueClass(tone: Tone) {
   if (tone === "orange") return "text-brandBright";
-  if (tone === "amber") return "text-[#f2a44c]";
-  if (tone === "green") return "text-emerald-300";
-  if (tone === "violet") return "text-violet-300";
-  return "text-sky-300";
+  if (tone === "amber") return "text-[#f2a44c] [[data-app-theme=light]_&]:text-[color:var(--brand-deep)]";
+  if (tone === "green") return "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700";
+  if (tone === "violet") return "text-violet-300 [[data-app-theme=light]_&]:text-violet-700";
+  return "text-sky-300 [[data-app-theme=light]_&]:text-sky-700";
 }
 
 function buildDailyActivity(conversations: ConversationRowData[], now: Date) {

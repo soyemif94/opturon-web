@@ -191,7 +191,7 @@ export default async function AppSettingsPage() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="app-light-surface space-y-4">
       <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_236px]">
         <div className="overflow-hidden rounded-[26px] border border-white/8 bg-[radial-gradient(circle_at_82%_18%,rgba(176,80,0,0.12),transparent_18%),linear-gradient(135deg,rgba(12,20,32,0.98),rgba(10,16,28,0.96))] p-4 shadow-[var(--card-shadow)]">
           <div className="flex flex-wrap items-center gap-2">

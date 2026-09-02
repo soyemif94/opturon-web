@@ -244,7 +244,7 @@ async function loadSnapshot(tenantId: string, preferredRuleId: string | null): P
 }
 
 function Metric({ label, value, tone = "muted" }: { label: string; value: string | number; tone?: "success" | "warning" | "danger" | "muted" }) {
-  const color = tone === "success" ? "text-emerald-200" : tone === "warning" ? "text-amber-200" : tone === "danger" ? "text-red-200" : "text-white";
+  const color = tone === "success" ? "text-emerald-200 [[data-app-theme=light]_&]:text-emerald-700" : tone === "warning" ? "text-amber-200 [[data-app-theme=light]_&]:text-amber-800" : tone === "danger" ? "text-red-200 [[data-app-theme=light]_&]:text-red-700" : "text-white";
   return (
     <div className="rounded-xl border border-white/8 bg-black/15 p-3">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted">{label}</p>
@@ -603,7 +603,7 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
         </CardContent>
       </Card>
 
-      {pageError ? <div role="alert" className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100">{pageError}</div> : null}
+      {pageError ? <div role="alert" className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100 [[data-app-theme=light]_&]:text-red-700">{pageError}</div> : null}
       {!selectedTenant ? <EmptyState title="No hay tenant disponible" detail="No pudimos resolver un tenant válido desde la sesión Admin." /> : null}
 
       {selectedTenant ? <>
@@ -641,11 +641,11 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
               <Gate label="Switch y regla OFF" pass={settings?.operationalAlertsEnabled === false && selectedRule?.enabled === false} />
             </div>
             {activationBlockers.length ? <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3">
-              <p className="text-sm font-medium text-amber-100">Bloqueos antes de activar</p>
-              <ul className="mt-2 space-y-1 text-sm text-amber-100/85">
+              <p className="text-sm font-medium text-amber-100 [[data-app-theme=light]_&]:text-amber-800">Bloqueos antes de activar</p>
+              <ul className="mt-2 space-y-1 text-sm text-amber-100/85 [[data-app-theme=light]_&]:text-amber-800">
                 {activationBlockers.map((code) => <li key={code}>• {canaryGateLabel(code)}</li>)}
               </ul>
-            </div> : <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">Todos los gates de activación están en PASS. Falta confirmación humana.</div>}
+            </div> : <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100 [[data-app-theme=light]_&]:text-emerald-700">Todos los gates de activación están en PASS. Falta confirmación humana.</div>}
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button type="button" disabled={!activationAllowed || activeCanaryScope !== null || busy !== null} onClick={() => {
                 setActivationAcknowledged(false);
@@ -717,7 +717,7 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
             <CardContent className="space-y-3">
               {selectedRule && preflight ? <>
                 <div className="grid gap-2 sm:grid-cols-2"><Metric label="Enabled rules" value={preflight.enabledRules?.count ?? "—"} /><Metric label="Recipient count" value={preflight.recipients?.count ?? "—"} /></div>
-                <div className="rounded-xl border border-white/8 bg-black/15 p-3 text-sm"><p className="font-medium text-white">Reasons</p>{preflight.reasons?.length ? <ul className="mt-2 space-y-1 text-muted">{preflight.reasons.map((reason, index) => { const code = typeof reason === "string" ? reason : reason.code || "unknown"; const detail = typeof reason === "string" ? null : reason.detail; return <li key={`${code}-${index}`}>• {code}{detail ? ` — ${detail}` : ""}</li>; })}</ul> : <p className="mt-2 text-emerald-200">Sin blockers.</p>}</div>
+                <div className="rounded-xl border border-white/8 bg-black/15 p-3 text-sm"><p className="font-medium text-white">Reasons</p>{preflight.reasons?.length ? <ul className="mt-2 space-y-1 text-muted">{preflight.reasons.map((reason, index) => { const code = typeof reason === "string" ? reason : reason.code || "unknown"; const detail = typeof reason === "string" ? null : reason.detail; return <li key={`${code}-${index}`}>• {code}{detail ? ` — ${detail}` : ""}</li>; })}</ul> : <p className="mt-2 text-emerald-200 [[data-app-theme=light]_&]:text-emerald-700">Sin blockers.</p>}</div>
                 <p className="text-xs text-muted">Evaluado: {formatDate((preflight as { evaluatedAt?: string }).evaluatedAt)}</p>
               </> : <EmptyState title="Preflight pendiente" detail="Actualizá o seleccioná una rule. No se habilita nada automáticamente." />}
             </CardContent>
@@ -737,7 +737,7 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
                 {recipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name || "Sin nombre"} · {recipient.phoneMasked || "teléfono protegido"}</option>)}
               </select>
               <Button type="button" variant="secondary" disabled={!selectedRule || selectedRule.enabled || canaryScopeLocked || !selectedRecipient || busy !== null} onClick={() => setAssociationDialogOpen(true)}>Asociar a rule seleccionada</Button>
-              {selectedRule?.enabled ? <p className="text-sm text-amber-200">Detené la rule antes de cambiar su recipient.</p> : null}
+              {selectedRule?.enabled ? <p className="text-sm text-amber-200 [[data-app-theme=light]_&]:text-amber-800">Detené la rule antes de cambiar su recipient.</p> : null}
             </CardContent>
           </Card>
         </section>
@@ -766,7 +766,7 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
       <Dialog open={activationDialogOpen} onOpenChange={(open) => { setActivationDialogOpen(open); if (!open) setActivationAcknowledged(false); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Confirmar activación manual</DialogTitle><DialogDescription>Esta acción puede enviar 1 WhatsApp real. Primero activa el switch, revalida y luego habilita exclusivamente la rule seleccionada.</DialogDescription></DialogHeader>
-          <label className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100"><input type="checkbox" className="mt-1" checked={activationAcknowledged} onChange={(event) => setActivationAcknowledged(event.target.checked)} /><span>Confirmo que revisé los gates y que esta ventana manual puede enviar un único WhatsApp real. No habrá reintento ni reenvío automático.</span></label>
+          <label className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100 [[data-app-theme=light]_&]:text-amber-800"><input type="checkbox" className="mt-1" checked={activationAcknowledged} onChange={(event) => setActivationAcknowledged(event.target.checked)} /><span>Confirmo que revisé los gates y que esta ventana manual puede enviar un único WhatsApp real. No habrá reintento ni reenvío automático.</span></label>
           <DialogFooter><Button type="button" variant="secondary" onClick={() => setActivationDialogOpen(false)}>Cancelar</Button><Button type="button" disabled={!activationAcknowledged || !activationAllowed || busy !== null} onClick={() => void activateCanary()}>{busy === "activate-canary" ? "Activando..." : "Confirmar y activar canario"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -800,5 +800,5 @@ export function AdminOperationalAlertsWorkspace({ tenants, initialLoadError = nu
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
-  return <div className="rounded-2xl border border-dashed border-white/15 bg-black/10 p-6 text-center"><AlertTriangle className="mx-auto h-5 w-5 text-amber-200" /><p className="mt-2 font-medium text-white">{title}</p><p className="mt-1 text-sm text-muted">{detail}</p></div>;
+  return <div className="rounded-2xl border border-dashed border-white/15 bg-black/10 p-6 text-center"><AlertTriangle className="mx-auto h-5 w-5 text-amber-200 [[data-app-theme=light]_&]:text-amber-800" /><p className="mt-2 font-medium text-white">{title}</p><p className="mt-1 text-sm text-muted">{detail}</p></div>;
 }

@@ -586,11 +586,11 @@ export function CashHub({
                         </div>
                         <div className="flex flex-wrap gap-3">
                           <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => openMovementDialog("manual_in", primarySession.id)} disabled={readOnly || busyAction !== null}>
-                            <ArrowDown className="mr-2 h-4 w-4 text-emerald-300" />
+                            <ArrowDown className="mr-2 h-4 w-4 text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700" />
                             Ingresar dinero
                           </Button>
                           <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => openMovementDialog("manual_out", primarySession.id)} disabled={readOnly || busyAction !== null}>
-                            <ArrowUp className="mr-2 h-4 w-4 text-red-300" />
+                            <ArrowUp className="mr-2 h-4 w-4 text-red-300 [[data-app-theme=light]_&]:text-red-700" />
                             Retirar dinero
                           </Button>
                           <Button type="button" variant="secondary" className="rounded-2xl" onClick={() => scrollToSection("movements")}>
@@ -783,7 +783,7 @@ export function CashHub({
                     <div key={movement.id} className="grid gap-3 rounded-[22px] border border-white/8 bg-surface/55 p-4 md:grid-cols-[110px_minmax(0,1fr)_170px]">
                       <div>
                         <p className="text-sm font-medium">{movement.createdAt ? formatDate(movement.createdAt) : "Sin hora"}</p>
-                        <p className={`mt-1 text-xs uppercase tracking-[0.16em] ${movement.kind === "manual_out" ? "text-red-300" : "text-emerald-300"}`}>
+                        <p className={`mt-1 text-xs uppercase tracking-[0.16em] ${movement.kind === "manual_out" ? "text-red-300 [[data-app-theme=light]_&]:text-red-700" : "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700"}`}>
                           {movement.kind === "sale" ? "Venta visible" : movement.kind === "manual_in" ? "Ingreso manual" : "Retiro manual"}
                         </p>
                       </div>
@@ -794,7 +794,7 @@ export function CashHub({
                         </p>
                       </div>
                       <div className="text-left md:text-right">
-                        <p className={`text-lg font-semibold ${movement.kind === "manual_out" ? "text-red-300" : "text-emerald-300"}`}>
+                        <p className={`text-lg font-semibold ${movement.kind === "manual_out" ? "text-red-300 [[data-app-theme=light]_&]:text-red-700" : "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700"}`}>
                           {movement.kind === "manual_out" ? "-" : "+"}
                           {formatCurrency(movement.amount, movement.currency)}
                         </p>
@@ -884,7 +884,7 @@ export function CashHub({
                         <div className="mt-4 flex items-end justify-between gap-3">
                           <div>
                             <p className="text-xs uppercase tracking-[0.16em] text-muted">Saldo actual</p>
-                            <p className="mt-2 text-xl font-semibold text-emerald-300">{formatCurrency(box.currentSession.metrics?.expectedAmountCurrent)}</p>
+                            <p className="mt-2 text-xl font-semibold text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700">{formatCurrency(box.currentSession.metrics?.expectedAmountCurrent)}</p>
                           </div>
                           <Button type="button" variant="ghost" size="sm" className="rounded-2xl" onClick={() => scrollToSection("sessions")}>
                             <Eye className="mr-2 h-4 w-4" />
@@ -1022,10 +1022,10 @@ function MetricCard({
   onClick?: () => void;
 }) {
   const accentClasses = {
-    green: "border-emerald-500/18 bg-emerald-500/10 text-emerald-300",
-    blue: "border-blue-500/18 bg-blue-500/10 text-blue-300",
-    red: "border-red-500/18 bg-red-500/10 text-red-300",
-    amber: "border-amber-500/18 bg-amber-500/10 text-amber-300"
+    green: "border-emerald-500/18 bg-emerald-500/10 text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700",
+    blue: "border-blue-500/18 bg-blue-500/10 text-blue-300 [[data-app-theme=light]_&]:text-blue-700",
+    red: "border-red-500/18 bg-red-500/10 text-red-300 [[data-app-theme=light]_&]:text-red-700",
+    amber: "border-amber-500/18 bg-amber-500/10 text-amber-300 [[data-app-theme=light]_&]:text-amber-800"
   } as const;
 
   return (
@@ -1069,10 +1069,10 @@ function HighlightStat({
   tone: "green" | "blue" | "violet" | "amber";
 }) {
   const toneClass = {
-    green: "text-emerald-300",
-    blue: "text-blue-300",
-    violet: "text-violet-300",
-    amber: "text-amber-300"
+    green: "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700",
+    blue: "text-blue-300 [[data-app-theme=light]_&]:text-blue-700",
+    violet: "text-violet-300 [[data-app-theme=light]_&]:text-violet-700",
+    amber: "text-amber-300 [[data-app-theme=light]_&]:text-amber-800"
   } as const;
 
   return (
@@ -1101,11 +1101,11 @@ function QuickActionButton({
   fullWidth?: boolean;
 }) {
   const toneClass = {
-    green: "text-emerald-300",
-    red: "text-red-300",
-    amber: "text-amber-300",
-    blue: "text-blue-300",
-    violet: "text-violet-300"
+    green: "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700",
+    red: "text-red-300 [[data-app-theme=light]_&]:text-red-700",
+    amber: "text-amber-300 [[data-app-theme=light]_&]:text-amber-800",
+    blue: "text-blue-300 [[data-app-theme=light]_&]:text-blue-700",
+    violet: "text-violet-300 [[data-app-theme=light]_&]:text-violet-700"
   } as const;
 
   return (
@@ -1162,7 +1162,7 @@ function SummaryRow({
   value: string;
   tone?: "green" | "red" | "neutral";
 }) {
-  const toneClass = tone === "green" ? "text-emerald-300" : tone === "red" ? "text-red-300" : "text-text";
+  const toneClass = tone === "green" ? "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700" : tone === "red" ? "text-red-300 [[data-app-theme=light]_&]:text-red-700" : "text-text";
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-surface/55 px-4 py-3">
       <span className="text-sm text-muted">{label}</span>
