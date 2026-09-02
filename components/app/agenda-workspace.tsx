@@ -1066,12 +1066,13 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
                             onClick={() => setSelectedDateKey(day.dateKey)}
                             className={cn(
                               "min-h-[64px] bg-[rgba(10,14,22,0.94)] p-1.5 text-left transition hover:bg-[rgba(16,22,34,0.98)] md:min-h-[132px] md:p-3",
-                              day.isSelected && "bg-[rgba(192,80,0,0.10)] shadow-[inset_0_0_0_1px_rgba(192,80,0,0.32)]",
+                              !day.isSelected && "[[data-app-theme=light]_&]:bg-[var(--card)] [[data-app-theme=light]_&]:hover:bg-[var(--surface-muted)]",
+                              day.isSelected && "bg-[rgba(192,80,0,0.10)] shadow-[inset_0_0_0_1px_rgba(192,80,0,0.32)] [[data-app-theme=light]_&]:hover:bg-[rgba(192,80,0,0.10)]",
                               !day.inCurrentMonth && "opacity-45"
                             )}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className={cn("text-sm font-medium text-white", day.isToday && "text-brandBright")}>{day.date.getDate()}</span>
+                              <span className={cn("text-sm font-medium text-white [[data-app-theme=light]_&]:!text-[color:var(--text)]", day.isToday && "text-brandBright [[data-app-theme=light]_&]:!text-[color:var(--brand-deep)]")}>{day.date.getDate()}</span>
                               {day.isToday ? <span className="size-1.5 rounded-full bg-brand md:hidden" aria-label="Hoy" /> : null}
                               {day.isToday ? <Badge variant="warning" className="hidden md:inline-flex">Hoy</Badge> : null}
                             </div>
@@ -1801,11 +1802,11 @@ function AgendaKpiCard({
   tone: "violet" | "orange" | "blue" | "green" | "amber";
 }) {
   const tones = {
-    violet: "border-violet-500/20 bg-violet-500/10 text-violet-100",
-    orange: "border-brand/20 bg-brand/10 text-orange-100",
-    blue: "border-sky-500/20 bg-sky-500/10 text-sky-100",
-    green: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
-    amber: "border-amber-500/20 bg-amber-500/10 text-amber-100"
+    violet: "border-violet-500/20 bg-violet-500/10 text-violet-100 [[data-app-theme=light]_&]:text-violet-700",
+    orange: "border-brand/20 bg-brand/10 text-orange-100 [[data-app-theme=light]_&]:text-orange-800",
+    blue: "border-sky-500/20 bg-sky-500/10 text-sky-100 [[data-app-theme=light]_&]:text-sky-700",
+    green: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100 [[data-app-theme=light]_&]:text-emerald-700",
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-100 [[data-app-theme=light]_&]:text-amber-800"
   } as const;
 
   return (
@@ -1834,9 +1835,9 @@ function SummaryStrip({
   tone: "green" | "rose" | "orange";
 }) {
   const tones = {
-    green: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
-    rose: "border-rose-500/20 bg-rose-500/10 text-rose-100",
-    orange: "border-amber-500/20 bg-amber-500/10 text-amber-100"
+    green: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100 [[data-app-theme=light]_&]:text-emerald-700",
+    rose: "border-rose-500/20 bg-rose-500/10 text-rose-100 [[data-app-theme=light]_&]:text-rose-700",
+    orange: "border-amber-500/20 bg-amber-500/10 text-amber-100 [[data-app-theme=light]_&]:text-amber-800"
   } as const;
 
   return (
@@ -1863,10 +1864,10 @@ function QuickStatCard({
   tone: "violet" | "orange" | "green" | "blue";
 }) {
   const tones = {
-    violet: "text-violet-300 border-violet-500/20 bg-violet-500/8",
-    orange: "text-orange-300 border-brand/20 bg-brand/8",
-    green: "text-emerald-300 border-emerald-500/20 bg-emerald-500/8",
-    blue: "text-sky-300 border-sky-500/20 bg-sky-500/8"
+    violet: "text-violet-300 border-violet-500/20 bg-violet-500/8 [[data-app-theme=light]_&]:text-violet-700",
+    orange: "text-orange-300 border-brand/20 bg-brand/8 [[data-app-theme=light]_&]:text-orange-800",
+    green: "text-emerald-300 border-emerald-500/20 bg-emerald-500/8 [[data-app-theme=light]_&]:text-emerald-700",
+    blue: "text-sky-300 border-sky-500/20 bg-sky-500/8 [[data-app-theme=light]_&]:text-sky-700"
   } as const;
 
   return (

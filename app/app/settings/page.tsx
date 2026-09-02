@@ -527,11 +527,11 @@ function HubCard({
               {icon}
             </span>
             <div>
-              <p className="text-xl font-semibold text-white">{title}</p>
+              <p className="text-xl font-semibold text-white [[data-app-theme=light]_&]:!text-[color:var(--text)]">{title}</p>
               <p className="mt-1 text-sm text-muted">{subtitle}</p>
             </div>
           </div>
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 [[data-app-theme=light]_&]:!text-[color:var(--text-muted)]">
             <ArrowRight className="h-4 w-4" />
           </span>
         </div>
@@ -571,12 +571,12 @@ function StatusRow({
   return (
     <div className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-surface/60 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
-        <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${tone === "success" ? "text-emerald-300" : "text-muted"}`}>
+        <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${tone === "success" ? "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700" : "text-muted"}`}>
           <BadgeCheck className="h-4 w-4" />
         </span>
-        <span className="truncate text-sm text-white">{label}</span>
+        <span className="truncate text-sm text-white [[data-app-theme=light]_&]:!text-[color:var(--text)]">{label}</span>
       </div>
-      <span className={`shrink-0 text-sm ${tone === "success" ? "text-emerald-300" : "text-muted"}`}>{value}</span>
+      <span className={`shrink-0 text-sm ${tone === "success" ? "text-emerald-300 [[data-app-theme=light]_&]:text-emerald-700" : "text-muted"}`}>{value}</span>
     </div>
   );
 }
@@ -584,8 +584,8 @@ function StatusRow({
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[16px] border border-white/8 bg-black/14 px-3 py-3">
-      <p className="text-2xl font-semibold text-white">{value}</p>
-      <p className="mt-1 text-xs text-muted">{label}</p>
+      <p className="text-2xl font-semibold text-white [[data-app-theme=light]_&]:!text-[color:var(--text)]">{value}</p>
+      <p className="mt-1 text-xs text-muted [[data-app-theme=light]_&]:!text-[color:var(--text-muted)]">{label}</p>
     </div>
   );
 }
