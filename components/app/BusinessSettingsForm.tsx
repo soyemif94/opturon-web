@@ -146,7 +146,7 @@ export function BusinessSettingsForm({
   const businessImage = String(form.profileImageUrl || "").trim();
 
   return (
-    <form id={BUSINESS_SETTINGS_FORM_ID} className="space-y-5" onSubmit={save}>
+    <form id={BUSINESS_SETTINGS_FORM_ID} className="app-light-surface space-y-5" onSubmit={save}>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] p-1.5">
           <TabsTrigger value="general" className="rounded-[16px] px-4 py-2.5 text-sm">

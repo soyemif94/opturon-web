@@ -744,7 +744,7 @@ export function AutomationsHub({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="app-light-surface space-y-6">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
           <div className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brandBright">

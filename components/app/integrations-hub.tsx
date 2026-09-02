@@ -213,7 +213,7 @@ export function IntegrationsHub({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="app-light-surface space-y-8">
       <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(236,128,38,0.28),transparent_34%),linear-gradient(135deg,rgba(18,18,18,0.98),rgba(7,7,8,0.94))] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-3xl">

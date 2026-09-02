@@ -334,7 +334,7 @@ export function InvoicesWorkspace({
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+    <div className="app-light-surface grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="Comprobantes emitidos"

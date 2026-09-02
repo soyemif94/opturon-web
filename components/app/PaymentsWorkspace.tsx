@@ -672,7 +672,7 @@ export function PaymentsWorkspace({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="app-light-surface grid gap-6">
       <div className="flex flex-wrap items-center justify-end gap-3">
         <Button type="button" variant="secondary" className="rounded-2xl border-white/10 bg-white/[0.03]" onClick={exportVisiblePayments}>
           <Download className="mr-2 h-4 w-4" />

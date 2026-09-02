@@ -469,7 +469,7 @@ export function CashHub({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="app-light-surface space-y-6">
       <div className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[linear-gradient(135deg,rgba(8,14,24,0.98),rgba(10,18,30,0.94))] p-5 shadow-[0_20px_52px_rgba(3,8,16,0.22)] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Caja operativa</p>

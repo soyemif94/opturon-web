@@ -249,7 +249,7 @@ export function InventoryWorkspace({
       description="Centro operativo de stock para leer disponibilidad real, detectar alertas y preparar mejor la respuesta comercial del negocio sin duplicar el catalogo."
       badge="Stock operativo premium"
     >
-      <div className="grid gap-6">
+      <div className="app-light-surface grid gap-6">
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <MetricCard
             label="Productos activos"

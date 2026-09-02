@@ -108,6 +108,35 @@
   box-shadow: 0 0 0 1px rgba(176, 80, 0, 0.18), 0 18px 42px rgba(176, 80, 0, 0.12);
 }
 
+/* Keep legacy dark panel treatments from leaking into marked light workspaces. */
+[data-app-theme="light"] .app-light-surface :is([class*="bg-[linear-gradient"], [class*="bg-[radial-gradient"], [class*="bg-black/"], [class*="bg-[#07111f]"]) {
+  background-color: var(--card);
+  background-image: none;
+  border-color: var(--border);
+  box-shadow: var(--card-shadow);
+}
+
+[data-app-theme="light"] .app-light-surface [class*="border-white/"] {
+  border-color: var(--border);
+}
+
+[data-app-theme="light"] .app-light-surface [class*="bg-white/"] {
+  background-color: var(--surface-muted);
+}
+
+[data-app-theme="light"] .app-light-surface :is([class*="text-white"], .text-slate-100, .text-slate-200, .text-slate-300) {
+  color: var(--text);
+}
+
+[data-app-theme="light"] .app-light-surface :is(.text-slate-400, .text-slate-500) {
+  color: var(--text-muted);
+}
+
+[data-app-theme="light"] .app-light-surface :is(button, a) :is([class*="text-white"], .text-slate-100, .text-slate-200, .text-slate-300),
+[data-app-theme="light"] .app-light-surface :is(button, a)[class*="text-white"] {
+  color: #fff;
+}
+
 html,
 body {
   background: var(--bg);

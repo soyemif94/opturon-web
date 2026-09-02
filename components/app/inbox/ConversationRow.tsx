@@ -27,10 +27,10 @@ function followUpUi(nextActionAt?: string | null) {
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate();
   if (date.getTime() < now.getTime()) {
-    return { label: "Vencido", className: "border-red-400/30 bg-red-400/10 text-red-100" };
+    return { label: "Vencido", className: "border-red-400/30 bg-red-400/10 text-red-100 [[data-app-theme=light]_&]:text-red-700" };
   }
   if (isToday) {
-    return { label: "Hoy", className: "border-amber-400/30 bg-amber-400/10 text-amber-100" };
+    return { label: "Hoy", className: "border-amber-400/30 bg-amber-400/10 text-amber-100 [[data-app-theme=light]_&]:text-amber-700" };
   }
   return {
     label: date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }),
@@ -121,9 +121,9 @@ export function ConversationRow({
               </div>
               {(followUp || !row.botEnabled || row.priority === "hot") ? (
                 <div className="mt-1 flex items-center gap-2 text-[9px] text-muted">
-                  {followUp ? <span className={followUp.className.includes("red") ? "text-red-200" : "text-amber-100"}>{followUp.label}</span> : null}
-                  {!row.botEnabled ? <span className="inline-flex items-center gap-1 text-amber-100"><Pause aria-hidden="true" className="size-2.5" />Bot pausado</span> : null}
-                  {row.priority === "hot" ? <span className="inline-flex items-center gap-1 text-red-200"><span className={cn("size-1.5 rounded-full", priorityTone)} />Prioridad</span> : null}
+                  {followUp ? <span className={followUp.className.includes("red") ? "text-red-200 [[data-app-theme=light]_&]:text-red-700" : "text-amber-100 [[data-app-theme=light]_&]:text-amber-700"}>{followUp.label}</span> : null}
+                  {!row.botEnabled ? <span className="inline-flex items-center gap-1 text-amber-100 [[data-app-theme=light]_&]:text-amber-700"><Pause aria-hidden="true" className="size-2.5" />Bot pausado</span> : null}
+                  {row.priority === "hot" ? <span className="inline-flex items-center gap-1 text-red-200 [[data-app-theme=light]_&]:text-red-700"><span className={cn("size-1.5 rounded-full", priorityTone)} />Prioridad</span> : null}
                 </div>
               ) : null}
             </div>

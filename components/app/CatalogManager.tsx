@@ -1663,7 +1663,7 @@ export function CatalogManager({ initialProducts, readOnly = false }: { initialP
   };
 
   const renderCatalogWorkspacePremium = () => (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <section className="app-light-surface grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-5">
         <Card className="overflow-hidden border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[0_22px_48px_rgba(3,8,16,0.28)]">
           <CardHeader
