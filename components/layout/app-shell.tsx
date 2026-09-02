@@ -431,8 +431,8 @@ function OpturonMark({ compact = false }: { compact?: boolean }) {
           aria-hidden="true"
           className="h-6 w-6 text-brandBright drop-shadow-[0_4px_10px_rgba(255,122,0,0.18)]"
         >
-          <circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" strokeWidth="5.5" />
-          <circle cx="16" cy="16" r="3.2" fill="currentColor" opacity="0.16" />
+          <path d="M 11.6 25.5 A 10.5 10.5 0 1 1 20.4 25.5" fill="none" stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" />
+          <circle cx="16" cy="16" r="3.2" fill="var(--text)" />
         </svg>
       </span>
       {!compact ? (
