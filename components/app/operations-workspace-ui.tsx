@@ -27,12 +27,12 @@ export function OperationsMetricFilter({
       className={cn(
         "rounded-full border px-3 py-1.5 text-sm tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60",
         active
-          ? "border-brand/45 bg-brand/15 text-white"
+          ? "border-brand/45 bg-brand/15 text-white [[data-app-theme=light]_&]:text-[color:var(--text)]"
           : tone === "success"
-            ? "border-emerald-400/20 bg-emerald-500/8 text-emerald-100 hover:bg-emerald-500/14"
+            ? "border-emerald-400/20 bg-emerald-500/8 text-emerald-100 hover:bg-emerald-500/14 [[data-app-theme=light]_&]:text-emerald-700"
             : tone === "warning"
-              ? "border-amber-400/20 bg-amber-500/8 text-amber-100 hover:bg-amber-500/14"
-              : "border-[color:var(--border)] bg-muted/20 text-muted hover:text-white"
+              ? "border-amber-400/20 bg-amber-500/8 text-amber-100 hover:bg-amber-500/14 [[data-app-theme=light]_&]:text-amber-800"
+              : "border-[color:var(--border)] bg-muted/20 text-muted hover:text-white [[data-app-theme=light]_&]:text-[color:var(--text)] [[data-app-theme=light]_&]:hover:text-[color:var(--brand-deep)]"
       )}
     >
       <span className="font-semibold">{value}</span> {label}
