@@ -897,7 +897,7 @@ export function AgendaWorkspace({ currentUserId, sellerOptions = [], initialComm
   }
 
   return (
-    <div className="space-y-5">
+    <div className="app-light-surface space-y-5">
       <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(192,80,0,0.24),transparent_24%),linear-gradient(180deg,rgba(12,16,24,0.98),rgba(9,13,20,0.96))] p-3 shadow-[var(--card-shadow)] sm:p-4 md:p-5">
         <div className="flex flex-col gap-4">
           <div className="hidden flex-col gap-3 sm:flex lg:flex-row lg:items-start lg:justify-between">

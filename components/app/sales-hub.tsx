@@ -555,7 +555,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   }, [archivedOpportunities, listMode]);
 
   return (
-    <div className="space-y-6">
+    <div className="app-light-surface space-y-6">
       {readOnly ? (
         <div className="rounded-[22px] border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           Este espacio esta en modo solo lectura. Puedes revisar el pipeline, pero las acciones de archivo no estan disponibles.

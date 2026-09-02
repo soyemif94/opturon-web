@@ -989,9 +989,9 @@ function MetricCard({
           <Icon className="h-6 w-6" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm text-slate-400">{label}</p>
-          <p className="mt-1 truncate text-[1.75rem] font-semibold leading-none tracking-tight text-white">{value}</p>
-          <p className="mt-2 text-sm text-slate-400">{helper}</p>
+          <p className="text-sm text-slate-400 [[data-app-theme=light]_&]:!text-[color:var(--text-muted)]">{label}</p>
+          <p className="mt-1 truncate text-[1.75rem] font-semibold leading-none tracking-tight text-white [[data-app-theme=light]_&]:!text-[color:var(--text)]">{value}</p>
+          <p className="mt-2 text-sm text-slate-400 [[data-app-theme=light]_&]:!text-[color:var(--text-muted)]">{helper}</p>
         </div>
       </CardContent>
     </Card>
@@ -1090,7 +1090,7 @@ function StatusDonutCard({ paid, pending, overdue }: { paid: number; pending: nu
               ))}
             </div>
           </div>
-          <div className="rounded-[20px] border border-amber-500/18 bg-amber-500/8 px-4 py-3 text-sm text-amber-100">
+          <div className="rounded-[20px] border border-amber-500/18 bg-amber-500/8 px-4 py-3 text-sm text-amber-100 [[data-app-theme=light]_&]:text-amber-700">
             Los datos se actualizan en tiempo real con pagos, comprobantes y saldos actuales.
           </div>
         </div>
