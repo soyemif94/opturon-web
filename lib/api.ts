@@ -1431,6 +1431,11 @@ export type PortalContact = {
   phone: string | null;
   name: string;
   profileImageUrl?: string | null;
+  instagramIdentity?: {
+    senderIgsid: string | null;
+    username: string | null;
+    profileImageUrl: string | null;
+  } | null;
   optedOut: boolean;
   lastInteractionAt: string | null;
   conversationCount: number;

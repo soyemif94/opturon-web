@@ -532,7 +532,7 @@ export function ContactsWorkspace({
 
                           <button type="button" onClick={() => setSelectedId(contact.id)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
                             <SimpleAvatar
-                              src={contact.profileImageUrl}
+                              src={getContactAvatar(contact)}
                               name={contact.name}
                               className="h-10 w-10 rounded-xl border border-[color:var(--border)] bg-brand/10 text-brandBright sm:h-12 sm:w-12 sm:rounded-[18px]"
                               fallbackClassName="bg-brand/10 text-brandBright"
@@ -544,7 +544,7 @@ export function ContactsWorkspace({
                                 <span className="hidden sm:inline-flex"><OperationalBadge tone={commercialRead.tone}>{commercialRead.label}</OperationalBadge></span>
                               </div>
                               <p className="mt-0.5 truncate text-sm text-muted">
-                                {contact.phone || contact.whatsappPhone || contact.email || "Sin datos de contacto"}
+                                {getContactIdentityLabel(contact)}
                               </p>
                               <div className="mt-1.5 flex flex-wrap gap-1 sm:mt-2 sm:gap-1.5">
                                 <MetaPill label="Canal" value={getChannelLabel(contact)} />
@@ -620,14 +620,14 @@ export function ContactsWorkspace({
                   <div className="rounded-[22px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.02))] p-3.5">
                     <div className="flex items-start gap-4">
                       <SimpleAvatar
-                        src={selected.profileImageUrl}
+                        src={getContactAvatar(selected)}
                         name={selected.name}
                         className="h-16 w-16 rounded-[22px] border border-[color:var(--border)] bg-brand/10 text-lg text-brandBright"
                         fallbackClassName="bg-brand/10 text-brandBright"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-lg font-semibold">{selected.name}</p>
-                        <p className="mt-0.5 text-sm text-muted">{selected.phone || selected.whatsappPhone || selected.email || "Sin dato principal de contacto"}</p>
+                        <p className="mt-0.5 text-sm text-muted">{getContactIdentityLabel(selected)}</p>
                         <div className="mt-2.5 flex flex-wrap gap-2">
                           <Badge variant={selected.status === "archived" ? "danger" : "success"}>{selected.status || "active"}</Badge>
                           <OperationalBadge tone={selectedRead?.tone || "sky"}>{selectedRead?.label || "Sin lectura"}</OperationalBadge>
@@ -641,7 +641,11 @@ export function ContactsWorkspace({
                     <DetailRow icon={<Clock3 className="h-4 w-4" />} label="Ultimo movimiento" value={relativeDateLabel(selected.lastInteractionAt || selected.updatedAt || selected.createdAt)} />
                     <DetailRow icon={<MessageSquareMore className="h-4 w-4" />} label="Conversaciones visibles" value={String(selected.conversationCount || 0)} />
                     <DetailRow icon={<Mail className="h-4 w-4" />} label="Email" value={selected.email || "-"} />
-                    <DetailRow icon={<Phone className="h-4 w-4" />} label="Telefono" value={selected.phone || selected.whatsappPhone || "-"} />
+                    {isInstagramOnlyContact(selected) ? (
+                      <DetailRow icon={<MessageSquareMore className="h-4 w-4" />} label="Instagram" value={getInstagramIdentityLabel(selected)} />
+                    ) : (
+                      <DetailRow icon={<Phone className="h-4 w-4" />} label="Telefono" value={selected.phone || selected.whatsappPhone || "-"} />
+                    )}
                     <DetailRow icon={<Building2 className="h-4 w-4" />} label="Empresa" value={selected.companyName || "-"} />
                     <DetailRow icon={<ReceiptText className="h-4 w-4" />} label="Documento fiscal" value={selected.taxId || "-"} />
                   </div>
@@ -921,9 +925,30 @@ function getFinancialHelper(contact: PortalContactDetail) {
 }
 
 function getChannelLabel(contact: PortalContactDetail) {
+  if (isInstagramOnlyContact(contact)) return "Instagram";
   if (contact.whatsappPhone || contact.waId) return "WhatsApp";
   if (contact.email) return "Email";
   return "Telefonico";
+}
+
+function isInstagramOnlyContact(contact: PortalContactDetail) {
+  return Boolean(contact.instagramIdentity) && !contact.whatsappPhone;
+}
+
+function getInstagramIdentityLabel(contact: PortalContactDetail) {
+  const identity = contact.instagramIdentity;
+  if (identity?.username) return `@${identity.username.replace(/^@+/, "")}`;
+  if (identity?.senderIgsid) return `Instagram ID ${identity.senderIgsid}`;
+  return "Instagram";
+}
+
+function getContactIdentityLabel(contact: PortalContactDetail) {
+  if (isInstagramOnlyContact(contact)) return getInstagramIdentityLabel(contact);
+  return contact.phone || contact.whatsappPhone || contact.email || "Sin datos de contacto";
+}
+
+function getContactAvatar(contact: PortalContactDetail) {
+  return contact.profileImageUrl || contact.instagramIdentity?.profileImageUrl || null;
 }
 
 function getCommercialRead(contact: PortalContactDetail): { label: string; shortValue: string; helper: string; tone: SurfaceTone } {
