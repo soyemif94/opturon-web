@@ -361,7 +361,7 @@ export function OrderCreateEditor() {
   }
 
   return (
-    <form id="order-create-form" className="min-w-0 max-w-full space-y-6" onSubmit={submitOrder}>
+    <form id="order-create-form" className="min-w-0 max-w-full space-y-5" onSubmit={submitOrder}>
       <section className="min-w-0 max-w-full rounded-[22px] border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(11,18,29,0.96),rgba(8,14,23,0.94))] p-4 shadow-[var(--card-shadow)] sm:rounded-[30px] sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -384,7 +384,7 @@ export function OrderCreateEditor() {
         <SummaryChip icon={Box} accent="text-fuchsia-300" label="Items agregados" value={`${cartItems.length} producto(s)`} helper={`${cartUnits} unidad(es)`} />
       </section>
 
-      <div className="grid min-w-0 gap-6 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(240px,0.9fr)_minmax(420px,1.6fr)_minmax(260px,0.9fr)] xl:gap-6">
         <div className="min-w-0 space-y-6">
           <SectionCard title="Cliente y responsable" description="Define quien compra, quien responde y donde queda trazado el cobro." badge="Base comercial">
             <div className="grid gap-4">
@@ -628,8 +628,8 @@ export function OrderCreateEditor() {
                 Agrega al menos un producto para crear el pedido.
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="hidden grid-cols-[minmax(0,1.3fr)_160px_160px_180px_80px] gap-3 rounded-[18px] border border-[color:var(--border)] bg-white/[0.03] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted lg:grid">
+              <div className="space-y-3">
+                <div className="hidden grid-cols-[minmax(220px,1.3fr)_auto_auto_auto_auto] gap-3 rounded-[18px] border border-[color:var(--border)] bg-white/[0.03] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-muted 2xl:grid">
                   <span>Producto</span>
                   <span>Precio unitario</span>
                   <span>Cantidad</span>
@@ -637,11 +637,11 @@ export function OrderCreateEditor() {
                   <span />
                 </div>
                 {cartItems.map((item) => (
-                  <div key={item.productId} className="grid min-w-0 gap-4 rounded-[22px] border border-[color:var(--border)] bg-surface/50 px-4 py-4 lg:grid-cols-[minmax(0,1.3fr)_160px_160px_180px_80px] lg:gap-3">
+                  <div key={item.productId} className="grid min-w-0 gap-3 rounded-[22px] border border-[color:var(--border)] bg-surface/50 px-4 py-3 2xl:grid-cols-[minmax(220px,1.3fr)_auto_auto_auto_auto] 2xl:items-center 2xl:gap-3">
                     <div className="flex min-w-0 items-center gap-4">
                       <ProductThumb name={item.name} imageUrl={item.imageUrl} />
                       <div className="min-w-0">
-                        <p className="break-words text-base font-semibold text-text">{item.name}</p>
+                        <p className="break-words text-base font-semibold leading-5 text-text">{item.name}</p>
                         <p className="mt-1 break-all text-sm text-muted">{item.sku || "Sin codigo"}</p>
                         {item.inventoryTrackingMode === "lot_based" ? (
                           <p className="mt-1 text-xs text-emerald-200">
@@ -650,52 +650,54 @@ export function OrderCreateEditor() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex min-w-0 items-center justify-between gap-3 text-sm font-medium text-text lg:justify-start">
-                      <span className="text-muted lg:hidden">Precio unitario</span>
-                      <span className="break-words text-right lg:text-left">{formatCurrency(item.unitPrice, item.currency)}</span>
-                    </div>
-                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 lg:justify-start">
-                      <span className="text-sm text-muted lg:hidden">Cantidad</span>
-                      <div className="flex h-11 items-center rounded-2xl border border-[color:var(--border)] bg-bg/55 px-2">
-                        <button
-                          type="button"
-                          className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
-                          onClick={() => updateCartItemQuantity(item.productId, item.quantity - 1)}
-                        >
-                          -
-                        </button>
-                        <Input
-                          className="h-8 w-14 border-0 bg-transparent px-0 text-center"
-                          value={String(item.quantity)}
-                          onChange={(event) => {
-                            const nextQuantity = Number.parseInt(event.target.value || "0", 10);
-                            if (!Number.isFinite(nextQuantity)) return;
-                            updateCartItemQuantity(item.productId, nextQuantity);
-                          }}
-                          inputMode="numeric"
-                        />
-                        <button
-                          type="button"
-                          className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
-                          onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
-                        >
-                          +
-                        </button>
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-5 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto] 2xl:contents">
+                      <div className="flex min-w-0 items-center justify-between gap-3 text-sm font-medium text-text 2xl:justify-start">
+                        <span className="text-muted 2xl:hidden">Precio unitario</span>
+                        <span className="whitespace-nowrap text-right 2xl:text-left">{formatCurrency(item.unitPrice, item.currency)}</span>
                       </div>
-                    </div>
-                    <div className="flex min-w-0 items-center justify-between gap-3 text-base font-semibold text-text lg:justify-start">
-                      <span className="text-sm font-normal text-muted lg:hidden">Subtotal</span>
-                      <span className="break-words text-right lg:text-left">{formatCurrency(item.unitPrice * item.quantity, item.currency)}</span>
-                    </div>
-                    <div className="flex min-w-0 items-center justify-end">
-                      <Button type="button" variant="ghost" className="rounded-2xl text-red-300 hover:text-red-200" onClick={() => removeCartItem(item.productId)}>
-                        Quitar
-                      </Button>
+                      <div className="flex min-w-0 items-center justify-end gap-3 2xl:justify-start">
+                        <span className="text-sm text-muted 2xl:hidden">Cantidad</span>
+                        <div className="flex h-10 items-center rounded-2xl border border-[color:var(--border)] bg-bg/55 px-1.5">
+                          <button
+                            type="button"
+                            className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
+                            onClick={() => updateCartItemQuantity(item.productId, item.quantity - 1)}
+                          >
+                            -
+                          </button>
+                          <Input
+                            className="h-8 w-12 border-0 bg-transparent px-0 text-center"
+                            value={String(item.quantity)}
+                            onChange={(event) => {
+                              const nextQuantity = Number.parseInt(event.target.value || "0", 10);
+                              if (!Number.isFinite(nextQuantity)) return;
+                              updateCartItemQuantity(item.productId, nextQuantity);
+                            }}
+                            inputMode="numeric"
+                          />
+                          <button
+                            type="button"
+                            className="h-8 w-8 rounded-xl text-lg text-text transition hover:bg-white/5"
+                            onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 items-center justify-between gap-3 text-base font-semibold text-text 2xl:justify-start">
+                        <span className="text-sm font-normal text-muted 2xl:hidden">Subtotal</span>
+                        <span className="whitespace-nowrap text-right 2xl:text-left">{formatCurrency(item.unitPrice * item.quantity, item.currency)}</span>
+                      </div>
+                      <div className="flex min-w-0 items-center justify-end">
+                        <Button type="button" variant="ghost" className="rounded-2xl text-red-300 hover:text-red-200" onClick={() => removeCartItem(item.productId)}>
+                          Quitar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
 
-                <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/35 p-5 text-sm text-muted">
+                <div className="rounded-[22px] border border-dashed border-[color:var(--border)] bg-surface/35 p-4 text-sm text-muted">
                   Todos los datos utilizados son reales y provienen del sistema actual.
                 </div>
               </div>
