@@ -3251,6 +3251,17 @@ export async function createPortalOrder(
   );
 }
 
+export async function sendPortalOrderWhatsAppSummary(tenantId: string, orderId: string) {
+  return backendFetch<{
+    success: boolean;
+    data: { orderId: string; conversationId: string; channelId: string };
+  }>(
+    `/portal/tenants/${tenantId}/orders/${orderId}/whatsapp-summary`,
+    { method: "POST" },
+    false
+  );
+}
+
 export async function getPortalPaymentDestinations(
   tenantId: string,
   options?: { includeInactive?: boolean }

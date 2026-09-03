@@ -1,7 +1,7 @@
 "use client";
 
 import { type ComponentType, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardList, CreditCard, Package, Receipt } from "lucide-react";
+import { AlertTriangle, ClipboardList, CreditCard, Package, Receipt, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { PortalOrder, PortalOrderPaymentMetrics, PortalOrderPaymentMetricsRange } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [sendingSummaryOrderId, setSendingSummaryOrderId] = useState<string | null>(null);
 
   const monthSummary = useMemo(() => {
     const now = new Date();
@@ -291,6 +292,31 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
     }
   }
 
+  async function sendSelectedOrderWhatsAppSummary(order: PortalOrder) {
+    if (readOnly || !order.contactId || sendingSummaryOrderId) return;
+
+    setSendingSummaryOrderId(order.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/app/orders/${encodeURIComponent(order.id)}/whatsapp-summary`, {
+        method: "POST"
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(json?.error || "No se pudo enviar el resumen por WhatsApp.");
+      }
+      setFeedback({ tone: "success", text: "Resumen enviado por WhatsApp y registrado en Inbox." });
+      router.refresh();
+    } catch (error) {
+      setFeedback({
+        tone: "warning",
+        text: error instanceof Error ? error.message : "No se pudo enviar el resumen por WhatsApp."
+      });
+    } finally {
+      setSendingSummaryOrderId(null);
+    }
+  }
+
   const totalPages = Math.max(Math.ceil(filteredOrders.length / ORDERS_PER_PAGE), 1);
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * ORDERS_PER_PAGE;
@@ -473,6 +499,19 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
                       <Badge variant={badgeForOrderStatus(selectedOrder.orderStatus)}>{labelForOrderStatus(selectedOrder.orderStatus)}</Badge>
                       <Badge variant={badgeForPaymentStatus(selectedOrder.paymentStatus)}>{labelForPaymentStatus(selectedOrder.paymentStatus)}</Badge>
                       <Badge variant="outline">{formatCurrency(selectedOrder.total, selectedOrder.currency)}</Badge>
+                      {!readOnly && selectedOrder.contactId ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="rounded-2xl"
+                          onClick={() => void sendSelectedOrderWhatsAppSummary(selectedOrder)}
+                          disabled={sendingSummaryOrderId === selectedOrder.id}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          {sendingSummaryOrderId === selectedOrder.id ? "Enviando..." : "Enviar resumen por WhatsApp"}
+                        </Button>
+                      ) : null}
                       {!readOnly && selectedOrder.orderStatus !== "cancelled" ? (
                         <Button
                           type="button"
