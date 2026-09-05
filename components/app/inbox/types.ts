@@ -48,6 +48,7 @@ export type DetailPayload = {
     caption?: string;
     timestamp: string;
     status: string;
+    deliveryErrorCode?: string | null;
     optimistic?: boolean;
     media?: {
       mediaId?: string | null;

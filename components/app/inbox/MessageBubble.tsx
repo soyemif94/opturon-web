@@ -1,4 +1,4 @@
-import { Bot, Check, CheckCheck, UserRound } from "lucide-react";
+import { AlertCircle, Bot, Check, CheckCheck, Clock3, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 function formatTime(iso: string) {
@@ -14,6 +14,7 @@ export function MessageBubble({
   caption,
   timestamp,
   status,
+  deliveryErrorCode,
   media,
   optimistic
 }: {
@@ -23,6 +24,7 @@ export function MessageBubble({
   caption?: string;
   timestamp: string;
   status?: string;
+  deliveryErrorCode?: string | null;
   media?: {
     previewUrl?: string | null;
     downloadUrl?: string | null;
@@ -42,6 +44,17 @@ export function MessageBubble({
     : outbound
       ? "rgba(233,255,243,0.72)"
       : "var(--text-muted)";
+  const deliveryLabel = status === "read"
+    ? "Leído"
+    : status === "delivered"
+      ? "Entregado"
+      : status === "sent"
+        ? "Enviado"
+        : status === "failed"
+          ? deliveryErrorCode === "131047"
+            ? "No se pudo enviar: pasaron más de 24 horas desde el último mensaje del cliente."
+            : "No se pudo enviar el mensaje."
+          : "Pendiente de confirmación";
 
   return (
     <div className={cn("flex", outbound ? "justify-end" : "justify-start", system ? "justify-center" : "")}>
@@ -84,7 +97,11 @@ export function MessageBubble({
         >
           {formatTime(timestamp)}
           {outbound && status ? (
-            status === "read" ? <CheckCheck aria-label="Leído" className="size-3" /> : status === "delivered" ? <CheckCheck aria-label="Entregado" className="size-3" /> : <Check aria-label="Enviado" className="size-3" />
+            status === "read" ? <CheckCheck aria-label={deliveryLabel} className="size-3 text-sky-200" />
+              : status === "delivered" ? <CheckCheck aria-label={deliveryLabel} className="size-3" />
+                : status === "sent" ? <Check aria-label={deliveryLabel} className="size-3" />
+                  : status === "failed" ? <span title={deliveryLabel}><AlertCircle aria-label={deliveryLabel} className="size-3 text-red-200" /></span>
+                    : <Clock3 aria-label={deliveryLabel} className="size-3" />
           ) : null}
         </p>
       </div>

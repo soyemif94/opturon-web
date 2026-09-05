@@ -303,6 +303,9 @@ export function OrdersHub({ initialOrders, initialOrderId, readOnly = false, bac
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
+        if (json?.error === "whatsapp_customer_service_window_closed") {
+          throw new Error("La ventana de WhatsApp está cerrada. Para volver a iniciar la conversación se necesita una plantilla aprobada.");
+        }
         throw new Error(json?.error || "No se pudo enviar el resumen por WhatsApp.");
       }
       setFeedback({ tone: "success", text: "Resumen enviado por WhatsApp y registrado en Inbox." });

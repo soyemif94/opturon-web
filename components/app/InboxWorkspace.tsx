@@ -1218,7 +1218,12 @@ export function InboxWorkspace({
     const text = value.trim();
     if (!selectedId || !text || readOnly || !detail) return;
     if (detail.composerCapability?.enabled !== true) {
-      toast.error("No se puede enviar", "El canal no esta activo o no tiene una credencial valida.");
+      toast.error(
+        "No se puede enviar",
+        detail.composerCapability?.reason === "whatsapp_customer_service_window_closed"
+          ? "Pasaron más de 24 h desde el último mensaje del cliente. Usá una plantilla de WhatsApp."
+          : "El canal no esta activo o no tiene una credencial valida."
+      );
       return;
     }
 
@@ -1244,12 +1249,20 @@ export function InboxWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: selectedId, text, idempotencyKey })
       });
-      if (!response.ok) throw new Error("message_failed");
+      if (!response.ok) {
+        const json = await response.json().catch(() => null);
+        throw new Error(json?.error || "message_failed");
+      }
       await loadRows();
       await loadDetail(selectedId);
-    } catch {
+    } catch (error) {
       setDetail((prev) => (prev ? { ...prev, messages: prev.messages.map((item) => item.id === optimisticId ? { ...item, status: "failed", optimistic: false } : item) } : prev));
-      toast.error("No se pudo enviar el mensaje", "Reintenta en unos segundos.");
+      toast.error(
+        "No se pudo enviar el mensaje",
+        error instanceof Error && error.message === "whatsapp_customer_service_window_closed"
+          ? "Pasaron más de 24 h desde el último mensaje del cliente. Usá una plantilla de WhatsApp."
+          : "Reintenta en unos segundos."
+      );
     } finally {
       setSendingMessage(false);
     }

@@ -89,6 +89,7 @@ export function ChatPanel({
   const visibleTimeline = historyExpanded || !hasCollapsibleHistory ? timeline : timeline.slice(-COLLAPSED_TIMELINE_ITEMS);
   const lastTimelineKey = visibleTimeline[visibleTimeline.length - 1]?.id || null;
   const isInstagramConversation = detail?.conversation.channelType === "instagram";
+  const isWhatsAppConversation = detail?.conversation.channelType === "whatsapp";
   const composerReady = detail?.composerCapability?.enabled === true;
   const isComposerDisabled = readOnly || sending || !composerReady;
   const headerConversation = detail?.conversation || selectedConversation;
@@ -257,6 +258,7 @@ export function ChatPanel({
                   caption={item.payload.caption}
                   timestamp={item.payload.timestamp}
                   status={item.payload.status}
+                  deliveryErrorCode={item.payload.deliveryErrorCode}
                   media={item.payload.media}
                   optimistic={Boolean(item.payload.optimistic)}
                 />
@@ -271,7 +273,11 @@ export function ChatPanel({
 
       {detail ? (
         <div className="shrink-0 space-y-1.5 border-t border-[color:var(--border)] bg-surface/35 px-2.5 py-2 sm:px-3">
-          {isInstagramConversation && !composerReady ? (
+          {isWhatsAppConversation && detail.composerCapability?.reason === "whatsapp_customer_service_window_closed" ? (
+            <div className="rounded-[18px] border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 [[data-app-theme=dark]_&]:text-amber-100">
+              Pasaron más de 24 h desde el último mensaje del cliente. Para volver a escribirle necesitás usar una plantilla de WhatsApp.
+            </div>
+          ) : isInstagramConversation && !composerReady ? (
             <div className="rounded-[18px] border border-fuchsia-300/25 bg-fuchsia-300/10 px-3 py-2 text-xs text-fuchsia-50">
               No se puede responder: el canal de Instagram no esta activo o no tiene una credencial valida.
             </div>
