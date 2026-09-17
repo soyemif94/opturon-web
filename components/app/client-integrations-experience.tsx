@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { AlertCircle, CheckCircle2, Instagram, Loader2, MessageCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
+import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
 export type ClientInstagramAssetSelection = {
@@ -16,11 +19,6 @@ export type ClientInstagramAssetSelection = {
 };
 
 type FriendlyState = "disconnected" | "connecting" | "connected" | "error";
-
-const WHATSAPP_CONNECT_LINK = getTrackedWhatsAppLink({
-  origin: "client-integrations-connect",
-  prefill: "Hola Opturon. Quiero conectar WhatsApp Business en mi espacio."
-});
 
 const WHATSAPP_MANAGE_LINK = getTrackedWhatsAppLink({
   origin: "client-integrations-manage",
@@ -52,6 +50,9 @@ export function ClientIntegrationsExperience({
   onRefreshInstagram: () => void;
   onDisconnectInstagram: () => void | Promise<void>;
 }) {
+  const router = useRouter();
+  const [whatsappSignupBusy, setWhatsAppSignupBusy] = useState(false);
+  const [whatsappSignupError, setWhatsAppSignupError] = useState<string | null>(null);
   const whatsappState = resolveWhatsAppState(whatsapp);
   const instagramState = resolveInstagramState({
     status: instagramStatus,
@@ -62,6 +63,21 @@ export function ClientIntegrationsExperience({
   });
   const connectedNumber = formatCustomerPhone(whatsapp.connectedNumber || null);
   const instagramUsername = formatInstagramUsername(instagramStatus?.channel?.instagramUsername || null);
+
+  async function handleConnectWhatsApp() {
+    if (whatsappSignupBusy) return;
+
+    setWhatsAppSignupBusy(true);
+    setWhatsAppSignupError(null);
+    try {
+      await beginMetaWhatsAppConnection();
+    } catch (error) {
+      setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo iniciar la conexión de WhatsApp.");
+    } finally {
+      setWhatsAppSignupBusy(false);
+      router.refresh();
+    }
+  }
 
   return (
     <section
@@ -87,11 +103,17 @@ export function ClientIntegrationsExperience({
               Conectando
             </Button>
           ) : (
-            <Button asChild className="w-full rounded-xl sm:w-auto">
-              <a href={WHATSAPP_CONNECT_LINK} target="_blank" rel="noreferrer">
-                {whatsappState === "error" ? "Solicitar ayuda" : "Conectar WhatsApp"}
-              </a>
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto">
+              {whatsappSignupError ? <p role="alert" className="text-sm text-destructive">{whatsappSignupError}</p> : null}
+              <Button
+                type="button"
+                className="w-full rounded-xl sm:w-auto"
+                disabled={whatsappSignupBusy}
+                onClick={handleConnectWhatsApp}
+              >
+                {whatsappSignupBusy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Conectando</> : "Conectar WhatsApp"}
+              </Button>
+            </div>
           )
         }
       />
