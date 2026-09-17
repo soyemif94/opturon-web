@@ -85,6 +85,80 @@ async function testPopupClosedWithoutCallbackTriggersRecovery() {
   }
 }
 
+async function testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPassed() {
+  const originalFetch = global.fetch;
+  const originalWindow = (globalThis as typeof globalThis & { window?: typeof window }).window;
+
+  let finalizeBody = "";
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/bootstrap")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            tenantId: "tenant-a",
+            clinicId: "clinic-1",
+            state: "launching",
+            provider: "meta_embedded_signup",
+            ready: true,
+            appId: "app-id",
+            configId: "config-id",
+            graphVersion: "v25.0",
+            redirectUri: "https://opturon.test/callback",
+            callbackPath: "/callback",
+            stateToken: "state-1",
+            sessionId: "session-1",
+            message: "ok"
+          }
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (url.includes("/embedded-signup/callback")) {
+      finalizeBody = String(init?.body || "{}");
+      return new Response(JSON.stringify({ error: "missing_meta_code" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    throw new Error(`Unexpected fetch ${url}`);
+  }) as typeof fetch;
+
+  const fakeWindow = {
+    FB: {
+      init: () => {},
+      login: () => {}
+    },
+    location: { origin: "https://opturon.test" },
+    setTimeout: (fn: () => void) => {
+      queueMicrotask(fn);
+      return 1;
+    },
+    clearTimeout: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {}
+  } as unknown as typeof window;
+
+  (globalThis as typeof globalThis & { window?: typeof window }).window = fakeWindow;
+
+  try {
+    await beginMetaWhatsAppConnection({ bootstrapEndpoint: "https://opturon.test/bootstrap" });
+    assert.fail("Expected beginMetaWhatsAppConnection to time out");
+  } catch (error) {
+    const details = getMetaEmbeddedSignupErrorDetails(error);
+    assert.equal(details.kind, "timeout");
+    const parsedFinalizeBody = JSON.parse(finalizeBody) as Record<string, unknown>;
+    assert.equal(parsedFinalizeBody.stateToken, "state-1");
+    assert.equal(parsedFinalizeBody.code, null);
+    assert.equal(parsedFinalizeBody.redirectUri, "https://opturon.test/callback");
+  } finally {
+    global.fetch = originalFetch;
+    (globalThis as typeof globalThis & { window?: typeof window }).window = originalWindow;
+  }
+}
+
 function testAdminViewModelReenablesCtaAfterCancellation() {
   const cancelled = buildAdminEmbeddedSignupViewModel({
     embeddedSignupStatus: {
@@ -139,6 +213,7 @@ function testBspMessageIsSafeAndClear() {
 
 async function run() {
   await testPopupClosedWithoutCallbackTriggersRecovery();
+  await testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPassed();
   testAdminViewModelReenablesCtaAfterCancellation();
   testBspMessageIsSafeAndClear();
   console.log("admin-whatsapp-embedded-signup.test.ts: ok");

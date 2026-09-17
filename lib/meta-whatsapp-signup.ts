@@ -376,7 +376,8 @@ async function bootstrapEmbeddedSignup(endpoint = "/api/app/integrations/whatsap
 }
 
 function waitForMetaCompletion(stateToken: string) {
-  return new Promise<{ callback: MetaCallbackPayload; metaEvent: MetaEmbeddedEvent | null }>((resolve, reject) => {
+  let completeWithoutCode = () => {};
+  const promise = new Promise<{ callback: MetaCallbackPayload; metaEvent: MetaEmbeddedEvent | null }>((resolve, reject) => {
     let callbackPayload: MetaCallbackPayload | null = null;
     let metaEventPayload: MetaEmbeddedEvent | null = null;
     let done = false;
@@ -391,6 +392,12 @@ function waitForMetaCompletion(stateToken: string) {
       if (done || !callbackPayload) return;
       cleanup();
       resolve({ callback: callbackPayload, metaEvent: metaEventPayload });
+    };
+
+    completeWithoutCode = () => {
+      if (done) return;
+      callbackPayload = { type: META_CALLBACK_MESSAGE, stateToken };
+      finish();
     };
 
     const onMessage = (event: MessageEvent) => {
@@ -425,6 +432,23 @@ function waitForMetaCompletion(stateToken: string) {
         errorCode: normalized.errorCode
       });
       metaEventPayload = normalized;
+
+      const eventName = normalized.eventName || "";
+      const cancelled = eventName.includes("CANCEL");
+      const failed = Boolean(normalized.errorCode) || eventName.includes("ERROR");
+      if (cancelled || failed) {
+        callbackPayload = {
+          type: META_CALLBACK_MESSAGE,
+          stateToken,
+          ...(cancelled
+            ? { error: "cancelled" }
+            : {
+                error: normalized.errorCode || "meta_embedded_signup_error",
+                errorDescription: normalized.errorMessage || undefined
+              })
+        };
+        finish();
+      }
     };
 
     const timeout = window.setTimeout(() => {
@@ -434,6 +458,8 @@ function waitForMetaCompletion(stateToken: string) {
 
     window.addEventListener("message", onMessage);
   });
+
+  return { promise, completeWithoutCode: () => completeWithoutCode() };
 }
 
 async function finalizeEmbeddedSignup(input: {
@@ -488,6 +514,14 @@ async function finalizeEmbeddedSignup(input: {
     phoneNumberId: json.data.channel?.phoneNumberId || null
   });
   return json.data;
+}
+
+function logCancellationCleanupOutcome(error: unknown) {
+  if (error instanceof Error && error.message === "missing_meta_code") {
+    debugLog("cancel_cleanup_completed");
+    return;
+  }
+  debugError("cancel_cleanup_fail", error);
 }
 
 async function recoverEmbeddedSignupAttempt(input: {
@@ -570,7 +604,8 @@ export async function beginMetaWhatsAppConnection(
   }
 
   options.onProgress?.("awaiting_callback");
-  const completionPromise = waitForMetaCompletion(bootstrap.stateToken);
+  const metaCompletion = waitForMetaCompletion(bootstrap.stateToken);
+  const completionPromise = metaCompletion.promise;
   let immediateCode: string | null = null;
 
   try {
@@ -586,6 +621,9 @@ export async function beginMetaWhatsAppConnection(
           status: response?.status || null,
           codePresent: Boolean(immediateCode)
         });
+        if (!immediateCode && (response?.status === "unknown" || response?.status === "not_authorized")) {
+          metaCompletion.completeWithoutCode();
+        }
       },
       {
         config_id: bootstrap.configId,
@@ -633,6 +671,17 @@ export async function beginMetaWhatsAppConnection(
       } catch (recoveryError) {
         debugError("recovery_fail", recoveryError);
       }
+    } else {
+      try {
+        await finalizeEmbeddedSignup({
+          finalizeEndpoint: options.finalizeEndpoint,
+          stateToken: bootstrap.stateToken,
+          code: null,
+          redirectUri: bootstrap.redirectUri
+        });
+      } catch (cleanupError) {
+        logCancellationCleanupOutcome(cleanupError);
+      }
     }
     if (recoveredError) {
       throw recoveredError;
@@ -644,10 +693,45 @@ export async function beginMetaWhatsAppConnection(
   }
   const callbackCode = callback.code || immediateCode || null;
 
-  if (callback.error) {
+  const callbackErrorCode = callback.error || metaEvent?.errorCode || null;
+  if (callback.error || metaEvent?.errorCode) {
+    const callbackError = buildMetaEmbeddedSignupError({
+      message: callback.errorDescription || metaEvent?.errorMessage || callback.error || callbackErrorCode,
+      code: callbackErrorCode
+    });
+    const wasCancelled = callbackError.kind === "cancelled";
+    try {
+      await finalizeEmbeddedSignup({
+        finalizeEndpoint: options.finalizeEndpoint,
+        stateToken: bootstrap.stateToken,
+        code: wasCancelled ? null : callbackCode,
+        redirectUri: bootstrap.redirectUri,
+        metaPayload: metaEvent?.raw || null,
+        error: wasCancelled ? null : callbackErrorCode,
+        errorDescription: wasCancelled ? null : callback.errorDescription || metaEvent?.errorMessage || null
+      });
+    } catch (cleanupError) {
+      if (wasCancelled) logCancellationCleanupOutcome(cleanupError);
+      else debugError("meta_event_cleanup_fail", cleanupError);
+    }
+    throw callbackError;
+  }
+
+  if (!callbackCode) {
+    try {
+      await finalizeEmbeddedSignup({
+        finalizeEndpoint: options.finalizeEndpoint,
+        stateToken: bootstrap.stateToken,
+        code: null,
+        redirectUri: bootstrap.redirectUri,
+        metaPayload: metaEvent?.raw || null
+      });
+    } catch (cleanupError) {
+      logCancellationCleanupOutcome(cleanupError);
+    }
     throw buildMetaEmbeddedSignupError({
-      message: callback.errorDescription || metaEvent?.errorMessage || callback.error,
-      code: callback.error || metaEvent?.errorCode || null
+      message: "Cancelaste la conexión con Meta. Puedes reintentarlo.",
+      code: "meta_embedded_signup_cancelled"
     });
   }
 
