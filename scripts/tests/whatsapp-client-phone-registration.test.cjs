@@ -59,7 +59,7 @@ function setup(overrides = {}) {
   return { ...exports, calls };
 }
 
-const origin = "https://portal.example";
+const origin = "https://www.opturon.com";
 const route = "/api/app/integrations/whatsapp/register";
 function request(method = "GET", options = {}) {
   const nextUrl = new URL(origin + route + (options.query || ""));
