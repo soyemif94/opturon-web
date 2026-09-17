@@ -82,6 +82,7 @@ test("GET binds tenant and masks number without exposing credentials or making w
   assert.equal(h.calls.auth[0].permission, "manage_workspace");
   assert.equal(response.headers.get("cache-control"), "private, no-store");
   assert.match(response.headers.get("content-security-policy"), /form-action 'self'/);
+  assert.match(response.headers.get("content-security-policy"), /connect-src 'self'/);
 });
 test("GET completion navigation has no form and does not claim registeredAt evidence", async () => {
   const h = setup(); const response = await h.GET(request("GET", { query: "?result=completed" }));

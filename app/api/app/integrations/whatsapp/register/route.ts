@@ -7,7 +7,7 @@ const ROUTE = "/api/app/integrations/whatsapp/register";
 const RESPONSE_HEADERS = {
   "Cache-Control": "private, no-store",
   "Content-Type": "text/html; charset=utf-8",
-  "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
