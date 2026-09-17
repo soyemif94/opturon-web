@@ -7,7 +7,7 @@ const ROUTE = "/api/app/integrations/whatsapp/register";
 const RESPONSE_HEADERS = {
   "Cache-Control": "private, no-store",
   "Content-Type": "text/html; charset=utf-8",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff"
 };
@@ -28,7 +28,7 @@ function isTrustedOrigin(request: NextRequest) {
 }
 
 function page(message: string, status = 200, last4?: string, completed = false) {
-  return new NextResponse(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registrar WhatsApp · Opturon</title><style>body{font:16px system-ui,sans-serif;background:#f4f6f8;color:#17212f;margin:0;padding:32px 20px}main{max-width:520px;margin:48px auto;padding:28px;background:white;border-radius:16px}h1{font-size:24px}p{line-height:1.6}button{font:inherit;background:#13795b;color:white;border:0;border-radius:8px;padding:12px 18px;cursor:pointer}a{color:#13795b}nav{margin-top:24px}</style></head><body><main><h1>Registrar número de WhatsApp</h1><p>${message}</p>${last4 ? `<p>Número del workspace: •••• ${last4}</p>` : ""}${last4 && !completed ? `<form method="post" action="${ROUTE}"><input type="hidden" name="confirm" value="register_current_channel"><button type="submit">Registrar este número</button></form>` : ""}<nav><a href="/app/integrations">Volver a Integraciones</a>${status >= 400 ? ` · <a href="${ROUTE}">Volver a intentar</a>` : ""}</nav></main></body></html>`, { status, headers: RESPONSE_HEADERS });
+  return new NextResponse(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registrar WhatsApp · Opturon</title><style>body{font:16px system-ui,sans-serif;background:#f4f6f8;color:#17212f;margin:0;padding:32px 20px}main{max-width:520px;margin:48px auto;padding:28px;background:white;border-radius:16px}h1{font-size:24px}p{line-height:1.6}button{font:inherit;background:#13795b;color:white;border:0;border-radius:8px;padding:12px 18px;cursor:pointer}a{color:#13795b}nav{margin-top:24px}</style></head><body><main><h1>Registrar número de WhatsApp</h1><p>${message}</p>${last4 ? `<p>Número del workspace: •••• ${last4}</p>` : ""}${last4 && !completed ? `<form id="register-form" method="post" action="${ROUTE}"><input type="hidden" name="confirm" value="register_current_channel"><button type="submit">Registrar este número</button></form><script>document.getElementById('register-form').addEventListener('submit',async function(event){event.preventDefault();const response=await fetch(this.action,{method:'POST',body:new URLSearchParams(new FormData(this)),headers:{'X-Requested-With':'XMLHttpRequest','Content-Type':'application/x-www-form-urlencoded'},credentials:'same-origin'});document.open();document.write(await response.text());document.close();});</script>` : ""}<nav><a href="/app/integrations">Volver a Integraciones</a>${status >= 400 ? ` · <a href="${ROUTE}">Volver a intentar</a>` : ""}</nav></main></body></html>`, { status, headers: RESPONSE_HEADERS });
 }
 
 async function authority() {
@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await authority();
   if (auth.error) return auth.error;
+  if (request.headers.get("x-requested-with") !== "XMLHttpRequest") return page("La solicitud no es válida.", 400);
   if (!isTrustedOrigin(request)) {
     return page("La solicitud no proviene de este sitio.", 403);
   }

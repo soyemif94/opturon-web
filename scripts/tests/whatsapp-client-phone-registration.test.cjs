@@ -64,7 +64,7 @@ const route = "/api/app/integrations/whatsapp/register";
 function request(method = "GET", options = {}) {
   const nextUrl = new URL(origin + route + (options.query || ""));
   return {
-    nextUrl, headers: new Headers({ origin, "content-type": "application/x-www-form-urlencoded", ...options.headers }),
+    nextUrl, headers: new Headers({ origin, "x-requested-with": "XMLHttpRequest", "content-type": "application/x-www-form-urlencoded", ...options.headers }),
     text: async () => options.body === undefined ? "confirm=register_current_channel" : options.body,
     method
   };
@@ -99,7 +99,7 @@ for (const [name, overrides] of [
 });
 test("manager can inspect confirmation", async () => assert.equal((await setup({ ctx: { tenantRole: "manager" } }).GET(request())).status, 200));
 for (const [name, options] of [
-  ["cross origin", { headers: { origin: "https://attacker.example" } }], ["missing origin", { headers: { origin: "" } }],
+  ["cross origin", { headers: { origin: "https://attacker.example" } }], ["missing origin", { headers: { origin: "" } }], ["missing request proof", { headers: { "x-requested-with": "" } }],
   ["query tenant override", { query: "?tenantId=other" }], ["body tenant override", { body: "confirm=register_current_channel&tenantId=other" }],
   ["body phone override", { body: "confirm=register_current_channel&phoneNumberId=other" }],
   ["duplicate confirmation", { body: "confirm=register_current_channel&confirm=register_current_channel" }],
