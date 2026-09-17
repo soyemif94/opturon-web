@@ -19,8 +19,11 @@ function canonicalOrigin(request: NextRequest) {
 
 function isTrustedOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
-  if (!origin) return request.headers.get("sec-fetch-site") === "same-origin";
   const allowed = new Set([canonicalOrigin(request), "https://www.opturon.com", "https://opturon.com"]);
+  if (!origin) {
+    const referer = request.headers.get("referer");
+    try { const url = new URL(referer || ""); return allowed.has(url.origin) && url.pathname === ROUTE; } catch { return false; }
+  }
   return allowed.has(origin);
 }
 
