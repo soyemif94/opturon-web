@@ -76,7 +76,8 @@ test("GET binds tenant and masks number without exposing credentials or making w
   const h = setup(); const response = await h.GET(request()); const html = await response.text();
   assert.equal(response.status, 200); assert.match(html, /•••• 8810/);
   assert.match(html, /method="post"/); assert.match(html, /Registrar este número/);
-  assert.doesNotMatch(html, /549112345|status-secret|123456|channel-a|phone-id-a|actor-a|<script/);
+  assert.doesNotMatch(html, /549112345|status-secret|123456|channel-a|phone-id-a|actor-a/);
+  assert.match(html, /X-Requested-With/);
   assert.deepEqual(h.calls.status, ["tenant-a"]); assert.equal(h.calls.fetch.length, 0);
   assert.equal(h.calls.auth[0].permission, "manage_workspace");
   assert.equal(response.headers.get("cache-control"), "private, no-store");
