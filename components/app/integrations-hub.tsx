@@ -197,7 +197,7 @@ export function IntegrationsHub({
   if (!isOpturonAdmin) {
     return (
       <ClientIntegrationsExperience
-        whatsapp={liveWhatsApp}
+        whatsapp={whatsapp}
         instagramStatus={liveInstagramStatus}
         instagramError={instagramError || searchParams.get("reason")}
         instagramMode={searchParams.get("instagram")}
