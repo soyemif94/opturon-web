@@ -377,21 +377,36 @@ async function bootstrapEmbeddedSignup(endpoint = "/api/app/integrations/whatsap
 
 function waitForMetaCompletion(stateToken: string) {
   let completeWithoutCode = () => {};
+  let receiveCode = (_code: string) => {};
+  let dispose = () => {};
   const promise = new Promise<{ callback: MetaCallbackPayload; metaEvent: MetaEmbeddedEvent | null }>((resolve, reject) => {
     let callbackPayload: MetaCallbackPayload | null = null;
     let metaEventPayload: MetaEmbeddedEvent | null = null;
     let done = false;
+    let timeout: number | undefined;
 
     const cleanup = () => {
       done = true;
       window.removeEventListener("message", onMessage);
-      clearTimeout(timeout);
+      if (timeout !== undefined) clearTimeout(timeout);
     };
+    dispose = cleanup;
 
     const finish = () => {
       if (done || !callbackPayload) return;
       cleanup();
       resolve({ callback: callbackPayload, metaEvent: metaEventPayload });
+    };
+
+    // SDK authorization and Embedded Signup assets arrive independently.
+    // Keep listening until both are available, regardless of their order.
+    const finishWithAssets = () => {
+      if (callbackPayload?.code && metaEventPayload?.eventName?.startsWith("FINISH")) finish();
+    };
+    receiveCode = (code: string) => {
+      if (done) return;
+      callbackPayload = { type: META_CALLBACK_MESSAGE, stateToken, code };
+      finishWithAssets();
     };
 
     completeWithoutCode = () => {
@@ -416,7 +431,7 @@ function waitForMetaCompletion(stateToken: string) {
           if (payload.stateToken && payload.stateToken !== stateToken) {
             return;
           }
-          callbackPayload = payload;
+          callbackPayload = { ...payload, code: payload.code || callbackPayload?.code || null };
           finish();
         }
         return;
@@ -431,11 +446,12 @@ function waitForMetaCompletion(stateToken: string) {
         phoneNumberId: normalized.phoneNumberId,
         errorCode: normalized.errorCode
       });
-      metaEventPayload = normalized;
-
       const eventName = normalized.eventName || "";
       const cancelled = eventName.includes("CANCEL");
       const failed = Boolean(normalized.errorCode) || eventName.includes("ERROR");
+      if (!metaEventPayload?.eventName?.startsWith("FINISH") || cancelled || failed) {
+        metaEventPayload = normalized;
+      }
       if (cancelled || failed) {
         callbackPayload = {
           type: META_CALLBACK_MESSAGE,
@@ -448,18 +464,29 @@ function waitForMetaCompletion(stateToken: string) {
               })
         };
         finish();
+      } else {
+        finishWithAssets();
       }
     };
 
-    const timeout = window.setTimeout(() => {
+    window.addEventListener("message", onMessage);
+    timeout = window.setTimeout(() => {
+      // Without session-info, the backend can still discover assets from code.
+      if (callbackPayload?.code) {
+        finish();
+        return;
+      }
       cleanup();
       reject(new Error("meta_embedded_signup_timeout"));
     }, CALLBACK_WAIT_MS);
-
-    window.addEventListener("message", onMessage);
   });
 
-  return { promise, completeWithoutCode: () => completeWithoutCode() };
+  return {
+    promise,
+    completeWithoutCode: () => completeWithoutCode(),
+    receiveCode: (code: string) => receiveCode(code),
+    dispose: () => dispose()
+  };
 }
 
 async function finalizeEmbeddedSignup(input: {
@@ -606,7 +633,6 @@ export async function beginMetaWhatsAppConnection(
   options.onProgress?.("awaiting_callback");
   const metaCompletion = waitForMetaCompletion(bootstrap.stateToken);
   const completionPromise = metaCompletion.promise;
-  let immediateCode: string | null = null;
 
   try {
     debugLog("launch_start", {
@@ -616,12 +642,14 @@ export async function beginMetaWhatsAppConnection(
     });
     window.FB.login(
       (response) => {
-        immediateCode = response?.authResponse?.code || null;
+        const code = response?.authResponse?.code || null;
         debugLog("fb_login_callback", {
           status: response?.status || null,
-          codePresent: Boolean(immediateCode)
+          codePresent: Boolean(code)
         });
-        if (!immediateCode && (response?.status === "unknown" || response?.status === "not_authorized")) {
+        if (code) {
+          metaCompletion.receiveCode(code);
+        } else if (response?.status === "unknown" || response?.status === "not_authorized") {
           metaCompletion.completeWithoutCode();
         }
       },
@@ -638,6 +666,7 @@ export async function beginMetaWhatsAppConnection(
       }
     );
   } catch (error) {
+    metaCompletion.dispose();
     debugError("launch_fail", error, {
       redirectUri: bootstrap.redirectUri,
       configIdPresent: Boolean(bootstrap.configId)
@@ -691,7 +720,7 @@ export async function beginMetaWhatsAppConnection(
       code: error instanceof Error ? error.message : "meta_embedded_signup_timeout"
     });
   }
-  const callbackCode = callback.code || immediateCode || null;
+  const callbackCode = callback.code || null;
 
   const callbackErrorCode = callback.error || metaEvent?.errorCode || null;
   if (callback.error || metaEvent?.errorCode) {
