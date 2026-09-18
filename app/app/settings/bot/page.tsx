@@ -9,7 +9,11 @@ const EMPTY_BOT_CONFIG: PortalBotConfig = {
   treatment: "vos",
   outOfHoursMessage: "",
   fallbackMessage: "",
-  handoffMessage: ""
+  handoffMessage: "",
+  businessProfilePreset: null,
+  commercialObjective: null,
+  salesMode: null,
+  businessInstructions: ""
 };
 
 export default async function AppBotSettingsPage() {

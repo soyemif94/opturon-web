@@ -14,13 +14,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const schema = z.object({
-  name: z.string().optional(),
-  greetingMessage: z.string().optional(),
+  name: z.string().max(80).optional(),
+  greetingMessage: z.string().max(500).optional(),
   tone: z.enum(["amigable", "profesional", "calido"]).optional(),
   treatment: z.enum(["vos", "usted"]).optional(),
-  outOfHoursMessage: z.string().optional(),
-  fallbackMessage: z.string().optional(),
-  handoffMessage: z.string().optional()
+  outOfHoursMessage: z.string().max(500).optional(),
+  fallbackMessage: z.string().max(500).optional(),
+  handoffMessage: z.string().max(500).optional(),
+  businessProfilePreset: z.enum(["wholesale_distributor", "retail", "services", "professional", "restaurant", "real_estate", "health_appointments", "custom"]).nullable().optional(),
+  commercialObjective: z.enum(["order_generation", "product_sales", "quote", "appointments", "lead_capture", "inquiries", "custom"]).nullable().optional(),
+  salesMode: z.enum(["consultative", "proactive", "direct"]).nullable().optional(),
+  businessInstructions: z.string().max(4000).optional()
 });
 
 function noStore(response: NextResponse) {
@@ -41,7 +45,11 @@ function emptyBotConfig() {
       treatment: "vos" as const,
       outOfHoursMessage: "",
       fallbackMessage: "",
-      handoffMessage: ""
+      handoffMessage: "",
+      businessProfilePreset: null,
+      commercialObjective: null,
+      salesMode: null,
+      businessInstructions: ""
     }
   };
 }
@@ -58,7 +66,11 @@ function normalizePayload(payload: z.infer<typeof schema>) {
     treatment: payload.treatment || "vos",
     outOfHoursMessage: normalizeText(payload.outOfHoursMessage, 500),
     fallbackMessage: normalizeText(payload.fallbackMessage, 500),
-    handoffMessage: normalizeText(payload.handoffMessage, 500)
+    handoffMessage: normalizeText(payload.handoffMessage, 500),
+    businessProfilePreset: payload.businessProfilePreset || null,
+    commercialObjective: payload.commercialObjective || null,
+    salesMode: payload.salesMode || null,
+    businessInstructions: normalizeText(payload.businessInstructions, 4000)
   };
 }
 

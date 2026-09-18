@@ -1655,6 +1655,10 @@ export type PortalBotConfig = {
   outOfHoursMessage: string;
   fallbackMessage: string;
   handoffMessage: string;
+  businessProfilePreset: "wholesale_distributor" | "retail" | "services" | "professional" | "restaurant" | "real_estate" | "health_appointments" | "custom" | null;
+  commercialObjective: "order_generation" | "product_sales" | "quote" | "appointments" | "lead_capture" | "inquiries" | "custom" | null;
+  salesMode: "consultative" | "proactive" | "direct" | null;
+  businessInstructions: string;
 };
 
 export type PortalBotSettings = {

@@ -31,6 +31,82 @@ const TREATMENT_OPTIONS: Array<{ value: PortalBotConfig["treatment"]; label: str
   { value: "usted", label: "Usted" }
 ];
 
+const BUSINESS_PROFILE_OPTIONS: Array<{ value: NonNullable<PortalBotConfig["businessProfilePreset"]>; label: string }> = [
+  { value: "wholesale_distributor", label: "Distribuidora mayorista" },
+  { value: "retail", label: "Comercio minorista" },
+  { value: "services", label: "Servicios" },
+  { value: "professional", label: "Profesional" },
+  { value: "restaurant", label: "Restaurante / gastronomía" },
+  { value: "real_estate", label: "Inmobiliaria" },
+  { value: "health_appointments", label: "Salud / turnos" },
+  { value: "custom", label: "Otro / personalizado" }
+];
+
+const COMMERCIAL_OBJECTIVE_OPTIONS: Array<{ value: NonNullable<PortalBotConfig["commercialObjective"]>; label: string }> = [
+  { value: "order_generation", label: "Generar pedidos" },
+  { value: "product_sales", label: "Vender productos" },
+  { value: "quote", label: "Cotizar" },
+  { value: "appointments", label: "Agendar turnos" },
+  { value: "lead_capture", label: "Captar clientes / leads" },
+  { value: "inquiries", label: "Atender consultas" },
+  { value: "custom", label: "Personalizado" }
+];
+
+const SALES_MODE_OPTIONS: Array<{ value: NonNullable<PortalBotConfig["salesMode"]>; label: string }> = [
+  { value: "consultative", label: "Consultivo" },
+  { value: "proactive", label: "Proactivo" },
+  { value: "direct", label: "Directo" }
+];
+
+type CommercialPreset = Pick<PortalBotConfig, "commercialObjective" | "salesMode" | "businessInstructions">;
+
+const PRESET_DEFAULTS: Record<NonNullable<PortalBotConfig["businessProfilePreset"]>, CommercialPreset> = {
+  wholesale_distributor: {
+    commercialObjective: "order_generation",
+    salesMode: "proactive",
+    businessInstructions: "Sos el asistente comercial de una distribuidora mayorista.\nDetectá qué necesita el cliente y ofrecé productos disponibles en el catálogo.\nAyudalo a elegir productos, variedades y cantidades.\nCuando tenga sentido, sugerí alternativas o productos complementarios.\nGuiá la conversación naturalmente hacia la concreción de un pedido.\nUsá únicamente información real disponible para este negocio."
+  },
+  retail: {
+    commercialObjective: "product_sales",
+    salesMode: "proactive",
+    businessInstructions: "Ayudá al cliente a elegir productos reales del catálogo y a avanzar hacia una compra. Sugerí alternativas disponibles cuando aporten valor."
+  },
+  services: {
+    commercialObjective: "quote",
+    salesMode: "consultative",
+    businessInstructions: "Entendé la necesidad, explicá los servicios reales disponibles y facilitá el próximo paso para contactar, reservar o cotizar."
+  },
+  professional: {
+    commercialObjective: "lead_capture",
+    salesMode: "consultative",
+    businessInstructions: "Atendé consultas, calificá la necesidad con preguntas breves y facilitá un próximo paso claro con el profesional."
+  },
+  restaurant: {
+    commercialObjective: "order_generation",
+    salesMode: "direct",
+    businessInstructions: "Informá únicamente la oferta disponible y facilitá un pedido o una reserva según las funciones habilitadas para el negocio."
+  },
+  real_estate: {
+    commercialObjective: "lead_capture",
+    salesMode: "consultative",
+    businessInstructions: "Detectá el interés y las características buscadas. Usá sólo propiedades e información reales y facilitá el seguimiento con una persona."
+  },
+  health_appointments: {
+    commercialObjective: "appointments",
+    salesMode: "consultative",
+    businessInstructions: "Resolvé información administrativa permitida y facilitá la agenda. No inventes información médica ni reemplaces la evaluación profesional."
+  },
+  custom: {
+    commercialObjective: null,
+    salesMode: null,
+    businessInstructions: ""
+  }
+};
+
+function optionLabel<T extends string>(options: Array<{ value: T; label: string }>, value: T | null) {
+  return options.find((option) => option.value === value)?.label || "Sin configurar";
+}
+
 function normalizeForm(config: PortalBotConfig): PortalBotConfig {
   return {
     name: String(config?.name || "").trim(),
@@ -39,7 +115,15 @@ function normalizeForm(config: PortalBotConfig): PortalBotConfig {
     treatment: config?.treatment === "usted" ? "usted" : "vos",
     outOfHoursMessage: String(config?.outOfHoursMessage || "").trim(),
     fallbackMessage: String(config?.fallbackMessage || "").trim(),
-    handoffMessage: String(config?.handoffMessage || "").trim()
+    handoffMessage: String(config?.handoffMessage || "").trim(),
+    businessProfilePreset: BUSINESS_PROFILE_OPTIONS.some((option) => option.value === config?.businessProfilePreset)
+      ? config.businessProfilePreset
+      : null,
+    commercialObjective: COMMERCIAL_OBJECTIVE_OPTIONS.some((option) => option.value === config?.commercialObjective)
+      ? config.commercialObjective
+      : null,
+    salesMode: SALES_MODE_OPTIONS.some((option) => option.value === config?.salesMode) ? config.salesMode : null,
+    businessInstructions: String(config?.businessInstructions || "").trim()
   };
 }
 
@@ -47,6 +131,9 @@ function validateForm(config: PortalBotConfig): FieldErrors {
   const nextErrors: FieldErrors = {};
   if (config.name && config.name.length < 2) {
     nextErrors.name = "El nombre del bot debe tener al menos 2 caracteres.";
+  }
+  if (config.businessInstructions.length > 4000) {
+    nextErrors.businessInstructions = "Las instrucciones no pueden superar los 4000 caracteres.";
   }
   return nextErrors;
 }
@@ -62,14 +149,15 @@ async function safeJson(response: Response) {
 export function BotConfigForm({ initialConfig, tenantName, portalActive = true }: BotConfigFormProps) {
   const normalizedInitial = useMemo(() => normalizeForm(initialConfig), [initialConfig]);
   const [form, setForm] = useState<PortalBotConfig>(normalizedInitial);
+  const [savedConfig, setSavedConfig] = useState<PortalBotConfig>(normalizedInitial);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string }>({ tone: null, text: "" });
   const [isSaving, setIsSaving] = useState(false);
 
   const normalizedCurrent = useMemo(() => normalizeForm(form), [form]);
   const isDirty = useMemo(
-    () => JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedInitial),
-    [normalizedCurrent, normalizedInitial]
+    () => JSON.stringify(normalizedCurrent) !== JSON.stringify(savedConfig),
+    [normalizedCurrent, savedConfig]
   );
 
   function updateField<K extends keyof PortalBotConfig>(key: K, value: PortalBotConfig[K]) {
@@ -79,10 +167,36 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
   }
 
   function resetForm() {
-    setForm(normalizedInitial);
+    setForm(savedConfig);
     setFieldErrors({});
     setFeedback({ tone: null, text: "" });
     toast.success("Cambios descartados");
+  }
+
+  function applyBusinessProfilePreset(value: PortalBotConfig["businessProfilePreset"]) {
+    setForm((current) => {
+      if (!value) return normalizeForm({ ...current, businessProfilePreset: null });
+      const preset = PRESET_DEFAULTS[value];
+      const previousDefault = current.businessProfilePreset ? PRESET_DEFAULTS[current.businessProfilePreset].businessInstructions : "";
+      const currentInstructions = String(current.businessInstructions || "").trim();
+      const canReplaceInstructions = !currentInstructions || currentInstructions === previousDefault.trim();
+      return normalizeForm({
+        ...current,
+        businessProfilePreset: value,
+        commercialObjective: preset.commercialObjective,
+        salesMode: preset.salesMode,
+        businessInstructions: canReplaceInstructions ? preset.businessInstructions : current.businessInstructions
+      });
+    });
+    setFieldErrors((current) => ({
+      ...current,
+      businessProfilePreset: undefined,
+      commercialObjective: undefined,
+      salesMode: undefined,
+      businessInstructions: undefined,
+      general: undefined
+    }));
+    setFeedback({ tone: null, text: "" });
   }
 
   async function save(event?: FormEvent<HTMLFormElement>) {
@@ -115,6 +229,7 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
 
       const nextConfig = normalizeForm(json?.settings?.botConfig || normalized);
       setForm(nextConfig);
+      setSavedConfig(nextConfig);
       setFieldErrors({});
       setFeedback({ tone: "success", text: "Configuracion del bot guardada correctamente." });
       toast.success("Bot de WhatsApp actualizado");
@@ -184,6 +299,74 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
             </Field>
           </div>
 
+          <section className="space-y-4 rounded-[24px] border border-[#fb923c]/20 bg-[#fb923c]/[0.04] p-4 md:p-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-[#fdba74]">Comportamiento comercial</p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                Definí qué negocio representa el bot y cómo debe acompañar cada oportunidad comercial.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <Field label="Perfil del bot" helper="Aplica un punto de partida editable para tu tipo de negocio.">
+                <select
+                  className="h-12 rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-sm text-slate-100 outline-none transition focus:border-[#fb923c]"
+                  value={form.businessProfilePreset || ""}
+                  onChange={(event) => applyBusinessProfilePreset((event.target.value || null) as PortalBotConfig["businessProfilePreset"])}
+                >
+                  <option value="" className="bg-slate-950 text-slate-100">Sin configurar</option>
+                  {BUSINESS_PROFILE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">{option.label}</option>
+                  ))}
+                </select>
+                {fieldErrors.businessProfilePreset ? <FieldError text={fieldErrors.businessProfilePreset} /> : null}
+              </Field>
+
+              <Field label="Objetivo principal" helper="Indica el resultado principal que debe facilitar el bot.">
+                <select
+                  className="h-12 rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-sm text-slate-100 outline-none transition focus:border-[#fb923c]"
+                  value={form.commercialObjective || ""}
+                  onChange={(event) => updateField("commercialObjective", (event.target.value || null) as PortalBotConfig["commercialObjective"])}
+                >
+                  <option value="" className="bg-slate-950 text-slate-100">Sin configurar</option>
+                  {COMMERCIAL_OBJECTIVE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">{option.label}</option>
+                  ))}
+                </select>
+                {fieldErrors.commercialObjective ? <FieldError text={fieldErrors.commercialObjective} /> : null}
+              </Field>
+
+              <Field label="Estilo comercial" helper="Define cuánto explora, recomienda o va directo a la acción.">
+                <select
+                  className="h-12 rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-sm text-slate-100 outline-none transition focus:border-[#fb923c]"
+                  value={form.salesMode || ""}
+                  onChange={(event) => updateField("salesMode", (event.target.value || null) as PortalBotConfig["salesMode"])}
+                >
+                  <option value="" className="bg-slate-950 text-slate-100">Sin configurar</option>
+                  {SALES_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">{option.label}</option>
+                  ))}
+                </select>
+                {fieldErrors.salesMode ? <FieldError text={fieldErrors.salesMode} /> : null}
+              </Field>
+            </div>
+
+            <Field label="Instrucciones para el bot" helper="Contale al bot qué vende tu negocio, cómo querés que atienda y qué debería priorizar.">
+              <Textarea
+                rows={8}
+                maxLength={4000}
+                value={form.businessInstructions}
+                onChange={(event) => updateField("businessInstructions", event.target.value)}
+                placeholder="Ej: Detectá qué necesita el cliente y ofrecé únicamente productos disponibles en el catálogo real."
+              />
+              <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                <span>Las instrucciones personalizadas se conservan al cambiar de preset.</span>
+                <span>{form.businessInstructions.length}/4000</span>
+              </div>
+              {fieldErrors.businessInstructions ? <FieldError text={fieldErrors.businessInstructions} /> : null}
+            </Field>
+          </section>
+
           <Field label="Saludo inicial" helper="Si lo dejas vacio, el bot mantiene el saludo actual por defecto.">
             <Textarea
               rows={4}
@@ -229,6 +412,11 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
               <PreviewBlock label="Fuera de horario" text={normalizedCurrent.outOfHoursMessage || "(usa el mensaje por defecto)"} />
               <PreviewBlock label="Fallback" text={normalizedCurrent.fallbackMessage || "(usa el fallback actual)"} />
               <PreviewBlock label="Humano" text={normalizedCurrent.handoffMessage || "(usa el mensaje actual)"} />
+              <PreviewBlock label="Perfil" text={optionLabel(BUSINESS_PROFILE_OPTIONS, normalizedCurrent.businessProfilePreset)} />
+              <PreviewBlock label="Objetivo" text={optionLabel(COMMERCIAL_OBJECTIVE_OPTIONS, normalizedCurrent.commercialObjective)} />
+              <PreviewBlock label="Estilo" text={optionLabel(SALES_MODE_OPTIONS, normalizedCurrent.salesMode)} />
+              <PreviewBlock label="Fuente comercial" text="Catálogo y datos reales del negocio" />
+              <PreviewBlock label="Reglas" text="No inventar productos, precios ni stock" />
             </div>
           </section>
 
