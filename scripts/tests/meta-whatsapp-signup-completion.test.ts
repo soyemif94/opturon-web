@@ -3,6 +3,7 @@ import test from "node:test";
 import { beginMetaWhatsAppConnection, getMetaEmbeddedSignupErrorDetails } from "../../lib/meta-whatsapp-signup.ts";
 
 type LoginResponse = { status?: string; authResponse?: { code?: string | null } | null };
+type LoginOptions = Record<string, unknown> & { extras?: Record<string, unknown> };
 type MessageListener = (event: MessageEvent) => void;
 const origin = "https://opturon.test";
 const finishEvent = {
@@ -30,6 +31,7 @@ async function createSignup() {
   const recoveries: Record<string, unknown>[] = [];
   const progress: string[] = [];
   let loginCallback: ((response: LoginResponse) => void) | undefined;
+  let loginOptions: LoginOptions | undefined;
   let loginReady: () => void = () => {};
   let settled = false;
   let timerId = 0;
@@ -69,8 +71,9 @@ async function createSignup() {
     location: { origin },
     FB: {
       init: () => {},
-      login: (callback: (response: LoginResponse) => void) => {
+      login: (callback: (response: LoginResponse) => void, options?: LoginOptions) => {
         loginCallback = callback;
+        loginOptions = options;
         loginReady();
         if (throwOnLogin) throw new Error("Test SDK launch failure");
       }
@@ -100,6 +103,7 @@ async function createSignup() {
   return {
     finalizations, recoveries, progress, listeners, timers,
     isSettled: () => settled,
+    loginOptions: () => loginOptions,
     login: (payload: LoginResponse = { authResponse: { code: "oauth-test-code" } }) => loginCallback!(payload),
     message: (data: unknown, source = "https://www.facebook.com") => {
       for (const listener of [...listeners]) listener({ origin: source, data } as MessageEvent);
@@ -117,6 +121,18 @@ async function createSignup() {
     }
   };
 }
+
+test("standard launcher selects Embedded Signup v4 without enabling coexistence", async () => {
+  await withSignup(async (h) => {
+    const options = h.loginOptions();
+    const extras = options?.extras;
+    assert.equal(extras?.version, "v4");
+    assert.equal(extras?.featureType, undefined);
+    h.login();
+    h.message(finishEvent);
+    assert.equal((await h.outcome()).value?.state, "connected");
+  });
+});
 
 for (const order of ["FINISH before CODE", "CODE before FINISH"] as const) {
   test(`${order}: wait for both, finalize exactly once with assets, then report connected`, async () => {

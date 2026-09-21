@@ -659,6 +659,7 @@ export async function beginMetaWhatsAppConnection(
         override_default_response_type: true,
         extras: {
           feature: "whatsapp_embedded_signup",
+          version: "v4",
           sessionInfoVersion: 3,
           redirect_uri: bootstrap.redirectUri
         },
