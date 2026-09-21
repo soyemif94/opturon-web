@@ -194,7 +194,7 @@ async function backendPortalFetch<T>(
   }
 }
 
-export async function getAdminTenantPolicies(options?: { actorUserId?: string | null }) {
+export async function getAdminTenantPolicies(options: { actorUserId: string }) {
   return backendPortalFetch<{
     success: boolean;
     data: {

@@ -222,7 +222,9 @@ export function TenantUsersManager({
 
       if (!response.ok) {
         const json = await safeJson(response);
-        const message = json?.detail || json?.error?.formErrors?.[0] || json?.error || "No se pudo invitar al usuario.";
+        const message = response.status === 409
+          ? "Revisá el email o el cupo de usuarios e intentá nuevamente."
+          : "No pudimos invitar al usuario. Intentá nuevamente.";
         if (json?.meta) setMeta(json.meta);
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al invitar usuario", String(message));
@@ -264,8 +266,7 @@ export function TenantUsersManager({
         body: JSON.stringify({ userId, role, tenantId: targetTenantId })
       });
       if (!response.ok) {
-        const json = await safeJson(response);
-        const message = json?.error || "No se pudo actualizar el rol.";
+        const message = "No pudimos actualizar el rol. Intentá nuevamente.";
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al actualizar rol", String(message));
         return;
@@ -311,8 +312,7 @@ export function TenantUsersManager({
         body: JSON.stringify({ userId, name: nextName, tenantId: targetTenantId })
       });
       if (!response.ok) {
-        const json = await safeJson(response);
-        const message = json?.detail || json?.error || "No se pudo actualizar el nombre.";
+        const message = "No pudimos actualizar el nombre. Intentá nuevamente.";
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al actualizar usuario", String(message));
         return;
@@ -348,7 +348,7 @@ export function TenantUsersManager({
 
       if (!response.ok) {
         const json = await safeJson(response);
-        const message = json?.detail || json?.error || "No se pudo actualizar la cuenta principal.";
+        const message = "No pudimos actualizar la cuenta principal. Intentá nuevamente.";
         if (json?.meta) setMeta(json.meta);
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al actualizar cuenta principal", String(message));
@@ -373,8 +373,7 @@ export function TenantUsersManager({
       const query = targetTenantId ? `&tenantId=${encodeURIComponent(targetTenantId)}` : "";
       const response = await fetch(`/api/app/users?id=${encodeURIComponent(userId)}${query}`, { method: "DELETE" });
       if (!response.ok) {
-        const json = await safeJson(response);
-        const message = json?.error || "No se pudo eliminar el usuario.";
+        const message = "No pudimos eliminar el usuario. Intentá nuevamente.";
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al eliminar usuario", String(message));
         return;

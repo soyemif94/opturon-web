@@ -113,8 +113,10 @@ export function TransferConfigForm({ initialConfig, tenantName, portalActive = t
       });
       const json = await safeJson(response);
       if (!response.ok) {
-        const nextErrors = normalizeFieldErrors(json?.fieldErrors);
-        const message = json?.detail || json?.error || "No se pudo guardar la configuracion de transferencia.";
+        const nextErrors = response.status === 400 ? normalizeFieldErrors(json?.fieldErrors) : {};
+        const message = response.status === 400 && nextErrors.general
+          ? nextErrors.general
+          : "No pudimos guardar la configuración de transferencia. Intentá nuevamente.";
         setFieldErrors(nextErrors);
         setFeedback({ tone: "error", text: String(message) });
         toast.error("Error al guardar", String(message));
@@ -167,20 +169,6 @@ export function TransferConfigForm({ initialConfig, tenantName, portalActive = t
       value: normalizedCurrent.bank,
       editable: true,
       helper: "Banco o billetera donde recibe la transferencia."
-    },
-    {
-      key: "accountType",
-      label: "Tipo de cuenta",
-      value: "",
-      editable: false,
-      helper: "Este dato todavia no forma parte de la configuracion actual."
-    },
-    {
-      key: "taxId",
-      label: "CUIL del titular",
-      value: "",
-      editable: false,
-      helper: "Este dato todavia no forma parte de la configuracion actual."
     }
   ];
 

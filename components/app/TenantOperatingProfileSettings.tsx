@@ -94,12 +94,12 @@ export function TenantOperatingProfileSettings({ initialPolicy }: { initialPolic
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(json?.error || "tenant_policy_save_failed");
+        throw new Error("tenant_policy_save_failed");
       }
       setDraft(clonePolicy(json.policy || draft));
       toast.success("Configuracion operativa guardada");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar la configuracion.");
+    } catch {
+      toast.error("No pudimos guardar los cambios. Intentá nuevamente.");
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOpsApi } from "@/lib/saas/access";
+import { requireOpturonAdminApi, resolveOpturonAdminActorId } from "@/lib/saas/access";
 import { getBackendErrorBody, getBackendErrorStatus, isBackendConfigured, isPortalInternalAuthConfigured, provisionPortalTenant } from "@/lib/api";
 import { appendAuditLog, applyIndustryTemplate, calculateHealthScore, daysActive, newId, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 import type { TenantStatus } from "@/lib/saas/types";
@@ -32,7 +32,7 @@ const createTenantSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const guard = await requireOpsApi();
+  const guard = await requireOpturonAdminApi();
   if (guard.error) return guard.error;
 
   const data = readSaasData();
@@ -57,8 +57,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireOpsApi();
+  const guard = await requireOpturonAdminApi();
   if (guard.error) return guard.error;
+  const actorUserId = resolveOpturonAdminActorId(guard.ctx);
+  if (!actorUserId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const payload = await request.json();
   const parsed = createTenantSchema.safeParse(payload);
@@ -109,13 +111,17 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await provisionPortalTenant(tenantId, {
-        name: input.name,
-        timezone: "America/Argentina/Buenos_Aires",
-        operatingProfile: input.operatingProfile,
-        capabilities: input.capabilities,
-        enabledModules: input.enabledModules
-      });
+      await provisionPortalTenant(
+        tenantId,
+        {
+          name: input.name,
+          timezone: "America/Argentina/Buenos_Aires",
+          operatingProfile: input.operatingProfile,
+          capabilities: input.capabilities,
+          enabledModules: input.enabledModules
+        },
+        { actorUserId }
+      );
     } catch (error) {
       return NextResponse.json(
         getBackendErrorBody(error) || {

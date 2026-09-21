@@ -18,9 +18,9 @@ import {
   sendPortalUserInvitationEmail
 } from "@/lib/portal-user-invitations";
 import { canManageUsers, isStaffRole, normalizeTenantRole } from "@/lib/app-permissions";
-import { requireAppApi } from "@/lib/saas/access";
+import { hasOpturonAdminApiAccess, requireAppApi } from "@/lib/saas/access";
 import { appendAuditLog, listTenantMembers, newId, readSaasData, writeSaasData } from "@/lib/saas/store";
-import { hasExplicitRuntimeDataDir, resolveRuntimeDataDir } from "@/lib/runtime-data";
+import { hasExplicitRuntimeDataDir } from "@/lib/runtime-data";
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -100,19 +100,7 @@ function requirePortalUsersBackend(tenantId?: string) {
       hasBackendBaseUrl: Boolean(resolveBackendBaseUrl()),
       hasPortalInternalKey: false
     });
-    return NextResponse.json(
-      {
-        error: "portal_internal_key_missing",
-        detail: "PORTAL_INTERNAL_KEY is not configured in opturon-web.",
-        debug: {
-          tenantId: tenantId || null,
-          backendBaseUrl: resolveBackendBaseUrl() || null,
-          hasBackendBaseUrl: Boolean(resolveBackendBaseUrl()),
-          hasPortalInternalKey: false
-        }
-      },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "portal_users_unavailable" }, { status: 503 });
   }
   return null;
 }
@@ -137,18 +125,7 @@ function proxyUsersBackendError(action: string, tenantId: string, error: unknown
     ...debug
   });
 
-  if (body && typeof body === "object") {
-    return NextResponse.json(body, { status });
-  }
-
-  return NextResponse.json(
-    {
-      error: "portal_user_request_failed",
-      detail,
-      debug
-    },
-    { status }
-  );
+  return NextResponse.json({ error: "portal_user_request_failed" }, { status });
 }
 
 function safeAppendUsersAuditLog(entry: Parameters<typeof appendAuditLog>[0]) {
@@ -386,6 +363,15 @@ export async function POST(request: NextRequest) {
 
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const includesControlPlaneFields = Boolean(
+    parsed.data.tenantName !== undefined ||
+    parsed.data.operatingProfile !== undefined ||
+    parsed.data.capabilities !== undefined ||
+    parsed.data.enabledModules !== undefined
+  );
+  if (includesControlPlaneFields && !hasOpturonAdminApiAccess(guard.ctx || {})) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (!policy.allowedRoles.includes(parsed.data.role)) {
     return NextResponse.json(
       {
@@ -534,12 +520,9 @@ export async function POST(request: NextRequest) {
   try {
     writeSaasData(data);
   } catch (error) {
+    console.error("[users-route] Local user persistence failed", error);
     return NextResponse.json(
-      {
-        error: "User was not persisted",
-        detail: error instanceof Error ? error.message : String(error),
-        storagePath: resolveRuntimeDataDir()
-      },
+      { error: "portal_user_save_failed" },
       { status: 500 }
     );
   }
@@ -564,11 +547,9 @@ export async function POST(request: NextRequest) {
       expiresAt: invitation.expiresAt
     });
   } catch (error) {
+    console.error("[users-route] Invitation email failed", error);
     return NextResponse.json(
-      {
-        error: "portal_invitation_email_failed",
-        detail: error instanceof Error ? error.message : String(error)
-      },
+      { error: "portal_invitation_email_failed" },
       { status: 500 }
     );
   }

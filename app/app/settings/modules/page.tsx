@@ -1,10 +1,10 @@
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { TenantOperatingProfileSettings } from "@/components/app/TenantOperatingProfileSettings";
 import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
-import { requireAppModulePage } from "@/lib/saas/access";
+import { requireOpturonAdminPage } from "@/lib/saas/access";
 
 export default async function SettingsModulesPage() {
-  const ctx = await requireAppModulePage("settings", { permission: "manage_workspace" });
+  const ctx = await requireOpturonAdminPage("/app/settings/modules");
   const result = ctx.tenantId && isBackendConfigured() ? await getPortalTenantContext(ctx.tenantId).catch(() => null) : null;
   const policy = result?.data?.policy;
 

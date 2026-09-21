@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppApi } from "@/lib/saas/access";
 import {
-  getBackendErrorBody,
-  getBackendErrorStatus,
   getPortalBusinessSettings,
   isBackendConfigured,
   patchPortalBusinessSettings
@@ -74,8 +72,8 @@ export async function GET() {
       return noStore(
         NextResponse.json(
           {
-            error: "business_backend_not_configured",
-            detail: "No hay backend persistente configurado para cargar los datos del negocio."
+            error: "business_unavailable",
+            detail: "No pudimos cargar los datos del negocio. Intentá nuevamente."
           },
           { status: 503 }
         )
@@ -86,15 +84,8 @@ export async function GET() {
       const result = await getPortalBusinessSettings(tenantId);
       return noStore(NextResponse.json({ settings: result.data.settings, source: "backend_real_tenant" }));
     } catch (error) {
-      return noStore(
-        NextResponse.json(
-          getBackendErrorBody(error) || {
-            error: "business_load_failed",
-            detail: error instanceof Error ? error.message : "No se pudieron cargar los datos del negocio."
-          },
-          { status: getBackendErrorStatus(error) || 502 }
-        )
-      );
+      console.error("[api/app/business][GET] Backend request failed", error);
+      return noStore(NextResponse.json({ error: "business_load_failed" }, { status: 502 }));
     }
   }
 
@@ -182,14 +173,6 @@ export async function PATCH(request: NextRequest) {
     return noStore(NextResponse.json({ ok: true, settings }));
   } catch (error) {
     console.error("[api/app/business][PATCH] Failed to save business settings.", error);
-    return noStore(
-      NextResponse.json(
-        getBackendErrorBody(error) || {
-          error: "business_save_failed",
-          detail: error instanceof Error ? error.message : "No se pudieron guardar los datos del negocio."
-        },
-        { status: getBackendErrorStatus(error) || 500 }
-      )
-    );
+    return noStore(NextResponse.json({ error: "business_save_failed" }, { status: 502 }));
   }
 }

@@ -31,7 +31,7 @@ import {
   type PortalUser,
   type PortalUsersMeta
 } from "@/lib/api";
-import { isOpturonAdminWorkspaceContext, requireAppPage } from "@/lib/saas/access";
+import { hasOpturonAdminApiAccess, isOpturonAdminWorkspaceContext, requireAppPage } from "@/lib/saas/access";
 import { listTenantMembers, readSaasData } from "@/lib/saas/store";
 
 const EMPTY_BUSINESS_SETTINGS: PortalBusinessSettings = {
@@ -104,7 +104,7 @@ export default async function AppSettingsPage() {
   const backendReady = tenantId && isBackendConfigured();
   const canUseLocalDemoData = !ctx.tenantId && isStaffRole(ctx.globalRole);
   const allowUsers = canManageUsers(ctx);
-  const isOpturonAdmin = isOpturonAdminWorkspaceContext(ctx);
+  const isOpturonAdmin = isOpturonAdminWorkspaceContext(ctx) && hasOpturonAdminApiAccess(ctx);
 
   let clinicName = "Espacio del cliente";
   let businessSettings = EMPTY_BUSINESS_SETTINGS;
@@ -202,7 +202,7 @@ export default async function AppSettingsPage() {
             <Badge variant="muted">Portal del cliente</Badge>
             <Badge variant="success">Portal activo</Badge>
             <Badge variant="success">Espacio activo</Badge>
-            {backendReady ? <Badge variant="warning">Operacion en vivo</Badge> : null}
+            {isOpturonAdmin && backendReady ? <Badge variant="warning">Operacion en vivo</Badge> : null}
           </div>
           <p className="mt-3 text-[10px] uppercase tracking-[0.22em] text-muted">Configuracion</p>
           <h1 className="mt-1.5 text-[31px] font-semibold tracking-tight text-white">Configuracion</h1>
@@ -249,9 +249,11 @@ export default async function AppSettingsPage() {
                 </div>
               </div>
             ))}
-            <div className="rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5 text-xs leading-5 text-muted">
-              {backendReady ? "Conectado a datos reales del portal." : "Usando datos locales del espacio actual."}
-            </div>
+            {isOpturonAdmin ? (
+              <div className="rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5 text-xs leading-5 text-muted">
+                {backendReady ? "Conectado a datos reales del portal." : "Usando datos locales del espacio actual."}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </section>
@@ -322,21 +324,23 @@ export default async function AppSettingsPage() {
           </div>
         </HubCard>
 
-        <HubCard
-          href="/app/settings/modules"
-          icon={<Cog className="h-6 w-6 text-amber-300" />}
-          title="Modulos y operacion"
-          subtitle="Perfil operativo del tenant"
-          description="Define perfil operativo, subtipo comercial y capacidades activas del portal sin borrar datos existentes."
-          cta="Editar modulos"
-          accent="green"
-        >
-          <div className="space-y-3">
-            <StatusRow label="Politica" value={backendReady ? "Persistida en backend" : "Backend requerido"} tone={backendReady ? "success" : "muted"} />
-            <StatusRow label="Desactivacion" value="Oculta y bloquea acceso" tone="muted" />
-            <StatusRow label="Reactivacion" value="Recupera acceso sobre los datos existentes" tone="success" />
-          </div>
-        </HubCard>
+        {isOpturonAdmin ? (
+          <HubCard
+            href="/app/settings/modules"
+            icon={<Cog className="h-6 w-6 text-amber-300" />}
+            title="Modulos y operacion"
+            subtitle="Perfil operativo del tenant"
+            description="Define perfil operativo, subtipo comercial y capacidades activas del portal sin borrar datos existentes."
+            cta="Editar modulos"
+            accent="green"
+          >
+            <div className="space-y-3">
+              <StatusRow label="Politica" value={backendReady ? "Persistida en backend" : "Backend requerido"} tone={backendReady ? "success" : "muted"} />
+              <StatusRow label="Desactivacion" value="Oculta y bloquea acceso" tone="muted" />
+              <StatusRow label="Reactivacion" value="Recupera acceso sobre los datos existentes" tone="success" />
+            </div>
+          </HubCard>
+        ) : null}
 
         <HubCard
           href="/app/settings/operational-alerts"
@@ -377,7 +381,7 @@ export default async function AppSettingsPage() {
           icon={<Bot className="h-6 w-6 text-sky-300" />}
           title="Bot de WhatsApp"
           subtitle="Voz y mensajes base"
-          description="Personaliza saludo, fallback, fuera de horario y derivacion a humano por tenant sin tocar el motor del bot."
+          description="Personaliza el saludo, las respuestas alternativas, el mensaje fuera de horario y la derivación a una persona."
           cta="Editar bot"
           accent="violet"
         >
@@ -388,17 +392,17 @@ export default async function AppSettingsPage() {
             </div>
             <StatusRow
               label="Saludo inicial"
-              value={botSettings.botConfig.greetingMessage || "Default actual"}
+              value={botSettings.botConfig.greetingMessage || "Predeterminado"}
               tone={botSettings.botConfig.greetingMessage ? "success" : "muted"}
             />
             <StatusRow
-              label="Fallback"
-              value={botSettings.botConfig.fallbackMessage ? "Personalizado" : "Default actual"}
+              label="Respuesta alternativa"
+              value={botSettings.botConfig.fallbackMessage ? "Personalizado" : "Predeterminado"}
               tone={botSettings.botConfig.fallbackMessage ? "success" : "muted"}
             />
             <StatusRow
               label="Humano"
-              value={botSettings.botConfig.handoffMessage ? "Personalizado" : "Default actual"}
+              value={botSettings.botConfig.handoffMessage ? "Personalizado" : "Predeterminado"}
               tone={botSettings.botConfig.handoffMessage ? "success" : "muted"}
             />
           </div>
@@ -430,61 +434,63 @@ export default async function AppSettingsPage() {
         </HubCard>
       </section>
 
-      <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_236px]">
-        <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="flex flex-col gap-3 p-3.5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
-                <Cog className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-lg font-semibold text-white">Mejora continua del espacio</p>
-                <p className="mt-1 text-sm leading-5 text-muted">Negocio, equipo y cobros completos ayudan a operar con menos friccion.</p>
-              </div>
-            </div>
-            <Button asChild variant="secondary" className="rounded-2xl">
-              <Link href="/app/business">
-                Ver recomendaciones
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
-          <CardContent className="space-y-2.5 p-3.5">
-            <p className="text-base font-semibold text-white">Estado del centro</p>
-            {[
-              {
-                label: "Negocio",
-                ready: businessChecks.every((item) => item.value)
-              },
-              {
-                label: "Equipo",
-                ready: activeUsers.length > 0
-              },
-              {
-                label: "Cobros",
-                ready: transferChecks.some((item) => item.value)
-              }
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5">
-                <span className="text-sm text-white">{item.label}</span>
-                <span className={`inline-flex items-center gap-2 text-xs ${item.ready ? "text-emerald-300" : "text-muted"}`}>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {item.ready ? "Listo" : "Pendiente"}
+      {isOpturonAdmin ? (
+        <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_236px]">
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+            <CardContent className="flex flex-col gap-3 p-3.5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
+                  <Cog className="h-4 w-4" />
                 </span>
+                <div>
+                  <p className="text-lg font-semibold text-white">Mejora continua del espacio</p>
+                  <p className="mt-1 text-sm leading-5 text-muted">Negocio, equipo y cobros completos ayudan a operar con menos friccion.</p>
+                </div>
               </div>
-            ))}
-            <Button asChild className="w-full rounded-2xl">
-              <Link href="/app/settings/transfer">
-                Configurar cobros
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
+              <Button asChild variant="secondary" className="rounded-2xl">
+                <Link href="/app/business">
+                  Ver recomendaciones
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.96),rgba(8,14,23,0.96))] shadow-[var(--card-shadow)]">
+            <CardContent className="space-y-2.5 p-3.5">
+              <p className="text-base font-semibold text-white">Estado del centro</p>
+              {[
+                {
+                  label: "Negocio",
+                  ready: businessChecks.every((item) => item.value)
+                },
+                {
+                  label: "Equipo",
+                  ready: activeUsers.length > 0
+                },
+                {
+                  label: "Cobros",
+                  ready: transferChecks.some((item) => item.value)
+                }
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-[16px] border border-white/8 bg-surface/55 px-3 py-2.5">
+                  <span className="text-sm text-white">{item.label}</span>
+                  <span className={`inline-flex items-center gap-2 text-xs ${item.ready ? "text-emerald-300" : "text-muted"}`}>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {item.ready ? "Listo" : "Pendiente"}
+                  </span>
+                </div>
+              ))}
+              <Button asChild className="w-full rounded-2xl">
+                <Link href="/app/settings/transfer">
+                  Configurar cobros
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
     </div>
   );
 }

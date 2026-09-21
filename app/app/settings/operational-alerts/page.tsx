@@ -43,7 +43,7 @@ export default async function OperationalAlertsPage() {
   };
 
   if (!tenantId || !actorUserId || !isBackendConfigured()) {
-    initialData.loadError = "No pudimos resolver el contexto productivo de esta cuenta.";
+    initialData.loadError = "No pudimos cargar las alertas. Intentá nuevamente.";
     return <OperationalAlertsWorkspace initialData={initialData} />;
   }
 

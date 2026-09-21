@@ -623,7 +623,8 @@ export async function provisionPortalTenant(
     operatingProfile?: TenantOperatingProfile;
     capabilities?: string[];
     enabledModules?: Record<string, boolean>;
-  }
+  },
+  options: { actorUserId: string }
 ) {
   return backendPortalFetch<{
     success: boolean;
@@ -638,15 +639,18 @@ export async function provisionPortalTenant(
     };
   }>(`/portal/tenants/${tenantId}/provision`, {
     method: "POST",
+    headers: { "x-portal-actor-id": options.actorUserId },
     body: JSON.stringify(payload)
   });
 }
 
-export async function getPortalTenantPolicy(tenantId: string) {
+export async function getPortalTenantPolicy(tenantId: string, options: { actorUserId: string }) {
   return backendPortalFetch<{
     success: boolean;
     data: PortalTenantPolicyResponse;
-  }>(`/portal/tenants/${tenantId}/policy`);
+  }>(`/portal/tenants/${tenantId}/policy`, {
+    headers: { "x-portal-actor-id": options.actorUserId }
+  });
 }
 
 export async function patchPortalTenantPolicy(

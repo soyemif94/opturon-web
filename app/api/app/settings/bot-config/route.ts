@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppApi } from "@/lib/saas/access";
 import {
-  getBackendErrorBody,
-  getBackendErrorStatus,
   getPortalBotSettings,
   isBackendConfigured,
   patchPortalBotSettings
@@ -97,15 +95,8 @@ export async function GET() {
     const result = await getPortalBotSettings(tenantId);
     return noStore(NextResponse.json({ settings: result.data.settings, source: "backend_real_tenant" }));
   } catch (error) {
-    return noStore(
-      NextResponse.json(
-        getBackendErrorBody(error) || {
-          error: "bot_config_load_failed",
-          detail: error instanceof Error ? error.message : "No se pudo cargar la configuracion del bot."
-        },
-        { status: getBackendErrorStatus(error) || 502 }
-      )
-    );
+    console.error("[bot-config][GET] Backend request failed", error);
+    return noStore(NextResponse.json({ error: "bot_config_load_failed" }, { status: 502 }));
   }
 }
 
@@ -134,8 +125,8 @@ export async function POST(request: NextRequest) {
       return noStore(
         NextResponse.json(
           {
-            error: "bot_config_backend_not_configured",
-            detail: "No hay backend persistente configurado para guardar la configuracion del bot."
+            error: "bot_config_unavailable",
+            detail: "No pudimos guardar la configuración del bot. Intentá nuevamente."
           },
           { status: 503 }
         )
@@ -147,18 +138,7 @@ export async function POST(request: NextRequest) {
     });
     return noStore(NextResponse.json({ ok: true, settings: result.data.settings, source: "backend_real_tenant" }));
   } catch (error) {
-    const backendBody = getBackendErrorBody(error) as
-      | { error?: string; detail?: string; details?: string; fieldErrors?: Record<string, string> }
-      | undefined;
-
-    return noStore(
-      NextResponse.json(
-        backendBody || {
-          error: "bot_config_save_failed",
-          detail: error instanceof Error ? error.message : "No se pudo guardar la configuracion del bot."
-        },
-        { status: getBackendErrorStatus(error) || 500 }
-      )
-    );
+    console.error("[bot-config][POST] Backend request failed", error);
+    return noStore(NextResponse.json({ error: "bot_config_save_failed" }, { status: 502 }));
   }
 }

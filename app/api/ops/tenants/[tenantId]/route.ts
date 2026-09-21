@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOpsApi } from "@/lib/saas/access";
+import { requireOpturonAdminApi } from "@/lib/saas/access";
 import { appendAuditLog, calculateHealthScore, daysActive, readSaasData, writeSaasData } from "@/lib/saas/store";
 
 const updateSchema = z.object({
@@ -17,7 +17,7 @@ const updateSchema = z.object({
 });
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
-  const guard = await requireOpsApi();
+  const guard = await requireOpturonAdminApi();
   if (guard.error) return guard.error;
   const { tenantId } = await params;
 
@@ -38,7 +38,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ tenant
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
-  const guard = await requireOpsApi();
+  const guard = await requireOpturonAdminApi();
   if (guard.error) return guard.error;
   const { tenantId } = await params;
 

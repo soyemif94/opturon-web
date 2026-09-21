@@ -100,7 +100,7 @@ export function BusinessSettingsForm({
       });
       const json = await response.json().catch(() => null);
       if (!response.ok || !json?.image?.url) {
-        throw new Error(String(json?.error || "No se pudo subir la imagen del negocio."));
+        throw new Error("business_image_upload_failed");
       }
 
       setForm((current) => ({
@@ -108,8 +108,8 @@ export function BusinessSettingsForm({
         profileImageUrl: String(json.image.url || "")
       }));
       toast.success("Imagen actualizada", "La imagen del negocio ya quedo lista en la configuracion.");
-    } catch (error) {
-      toast.error("No se pudo subir la imagen", error instanceof Error ? error.message : "unknown_error");
+    } catch {
+      toast.error("No se pudo subir la imagen", "Intentá nuevamente.");
     } finally {
       setUploadingImage(false);
     }
@@ -127,9 +127,9 @@ export function BusinessSettingsForm({
       });
       const json = await safeJson(response);
       if (!response.ok) {
-        const message = json?.error?.formErrors?.[0] || json?.detail || json?.error || "No se pudieron guardar los datos del negocio.";
-        setFeedback({ tone: "error", text: String(message) });
-        toast.error("Error al guardar", String(message));
+        const message = "No pudimos guardar los datos del negocio. Intentá nuevamente.";
+        setFeedback({ tone: "error", text: message });
+        toast.error("Error al guardar", message);
         return;
       }
       setForm(json?.settings || form);

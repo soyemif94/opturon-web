@@ -1,7 +1,7 @@
 import { AdminOperationalAlertsWorkspace, type AdminOperationalAlertsTenant } from "@/components/app/admin-operational-alerts-workspace";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { getAdminTenantPolicies } from "@/lib/admin-client-policy";
-import { requireOpturonAdminPage } from "@/lib/saas/access";
+import { requireOpturonAdminPage, resolveOpturonAdminActorId } from "@/lib/saas/access";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,12 +12,14 @@ function tenantLabel(value: { displayName?: string | null; name?: string | null;
 
 export default async function AdminOperationalAlertsPage() {
   const ctx = await requireOpturonAdminPage("/app/admin/operational-alerts");
+  const actorUserId = resolveOpturonAdminActorId(ctx);
   const adminWorkspaceTenantId = String(ctx.tenantId || "").trim();
   let initialLoadError: string | null = null;
   let clientTenants: AdminOperationalAlertsTenant[] = [];
 
   try {
-    const result = await getAdminTenantPolicies();
+    if (!actorUserId) throw new Error("missing_admin_actor");
+    const result = await getAdminTenantPolicies({ actorUserId });
     clientTenants = (result.data.tenants || [])
       .map((tenant) => ({
         tenantId: String(tenant.tenantId || tenant.externalTenantId || "").trim(),

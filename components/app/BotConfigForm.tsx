@@ -220,7 +220,7 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
       });
       const json = await safeJson(response);
       if (!response.ok) {
-        const message = String(json?.detail || json?.error || "No se pudo guardar la configuracion del bot.");
+        const message = "No pudimos guardar la configuración del bot. Intentá nuevamente.";
         setFieldErrors((json?.fieldErrors || {}) as FieldErrors);
         setFeedback({ tone: "error", text: message });
         toast.error("Error al guardar", message);
