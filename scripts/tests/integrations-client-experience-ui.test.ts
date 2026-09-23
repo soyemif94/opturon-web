@@ -41,7 +41,9 @@ test("WhatsApp has friendly disconnected, connecting, connected and error states
   assert.match(client, /whatsapp\.state === "error" \|\| whatsapp\.state === "ambiguous_configuration"/);
   assert.match(client, /"Conectar WhatsApp"/);
   assert.match(client, />Gestionar</);
-  assert.match(client, /beginMetaWhatsAppConnection\(\)/);
+  assert.match(client, /beginMetaWhatsAppConnection\(\{ requestedConnectionMode \}\)/);
+  assert.match(client, /whatsapp\.coexistencePilotEnabled/);
+  assert.match(client, /Ya uso WhatsApp Business/);
   assert.match(client, /whatsappSignupBusy/);
   assert.match(client, /role="alert"/);
   assert.doesNotMatch(client, /WHATSAPP_CONNECT_LINK|client-integrations-connect|wa\.me/);

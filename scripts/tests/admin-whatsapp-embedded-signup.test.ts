@@ -1,17 +1,28 @@
 import assert from "node:assert/strict";
 import { buildAdminEmbeddedSignupErrorMessage, buildAdminEmbeddedSignupViewModel } from "../../lib/admin-whatsapp-embedded-signup.ts";
-import { beginMetaWhatsAppConnection, getMetaEmbeddedSignupErrorDetails } from "../../lib/meta-whatsapp-signup.ts";
+import {
+  beginMetaWhatsAppConnection,
+  getMetaEmbeddedSignupErrorDetails,
+  prepareMetaWhatsAppConnection
+} from "../../lib/meta-whatsapp-signup.ts";
 
 async function testPopupClosedWithoutCallbackTriggersRecovery() {
   const originalFetch = global.fetch;
   const originalWindow = (globalThis as typeof globalThis & { window?: typeof window }).window;
 
   const fetchCalls: string[] = [];
-  global.fetch = (async (input: RequestInfo | URL) => {
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     fetchCalls.push(url);
 
     if (url.includes("/bootstrap")) {
+      if (init?.method === "GET") {
+        return new Response(JSON.stringify({ data: { embeddedSignup: {
+          ready: true, appId: "app-id", configId: "config-id", missingConfig: [],
+          graphVersion: "v25.0", redirectUri: "https://opturon.test/callback", callbackPath: "/callback"
+        } } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      const body = JSON.parse(String(init?.body || "{}"));
       return new Response(
         JSON.stringify({
           data: {
@@ -25,7 +36,8 @@ async function testPopupClosedWithoutCallbackTriggersRecovery() {
             graphVersion: "v25.0",
             redirectUri: "https://opturon.test/callback",
             callbackPath: "/callback",
-            stateToken: "state-1",
+            stateToken: body.stateToken,
+            requestedConnectionMode: body.requestedConnectionMode,
             sessionId: "session-1",
             message: "ok"
           }
@@ -57,6 +69,7 @@ async function testPopupClosedWithoutCallbackTriggersRecovery() {
       login: () => {}
     },
     location: { origin: "https://opturon.test" },
+    crypto: globalThis.crypto,
     setTimeout: (fn: () => void) => {
       fn();
       return 1;
@@ -69,6 +82,7 @@ async function testPopupClosedWithoutCallbackTriggersRecovery() {
   (globalThis as typeof globalThis & { window?: typeof window }).window = fakeWindow;
 
   try {
+    await prepareMetaWhatsAppConnection("https://opturon.test/bootstrap");
     await beginMetaWhatsAppConnection({
       bootstrapEndpoint: "https://opturon.test/bootstrap",
       recoverEndpoint: "https://opturon.test/refresh"
@@ -93,6 +107,13 @@ async function testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPass
   global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/bootstrap")) {
+      if (init?.method === "GET") {
+        return new Response(JSON.stringify({ data: { embeddedSignup: {
+          ready: true, appId: "app-id", configId: "config-id", missingConfig: [],
+          graphVersion: "v25.0", redirectUri: "https://opturon.test/callback", callbackPath: "/callback"
+        } } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      const body = JSON.parse(String(init?.body || "{}"));
       return new Response(
         JSON.stringify({
           data: {
@@ -106,7 +127,8 @@ async function testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPass
             graphVersion: "v25.0",
             redirectUri: "https://opturon.test/callback",
             callbackPath: "/callback",
-            stateToken: "state-1",
+            stateToken: body.stateToken,
+            requestedConnectionMode: body.requestedConnectionMode,
             sessionId: "session-1",
             message: "ok"
           }
@@ -132,6 +154,7 @@ async function testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPass
       login: () => {}
     },
     location: { origin: "https://opturon.test" },
+    crypto: globalThis.crypto,
     setTimeout: (fn: () => void) => {
       queueMicrotask(fn);
       return 1;
@@ -144,13 +167,14 @@ async function testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPass
   (globalThis as typeof globalThis & { window?: typeof window }).window = fakeWindow;
 
   try {
+    await prepareMetaWhatsAppConnection("https://opturon.test/bootstrap");
     await beginMetaWhatsAppConnection({ bootstrapEndpoint: "https://opturon.test/bootstrap" });
     assert.fail("Expected beginMetaWhatsAppConnection to time out");
   } catch (error) {
     const details = getMetaEmbeddedSignupErrorDetails(error);
     assert.equal(details.kind, "timeout");
     const parsedFinalizeBody = JSON.parse(finalizeBody) as Record<string, unknown>;
-    assert.equal(parsedFinalizeBody.stateToken, "state-1");
+    assert.match(String(parsedFinalizeBody.stateToken), /^[0-9a-f]{48}$/);
     assert.equal(parsedFinalizeBody.code, null);
     assert.equal(parsedFinalizeBody.redirectUri, "https://opturon.test/callback");
   } finally {

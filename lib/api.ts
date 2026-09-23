@@ -378,6 +378,7 @@ export type PortalTenantContext = {
     verifiedName?: string | null;
     wabaId: string | null;
     status: string | null;
+    connectionMode?: "API_ONLY" | "COEXISTENCE" | null;
   } | null;
   onboarding?: {
     hasChannel: boolean;
@@ -408,6 +409,7 @@ export type PortalTenantPolicyResponse = {
 export type PortalWhatsAppOnboardingSession = {
   id: string;
   status: string | null;
+  requestedConnectionMode: "API_ONLY" | "COEXISTENCE";
   externalTenantId: string | null;
   clinicId: string | null;
   stateToken: string | null;
@@ -434,6 +436,7 @@ export type PortalWhatsAppEmbeddedSignupStatus = {
   processingSession?: boolean;
   canCancel?: boolean;
   canStartNewAttempt?: boolean;
+  coexistencePilotEnabled?: boolean;
 };
 
 export type PortalWhatsAppTemplateBlueprint = {
@@ -723,7 +726,13 @@ export async function getPortalWhatsAppStatus(tenantId: string) {
 
 export async function createPortalWhatsAppEmbeddedSignupBootstrap(
   tenantId: string,
-  payload: { redirectUri: string; actorUserId?: string | null; metadata?: Record<string, unknown> | null }
+  payload: {
+    redirectUri: string;
+    actorUserId?: string | null;
+    metadata?: Record<string, unknown> | null;
+    requestedConnectionMode?: "API_ONLY" | "COEXISTENCE";
+    stateToken?: string | null;
+  }
 ) {
   return backendPortalFetch<{
     success: boolean;

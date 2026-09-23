@@ -31,6 +31,12 @@ export async function POST(request: NextRequest) {
 
   const embeddedSignup = resolveMetaEmbeddedSignupConfig();
   const redirectUri = new URL(embeddedSignup.callbackPath, request.nextUrl.origin).toString();
+  const body = (await request.json().catch(() => ({}))) as {
+    requestedConnectionMode?: unknown;
+    stateToken?: unknown;
+  };
+  const requestedConnectionMode = body.requestedConnectionMode === "COEXISTENCE" ? "COEXISTENCE" : "API_ONLY";
+  const stateToken = typeof body.stateToken === "string" ? body.stateToken : null;
 
   if (!embeddedSignup.ready) {
     return NextResponse.json(
@@ -59,7 +65,9 @@ export async function POST(request: NextRequest) {
     const bootstrap = await createPortalWhatsAppEmbeddedSignupBootstrap(auth.ctx.tenantId, {
       redirectUri,
       actorUserId: auth.ctx.userId,
-      metadata: null
+      metadata: null,
+      requestedConnectionMode,
+      stateToken
     });
     const tenantContext = await getPortalTenantContext(auth.ctx.tenantId).catch(() => null);
     const onboarding = await getPortalWhatsAppEmbeddedSignupStatus(auth.ctx.tenantId).catch(() => null);
@@ -86,6 +94,7 @@ export async function POST(request: NextRequest) {
           callbackPath: embeddedSignup.callbackPath,
           stateToken: bootstrap.data.session?.stateToken || null,
           sessionId: bootstrap.data.session?.id || null,
+          requestedConnectionMode: bootstrap.data.session?.requestedConnectionMode || "API_ONLY",
           message:
             status.state === "connected"
               ? "El canal ya esta conectado para este workspace."
@@ -105,7 +114,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const auth = await requireAppApi({ permission: "manage_workspace" });
   if (auth.error) return auth.error;
 
@@ -127,7 +136,22 @@ export async function GET() {
       context: contextResult.data,
       onboarding: onboardingResult.data
     });
-    return NextResponse.json({ success: true, data: status });
+    const embeddedSignup = resolveMetaEmbeddedSignupConfig();
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...status,
+        embeddedSignup: {
+          ready: embeddedSignup.ready,
+          appId: embeddedSignup.appId,
+          configId: embeddedSignup.configId,
+          graphVersion: embeddedSignup.graphVersion,
+          redirectUri: new URL(embeddedSignup.callbackPath, request.nextUrl.origin).toString(),
+          callbackPath: embeddedSignup.callbackPath,
+          missingConfig: embeddedSignup.missingConfig
+        }
+      }
+    });
   } catch (error) {
     const status = buildWhatsAppConnectionStatus({
       fallbackReason: error instanceof Error ? error.message : "portal_tenant_context_failed"

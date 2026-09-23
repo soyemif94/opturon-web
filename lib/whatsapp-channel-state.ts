@@ -24,6 +24,8 @@ export type WhatsAppConnectionStatus = {
   helper: string;
   primaryCtaLabel: string;
   secondaryCtaLabel: string;
+  connectionMode: "API_ONLY" | "COEXISTENCE" | null;
+  coexistencePilotEnabled: boolean;
 };
 
 type BuildOptions = {
@@ -53,7 +55,12 @@ export function buildWhatsAppConnectionStatus({
     channelId: context?.channel?.id || null,
     connectedNumber: context?.channel?.displayPhoneNumber || context?.channel?.phoneNumberId || onboardingSession?.displayPhoneNumber || onboardingSession?.phoneNumberId || null,
     channelStatus,
-    webhookActive: channelStatus === "active"
+    webhookActive: channelStatus === "active",
+    connectionMode:
+      context?.channel?.connectionMode === "COEXISTENCE" || context?.channel?.connectionMode === "API_ONLY"
+        ? context.channel.connectionMode
+        : null,
+    coexistencePilotEnabled: onboarding?.coexistencePilotEnabled === true
   };
 
   if (context?.channel && channelStatus === "active") {

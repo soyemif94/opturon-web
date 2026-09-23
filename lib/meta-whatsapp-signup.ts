@@ -23,7 +23,10 @@ export type MetaEmbeddedSignupBootstrap = {
   stateToken: string | null;
   sessionId: string | null;
   message: string;
+  requestedConnectionMode?: WhatsAppConnectionMode;
 };
+
+export type WhatsAppConnectionMode = "API_ONLY" | "COEXISTENCE";
 
 export type MetaEmbeddedSignupLaunchResult = {
   state: EmbeddedSignupState;
@@ -72,7 +75,13 @@ type BeginMetaWhatsAppConnectionOptions = {
   finalizeEndpoint?: string;
   recoverEndpoint?: string;
   onProgress?: (stage: MetaEmbeddedSignupProgressStage) => void;
+  requestedConnectionMode?: WhatsAppConnectionMode;
 };
+
+type MetaEmbeddedSignupPreparedConfig = Pick<
+  MetaEmbeddedSignupBootstrap,
+  "ready" | "appId" | "configId" | "missingConfig" | "graphVersion" | "redirectUri" | "callbackPath"
+>;
 
 declare global {
   interface Window {
@@ -90,8 +99,12 @@ declare global {
 const META_SDK_SRC = "https://connect.facebook.net/en_US/sdk.js";
 const META_CALLBACK_MESSAGE = "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK";
 const CALLBACK_WAIT_MS = 90_000;
+const STANDARD_COMPLETION_EVENT = "FINISH";
+const COEXISTENCE_COMPLETION_EVENT = "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING";
 
 let sdkPromise: Promise<void> | null = null;
+const preparedConfigs = new Map<string, MetaEmbeddedSignupPreparedConfig>();
+const preparationPromises = new Map<string, Promise<MetaEmbeddedSignupPreparedConfig>>();
 
 function debugLog(stage: string, payload?: Record<string, unknown>) {
   console.info("[meta-embedded-signup]", stage, payload || {});
@@ -344,12 +357,16 @@ function loadFacebookSdk(appId: string, graphVersion: string) {
   return sdkPromise;
 }
 
-async function bootstrapEmbeddedSignup(endpoint = "/api/app/integrations/whatsapp/embedded-signup"): Promise<MetaEmbeddedSignupBootstrap> {
+async function bootstrapEmbeddedSignup(
+  endpoint: string,
+  requestedConnectionMode: WhatsAppConnectionMode,
+  stateToken: string
+): Promise<MetaEmbeddedSignupBootstrap> {
   debugLog("bootstrap_start");
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({})
+    body: JSON.stringify({ requestedConnectionMode, stateToken })
   });
 
   const json = (await response.json().catch(() => null)) as
@@ -375,7 +392,56 @@ async function bootstrapEmbeddedSignup(endpoint = "/api/app/integrations/whatsap
   return json.data;
 }
 
-function waitForMetaCompletion(stateToken: string) {
+export function prepareMetaWhatsAppConnection(
+  endpoint = "/api/app/integrations/whatsapp/embedded-signup"
+): Promise<MetaEmbeddedSignupPreparedConfig> {
+  const cached = preparedConfigs.get(endpoint);
+  if (cached) return Promise.resolve(cached);
+  const pending = preparationPromises.get(endpoint);
+  if (pending) return pending;
+
+  const preparation = (async () => {
+    const response = await fetch(endpoint, { method: "GET", cache: "no-store" });
+    const json = (await response.json().catch(() => null)) as {
+      data?: { embeddedSignup?: MetaEmbeddedSignupPreparedConfig };
+      error?: string;
+      detail?: string;
+    } | null;
+    const config = json?.data?.embeddedSignup || null;
+    if (!response.ok || !config) {
+      throw buildMetaEmbeddedSignupError({
+        message: json?.detail || json?.error || `embedded_signup_prepare_failed_${response.status}`,
+        code: "embedded_signup_prepare_failed"
+      });
+    }
+    if (!config.ready || !config.appId || !config.configId) {
+      throw buildMetaEmbeddedSignupError({
+        message: `Embedded Signup no listo. Falta configurar: ${(config.missingConfig || []).join(", ")}.`,
+        code: "embedded_signup_not_ready"
+      });
+    }
+    await loadFacebookSdk(config.appId, config.graphVersion);
+    if (!window.FB) {
+      throw buildMetaEmbeddedSignupError({
+        message: "No pudimos cargar el SDK de Meta para abrir la conexión guiada.",
+        code: "meta_sdk_unavailable"
+      });
+    }
+    preparedConfigs.set(endpoint, config);
+    return config;
+  })().finally(() => preparationPromises.delete(endpoint));
+
+  preparationPromises.set(endpoint, preparation);
+  return preparation;
+}
+
+function createClientStateToken() {
+  const bytes = new Uint8Array(24);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+function waitForMetaCompletion(stateToken: string, expectedCompletionEvent: string) {
   let completeWithoutCode = () => {};
   let receiveCode = (_code: string) => {};
   let dispose = () => {};
@@ -401,7 +467,7 @@ function waitForMetaCompletion(stateToken: string) {
     // SDK authorization and Embedded Signup assets arrive independently.
     // Keep listening until both are available, regardless of their order.
     const finishWithAssets = () => {
-      if (callbackPayload?.code && metaEventPayload?.eventName?.startsWith("FINISH")) finish();
+      if (callbackPayload?.code && metaEventPayload?.eventName === expectedCompletionEvent) finish();
     };
     receiveCode = (code: string) => {
       if (done) return;
@@ -449,7 +515,12 @@ function waitForMetaCompletion(stateToken: string) {
       const eventName = normalized.eventName || "";
       const cancelled = eventName.includes("CANCEL");
       const failed = Boolean(normalized.errorCode) || eventName.includes("ERROR");
-      if (!metaEventPayload?.eventName?.startsWith("FINISH") || cancelled || failed) {
+      if (
+        normalized.eventName === expectedCompletionEvent ||
+        !metaEventPayload?.eventName?.startsWith("FINISH") ||
+        cancelled ||
+        failed
+      ) {
         metaEventPayload = normalized;
       }
       if (cancelled || failed) {
@@ -584,62 +655,56 @@ async function recoverEmbeddedSignupAttempt(input: {
   return json?.data || null;
 }
 
-export async function beginMetaWhatsAppConnection(
+export function beginMetaWhatsAppConnection(
   options: BeginMetaWhatsAppConnectionOptions = {}
 ): Promise<MetaEmbeddedSignupLaunchResult> {
   debugLog("click_received");
+  const bootstrapEndpoint = options.bootstrapEndpoint || "/api/app/integrations/whatsapp/embedded-signup";
+  const prepared = preparedConfigs.get(bootstrapEndpoint);
+  if (!prepared || !prepared.appId || !prepared.configId || !window.FB) {
+    return Promise.reject(buildMetaEmbeddedSignupError({
+      message: "La conexión con Meta todavía se está preparando. Intentá nuevamente en unos segundos.",
+      code: "embedded_signup_not_prepared"
+    }));
+  }
+
+  const requestedConnectionMode = options.requestedConnectionMode || "API_ONLY";
+  const expectedCompletionEvent =
+    requestedConnectionMode === "COEXISTENCE"
+      ? COEXISTENCE_COMPLETION_EVENT
+      : STANDARD_COMPLETION_EVENT;
+  const stateToken = createClientStateToken();
+
   options.onProgress?.("bootstrapping");
-  const bootstrap = await bootstrapEmbeddedSignup(options.bootstrapEndpoint);
-
-  if (!bootstrap.ready || !bootstrap.appId || !bootstrap.configId || !bootstrap.stateToken) {
-    const missingConfig = Array.isArray(bootstrap.missingConfig) ? bootstrap.missingConfig.join(", ") : "";
-    const message =
-      missingConfig || !bootstrap.stateToken
-        ? `Embedded Signup no listo. Falta configurar: ${[
-            ...(missingConfig ? [missingConfig] : []),
-            ...(!bootstrap.stateToken ? ["STATE_TOKEN"] : [])
-          ].join(", ")}.`
-        : bootstrap.message;
-    debugError("launch_blocked_before_sdk", message, {
-      ready: bootstrap.ready,
-      appIdPresent: Boolean(bootstrap.appId),
-      configIdPresent: Boolean(bootstrap.configId),
-      stateTokenPresent: Boolean(bootstrap.stateToken),
-      missingConfig: bootstrap.missingConfig || []
-    });
-    throw buildMetaEmbeddedSignupError({
-      message,
-      code: !bootstrap.ready ? "embedded_signup_not_ready" : "embedded_signup_state_token_missing"
-    });
-  }
-
-  options.onProgress?.("opening_meta");
-  debugLog("sdk_load_start", {
-    appIdPresent: Boolean(bootstrap.appId),
-    configIdPresent: Boolean(bootstrap.configId),
-    graphVersion: bootstrap.graphVersion
-  });
-  await loadFacebookSdk(bootstrap.appId, bootstrap.graphVersion);
-  debugLog("sdk_loaded", { fbAvailable: Boolean(window.FB) });
-
-  if (!window.FB) {
-    debugError("sdk_missing_fb", "meta_sdk_unavailable");
-    throw buildMetaEmbeddedSignupError({
-      message: "No pudimos cargar el SDK de Meta para abrir la conexión guiada.",
-      code: "meta_sdk_unavailable"
-    });
-  }
-
+  const bootstrapPromise = bootstrapEmbeddedSignup(
+    bootstrapEndpoint,
+    requestedConnectionMode,
+    stateToken
+  );
   options.onProgress?.("awaiting_callback");
-  const metaCompletion = waitForMetaCompletion(bootstrap.stateToken);
+  const metaCompletion = waitForMetaCompletion(stateToken, expectedCompletionEvent);
   const completionPromise = metaCompletion.promise;
 
   try {
     debugLog("launch_start", {
-      redirectUri: bootstrap.redirectUri,
-      stateTokenPresent: Boolean(bootstrap.stateToken),
-      configIdPresent: Boolean(bootstrap.configId)
+      redirectUri: prepared.redirectUri,
+      stateTokenPresent: true,
+      configIdPresent: true,
+      requestedConnectionMode
     });
+    const extras: Record<string, unknown> = {
+      feature: "whatsapp_embedded_signup",
+      version: "v4",
+      sessionInfoVersion: 3,
+      redirect_uri: prepared.redirectUri
+    };
+    if (requestedConnectionMode === "COEXISTENCE") {
+      extras.featureType = "whatsapp_business_app_onboarding";
+    }
+
+    // There is deliberately no await between this function entry and FB.login.
+    // The SDK/config are prepared while the CTA is idle, and session creation
+    // runs in parallel so the browser keeps the user's activation for the popup.
     window.FB.login(
       (response) => {
         const code = response?.authResponse?.code || null;
@@ -654,145 +719,177 @@ export async function beginMetaWhatsAppConnection(
         }
       },
       {
-        config_id: bootstrap.configId,
+        config_id: prepared.configId,
         response_type: "code",
         override_default_response_type: true,
-        extras: {
-          feature: "whatsapp_embedded_signup",
-          version: "v4",
-          sessionInfoVersion: 3,
-          redirect_uri: bootstrap.redirectUri
-        },
-        state: bootstrap.stateToken
+        extras,
+        state: stateToken
       }
     );
   } catch (error) {
     metaCompletion.dispose();
     debugError("launch_fail", error, {
-      redirectUri: bootstrap.redirectUri,
-      configIdPresent: Boolean(bootstrap.configId)
+      redirectUri: prepared.redirectUri,
+      configIdPresent: true
     });
-    throw buildMetaEmbeddedSignupError({
-      message: error instanceof Error ? error.message : "meta_embedded_signup_launch_failed",
-      code: "meta_embedded_signup_launch_failed"
-    });
+    return bootstrapPromise
+      .then(async (bootstrap) => {
+        try {
+          await finalizeEmbeddedSignup({
+            finalizeEndpoint: options.finalizeEndpoint,
+            stateToken: bootstrap.stateToken || stateToken,
+            code: null,
+            redirectUri: bootstrap.redirectUri
+          });
+        } catch (cleanupError) {
+          logCancellationCleanupOutcome(cleanupError);
+        }
+        throw buildMetaEmbeddedSignupError({
+          message: error instanceof Error ? error.message : "meta_embedded_signup_launch_failed",
+          code: "meta_embedded_signup_launch_failed"
+        });
+      });
   }
 
-  let callback: MetaCallbackPayload;
-  let metaEvent: MetaEmbeddedEvent | null;
-  try {
-    ({ callback, metaEvent } = await completionPromise);
-  } catch (error) {
-    let recoveredError: MetaEmbeddedSignupError | null = null;
-    if (options.recoverEndpoint) {
-      try {
-        const recovered = await recoverEmbeddedSignupAttempt({
-          recoverEndpoint: options.recoverEndpoint,
-          reason: "popup_closed_without_callback"
-        });
-        const recoveredMessage = sanitizeMessage(recovered?.session?.errorMessage);
-        const recoveredCode = sanitizeMessage(recovered?.session?.errorCode);
-        if (recoveredMessage || recoveredCode) {
-          recoveredError = buildMetaEmbeddedSignupError({
-            message: recoveredMessage || (error instanceof Error ? error.message : "meta_embedded_signup_timeout"),
-            code: recoveredCode || (error instanceof Error ? error.message : "meta_embedded_signup_timeout")
+  return (async () => {
+    let bootstrap: MetaEmbeddedSignupBootstrap;
+    try {
+      bootstrap = await bootstrapPromise;
+    } catch (error) {
+      metaCompletion.dispose();
+      throw buildMetaEmbeddedSignupError({
+        message: error instanceof Error ? error.message : "embedded_signup_bootstrap_failed",
+        code: "embedded_signup_bootstrap_failed"
+      });
+    }
+
+    if (
+      !bootstrap.ready ||
+      !bootstrap.stateToken ||
+      bootstrap.stateToken !== stateToken ||
+      bootstrap.requestedConnectionMode !== requestedConnectionMode
+    ) {
+      metaCompletion.dispose();
+      throw buildMetaEmbeddedSignupError({
+        message: "El servidor no autorizó el modo solicitado para esta sesión de Meta.",
+        code: "embedded_signup_session_authorization_mismatch"
+      });
+    }
+
+    let callback: MetaCallbackPayload;
+    let metaEvent: MetaEmbeddedEvent | null;
+    try {
+      ({ callback, metaEvent } = await completionPromise);
+    } catch (error) {
+      let recoveredError: MetaEmbeddedSignupError | null = null;
+      if (options.recoverEndpoint) {
+        try {
+          const recovered = await recoverEmbeddedSignupAttempt({
+            recoverEndpoint: options.recoverEndpoint,
+            reason: "popup_closed_without_callback"
           });
+          const recoveredMessage = sanitizeMessage(recovered?.session?.errorMessage);
+          const recoveredCode = sanitizeMessage(recovered?.session?.errorCode);
+          if (recoveredMessage || recoveredCode) {
+            recoveredError = buildMetaEmbeddedSignupError({
+              message: recoveredMessage || (error instanceof Error ? error.message : "meta_embedded_signup_timeout"),
+              code: recoveredCode || (error instanceof Error ? error.message : "meta_embedded_signup_timeout")
+            });
+          }
+        } catch (recoveryError) {
+          debugError("recovery_fail", recoveryError);
         }
-      } catch (recoveryError) {
-        debugError("recovery_fail", recoveryError);
+      } else {
+        try {
+          await finalizeEmbeddedSignup({
+            finalizeEndpoint: options.finalizeEndpoint,
+            stateToken,
+            code: null,
+            redirectUri: bootstrap.redirectUri
+          });
+        } catch (cleanupError) {
+          logCancellationCleanupOutcome(cleanupError);
+        }
       }
-    } else {
+      if (recoveredError) throw recoveredError;
+      throw buildMetaEmbeddedSignupError({
+        message: error instanceof Error ? error.message : "meta_embedded_signup_timeout",
+        code: error instanceof Error ? error.message : "meta_embedded_signup_timeout"
+      });
+    }
+
+    const callbackCode = callback.code || null;
+    const callbackErrorCode = callback.error || metaEvent?.errorCode || null;
+    if (callback.error || metaEvent?.errorCode) {
+      const callbackError = buildMetaEmbeddedSignupError({
+        message: callback.errorDescription || metaEvent?.errorMessage || callback.error || callbackErrorCode,
+        code: callbackErrorCode
+      });
+      const wasCancelled = callbackError.kind === "cancelled";
       try {
         await finalizeEmbeddedSignup({
           finalizeEndpoint: options.finalizeEndpoint,
-          stateToken: bootstrap.stateToken,
+          stateToken,
+          code: wasCancelled ? null : callbackCode,
+          redirectUri: bootstrap.redirectUri,
+          metaPayload: metaEvent?.raw || null,
+          error: wasCancelled ? null : callbackErrorCode,
+          errorDescription: wasCancelled ? null : callback.errorDescription || metaEvent?.errorMessage || null
+        });
+      } catch (cleanupError) {
+        if (wasCancelled) logCancellationCleanupOutcome(cleanupError);
+        else debugError("meta_event_cleanup_fail", cleanupError);
+      }
+      throw callbackError;
+    }
+
+    if (!callbackCode) {
+      try {
+        await finalizeEmbeddedSignup({
+          finalizeEndpoint: options.finalizeEndpoint,
+          stateToken,
           code: null,
-          redirectUri: bootstrap.redirectUri
+          redirectUri: bootstrap.redirectUri,
+          metaPayload: metaEvent?.raw || null
         });
       } catch (cleanupError) {
         logCancellationCleanupOutcome(cleanupError);
       }
+      throw buildMetaEmbeddedSignupError({
+        message: "Cancelaste la conexión con Meta. Puedes reintentarlo.",
+        code: "meta_embedded_signup_cancelled"
+      });
     }
-    if (recoveredError) {
-      throw recoveredError;
-    }
-    throw buildMetaEmbeddedSignupError({
-      message: error instanceof Error ? error.message : "meta_embedded_signup_timeout",
-      code: error instanceof Error ? error.message : "meta_embedded_signup_timeout"
-    });
-  }
-  const callbackCode = callback.code || null;
 
-  const callbackErrorCode = callback.error || metaEvent?.errorCode || null;
-  if (callback.error || metaEvent?.errorCode) {
-    const callbackError = buildMetaEmbeddedSignupError({
-      message: callback.errorDescription || metaEvent?.errorMessage || callback.error || callbackErrorCode,
-      code: callbackErrorCode
-    });
-    const wasCancelled = callbackError.kind === "cancelled";
+    let finalized;
     try {
-      await finalizeEmbeddedSignup({
+      options.onProgress?.("configuring_channel");
+      finalized = await finalizeEmbeddedSignup({
         finalizeEndpoint: options.finalizeEndpoint,
-        stateToken: bootstrap.stateToken,
-        code: wasCancelled ? null : callbackCode,
+        stateToken,
+        code: callbackCode,
         redirectUri: bootstrap.redirectUri,
         metaPayload: metaEvent?.raw || null,
-        error: wasCancelled ? null : callbackErrorCode,
-        errorDescription: wasCancelled ? null : callback.errorDescription || metaEvent?.errorMessage || null
+        error: metaEvent?.errorCode || null,
+        errorDescription: metaEvent?.errorMessage || null
       });
-    } catch (cleanupError) {
-      if (wasCancelled) logCancellationCleanupOutcome(cleanupError);
-      else debugError("meta_event_cleanup_fail", cleanupError);
-    }
-    throw callbackError;
-  }
-
-  if (!callbackCode) {
-    try {
-      await finalizeEmbeddedSignup({
-        finalizeEndpoint: options.finalizeEndpoint,
-        stateToken: bootstrap.stateToken,
-        code: null,
-        redirectUri: bootstrap.redirectUri,
-        metaPayload: metaEvent?.raw || null
+    } catch (error) {
+      throw buildMetaEmbeddedSignupError({
+        message: error instanceof Error ? error.message : "embedded_signup_finalize_failed",
+        code: "embedded_signup_finalize_failed"
       });
-    } catch (cleanupError) {
-      logCancellationCleanupOutcome(cleanupError);
     }
-    throw buildMetaEmbeddedSignupError({
-      message: "Cancelaste la conexión con Meta. Puedes reintentarlo.",
-      code: "meta_embedded_signup_cancelled"
-    });
-  }
 
-  let finalized;
-  try {
-    options.onProgress?.("configuring_channel");
-    finalized = await finalizeEmbeddedSignup({
-      finalizeEndpoint: options.finalizeEndpoint,
-      stateToken: bootstrap.stateToken,
-      code: callbackCode,
-      redirectUri: bootstrap.redirectUri,
-      metaPayload: metaEvent?.raw || null,
-      error: metaEvent?.errorCode || null,
-      errorDescription: metaEvent?.errorMessage || null
-    });
-  } catch (error) {
-    throw buildMetaEmbeddedSignupError({
-      message: error instanceof Error ? error.message : "embedded_signup_finalize_failed",
-      code: "embedded_signup_finalize_failed"
-    });
-  }
-
-  options.onProgress?.("completed");
-  return {
-    state: finalized.status,
-    message:
-      finalized.status === "connected"
-        ? "Tu canal de WhatsApp Business ya quedo asociado a este workspace."
-        : "La conexion quedo pendiente de una validacion final en Meta.",
-    channelId: finalized.channel?.id || null,
-    phoneNumberId: finalized.channel?.phoneNumberId || null,
-    displayPhoneNumber: finalized.channel?.displayPhoneNumber || null
-  };
+    options.onProgress?.("completed");
+    return {
+      state: finalized.status,
+      message:
+        finalized.status === "connected"
+          ? "Tu canal de WhatsApp Business ya quedó asociado a este workspace."
+          : "La conexión quedó pendiente de una validación final en Meta.",
+      channelId: finalized.channel?.id || null,
+      phoneNumberId: finalized.channel?.phoneNumberId || null,
+      displayPhoneNumber: finalized.channel?.displayPhoneNumber || null
+    };
+  })();
 }

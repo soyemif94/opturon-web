@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Instagram, Loader2, MessageCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
-import { beginMetaWhatsAppConnection } from "@/lib/meta-whatsapp-signup";
+import {
+  beginMetaWhatsAppConnection,
+  prepareMetaWhatsAppConnection,
+  type WhatsAppConnectionMode
+} from "@/lib/meta-whatsapp-signup";
 import { getTrackedWhatsAppLink } from "@/lib/whatsapp";
 
 export type ClientInstagramAssetSelection = {
@@ -52,6 +56,7 @@ export function ClientIntegrationsExperience({
 }) {
   const router = useRouter();
   const [whatsappSignupBusy, setWhatsAppSignupBusy] = useState(false);
+  const [whatsappSignupReady, setWhatsAppSignupReady] = useState(false);
   const [whatsappSignupError, setWhatsAppSignupError] = useState<string | null>(null);
   const whatsappState = resolveWhatsAppState(whatsapp);
   const instagramState = resolveInstagramState({
@@ -64,13 +69,36 @@ export function ClientIntegrationsExperience({
   const connectedNumber = formatCustomerPhone(whatsapp.connectedNumber || null);
   const instagramUsername = formatInstagramUsername(instagramStatus?.channel?.instagramUsername || null);
 
-  async function handleConnectWhatsApp() {
-    if (whatsappSignupBusy) return;
+  function prepareWhatsAppSignup() {
+    setWhatsAppSignupError(null);
+    return prepareMetaWhatsAppConnection()
+      .then(() => setWhatsAppSignupReady(true))
+      .catch((error) => {
+        setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo preparar la conexión con Meta.");
+      });
+  }
+
+  useEffect(() => {
+    if (whatsappState === "connected" || whatsappState === "connecting") return;
+    let active = true;
+    void prepareMetaWhatsAppConnection().then(
+      () => { if (active) setWhatsAppSignupReady(true); },
+      (error) => {
+        if (active) setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo preparar la conexión con Meta.");
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [whatsappState]);
+
+  async function handleConnectWhatsApp(requestedConnectionMode: WhatsAppConnectionMode) {
+    if (whatsappSignupBusy || !whatsappSignupReady) return;
 
     setWhatsAppSignupBusy(true);
     setWhatsAppSignupError(null);
     try {
-      await beginMetaWhatsAppConnection();
+      await beginMetaWhatsAppConnection({ requestedConnectionMode });
     } catch (error) {
       setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo iniciar la conexión de WhatsApp.");
     } finally {
@@ -105,14 +133,32 @@ export function ClientIntegrationsExperience({
           ) : (
             <div className="flex w-full flex-col gap-2 sm:w-auto">
               {whatsappSignupError ? <p role="alert" className="text-sm text-destructive">{whatsappSignupError}</p> : null}
-              <Button
-                type="button"
-                className="w-full rounded-xl sm:w-auto"
-                disabled={whatsappSignupBusy}
-                onClick={handleConnectWhatsApp}
-              >
-                {whatsappSignupBusy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Conectando</> : "Conectar WhatsApp"}
-              </Button>
+              {whatsappSignupError && !whatsappSignupReady ? (
+                <Button type="button" variant="secondary" onClick={() => void prepareWhatsAppSignup()}>
+                  Reintentar preparación
+                </Button>
+              ) : null}
+              <div className="flex w-full flex-col gap-2 sm:w-auto">
+                <Button
+                  type="button"
+                  className="w-full rounded-xl sm:w-auto"
+                  disabled={whatsappSignupBusy || !whatsappSignupReady}
+                  onClick={() => void handleConnectWhatsApp("API_ONLY")}
+                >
+                  {whatsappSignupBusy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Conectando</> : "Conectar WhatsApp"}
+                </Button>
+                {whatsapp.coexistencePilotEnabled ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full rounded-xl sm:w-auto"
+                    disabled={whatsappSignupBusy || !whatsappSignupReady}
+                    onClick={() => void handleConnectWhatsApp("COEXISTENCE")}
+                  >
+                    Ya uso WhatsApp Business
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )
         }

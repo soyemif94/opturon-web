@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { beginMetaWhatsAppConnection, getMetaEmbeddedSignupErrorDetails } from "../../lib/meta-whatsapp-signup.ts";
+import {
+  beginMetaWhatsAppConnection,
+  getMetaEmbeddedSignupErrorDetails,
+  prepareMetaWhatsAppConnection,
+  type WhatsAppConnectionMode
+} from "../../lib/meta-whatsapp-signup.ts";
 
 type LoginResponse = { status?: string; authResponse?: { code?: string | null } | null };
 type LoginOptions = Record<string, unknown> & { extras?: Record<string, unknown> };
@@ -30,6 +35,7 @@ async function createSignup() {
   const finalizations: Record<string, unknown>[] = [];
   const recoveries: Record<string, unknown>[] = [];
   const progress: string[] = [];
+  const bootstraps: Record<string, unknown>[] = [];
   let loginCallback: ((response: LoginResponse) => void) | undefined;
   let loginOptions: LoginOptions | undefined;
   let loginReady: () => void = () => {};
@@ -46,11 +52,19 @@ async function createSignup() {
     const url = String(input);
     const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
     if (url === "/bootstrap") {
+      if (init?.method === "GET") {
+        return response({ data: { embeddedSignup: {
+          ready: true, appId: "app-test", configId: "config-test", missingConfig: [],
+          graphVersion: "v25.0", redirectUri: `${origin}/callback`, callbackPath: "/callback"
+        } } });
+      }
+      bootstraps.push(body);
       return response({ data: {
         tenantId: "tenant-test", clinicId: "clinic-test", state: "launching", ready: true,
         provider: "meta_embedded_signup", appId: "app-test", configId: "config-test",
         graphVersion: "v25.0", redirectUri: `${origin}/callback`, callbackPath: "/callback",
-        stateToken: "state-test", sessionId: "session-test", message: "ready"
+        stateToken: body.stateToken, requestedConnectionMode: body.requestedConnectionMode,
+        sessionId: "session-test", message: "ready"
       } });
     }
     if (url === "/finalize") {
@@ -69,6 +83,7 @@ async function createSignup() {
   globalThis.clearTimeout = ((id: number) => { timers.delete(Number(id)); }) as typeof clearTimeout;
   globalThis.window = {
     location: { origin },
+    crypto: globalThis.crypto,
     FB: {
       init: () => {},
       login: (callback: (response: LoginResponse) => void, options?: LoginOptions) => {
@@ -83,10 +98,13 @@ async function createSignup() {
     removeEventListener: (_type: string, listener: MessageListener) => { listeners.delete(listener); }
   } as unknown as Window & typeof globalThis;
 
-  const launch = (recover = false) => {
+  await prepareMetaWhatsAppConnection("/bootstrap");
+
+  const launch = (recover = false, requestedConnectionMode: WhatsAppConnectionMode = "API_ONLY") => {
     settled = false;
     return beginMetaWhatsAppConnection({
       bootstrapEndpoint: "/bootstrap", finalizeEndpoint: "/finalize",
+      requestedConnectionMode,
       ...(recover ? { recoverEndpoint: "/recover" } : {}),
       onProgress: (stage) => { progress.push(stage); }
     }).then(
@@ -101,9 +119,10 @@ async function createSignup() {
     for (const [id, callback] of [...timers]) { timers.delete(id); callback(); }
   };
   return {
-    finalizations, recoveries, progress, listeners, timers,
+    finalizations, recoveries, bootstraps, progress, listeners, timers,
     isSettled: () => settled,
     loginOptions: () => loginOptions,
+    stateToken: () => String(bootstraps.at(-1)?.stateToken || ""),
     login: (payload: LoginResponse = { authResponse: { code: "oauth-test-code" } }) => loginCallback!(payload),
     message: (data: unknown, source = "https://www.facebook.com") => {
       for (const listener of [...listeners]) listener({ origin: source, data } as MessageEvent);
@@ -111,7 +130,9 @@ async function createSignup() {
     flush, expire, outcome: () => outcome,
     pendingBackend: () => { finalizeStatus = "pending_meta"; },
     failNextLogin: () => { throwOnLogin = true; },
-    retry: async (recover = false) => { outcome = launch(recover); await flush(); },
+    retry: async (recover = false, requestedConnectionMode: WhatsAppConnectionMode = "API_ONLY") => {
+      outcome = launch(recover, requestedConnectionMode); await flush();
+    },
     restore: async () => {
       expire();
       await outcome;
@@ -128,8 +149,33 @@ test("standard launcher selects Embedded Signup v4 without enabling coexistence"
     const extras = options?.extras;
     assert.equal(extras?.version, "v4");
     assert.equal(extras?.featureType, undefined);
+    assert.equal(h.bootstraps[0].requestedConnectionMode, "API_ONLY");
     h.login();
     h.message(finishEvent);
+    assert.equal((await h.outcome()).value?.state, "connected");
+  });
+});
+
+test("coexistence launcher uses the V4 Business App contract and its completion event", async () => {
+  await withSignup(async (h) => {
+    h.login();
+    h.message(finishEvent);
+    await h.outcome();
+    await h.retry(false, "COEXISTENCE");
+    const extras = h.loginOptions()?.extras;
+    assert.equal(extras?.version, "v4");
+    assert.equal(extras?.sessionInfoVersion, 3);
+    assert.equal(extras?.featureType, "whatsapp_business_app_onboarding");
+    assert.equal(h.bootstraps.at(-1)?.requestedConnectionMode, "COEXISTENCE");
+    h.login();
+    h.message(finishEvent);
+    await h.flush();
+    assert.equal(h.isSettled(), false, "standard FINISH cannot complete a coexistence session");
+    h.message({
+      type: "WA_EMBEDDED_SIGNUP",
+      event: "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+      data: { waba_id: "waba-test" }
+    });
     assert.equal((await h.outcome()).value?.state, "connected");
   });
 });
@@ -148,14 +194,14 @@ for (const order of ["FINISH before CODE", "CODE before FINISH"] as const) {
       await h.flush();
       assert.equal(h.finalizations.length, 1, "FINISH + SDK code must reach the backend callback without a redirect message");
       assert.equal(h.finalizations[0].code, "oauth-test-code");
-      assert.equal(h.finalizations[0].stateToken, "state-test");
+      assert.equal(h.finalizations[0].stateToken, h.stateToken());
       assert.deepEqual(h.finalizations[0].metaPayload, finishEvent);
       assert.equal((await h.outcome()).value?.state, "connected");
       assert.equal(h.listeners.size, 0);
       assert.equal(h.timers.size, 0);
       h.message(finishEvent);
       h.login();
-      h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: "state-test", code: "duplicate" }, origin);
+      h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: h.stateToken(), code: "duplicate" }, origin);
       h.expire();
       await h.flush();
       assert.equal(h.finalizations.length, 1);
@@ -248,7 +294,7 @@ test("existing redirect callback and state correlation still work", async () => 
     h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: "another-state", code: "wrong" }, origin);
     await h.flush();
     assert.equal(h.finalizations.length, 0);
-    h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: "state-test", code: "redirect-code" }, origin);
+    h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: h.stateToken(), code: "redirect-code" }, origin);
     assert.equal((await h.outcome()).value?.state, "connected");
     assert.equal(h.finalizations[0].code, "redirect-code");
   });
@@ -257,7 +303,7 @@ test("existing redirect callback and state correlation still work", async () => 
 test("redirect without code retains code already delivered by SDK", async () => {
   await withSignup(async (h) => {
     h.login();
-    h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: "state-test" }, origin);
+    h.message({ type: "OPTURON_META_EMBEDDED_SIGNUP_CALLBACK", stateToken: h.stateToken() }, origin);
     assert.equal((await h.outcome()).value?.state, "connected");
     assert.equal(h.finalizations[0].code, "oauth-test-code");
   });
@@ -284,6 +330,6 @@ test("SDK launch failure removes the listener and timeout from the attempt", asy
     assert.equal(h.timers.size, 0);
     h.expire();
     await h.flush();
-    assert.equal(h.finalizations.length, 1);
+    assert.equal(h.finalizations.length, 2);
   });
 });
