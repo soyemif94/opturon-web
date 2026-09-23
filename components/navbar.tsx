@@ -2,79 +2,57 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Cpu, Menu, Sparkles, X } from "lucide-react";
+import { ArrowRight, Menu, Orbit, X } from "lucide-react";
 
 const links = [
-  { href: "/", label: "Inicio" },
-  { href: "/demo", label: "Demo" },
-  { href: "/servicios", label: "Servicios" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/casos", label: "Casos" },
-  { href: "/blog", label: "Blog" },
-  { href: "/quienes-somos", label: "Quienes Somos" },
-  { href: "/contacto", label: "Contacto" },
-  { href: "/app", label: "Ingresar" }
+  { href: "/#producto", label: "Producto" },
+  { href: "/#distribuidoras", label: "Distribuidoras" },
+  { href: "/#automatizacion", label: "Automatización" },
+  { href: "/demo", label: "Demo" }
 ];
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#080d14]/88 backdrop-blur-xl">
       <div className="container-opt">
-        <div className="rounded-2xl border border-white/10 bg-bg/78 px-4 shadow-[0_14px_42px_rgba(0,0,0,0.2)] backdrop-blur-xl md:px-5">
-          <div className="flex h-[4.25rem] items-center justify-between md:h-[4.5rem]">
-            <Link href="/" className="inline-flex items-center gap-2.5 font-semibold tracking-tight">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-brand/40 bg-brand/20 shadow-brand">
-                <Cpu className="h-4 w-4 text-brandBright" />
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                Opturon
-                <Sparkles className="h-3.5 w-3.5 text-brandBright" />
-              </span>
+        <div className="flex h-[4.5rem] items-center justify-between gap-5">
+          <Link href="/" className="inline-flex items-center gap-2.5 font-semibold tracking-[-0.02em] text-white" aria-label="Opturon, inicio">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 text-white shadow-[0_10px_28px_rgba(249,115,22,0.22)]">
+              <Orbit className="h-4.5 w-4.5" />
+            </span>
+            <span className="text-lg">Opturon</span>
+          </Link>
+
+          <nav className="hidden items-center gap-1 text-sm text-slate-400 lg:flex" aria-label="Navegación principal">
+            {links.map((item) => (
+              <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="hidden items-center gap-2 sm:flex">
+            <Link href="/app" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">Ingresar</Link>
+            <Link href="/contacto" className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+              Solicitar demo <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-            <nav className="hidden items-center gap-2 text-sm text-muted md:flex">
-              {links.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-lg px-3 py-2 transition-colors duration-200 hover:bg-white/5 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandBright"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            <button
-              type="button"
-              onClick={() => setMobileOpen((prev) => !prev)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-text md:hidden"
-              aria-label={mobileOpen ? "Cerrar menu" : "Abrir menu"}
-            >
-              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
           </div>
-          {mobileOpen ? (
-            <div className="border-t border-white/10 pb-4 pt-3 md:hidden">
-              <nav className="space-y-2">
-                {links.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-text"
-                  >
-                    <span>{item.label}</span>
-                    {item.href === "/app" ? (
-                      <span className="rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[11px] text-brandBright">
-                        Software
-                      </span>
-                    ) : null}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          ) : null}
+
+          <button type="button" onClick={() => setMobileOpen((open) => !open)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white sm:hidden" aria-expanded={mobileOpen} aria-controls="mobile-navigation" aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}>
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
+        {mobileOpen ? (
+          <nav id="mobile-navigation" className="space-y-1 border-t border-white/10 py-4 sm:hidden" aria-label="Navegación móvil">
+            {links.map((item) => (
+              <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className="block rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/5">{item.label}</Link>
+            ))}
+            <Link href="/app" onClick={() => setMobileOpen(false)} className="block rounded-xl px-3 py-3 text-sm text-slate-200">Ingresar</Link>
+            <Link href="/contacto" onClick={() => setMobileOpen(false)} className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white">Solicitar una demo</Link>
+          </nav>
+        ) : null}
       </div>
     </header>
   );
