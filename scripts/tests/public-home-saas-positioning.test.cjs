@@ -51,6 +51,7 @@ test("shows the real Opturon inbox as the primary product proof", () => {
 
 test("uses the same real inbox in the demo journey", () => {
   assert.match(demo, /opturon-inbox-client-portal\.png/);
+  assert.doesNotMatch(demo, /variant="hero"/);
   assert.doesNotMatch(demo, /variant="inbox"/);
 });
 
@@ -58,4 +59,10 @@ test("continues the product story from conversation to a real order", () => {
   assert.match(home, /De la conversación a la operación/);
   assert.match(home, /opturon-orders-create-order\.png/);
   assert.match(home, /Cliente y responsable.*Catálogo y stock.*Total y cobro/s);
+});
+
+test("extends the real product journey with the connected catalog", () => {
+  assert.match(home, /Trabajá con un catálogo real, conectado a la operación/);
+  assert.match(home, /opturon-catalog-client-portal\.png/);
+  assert.match(home, /Productos reales.*Stock visible.*Búsqueda operativa.*Gestión centralizada/s);
 });

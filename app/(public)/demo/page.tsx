@@ -183,8 +183,24 @@ export default function DemoPage() {
           <div className="relative">
             <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
             <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
-            <div className="relative z-10">
-              <HomeProductMockup variant="hero" />
+            <div className="relative z-10 overflow-hidden rounded-[1.6rem] border border-white/15 bg-[#0d1623] p-2 shadow-[0_28px_90px_rgba(0,0,0,0.5)] sm:p-2.5">
+              <div className="flex h-10 items-center justify-between border-b border-white/10 px-3 sm:h-11 sm:px-4">
+                <div className="flex gap-1.5" aria-hidden="true">
+                  <span className="h-2.5 w-2.5 rounded-full bg-brandBright" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                </div>
+                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted sm:text-[10px]">Inbox · Producto real</span>
+              </div>
+              <Image
+                src="/product/opturon-inbox-client-portal.png"
+                width={1672}
+                height={939}
+                priority
+                sizes="(max-width: 639px) 94vw, (max-width: 1023px) 88vw, 620px"
+                alt="Inbox real de Opturon con conversaciones, prioridad, contexto comercial y seguimiento"
+                className="h-[390px] w-full rounded-b-[1.15rem] object-cover object-[48%_center] sm:h-auto sm:object-contain"
+              />
             </div>
           </div>
         </div>
