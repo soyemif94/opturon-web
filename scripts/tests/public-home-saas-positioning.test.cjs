@@ -66,3 +66,10 @@ test("extends the real product journey with the connected catalog", () => {
   assert.match(home, /opturon-catalog-client-portal\.png/);
   assert.match(home, /Productos reales.*Stock visible.*Búsqueda operativa.*Gestión centralizada/s);
 });
+
+test("closes the real product journey with commercial metrics", () => {
+  assert.match(home, /Convertí la actividad del canal en visibilidad comercial/);
+  assert.match(home, /opturon-metrics-client-portal\.png/);
+  assert.match(home, /Canal en tiempo real.*Trabajo humano.*Automatización visible.*Rendimiento operativo/s);
+  assert.match(home, /opturon-inbox-client-portal.*opturon-orders-create-order.*opturon-catalog-client-portal.*opturon-metrics-client-portal/s);
+});

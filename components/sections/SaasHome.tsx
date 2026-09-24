@@ -258,6 +258,44 @@ export function SaasHome() {
             </figure>
           </div>
 
+          <div className="mt-6 grid gap-8 rounded-[2rem] border border-white/10 bg-white/[0.025] p-4 sm:p-6 lg:grid-cols-[0.32fr_0.68fr] lg:items-center lg:gap-10 lg:p-8">
+            <div className="px-2 py-3 sm:px-3 lg:py-0">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/25 bg-orange-400/[0.1] text-sm font-semibold text-orange-300">04</span>
+              <p className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-orange-300">Métricas para decidir</p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Convertí la actividad del canal en visibilidad comercial.</h3>
+              <p className="mt-4 leading-7 text-slate-400">Leé conversaciones, cobertura automatizada, intervención humana y tendencias del canal para seguir el rendimiento y decidir con contexto operativo.</p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {['Canal en tiempo real', 'Trabajo humano', 'Automatización visible', 'Rendimiento operativo'].map((item) => (
+                  <span key={item} className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-slate-300">{item}</span>
+                ))}
+              </div>
+            </div>
+
+            <figure className="min-w-0">
+              <div className="overflow-hidden rounded-[1.25rem] border border-white/15 bg-[#0d1623] p-1.5 shadow-[0_28px_90px_rgba(0,0,0,0.5)] sm:p-2">
+                <div className="flex h-9 items-center justify-between border-b border-white/10 px-3 sm:h-10">
+                  <div className="flex gap-1.5" aria-hidden="true">
+                    <span className="h-2 w-2 rounded-full bg-orange-400" />
+                    <span className="h-2 w-2 rounded-full bg-white/20" />
+                    <span className="h-2 w-2 rounded-full bg-white/20" />
+                  </div>
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-[10px]">Métricas · Producto real</span>
+                </div>
+                <div className="overflow-hidden rounded-b-[0.85rem] sm:rounded-b-[1rem]">
+                  <Image
+                    src="/product/opturon-metrics-client-portal.png"
+                    width={1672}
+                    height={941}
+                    sizes="(max-width: 639px) 100vw, (max-width: 1023px) 92vw, 780px"
+                    alt="Métricas reales de Opturon con conversaciones, respuestas humanas, automatización, tendencias y visibilidad comercial"
+                    className="h-[320px] w-full object-cover object-[58%_center] sm:h-auto sm:object-contain"
+                  />
+                </div>
+              </div>
+              <figcaption className="mt-3 text-center text-xs text-slate-500">Canal, equipo y automatización reunidos en una lectura operativa</figcaption>
+            </figure>
+          </div>
+
           <div className="mt-12 grid gap-4 md:grid-cols-2">
             {capabilities.map((item) => {
               const Icon = item.icon;
