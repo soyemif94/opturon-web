@@ -14,7 +14,6 @@ import {
   Clock3,
   Flame,
   Handshake,
-  LayoutPanelTop,
   LoaderCircle,
   Search,
   Sparkles,
@@ -30,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
-import { formatDateTimeLabel, formatMoney, relativeDateLabel, titleCaseLabel } from "@/lib/billing";
+import { formatMoney, relativeDateLabel, titleCaseLabel } from "@/lib/billing";
 import { cn } from "@/lib/ui/cn";
 
 const PRIMARY_OPPORTUNITY_LIMIT = 20;
@@ -45,6 +44,7 @@ type SalesHubProps = {
 type SalesListMode = "main" | "archive";
 type SalesOpportunityFilter = "all" | "closed" | "open" | "active_conversations";
 type PipelineLane = "new" | "contacted" | "negotiation" | "proposal" | "closed";
+type PipelineBoardColumn = "incoming" | "follow_up" | "closing";
 type OpportunityPriority = "hot" | "attention" | "follow_up" | "cold" | "closed";
 type SalesVisibility = "active" | "archived";
 type SalesSnapshot = {
@@ -108,6 +108,40 @@ const PIPELINE_LANES: Array<{
   }
 ];
 
+const PIPELINE_BOARD_COLUMNS: Array<{
+  key: PipelineBoardColumn;
+  label: string;
+  helper: string;
+  lanes: PipelineLane[];
+  accent: string;
+  badge: string;
+}> = [
+  {
+    key: "incoming",
+    label: "Entrantes",
+    helper: "Consultas y oportunidades nuevas",
+    lanes: ["new"],
+    accent: "bg-orange-400",
+    badge: "border-orange-400/30 bg-orange-500/12 text-orange-100"
+  },
+  {
+    key: "follow_up",
+    label: "Seguimiento",
+    helper: "Contactos y negociaciones activas",
+    lanes: ["contacted", "negotiation"],
+    accent: "bg-amber-300",
+    badge: "border-amber-300/30 bg-amber-400/10 text-amber-100"
+  },
+  {
+    key: "closing",
+    label: "Cierre",
+    helper: "Propuestas y operaciones cerradas",
+    lanes: ["proposal", "closed"],
+    accent: "bg-violet-400",
+    badge: "border-violet-400/30 bg-violet-500/12 text-violet-100"
+  }
+];
+
 const PRIORITY_META: Record<
   OpportunityPriority,
   {
@@ -149,7 +183,6 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   const searchParams = useSearchParams();
   const [listMode, setListMode] = useState<SalesListMode>("main");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeLane, setActiveLane] = useState<PipelineLane | "all">("all");
   const [activeOpportunities, setActiveOpportunities] = useState<PortalSalesOpportunity[]>(opportunities);
   const [archivedOpportunities, setArchivedOpportunities] = useState<PortalSalesOpportunity[] | null>(null);
   const [summaryState, setSummaryState] = useState(summary);
@@ -208,19 +241,14 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
     });
   }, [normalizedSearch, stageFilteredOpportunities]);
 
-  const laneFilteredOpportunities = useMemo(() => {
-    if (activeLane === "all") return searchedOpportunities;
-    return searchedOpportunities.filter((item) => item.lane === activeLane);
-  }, [activeLane, searchedOpportunities]);
-
   const visibleOpportunities =
     activeFilter === "all" && listMode === "main"
-      ? laneFilteredOpportunities.slice(0, PRIMARY_OPPORTUNITY_LIMIT)
-      : laneFilteredOpportunities;
+      ? searchedOpportunities.slice(0, PRIMARY_OPPORTUNITY_LIMIT)
+      : searchedOpportunities;
 
   const overflowCount =
     listMode === "main" && activeFilter === "all"
-      ? Math.max(laneFilteredOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0)
+      ? Math.max(searchedOpportunities.length - PRIMARY_OPPORTUNITY_LIMIT, 0)
       : 0;
 
   const actionableVisibleOpportunities = useMemo(
@@ -240,17 +268,20 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
     actionableVisibleOpportunities.length > 0 &&
     actionableVisibleOpportunities.every((item) => actionableSelectedIds.includes(item.id));
 
-  const laneSummaries = useMemo(() => {
-    return PIPELINE_LANES.map((lane) => {
-      const items = searchedOpportunities.filter((item) => item.lane === lane.key);
-      return {
-        ...lane,
-        count: items.length,
-        amount: items.reduce((sum, item) => sum + Number(item.amount || 0), 0),
-        hotCount: items.filter((item) => item.priority === "hot" || item.priority === "attention").length
-      };
-    });
-  }, [searchedOpportunities]);
+  const boardColumns = useMemo(
+    () =>
+      PIPELINE_BOARD_COLUMNS.map((column) => {
+        const items = visibleOpportunities.filter((item) => column.lanes.includes(item.lane));
+        const allItems = searchedOpportunities.filter((item) => column.lanes.includes(item.lane));
+        return {
+          ...column,
+          items,
+          count: allItems.length,
+          amount: allItems.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+        };
+      }),
+    [searchedOpportunities, visibleOpportunities]
+  );
 
   const closedToday = useMemo(
     () =>
@@ -540,7 +571,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
 
   useEffect(() => {
     setSelectedOpportunityIds([]);
-  }, [activeFilter, activeLane, listMode, normalizedSearch]);
+  }, [activeFilter, listMode, normalizedSearch]);
 
   useEffect(() => {
     setSelectedOpportunityIds((current) =>
@@ -555,14 +586,170 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   }, [archivedOpportunities, listMode]);
 
   return (
-    <div className="app-light-surface space-y-6">
+    <div className="app-light-surface min-w-0 max-w-full space-y-6 overflow-hidden">
       {readOnly ? (
         <div className="rounded-[22px] border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           Este espacio esta en modo solo lectura. Puedes revisar el pipeline, pero las acciones de archivo no estan disponibles.
         </div>
       ) : null}
-      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+      <section className="grid min-w-0 max-w-full gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 max-w-full space-y-6">
+          <Card data-sales-pipeline-board className="min-w-0 max-w-full overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.09),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] shadow-[0_28px_90px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+            <CardContent className="p-4 sm:p-5 lg:p-6">
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Pipeline comercial</p>
+                      <span className="rounded-full border border-orange-400/25 bg-orange-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-orange-100">
+                        {searchedOpportunities.length} oportunidades
+                      </span>
+                    </div>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+                      Visualiza que esta entrando, que necesita seguimiento y que esta cerca de convertirse en venta.
+                    </p>
+                  </div>
+
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="inline-flex w-fit shrink-0 rounded-2xl border border-white/10 bg-black/20 p-1">
+                      <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
+                        Principal
+                        <span className="ml-2 text-xs text-white/65">{visibleActiveOpportunities.length}</span>
+                      </Button>
+                      <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
+                        Archivo
+                        <span className="ml-2 text-xs text-white/65">{archivedOpportunities?.length ?? 0}</span>
+                      </Button>
+                    </div>
+                    <Button asChild className="h-11 rounded-2xl bg-[linear-gradient(135deg,#f97316,#ea580c)] px-5 text-white shadow-[0_16px_34px_rgba(249,115,22,0.24)] hover:opacity-95">
+                      <Link href="/app/inbox">
+                        Abrir Inbox
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                  <div className="relative min-w-0">
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted" />
+                    <Input
+                      className="h-11 rounded-2xl border-white/10 bg-black/20 pl-10 text-sm"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Buscar oportunidades por cliente, telefono, responsable u origen"
+                    />
+                  </div>
+                  <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 xl:pb-0">
+                    <FilterChip active={activeFilter === "all"} label={`Todas ${searchedOpportunities.length}`} onClick={() => setOpportunityFilter("all")} />
+                    <FilterChip active={activeFilter === "open"} label={`Activas ${summaryState.activeOpportunities}`} onClick={() => setOpportunityFilter("open")} />
+                    <FilterChip active={activeFilter === "closed"} label={`Cierres ${metricsState.closedSalesCount}`} onClick={() => setOpportunityFilter("closed")} />
+                    <FilterChip active={activeFilter === "active_conversations"} label={`Con chat ${summaryState.activeSalesConversations}`} onClick={() => setOpportunityFilter("active_conversations")} />
+                  </div>
+                </div>
+
+                {listMode === "main" ? (
+                  <div className="flex flex-col gap-3 rounded-[20px] border border-white/8 bg-black/15 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                    <p className="text-sm text-muted">
+                      {actionableSelectedIds.length > 0
+                        ? `${actionableSelectedIds.length} oportunidades seleccionadas.`
+                        : "Selecciona oportunidades para archivarlas sin perder el historial comercial."}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-xl"
+                        onClick={() => setSelectedOpportunityIds(allVisibleActionableSelected ? [] : actionableVisibleOpportunities.map((item) => item.id))}
+                        disabled={readOnly || actionableVisibleOpportunities.length === 0}
+                      >
+                        {allVisibleActionableSelected ? "Cancelar visibles" : "Seleccionar visibles"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="rounded-xl border border-orange-400/25 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
+                        onClick={() => void archiveOpportunitySelection(actionableSelectedIds)}
+                        disabled={readOnly || actionableSelectedIds.length === 0 || archivingOpportunityIds.length > 0 || refreshingSales}
+                      >
+                        {archivingOpportunityIds.length > 0 ? "Archivando..." : "Archivar seleccionadas"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-[20px] border border-violet-400/15 bg-violet-500/8 px-4 py-3 text-sm text-violet-100/80">
+                    {loadingArchiveView ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                    {loadingArchiveView ? "Cargando archivo comercial..." : "Oportunidades fuera de la mesa activa, disponibles para consulta y restauracion."}
+                  </div>
+                )}
+
+                <div data-sales-kanban className="flex min-w-0 max-w-full gap-4 overflow-x-auto pb-2 xl:grid xl:grid-cols-3 xl:overflow-visible">
+                  {boardColumns.map((column) => (
+                    <section key={column.key} className="flex min-h-[390px] w-[292px] shrink-0 flex-col rounded-[24px] border border-white/10 bg-[#07111f]/72 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-4 xl:w-auto xl:min-w-0">
+                      <div className="flex items-start justify-between gap-3 border-b border-white/8 px-1 pb-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2.5">
+                            <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_18px_currentColor]", column.accent)} />
+                            <h2 className="text-lg font-semibold text-white">{column.label}</h2>
+                            <span className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium", column.badge)}>{column.count}</span>
+                          </div>
+                          <p className="mt-1.5 text-xs leading-5 text-white/45">{column.helper}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-white/90">{formatMoney(column.amount)}</p>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-white/32">valor visible</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-1 flex-col gap-3">
+                        {listMode === "archive" && loadingArchiveView ? (
+                          <div className="flex flex-1 items-center justify-center rounded-[18px] border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted">
+                            Cargando oportunidades...
+                          </div>
+                        ) : column.items.length ? (
+                          column.items.map((item) => (
+                            <PipelineOpportunityCard
+                              key={item.id}
+                              item={item}
+                              accentClass={column.accent}
+                              selectable={listMode === "main" && isSalesOpportunityActionable(item)}
+                              selected={selectedOpportunityIds.includes(item.id)}
+                              selectionDisabled={readOnly || !isSalesOpportunityActionable(item)}
+                              actionBusy={archivingOpportunityIds.includes(item.id) || refreshingSales}
+                              readOnly={readOnly}
+                              listMode={listMode}
+                              orphanHidden={listMode === "archive" && !item.conversationId && isOrderBackedOpportunity(item)}
+                              onToggleSelect={(checked) =>
+                                setSelectedOpportunityIds((current) =>
+                                  checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id)
+                                )
+                              }
+                              onArchive={() => void archiveOpportunitySelection([item.id])}
+                              onHideOrphan={() => void hideOrphanOpportunity(item.id)}
+                              onRestoreOrphan={() => void restoreHiddenOrphanOpportunity(item.id)}
+                            />
+                          ))
+                        ) : (
+                          <div className="flex flex-1 items-center justify-center rounded-[18px] border border-dashed border-white/10 bg-white/[0.018] px-5 py-10 text-center text-sm leading-6 text-muted">
+                            {normalizedSearch ? "No hay coincidencias en esta etapa." : "Sin oportunidades visibles en esta etapa."}
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+
+                {overflowCount > 0 ? (
+                  <div className="rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-muted">
+                    {overflowCount} oportunidades adicionales quedaron fuera del foco inicial para mantener una lectura clara del tablero.
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 lg:grid-cols-12">
             <Card className="relative overflow-hidden border-orange-400/30 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] shadow-[0_20px_80px_rgba(5,10,25,0.28)] lg:col-span-4 xl:col-span-4">
               <CardContent className="relative p-6">
@@ -670,222 +857,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
             </Card>
           </div>
 
-          <Card className="overflow-hidden border-white/10 bg-white/[0.03] shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-            <CardContent className="p-5 lg:p-6">
-                <div className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
-                    <div>
-                      <p className="text-xl font-semibold text-white">Pipeline comercial activo</p>
-                      <p className="mt-1 text-sm text-muted">
-                        Seguimiento ejecutivo de oportunidades, conversaciones y proximidad de cierre.
-                      </p>
-                    </div>
-                  <div className="flex min-w-0 flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <FilterChip
-                        active={activeFilter === "all"}
-                        label={`Todas ${searchedOpportunities.length}`}
-                        onClick={() => setOpportunityFilter("all")}
-                      />
-                      <FilterChip
-                        active={activeFilter === "open"}
-                        label={`Activas ${summaryState.activeOpportunities}`}
-                        onClick={() => setOpportunityFilter("open")}
-                      />
-                      <FilterChip
-                        active={activeFilter === "closed"}
-                        label={`Cierres ${metricsState.closedSalesCount}`}
-                        onClick={() => setOpportunityFilter("closed")}
-                      />
-                      <FilterChip
-                        active={activeFilter === "active_conversations"}
-                        label={`Conversaciones ${summaryState.activeSalesConversations}`}
-                        onClick={() => setOpportunityFilter("active_conversations")}
-                      />
-                    </div>
-                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
-                      <div className="relative min-w-0">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted" />
-                        <Input
-                          className="h-11 rounded-2xl border-white/10 bg-black/18 pl-10 text-sm"
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                          placeholder="Buscar por nombre, telefono, responsable o origen"
-                        />
-                      </div>
-                      <div className="inline-flex w-fit rounded-2xl border border-white/10 bg-black/18 p-1">
-                        <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
-                          Principal
-                          <span className="ml-2 text-xs text-white/65">{visibleActiveOpportunities.length}</span>
-                        </Button>
-                        <Button type="button" size="sm" variant={listMode === "archive" ? "primary" : "ghost"} onClick={() => setListMode("archive")}>
-                          Archivo
-                          <span className="ml-2 text-xs text-white/65">{archivedOpportunities?.length ?? 0}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="grid gap-3 overflow-x-auto pb-1 2xl:grid-cols-5">
-                  {laneSummaries.map((lane) => (
-                    <button
-                      key={lane.key}
-                      type="button"
-                      onClick={() => setActiveLane((current) => (current === lane.key ? "all" : lane.key))}
-                      className={cn(
-                        "min-w-[220px] rounded-[24px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-4 text-left transition-all duration-200 hover:-translate-y-0.5 2xl:min-w-0",
-                        activeLane === lane.key
-                          ? "border-orange-400/35 shadow-[0_0_0_1px_rgba(249,115,22,0.14),0_18px_40px_rgba(0,0,0,0.20)]"
-                          : "border-white/10"
-                      )}
-                    >
-                      <div className={cn("rounded-[18px] border border-white/10 p-4", `bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))] ${lane.accent}`)}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium text-white">{lane.label}</p>
-                            <p className="mt-1 text-xs text-white/55">{lane.helper}</p>
-                          </div>
-                          <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", lane.chip)}>
-                            {lane.count}
-                          </span>
-                        </div>
-                        <p className="mt-5 text-2xl font-semibold tracking-tight text-white">{formatMoney(lane.amount)}</p>
-                        <p className="mt-2 text-xs text-muted">
-                          {lane.hotCount ? `${lane.hotCount} con foco inmediato` : "Sin presion critica visible"}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {activeLane !== "all" || activeFilter !== "all" ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-orange-400/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
-                    <LayoutPanelTop className="h-4 w-4" />
-                    Mostrando{" "}
-                    <span className="font-medium">
-                      {activeLane === "all" ? labelForOpportunityFilter(activeFilter) : laneLabel(activeLane)}
-                    </span>
-                    {activeFilter !== "all" && activeLane !== "all" ? " dentro del filtro comercial actual." : "."}
-                    <button type="button" className="ml-auto text-orange-100/85 underline underline-offset-4" onClick={() => { setActiveLane("all"); setOpportunityFilter("all"); }}>
-                      Limpiar foco
-                    </button>
-                  </div>
-                ) : listMode === "main" ? (
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    Principal concentra el pipeline activo. Desde aca puedes seleccionar oportunidades y archivarlas sin tocar la base comercial.
-                  </div>
-                ) : (
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    Archivo comercial persistente para revisar historico, pruebas y conversaciones ocultadas del pipeline principal.
-                  </div>
-                )}
-
-                {listMode === "main" ? (
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <p className="text-sm text-muted">
-                        {actionableSelectedIds.length > 0
-                          ? `${actionableSelectedIds.length} oportunidades seleccionadas listas para limpiar el pipeline.`
-                          : "Selecciona oportunidades visibles para ocultarlas del pipeline sin borrar la base comercial."}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="rounded-2xl"
-                          onClick={() =>
-                            setSelectedOpportunityIds(
-                              allVisibleActionableSelected ? [] : actionableVisibleOpportunities.map((item) => item.id)
-                            )
-                          }
-                          disabled={readOnly || actionableVisibleOpportunities.length === 0}
-                        >
-                          {allVisibleActionableSelected ? "Cancelar visibles" : "Seleccionar visibles"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="rounded-2xl border border-orange-400/25 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14"
-                          onClick={() => void archiveOpportunitySelection(actionableSelectedIds)}
-                          disabled={readOnly || actionableSelectedIds.length === 0 || archivingOpportunityIds.length > 0 || refreshingSales}
-                        >
-                          {archivingOpportunityIds.length > 0 ? "Archivando..." : "Archivar seleccionadas"}
-                        </Button>
-                        {actionableSelectedIds.length > 0 ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="rounded-2xl"
-                            onClick={() => setSelectedOpportunityIds([])}
-                          >
-                            Cancelar
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    {loadingArchiveView
-                      ? "Cargando archivo comercial..."
-                      : "Las oportunidades archivadas salen de la mesa activa y quedan disponibles aca para consulta."}
-                  </div>
-                )}
-
-                {listMode === "archive" && loadingArchiveView ? (
-                  <div className="flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.025] px-4 py-4 text-sm text-muted">
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    Cargando oportunidades archivadas...
-                  </div>
-                ) : !visibleOpportunities.length ? (
-                  <div className="rounded-[24px] border border-dashed border-white/12 bg-white/[0.025] p-7 text-sm leading-7 text-muted">
-                    {normalizedSearch
-                      ? "No encontramos oportunidades para esa busqueda."
-                      : listMode === "archive"
-                        ? "Todavia no hay oportunidades archivadas para este foco comercial."
-                        : "Todavia no hay oportunidades visibles para este foco comercial."}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {visibleOpportunities.map((item) => (
-                      <OpportunityRow
-                        key={item.id}
-                        item={item}
-                        selectable={listMode === "main" && isSalesOpportunityActionable(item)}
-                        selected={selectedOpportunityIds.includes(item.id)}
-                        selectionDisabled={readOnly || !isSalesOpportunityActionable(item)}
-                        actionBusy={archivingOpportunityIds.includes(item.id) || refreshingSales}
-                        readOnly={readOnly}
-                        listMode={listMode}
-                        orphanHidden={listMode === "archive" && !item.conversationId && isOrderBackedOpportunity(item)}
-                        onToggleSelect={(checked) =>
-                          setSelectedOpportunityIds((current) =>
-                            checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id)
-                          )
-                        }
-                        onArchive={() => void archiveOpportunitySelection([item.id])}
-                        onHideOrphan={() => void hideOrphanOpportunity(item.id)}
-                        onRestoreOrphan={() => void restoreHiddenOrphanOpportunity(item.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {listMode === "main" && overflowCount > 0 ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-                    <span>{overflowCount} oportunidades adicionales quedaron fuera del foco principal para mantener lectura ejecutiva.</span>
-                    <Button type="button" size="sm" variant="secondary" className="rounded-2xl" onClick={() => setListMode("archive")}>
-                      Ver archivo
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <aside className="space-y-4">
@@ -1155,8 +1127,9 @@ function FilterChip({
   );
 }
 
-function OpportunityRow({
+function PipelineOpportunityCard({
   item,
+  accentClass,
   selectable,
   selected,
   selectionDisabled,
@@ -1170,6 +1143,7 @@ function OpportunityRow({
   onRestoreOrphan
 }: {
   item: EnrichedOpportunity;
+  accentClass: string;
   selectable: boolean;
   selected: boolean;
   selectionDisabled: boolean;
@@ -1183,425 +1157,102 @@ function OpportunityRow({
   onRestoreOrphan: () => void;
 }) {
   const priorityMeta = PRIORITY_META[item.priority];
-  const canArchiveConversation = Boolean(item.conversationId);
-  const canHideOrphan = listMode === "main" && !item.conversationId;
-  const customerAvatarClass =
-    "flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-orange-300/14 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.34),rgba(59,130,246,0.16)_62%,rgba(15,23,42,0.92))] text-base font-semibold text-white shadow-[0_14px_30px_rgba(15,23,42,0.34)]";
-  const actionButtonClass =
-    "h-10 shrink-0 rounded-2xl px-4 text-[13px] font-medium";
-  const helperCopy = canArchiveConversation
-    ? listMode === "archive"
-      ? "Archivada desde su conversacion comercial."
-      : "Puede archivarse sin perder historial."
-    : listMode === "archive"
-      ? "Oculta del pipeline activo sin borrar la informacion comercial."
-      : "Sin conversacion asociada. Puedes ocultarla del pipeline activo.";
+  const canArchiveConversation = listMode === "main" && Boolean(item.conversationId);
+  const canHideOrphan = listMode === "main" && !item.conversationId && isOrderBackedOpportunity(item);
 
   return (
-    <div
+    <article
+      data-sales-opportunity-card
       className={cn(
-        "overflow-hidden rounded-[24px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-400/20 sm:px-5",
-        priorityMeta.ringClass
+        "group relative overflow-hidden rounded-[20px] border bg-[linear-gradient(155deg,rgba(255,255,255,0.055),rgba(255,255,255,0.018))] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-[0_18px_45px_rgba(0,0,0,0.24)]",
+        selected ? "border-orange-400/40 shadow-[0_0_0_1px_rgba(249,115,22,0.16)]" : priorityMeta.ringClass
       )}
     >
-      <div className="hidden 2xl:grid 2xl:grid-cols-[minmax(320px,1.95fr)_minmax(170px,0.82fr)_minmax(165px,0.78fr)_minmax(190px,0.95fr)_minmax(120px,0.65fr)_minmax(185px,0.88fr)_minmax(230px,0.92fr)] 2xl:items-center 2xl:gap-5">
-        <div className="min-w-0">
-          <div className="flex items-start gap-4">
-            {selectable ? (
-              <label className="mt-2 inline-flex items-center">
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  onChange={(event) => onToggleSelect(event.target.checked)}
-                  disabled={selectionDisabled}
-                  className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
-                />
-              </label>
-            ) : (
-              <div className="mt-2 h-4 w-4 shrink-0" />
-            )}
-            <div className={customerAvatarClass}>
-              {initialsFromName(item.customer.name)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="text-[17px] font-semibold leading-6 tracking-[-0.01em] text-white">{item.customer.name}</p>
-                {item.contactId ? (
-                  <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
-                    Ver cliente
-                  </Link>
-                ) : null}
-              </div>
-              <p className="mt-1 text-[15px] text-white/72">{item.customer.phone || "Sin telefono"}</p>
-              <p className="mt-2 max-w-[26rem] text-[12px] leading-5 text-white/42">{helperCopy}</p>
-            </div>
-          </div>
-        </div>
+      <span className={cn("absolute inset-y-0 left-0 w-1", accentClass)} />
 
-        <div className="flex min-w-0 flex-wrap gap-2">
-          <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
-            {item.commercialStageLabel}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
-            {item.collectionStatusLabel}
-          </span>
-        </div>
-
-        <div className="min-w-0">
-          <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
-            {formatMoney(item.amount, item.currency)}
-          </p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/36">Valor potencial</p>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-start gap-2.5">
-            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+      <div className="flex items-start gap-3 pl-1">
+        {selectable ? (
+          <label className="mt-1 inline-flex shrink-0 items-center">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(event) => onToggleSelect(event.target.checked)}
+              disabled={selectionDisabled}
+              className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
+            />
+          </label>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm leading-6 text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
-              <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
+              <p className="truncate text-base font-semibold text-white">{item.customer.name}</p>
+              <p className="mt-1 truncate text-xs text-white/50">
+                {item.customer.phone || item.source ? [item.customer.phone, item.source ? titleCaseLabel(item.source) : null].filter(Boolean).join(" · ") : "Sin telefono ni origen"}
+              </p>
+            </div>
+            <span className="shrink-0 text-[11px] text-white/42">{item.lastActivityLabel}</span>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-lg font-semibold tracking-tight text-white">{formatMoney(item.amount, item.currency)}</p>
+              <p className="mt-0.5 text-[10px] uppercase tracking-[0.15em] text-white/34">valor potencial</p>
+            </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-xs font-semibold text-white/85">
+              {initialsFromName(item.responsible?.name || item.customer.name)}
             </div>
           </div>
-        </div>
 
-        <div className="min-w-0">
-          <div className="flex items-start gap-2.5">
-            {item.source && item.source.toLowerCase().includes("bot") ? (
-              <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
-            ) : (
-              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            )}
-            <div className="min-w-0">
-              <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
-              <p className="mt-1 text-xs text-muted">Origen</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-start gap-2.5">
-            <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            <div className="min-w-0">
-              <p className="text-sm leading-6 text-white">{item.responsible?.name || "Sin asignar"}</p>
-              <p className="mt-1 text-xs text-muted">Responsable</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col items-end gap-2 justify-self-end">
-          <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
-            {item.priorityLabel}
-          </span>
-          <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
-            {listMode === "archive" && orphanHidden ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(actionButtonClass, "border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14")}
-                onClick={onRestoreOrphan}
-              >
-                Restaurar
-              </Button>
-            ) : canArchiveConversation ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(actionButtonClass, "border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14")}
-                onClick={onArchive}
-                disabled={readOnly || actionBusy}
-              >
-                <Archive className="mr-2 h-4 w-4" />
-                {actionBusy ? "Archivando..." : "Archivar"}
-              </Button>
-            ) : canHideOrphan ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(actionButtonClass, "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]")}
-                onClick={onHideOrphan}
-                disabled={readOnly}
-              >
-                Ocultar
-              </Button>
-            ) : (
-              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-                En archivo
-              </span>
-            )}
-            {item.contactId ? (
-              <Button asChild size="sm" variant="ghost" className={cn(actionButtonClass, "border-white/10 bg-black/16 text-white hover:bg-white/8")}>
-                <Link href={`/app/contacts/${item.contactId}`}>
-                  Ver cliente
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden xl:flex 2xl:hidden xl:flex-col xl:gap-4">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(165px,0.8fr)_minmax(150px,0.72fr)_minmax(200px,0.9fr)] xl:items-start">
-          <div className="min-w-0">
-            <div className="flex items-start gap-4">
-              {selectable ? (
-                <label className="mt-2 inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={(event) => onToggleSelect(event.target.checked)}
-                    disabled={selectionDisabled}
-                    className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
-                  />
-                </label>
-              ) : (
-                <div className="mt-2 h-4 w-4 shrink-0" />
-              )}
-              <div className={customerAvatarClass}>
-                {initialsFromName(item.customer.name)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <p className="text-[17px] font-semibold leading-6 tracking-[-0.01em] text-white">{item.customer.name}</p>
-                  {item.contactId ? (
-                    <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
-                      Ver cliente
-                    </Link>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-[15px] text-white/72">{item.customer.phone || "Sin telefono"}</p>
-                <p className="mt-2 max-w-[28rem] text-[12px] leading-5 text-white/42">{helperCopy}</p>
+          <div className="mt-4 rounded-[16px] border border-white/9 bg-black/18 px-3.5 py-3">
+            <div className="flex items-start gap-2.5">
+              <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-orange-200" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">Proximo paso</p>
+                <p className="mt-1 text-sm leading-5 text-white/86">{item.attentionLabel}</p>
               </div>
             </div>
           </div>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", stageBadgeClass(item.stageTone))}>
               {item.commercialStageLabel}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
-              {item.collectionStatusLabel}
-            </span>
-          </div>
-          <div>
-            <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
-              {formatMoney(item.amount, item.currency)}
-            </p>
-            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/36">Valor potencial</p>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-            <div className="min-w-0">
-              <p className="text-sm leading-6 text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
-              <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
-            </div>
-          </div>
-        </div>
-        <div className="grid gap-4 xl:grid-cols-[minmax(120px,0.65fr)_minmax(180px,0.95fr)_minmax(240px,1fr)] xl:items-center">
-          <div className="flex items-start gap-2.5">
-            {item.source && item.source.toLowerCase().includes("bot") ? (
-              <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
-            ) : (
-              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            )}
-            <div className="min-w-0">
-              <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
-              <p className="mt-1 text-xs text-muted">Origen</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            <div className="min-w-0">
-              <p className="text-sm leading-6 text-white">{item.responsible?.name || "Sin asignar"}</p>
-              <p className="mt-1 text-xs text-muted">Responsable</p>
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 xl:pl-3">
-            <span className={cn("mr-auto rounded-full border px-2.5 py-1 text-[11px] font-medium xl:mr-0", priorityMeta.badgeClass)}>
+            <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", priorityMeta.badgeClass)}>
               {item.priorityLabel}
             </span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3">
+            <span className="mr-auto truncate text-xs text-white/45">{item.responsible?.name || "Sin responsable"}</span>
             {listMode === "archive" && orphanHidden ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(actionButtonClass, "border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14")}
-                onClick={onRestoreOrphan}
-              >
+              <Button type="button" size="sm" variant="ghost" className="h-8 rounded-xl border border-sky-400/20 bg-sky-500/10 px-3 text-xs text-sky-100" onClick={onRestoreOrphan}>
                 Restaurar
               </Button>
             ) : canArchiveConversation ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(actionButtonClass, "border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14")}
-                onClick={onArchive}
-                disabled={readOnly || actionBusy}
-              >
-                <Archive className="mr-2 h-4 w-4" />
+              <Button type="button" size="sm" variant="ghost" className="h-8 rounded-xl px-3 text-xs text-white/60 hover:text-white" onClick={onArchive} disabled={readOnly || actionBusy}>
                 {actionBusy ? "Archivando..." : "Archivar"}
               </Button>
             ) : canHideOrphan ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(actionButtonClass, "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]")}
-                onClick={onHideOrphan}
-                disabled={readOnly}
-              >
+              <Button type="button" size="sm" variant="ghost" className="h-8 rounded-xl px-3 text-xs text-white/60 hover:text-white" onClick={onHideOrphan} disabled={readOnly || actionBusy}>
                 Ocultar
               </Button>
-            ) : (
-              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-                En archivo
-              </span>
-            )}
+            ) : null}
             {item.contactId ? (
-              <Button asChild size="sm" variant="ghost" className={cn(actionButtonClass, "border-white/10 bg-black/16 text-white hover:bg-white/8")}>
-                <Link href={`/app/contacts/${item.contactId}`}>
-                  Ver cliente
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              <Link href={`/app/contacts/${item.contactId}`} className="inline-flex h-8 items-center rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/82 transition hover:bg-white/[0.08]">
+                Ver cliente
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Link>
+            ) : item.conversationId ? (
+              <Link href="/app/inbox" className="inline-flex h-8 items-center rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white/82 transition hover:bg-white/[0.08]">
+                Ver chat
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Link>
             ) : null}
           </div>
         </div>
       </div>
-
-      <div className="flex flex-col gap-3 xl:hidden">
-        <div className="flex items-start gap-4">
-          {selectable ? (
-            <label className="mt-2 inline-flex items-center">
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={(event) => onToggleSelect(event.target.checked)}
-                disabled={selectionDisabled}
-                className="h-4 w-4 rounded border-white/20 bg-transparent accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label={`Seleccionar oportunidad de ${item.customer.name}`}
-              />
-            </label>
-          ) : (
-            <div className="mt-2 h-4 w-4 shrink-0" />
-          )}
-          <div className={customerAvatarClass}>
-            {initialsFromName(item.customer.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <p className="text-[17px] font-semibold leading-6 tracking-[-0.01em] text-white">{item.customer.name}</p>
-              {item.contactId ? (
-                <Link href={`/app/contacts/${item.contactId}`} className="shrink-0 text-xs font-medium text-orange-100 transition hover:text-orange-200">
-                  Ver cliente
-                </Link>
-              ) : null}
-            </div>
-            <p className="mt-1 text-[15px] text-white/72">{item.customer.phone || "Sin telefono"}</p>
-            <p className="mt-2 text-[12px] leading-5 text-white/42">{helperCopy}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", stageBadgeClass(item.stageTone))}>
-            {item.commercialStageLabel}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/72">
-            {item.collectionStatusLabel}
-          </span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="whitespace-nowrap text-xl font-semibold tracking-tight text-white">
-              {formatMoney(item.amount, item.currency)}
-            </p>
-            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/36">Valor potencial</p>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-            <div className="min-w-0">
-              <p className="text-sm leading-6 text-white">{formatDateTimeLabel(item.lastActivityAt)}</p>
-              <p className="mt-1 text-xs text-muted">{item.lastActivityLabel}</p>
-            </div>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex items-start gap-2.5">
-            {item.source && item.source.toLowerCase().includes("bot") ? (
-              <Bot className="mt-0.5 h-4 w-4 shrink-0 text-orange-100" />
-            ) : (
-              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            )}
-            <div className="min-w-0">
-              <p className="text-sm text-white">{item.source ? titleCaseLabel(item.source) : "Sin origen"}</p>
-              <p className="mt-1 text-xs text-muted">Origen</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
-            <div className="min-w-0">
-              <p className="text-sm leading-6 text-white">{item.responsible?.name || "Sin asignar"}</p>
-              <p className="mt-1 text-xs text-muted">Responsable</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("mr-auto rounded-full border px-2.5 py-1 text-[11px] font-medium sm:mr-0", priorityMeta.badgeClass)}>
-            {item.priorityLabel}
-          </span>
-          {listMode === "archive" && orphanHidden ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className={cn(actionButtonClass, "border-sky-400/20 bg-sky-500/10 text-sky-100 hover:bg-sky-500/14")}
-              onClick={onRestoreOrphan}
-            >
-              Restaurar
-            </Button>
-          ) : canArchiveConversation ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className={cn(actionButtonClass, "border-orange-400/20 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14")}
-              onClick={onArchive}
-              disabled={readOnly || actionBusy}
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              {actionBusy ? "Archivando..." : "Archivar"}
-            </Button>
-          ) : canHideOrphan ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className={cn(actionButtonClass, "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]")}
-              onClick={onHideOrphan}
-              disabled={readOnly}
-            >
-              Ocultar
-            </Button>
-            ) : (
-              <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100">
-                En archivo
-              </span>
-            )}
-            {item.contactId ? (
-              <Button asChild size="sm" variant="ghost" className={cn(actionButtonClass, "border-white/10 bg-black/16 text-white hover:bg-white/8")}>
-                <Link href={`/app/contacts/${item.contactId}`}>
-                  Ver cliente
-                  <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+    </article>
   );
 }
 

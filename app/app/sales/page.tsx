@@ -54,9 +54,9 @@ export default async function AppSalesPage() {
 
   return (
     <ClientPageShell
-      title="Ventas"
-      description="Centro comercial premium para seguir pipeline, cierres, responsables y oportunidades activas del espacio."
-      badge="Pipeline comercial"
+      title="Ventas en movimiento"
+      description="Visualiza tu pipeline comercial, prioriza los proximos pasos y acompana cada oportunidad hasta el cierre."
+      badge="Ventas"
     >
       <SalesHub
         summary={summary}
