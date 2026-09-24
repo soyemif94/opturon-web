@@ -182,6 +182,44 @@ export function SaasHome() {
       <section id="producto" className="py-24 sm:py-28 lg:py-32">
         <div className="container-opt">
           <SectionHeading eyebrow="La plataforma" title="Todo lo que pasa después de un mensaje, conectado." copy="Opturon organiza el recorrido completo: desde la primera consulta hasta el pedido, la disponibilidad, el cobro y el seguimiento." />
+          <div className="mt-12 grid gap-8 rounded-[2rem] border border-white/10 bg-white/[0.025] p-4 sm:p-6 lg:grid-cols-[0.32fr_0.68fr] lg:items-center lg:gap-10 lg:p-8">
+            <div className="px-2 py-3 sm:px-3 lg:py-0">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/25 bg-orange-400/[0.1] text-sm font-semibold text-orange-300">02</span>
+              <p className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-orange-300">De la conversación a la operación</p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Convertí la consulta en un pedido listo para gestionar.</h3>
+              <p className="mt-4 leading-7 text-slate-400">El equipo trabaja con cliente, productos, cantidades, precios, stock y cobro en la misma operación. Así, lo acordado en el Inbox continúa sin perder contexto.</p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {['Cliente y responsable', 'Catálogo y stock', 'Total y cobro'].map((item) => (
+                  <span key={item} className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-slate-300">{item}</span>
+                ))}
+              </div>
+            </div>
+
+            <figure className="min-w-0">
+              <div className="overflow-hidden rounded-[1.25rem] border border-white/15 bg-[#0d1623] p-1.5 shadow-[0_28px_90px_rgba(0,0,0,0.5)] sm:p-2">
+                <div className="flex h-9 items-center justify-between border-b border-white/10 px-3 sm:h-10">
+                  <div className="flex gap-1.5" aria-hidden="true">
+                    <span className="h-2 w-2 rounded-full bg-orange-400" />
+                    <span className="h-2 w-2 rounded-full bg-white/20" />
+                    <span className="h-2 w-2 rounded-full bg-white/20" />
+                  </div>
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-[10px]">Pedidos · Producto real</span>
+                </div>
+                <div className="overflow-hidden rounded-b-[0.85rem] sm:rounded-b-[1rem]">
+                  <Image
+                    src="/product/opturon-orders-create-order.png"
+                    width={1815}
+                    height={867}
+                    sizes="(max-width: 639px) 100vw, (max-width: 1023px) 92vw, 780px"
+                    alt="Pantalla real de Opturon para crear un pedido con cliente, catálogo, stock, cantidades, cobro y resumen"
+                    className="h-[310px] w-full object-cover object-[58%_center] sm:h-auto sm:object-contain"
+                  />
+                </div>
+              </div>
+              <figcaption className="mt-3 text-center text-xs text-slate-500">Pedido conectado al cliente, al catálogo y al seguimiento comercial</figcaption>
+            </figure>
+          </div>
+
           <div className="mt-12 grid gap-4 md:grid-cols-2">
             {capabilities.map((item) => {
               const Icon = item.icon;

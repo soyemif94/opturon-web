@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -221,7 +222,16 @@ export default function DemoPage() {
                 <p className="text-sm text-muted">Inbox, prioridad y seguimiento en la misma superficie.</p>
               </div>
             </div>
-            <HomeProductMockup variant="inbox" compact />
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1623] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
+              <Image
+                src="/product/opturon-inbox-client-portal.png"
+                width={1672}
+                height={939}
+                sizes="(max-width: 1279px) 94vw, 600px"
+                alt="Inbox real de Opturon con conversaciones, contexto comercial y seguimiento"
+                className="h-[320px] w-full rounded-xl object-cover object-[48%_center] sm:h-auto sm:object-contain"
+              />
+            </div>
           </Card>
 
           <Card className="overflow-hidden p-5">

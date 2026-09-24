@@ -6,6 +6,7 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const page = read("app/(public)/page.tsx");
+const demo = read("app/(public)/demo/page.tsx");
 const home = read("components/sections/SaasHome.tsx");
 const navbar = read("components/navbar.tsx");
 const footer = read("components/footer.tsx");
@@ -46,4 +47,15 @@ test("shows the real Opturon inbox as the primary product proof", () => {
   assert.match(home, /Producto real/);
   assert.match(home, /Inbox omnicanal de Opturon/);
   assert.doesNotMatch(home, /Vista ilustrativa de la plataforma Opturon/);
+});
+
+test("uses the same real inbox in the demo journey", () => {
+  assert.match(demo, /opturon-inbox-client-portal\.png/);
+  assert.doesNotMatch(demo, /variant="inbox"/);
+});
+
+test("continues the product story from conversation to a real order", () => {
+  assert.match(home, /De la conversación a la operación/);
+  assert.match(home, /opturon-orders-create-order\.png/);
+  assert.match(home, /Cliente y responsable.*Catálogo y stock.*Total y cobro/s);
 });
