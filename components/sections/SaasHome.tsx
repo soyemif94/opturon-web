@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,7 +11,6 @@ import {
   ClipboardCheck,
   Clock3,
   Headphones,
-  Instagram,
   MessageCircle,
   PackageCheck,
   RefreshCcw,
@@ -20,8 +20,7 @@ import {
   TrendingUp,
   UserRoundCheck,
   UsersRound,
-  Warehouse,
-  Zap
+  Warehouse
 } from "lucide-react";
 
 const flow = ["Consulta", "Cliente", "Pedido", "Stock", "Cobro", "Control"];
@@ -89,99 +88,38 @@ function SectionHeading({ eyebrow, title, copy }: { eyebrow: string; title: stri
 
 function ProductPreview() {
   return (
-    <div
-      aria-label="Vista ilustrativa de la plataforma Opturon"
-      className="relative mx-auto w-full max-w-[650px] rounded-[1.75rem] border border-white/10 bg-[#111925] p-2 shadow-[0_36px_110px_rgba(0,0,0,0.55)] sm:p-3"
-    >
-      <div className="overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#08101b]">
-        <div className="flex h-11 items-center justify-between border-b border-white/10 px-4">
+    <figure className="relative mx-auto w-full max-w-[1240px]">
+      <div className="pointer-events-none absolute -inset-8 -z-10 rounded-[3rem] bg-orange-500/[0.08] blur-3xl" aria-hidden="true" />
+      <div className="overflow-hidden rounded-[1.4rem] border border-white/15 bg-[#0d1623] p-1.5 shadow-[0_42px_130px_rgba(0,0,0,0.62)] sm:rounded-[1.8rem] sm:p-2.5">
+        <div className="flex h-10 items-center justify-between border-b border-white/10 px-3 sm:h-12 sm:px-4">
           <div className="flex gap-1.5" aria-hidden="true">
-            <span className="h-2.5 w-2.5 rounded-full bg-orange-400/90" />
+            <span className="h-2.5 w-2.5 rounded-full bg-orange-400" />
             <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
             <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
           </div>
-          <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">Panel operativo</span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-300 sm:text-[10px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+            Producto real
+          </span>
         </div>
-        <div className="grid min-h-[410px] grid-cols-[68px_1fr] sm:grid-cols-[155px_1fr]">
-          <aside className="border-r border-white/10 bg-[#0c1420] p-3 sm:p-4" aria-label="Módulos de la plataforma">
-            <div className="mb-7 flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500 text-xs font-bold text-white">O</span>
-              <span className="hidden text-xs font-semibold text-white sm:block">Opturon</span>
-            </div>
-            {[
-              [MessageCircle, "Inbox"],
-              [UserRoundCheck, "Clientes"],
-              [ShoppingCart, "Pedidos"],
-              [Warehouse, "Inventario"],
-              [BarChart3, "Reportes"]
-            ].map(([Icon, label], index) => {
-              const MenuIcon = Icon as typeof MessageCircle;
-              return (
-                <div
-                  key={label as string}
-                  className={`mb-2 flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] ${
-                    index === 2 ? "bg-orange-500/15 text-orange-300" : "text-slate-500"
-                  }`}
-                >
-                  <MenuIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden sm:block">{label as string}</span>
-                </div>
-              );
-            })}
-          </aside>
-          <div className="p-3 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Operación de hoy</p>
-                <p className="mt-1 text-base font-semibold text-white">Pedidos</p>
-              </div>
-              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[9px] text-emerald-300">
-                Sincronizado
-              </span>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {[
-                ["Nuevos", "18"],
-                ["En preparación", "7"],
-                ["A entregar", "12"]
-              ].map(([label, value], index) => (
-                <div key={label} className={`${index === 2 ? "col-span-2 sm:col-span-1" : ""} rounded-xl border border-white/10 bg-white/[0.035] p-3`}>
-                  <p className="text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</p>
-                  <p className="mt-2 text-xl font-semibold text-white">{value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035]">
-              <div className="grid grid-cols-[1fr_auto] border-b border-white/10 px-3 py-2.5 text-[9px] uppercase tracking-[0.12em] text-slate-500">
-                <span>Cliente y pedido</span><span>Estado</span>
-              </div>
-              {[
-                ["Almacén Central", "6 productos", "Preparando"],
-                ["Mercado Norte", "12 productos", "Confirmado"],
-                ["Kiosco Avenida", "4 productos", "Nuevo"]
-              ].map(([name, detail, status], index) => (
-                <div key={name} className={`grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-3 ${index < 2 ? "border-b border-white/5" : ""}`}>
-                  <div>
-                    <p className="text-[11px] font-medium text-slate-200">{name}</p>
-                    <p className="mt-0.5 text-[9px] text-slate-500">{detail}</p>
-                  </div>
-                  <span className={`rounded-full px-2 py-1 text-[8px] ${index === 0 ? "bg-orange-500/15 text-orange-300" : index === 1 ? "bg-emerald-400/10 text-emerald-300" : "bg-sky-400/10 text-sky-300"}`}>
-                    {status}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-orange-400/20 bg-orange-400/[0.07] px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <Zap className="h-3.5 w-3.5 text-orange-300" />
-                <span className="text-[10px] text-slate-300">Seguimiento automático activo</span>
-              </div>
-              <span className="text-[9px] text-orange-300">Ver actividad</span>
-            </div>
-          </div>
+        <div className="overflow-hidden rounded-b-[1rem] sm:rounded-b-[1.25rem]">
+          <Image
+            src="/product/opturon-inbox-client-portal.png"
+            width={1672}
+            height={939}
+            priority
+            sizes="(max-width: 639px) 100vw, (max-width: 1279px) 94vw, 1240px"
+            alt="Inbox real de Opturon con conversaciones de WhatsApp e Instagram, automatización, contexto comercial y seguimiento"
+            className="h-[360px] w-full object-cover object-[48%_center] sm:h-auto sm:object-contain"
+          />
         </div>
       </div>
-    </div>
+      <figcaption className="mt-4 flex flex-col gap-1 text-center sm:flex-row sm:items-center sm:justify-center sm:gap-2">
+        <span className="text-sm font-medium text-slate-200">Inbox omnicanal de Opturon</span>
+        <span className="hidden h-1 w-1 rounded-full bg-slate-600 sm:block" aria-hidden="true" />
+        <span className="text-xs text-slate-500">Conversaciones, clientes y operación en el mismo contexto</span>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -194,19 +132,19 @@ export function SaasHome() {
           <div className="absolute -right-32 top-44 h-72 w-72 rounded-full bg-sky-500/[0.06] blur-[100px]" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
         </div>
-        <div className="container-opt relative grid items-center gap-16 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
-          <div>
+        <div className="container-opt relative">
+          <div className="mx-auto max-w-4xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-400/[0.08] px-3 py-1.5 text-xs font-medium text-orange-200">
               <Sparkles className="h-3.5 w-3.5" />
               Una plataforma para toda tu operación comercial
             </div>
-            <h1 className="mt-7 max-w-2xl text-balance text-4xl font-semibold leading-[1.04] tracking-[-0.05em] sm:text-6xl lg:text-[4.4rem]">
+            <h1 className="mt-7 text-balance text-4xl font-semibold leading-[1.04] tracking-[-0.05em] sm:text-6xl lg:text-[4.4rem]">
               Vendé, organizá y controlá tu operación desde un solo lugar.
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-8 text-slate-400 sm:text-xl">
+            <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-slate-400 sm:text-xl">
               Opturon conecta WhatsApp, Instagram, clientes, pedidos, stock y equipo para que cada conversación avance y toda la operación trabaje con el mismo contexto.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link href="/contacto" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(249,115,22,0.22)] transition hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
                 Solicitar una demo <ArrowRight className="h-4 w-4" />
               </Link>
@@ -214,13 +152,15 @@ export function SaasHome() {
                 Ver la plataforma <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3 text-xs text-slate-500">
+            <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-3 text-xs text-slate-500">
               {["Implementación acompañada", "Operación centralizada", "Escala con tu equipo"].map((item) => (
                 <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-orange-400" />{item}</span>
               ))}
             </div>
           </div>
-          <ProductPreview />
+          <div className="mt-14 sm:mt-16 lg:mt-20">
+            <ProductPreview />
+          </div>
         </div>
       </section>
 

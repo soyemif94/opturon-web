@@ -40,3 +40,10 @@ test("uses first-party conversion routes and removes the sticky WhatsApp CTA", (
   assert.doesNotMatch(home + page + navbar + footer, /wa\.me/);
   assert.doesNotMatch(page, /HomeStickyWhatsAppCta/);
 });
+
+test("shows the real Opturon inbox as the primary product proof", () => {
+  assert.match(home, /opturon-inbox-client-portal\.png/);
+  assert.match(home, /Producto real/);
+  assert.match(home, /Inbox omnicanal de Opturon/);
+  assert.doesNotMatch(home, /Vista ilustrativa de la plataforma Opturon/);
+});
