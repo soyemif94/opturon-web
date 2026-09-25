@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { ContactLeadForm } from "@/components/contact/ContactLeadForm";
 import { AuditIntake } from "@/components/lead/AuditIntake";
-import { HomeProductMockup } from "@/components/sections/HomeProductMockup";
 import { Card } from "@/components/ui/card";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SecondaryButton } from "@/components/ui/SecondaryButton";
@@ -179,11 +179,27 @@ export default function DemoPage() {
             </p>
           </div>
 
-          <div className="relative">
+          <div className="relative overflow-hidden">
             <div className="absolute -left-10 top-16 hidden h-28 w-28 rounded-full bg-brand/20 blur-3xl md:block" />
             <div className="absolute -right-8 bottom-8 hidden h-32 w-32 rounded-full bg-white/10 blur-3xl md:block" />
-            <div className="relative z-10">
-              <HomeProductMockup variant="hero" />
+            <div className="relative z-10 overflow-hidden rounded-[1.6rem] border border-white/15 bg-[#0d1623] p-2 shadow-[0_28px_90px_rgba(0,0,0,0.5)] sm:p-2.5">
+              <div className="flex h-10 items-center justify-between border-b border-white/10 px-3 sm:h-11 sm:px-4">
+                <div className="flex gap-1.5" aria-hidden="true">
+                  <span className="h-2.5 w-2.5 rounded-full bg-brandBright" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                </div>
+                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted sm:text-[10px]">Inbox · Producto real</span>
+              </div>
+              <Image
+                src="/product/opturon-inbox-client-portal.png"
+                width={1672}
+                height={939}
+                priority
+                sizes="(max-width: 639px) 94vw, (max-width: 1023px) 88vw, 620px"
+                alt="Inbox real de Opturon con conversaciones, prioridad, contexto comercial y seguimiento"
+                className="h-[390px] w-full rounded-b-[1.15rem] object-cover object-[48%_center] sm:h-auto sm:object-contain"
+              />
             </div>
           </div>
         </div>
@@ -210,7 +226,7 @@ export default function DemoPage() {
           ))}
         </div>
 
-        <div className="mt-10 grid gap-5 xl:grid-cols-2">
+        <div className="mt-10 grid gap-6 2xl:grid-cols-2">
           <Card className="overflow-hidden p-5">
             <div className="mb-4 flex items-center gap-3">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/35 bg-brand/10">
@@ -221,7 +237,16 @@ export default function DemoPage() {
                 <p className="text-sm text-muted">Inbox, prioridad y seguimiento en la misma superficie.</p>
               </div>
             </div>
-            <HomeProductMockup variant="inbox" compact />
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1623] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
+              <Image
+                src="/product/opturon-inbox-client-portal.png"
+                width={1672}
+                height={939}
+                sizes="(max-width: 1279px) 94vw, 600px"
+                alt="Inbox real de Opturon con conversaciones, contexto comercial y seguimiento"
+                className="h-[320px] w-full rounded-xl object-cover object-[48%_center] sm:h-auto sm:object-contain"
+              />
+            </div>
           </Card>
 
           <Card className="overflow-hidden p-5">
@@ -234,7 +259,18 @@ export default function DemoPage() {
                 <p className="text-sm text-muted">El pipeline deja claro que oportunidad mover y cual priorizar.</p>
               </div>
             </div>
-            <HomeProductMockup variant="pipeline" compact />
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1623] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
+              <div className="overflow-x-auto rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <Image
+                  src="/product/opturon-sales-pipeline-client-portal.png"
+                  width={3600}
+                  height={2000}
+                  sizes="(max-width: 1535px) 94vw, 760px"
+                  alt="Pipeline comercial de Opturon con oportunidades en Entrantes, Seguimiento y Cierre"
+                  className="h-auto min-w-[680px] rounded-xl object-contain sm:min-w-0"
+                />
+              </div>
+            </div>
           </Card>
         </div>
       </Section>

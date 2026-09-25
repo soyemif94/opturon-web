@@ -1,56 +1,42 @@
 import type { Metadata } from "next";
 import { HomePageEvents } from "@/components/analytics/HomePageEvents";
-import { HomeDifferentiator } from "@/components/sections/HomeDifferentiator";
-import { HomeFaq } from "@/components/sections/HomeFaq";
-import { HomeFinalCta } from "@/components/sections/HomeFinalCta";
-import { HomeHero } from "@/components/sections/HomeHero";
-import { HomePackages } from "@/components/sections/HomePackages";
-import { HomeProblems } from "@/components/sections/HomeProblems";
-import { HomeProcess } from "@/components/sections/HomeProcess";
-import { HomeResults } from "@/components/sections/HomeResults";
-import { HomeServices } from "@/components/sections/HomeServices";
-import { HomeSolution } from "@/components/sections/HomeSolution";
-import { HomeStickyWhatsAppCta } from "@/components/sections/HomeStickyWhatsAppCta";
+import { SaasHome } from "@/components/sections/SaasHome";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://opturon.com"),
   title: {
-    default: "Opturon | CRM conversacional para vender por WhatsApp",
+    default: "Opturon | Plataforma para conectar ventas y operación",
     template: "%s | Opturon"
   },
   description:
-    "Organiza conversaciones, automatiza seguimiento y convierte WhatsApp en tu sistema de ventas con Opturon.",
+    "Conectá conversaciones, clientes, pedidos, stock, cobros y equipo en una plataforma comercial diseñada para operar con más control.",
   keywords: [
-    "crm whatsapp",
-    "ventas por whatsapp",
-    "inbox whatsapp para empresas",
-    "pipeline de ventas whatsapp",
-    "seguimiento automatico leads",
-    "crm conversacional",
+    "software para distribuidoras",
+    "plataforma de ventas",
+    "gestión de pedidos y stock",
+    "automatización comercial",
+    "crm omnicanal",
+    "ventas por WhatsApp e Instagram",
     "opturon"
   ],
   openGraph: {
-    title: "Opturon | Convierte WhatsApp en tu sistema de ventas",
-    description: "Inbox, pipeline, contactos, automatizaciones y metricas para vender mejor desde WhatsApp.",
+    title: "Opturon | Toda tu operación comercial conectada",
+    description:
+      "Una plataforma para convertir conversaciones en pedidos y coordinar clientes, stock, cobros y equipo desde un solo lugar.",
     url: "https://opturon.com",
     siteName: "Opturon",
     type: "website",
     locale: "es_AR",
-    images: [{ url: "/og", width: 1200, height: 630, alt: "Opturon - CRM conversacional para ventas" }]
+    images: [{ url: "/og", width: 1200, height: 630, alt: "Opturon, plataforma de operación comercial" }]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Opturon | CRM conversacional para WhatsApp",
-    description: "Organiza clientes, automatiza seguimiento y cierra mas ventas desde un solo lugar.",
+    title: "Opturon | Plataforma de operación comercial",
+    description: "Ventas, clientes, pedidos, stock, cobros y seguimiento en un mismo sistema.",
     images: ["/og"]
   },
-  robots: {
-    index: true,
-    follow: true
-  },
-  alternates: {
-    canonical: "/"
-  }
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/" }
 };
 
 export default function HomePage() {
@@ -67,22 +53,17 @@ export default function HomePage() {
       "@type": "WebSite",
       "@id": "https://opturon.com/#website",
       name: "Opturon",
-      url: "https://opturon.com",
-      potentialAction: {
-        "@type": "SearchAction",
-        target: "https://opturon.com/?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
+      url: "https://opturon.com"
     },
     {
       "@context": "https://schema.org",
-      "@type": "Service",
-      name: "CRM conversacional para ventas por WhatsApp",
-      provider: {
-        "@id": "https://opturon.com/#organization"
-      },
-      areaServed: "AR",
-      serviceType: "CRM conversacional, inbox de ventas, pipeline y automatizaciones para WhatsApp"
+      "@type": "SoftwareApplication",
+      name: "Opturon",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description:
+        "Plataforma SaaS para conectar conversaciones, clientes, pedidos, stock, cobros, automatizaciones y reportes.",
+      provider: { "@id": "https://opturon.com/#organization" }
     }
   ];
 
@@ -93,19 +74,8 @@ export default function HomePage() {
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <HomeHero />
-      <HomeProblems />
-      <HomeSolution />
-      <HomeServices />
-      <HomeProcess />
-      <HomeDifferentiator />
-      <HomeResults />
-      <HomePackages />
-      <HomeFaq />
-      <HomeFinalCta />
+      <SaasHome />
       <HomePageEvents />
-      <div className="h-20 md:hidden" aria-hidden="true" />
-      <HomeStickyWhatsAppCta />
     </>
   );
 }
