@@ -11,6 +11,7 @@ test("sales page presents the real pipeline as the primary workspace", () => {
   assert.match(salesPage, /title="Ventas en movimiento"/);
   assert.match(salesHub, /data-sales-pipeline-board/);
   assert.match(salesHub, /data-sales-kanban/);
+  assert.match(salesHub, /data-sales-insights/);
   assert.match(salesHub, /label: "Entrantes"/);
   assert.match(salesHub, /label: "Seguimiento"/);
   assert.match(salesHub, /label: "Cierre"/);
@@ -30,4 +31,6 @@ test("pipeline retains search, filters, archive and responsive containment", () 
   assert.match(salesHub, /setListMode\("archive"\)/);
   assert.match(salesHub, /overflow-x-auto/);
   assert.match(salesHub, /xl:grid-cols-3/);
+  assert.match(salesHub, /xl:max-h-\[570px\]/);
+  assert.doesNotMatch(salesHub, /2xl:grid-cols-\[minmax\(0,1fr\)_320px\]/);
 });

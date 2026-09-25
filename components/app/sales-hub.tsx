@@ -586,18 +586,18 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
   }, [archivedOpportunities, listMode]);
 
   return (
-    <div className="app-light-surface min-w-0 max-w-full space-y-6 overflow-hidden">
+    <div className="app-light-surface min-w-0 max-w-full space-y-5 overflow-hidden">
       {readOnly ? (
         <div className="rounded-[22px] border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           Este espacio esta en modo solo lectura. Puedes revisar el pipeline, pero las acciones de archivo no estan disponibles.
         </div>
       ) : null}
-      <section className="grid min-w-0 max-w-full gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 max-w-full space-y-6">
+      <section className="min-w-0 max-w-full space-y-5">
+        <div className="min-w-0 max-w-full space-y-5">
           <Card data-sales-pipeline-board className="min-w-0 max-w-full overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.09),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] shadow-[0_28px_90px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-            <CardContent className="p-4 sm:p-5 lg:p-6">
-              <div className="flex flex-col gap-5">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <CardContent className="p-3.5 sm:p-4 lg:p-5">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <p className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Pipeline comercial</p>
@@ -605,12 +605,12 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                         {searchedOpportunities.length} oportunidades
                       </span>
                     </div>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-                      Visualiza que esta entrando, que necesita seguimiento y que esta cerca de convertirse en venta.
+                    <p className="mt-1.5 max-w-2xl text-sm leading-5 text-muted">
+                      Entradas, seguimientos y cierres en una sola vista comercial.
                     </p>
                   </div>
 
-                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <div className="inline-flex w-fit shrink-0 rounded-2xl border border-white/10 bg-black/20 p-1">
                       <Button type="button" size="sm" variant={listMode === "main" ? "primary" : "ghost"} onClick={() => setListMode("main")}>
                         Principal
@@ -621,7 +621,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                         <span className="ml-2 text-xs text-white/65">{archivedOpportunities?.length ?? 0}</span>
                       </Button>
                     </div>
-                    <Button asChild className="h-11 rounded-2xl bg-[linear-gradient(135deg,#f97316,#ea580c)] px-5 text-white shadow-[0_16px_34px_rgba(249,115,22,0.24)] hover:opacity-95">
+                    <Button asChild className="h-9 rounded-xl bg-[linear-gradient(135deg,#f97316,#ea580c)] px-4 text-white shadow-[0_12px_28px_rgba(249,115,22,0.22)] hover:opacity-95">
                       <Link href="/app/inbox">
                         Abrir Inbox
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -630,42 +630,40 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                   </div>
                 </div>
 
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                <div className="grid gap-2.5 xl:grid-cols-[minmax(280px,1fr)_auto] xl:items-center">
                   <div className="relative min-w-0">
                     <Search className="pointer-events-none absolute left-3.5 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted" />
                     <Input
-                      className="h-11 rounded-2xl border-white/10 bg-black/20 pl-10 text-sm"
+                      className="h-10 rounded-xl border-white/10 bg-black/20 pl-10 text-sm"
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="Buscar oportunidades por cliente, telefono, responsable u origen"
                     />
                   </div>
-                  <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 xl:pb-0">
+                  <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:pb-0">
                     <FilterChip active={activeFilter === "all"} label={`Todas ${searchedOpportunities.length}`} onClick={() => setOpportunityFilter("all")} />
                     <FilterChip active={activeFilter === "open"} label={`Activas ${summaryState.activeOpportunities}`} onClick={() => setOpportunityFilter("open")} />
                     <FilterChip active={activeFilter === "closed"} label={`Cierres ${metricsState.closedSalesCount}`} onClick={() => setOpportunityFilter("closed")} />
                     <FilterChip active={activeFilter === "active_conversations"} label={`Con chat ${summaryState.activeSalesConversations}`} onClick={() => setOpportunityFilter("active_conversations")} />
-                  </div>
-                </div>
-
-                {listMode === "main" ? (
-                  <div className="flex flex-col gap-3 rounded-[20px] border border-white/8 bg-black/15 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-                    <p className="text-sm text-muted">
-                      {actionableSelectedIds.length > 0
-                        ? `${actionableSelectedIds.length} oportunidades seleccionadas.`
-                        : "Selecciona oportunidades para archivarlas sin perder el historial comercial."}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                    {listMode === "main" ? (
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="rounded-xl"
+                        className="shrink-0 rounded-xl border border-white/10 bg-white/[0.025]"
                         onClick={() => setSelectedOpportunityIds(allVisibleActionableSelected ? [] : actionableVisibleOpportunities.map((item) => item.id))}
                         disabled={readOnly || actionableVisibleOpportunities.length === 0}
                       >
                         {allVisibleActionableSelected ? "Cancelar visibles" : "Seleccionar visibles"}
                       </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {listMode === "main" && actionableSelectedIds.length > 0 ? (
+                  <div className="flex flex-col gap-2 rounded-[16px] border border-orange-400/20 bg-orange-500/[0.07] px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-orange-50/80">{actionableSelectedIds.length} oportunidades seleccionadas.</p>
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
                         size="sm"
@@ -678,24 +676,24 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                       </Button>
                     </div>
                   </div>
-                ) : (
+                ) : listMode === "archive" ? (
                   <div className="flex items-center gap-3 rounded-[20px] border border-violet-400/15 bg-violet-500/8 px-4 py-3 text-sm text-violet-100/80">
                     {loadingArchiveView ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
                     {loadingArchiveView ? "Cargando archivo comercial..." : "Oportunidades fuera de la mesa activa, disponibles para consulta y restauracion."}
                   </div>
-                )}
+                ) : null}
 
-                <div data-sales-kanban className="flex min-w-0 max-w-full gap-4 overflow-x-auto pb-2 xl:grid xl:grid-cols-3 xl:overflow-visible">
+                <div data-sales-kanban className="flex min-w-0 max-w-full gap-3.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:grid xl:grid-cols-3 xl:overflow-visible">
                   {boardColumns.map((column) => (
-                    <section key={column.key} className="flex min-h-[390px] w-[292px] shrink-0 flex-col rounded-[24px] border border-white/10 bg-[#07111f]/72 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-4 xl:w-auto xl:min-w-0">
-                      <div className="flex items-start justify-between gap-3 border-b border-white/8 px-1 pb-4">
+                    <section key={column.key} className="flex min-h-[340px] w-[286px] shrink-0 flex-col rounded-[20px] border border-white/10 bg-[#07111f]/72 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:w-[310px] xl:w-auto xl:min-w-0">
+                      <div className="flex items-start justify-between gap-3 border-b border-white/8 px-0.5 pb-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2.5">
                             <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_18px_currentColor]", column.accent)} />
                             <h2 className="text-lg font-semibold text-white">{column.label}</h2>
                             <span className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium", column.badge)}>{column.count}</span>
                           </div>
-                          <p className="mt-1.5 text-xs leading-5 text-white/45">{column.helper}</p>
+                          <p className="mt-1 text-xs leading-4 text-white/45">{column.helper}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-white/90">{formatMoney(column.amount)}</p>
@@ -703,7 +701,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
                         </div>
                       </div>
 
-                      <div className="mt-3 flex flex-1 flex-col gap-3">
+                      <div className="mt-2.5 flex flex-1 flex-col gap-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:max-h-[570px] xl:overflow-y-auto xl:pr-1">
                         {listMode === "archive" && loadingArchiveView ? (
                           <div className="flex flex-1 items-center justify-center rounded-[18px] border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted">
                             Cargando oportunidades...
@@ -860,7 +858,7 @@ export function SalesHub({ summary, metrics, opportunities, readOnly }: SalesHub
 
         </div>
 
-        <aside className="space-y-4">
+        <aside data-sales-insights className="grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
           <Card className="border-orange-400/24 bg-white/[0.03] backdrop-blur-xl">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
@@ -1164,13 +1162,13 @@ function PipelineOpportunityCard({
     <article
       data-sales-opportunity-card
       className={cn(
-        "group relative overflow-hidden rounded-[20px] border bg-[linear-gradient(155deg,rgba(255,255,255,0.055),rgba(255,255,255,0.018))] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-[0_18px_45px_rgba(0,0,0,0.24)]",
+        "group relative shrink-0 overflow-hidden rounded-[18px] border bg-[linear-gradient(155deg,rgba(255,255,255,0.055),rgba(255,255,255,0.018))] p-3.5 transition duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-[0_18px_45px_rgba(0,0,0,0.24)]",
         selected ? "border-orange-400/40 shadow-[0_0_0_1px_rgba(249,115,22,0.16)]" : priorityMeta.ringClass
       )}
     >
       <span className={cn("absolute inset-y-0 left-0 w-1", accentClass)} />
 
-      <div className="flex items-start gap-3 pl-1">
+      <div className="flex items-start gap-2.5 pl-1">
         {selectable ? (
           <label className="mt-1 inline-flex shrink-0 items-center">
             <input
@@ -1194,27 +1192,27 @@ function PipelineOpportunityCard({
             <span className="shrink-0 text-[11px] text-white/42">{item.lastActivityLabel}</span>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-lg font-semibold tracking-tight text-white">{formatMoney(item.amount, item.currency)}</p>
               <p className="mt-0.5 text-[10px] uppercase tracking-[0.15em] text-white/34">valor potencial</p>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-xs font-semibold text-white/85">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-xs font-semibold text-white/85">
               {initialsFromName(item.responsible?.name || item.customer.name)}
             </div>
           </div>
 
-          <div className="mt-4 rounded-[16px] border border-white/9 bg-black/18 px-3.5 py-3">
+          <div className="mt-3 rounded-[14px] border border-white/9 bg-black/18 px-3 py-2.5">
             <div className="flex items-start gap-2.5">
               <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-orange-200" />
               <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">Proximo paso</p>
-                <p className="mt-1 text-sm leading-5 text-white/86">{item.attentionLabel}</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/45">Siguiente accion</p>
+                <p className="mt-0.5 text-sm leading-5 text-white/86">{item.attentionLabel}</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", stageBadgeClass(item.stageTone))}>
               {item.commercialStageLabel}
             </span>
@@ -1223,7 +1221,7 @@ function PipelineOpportunityCard({
             </span>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/8 pt-2.5">
             <span className="mr-auto truncate text-xs text-white/45">{item.responsible?.name || "Sin responsable"}</span>
             {listMode === "archive" && orphanHidden ? (
               <Button type="button" size="sm" variant="ghost" className="h-8 rounded-xl border border-sky-400/20 bg-sky-500/10 px-3 text-xs text-sky-100" onClick={onRestoreOrphan}>
