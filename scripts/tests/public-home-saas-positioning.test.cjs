@@ -55,6 +55,17 @@ test("uses the same real inbox in the demo journey", () => {
   assert.doesNotMatch(demo, /variant="inbox"/);
 });
 
+test("replaces the legacy pipeline mockup with the real sanitized sales product", () => {
+  assert.match(demo, /opturon-sales-pipeline-client-portal\.png/);
+  assert.match(demo, /Entrantes, Seguimiento y Cierre/);
+  assert.doesNotMatch(demo, /HomeProductMockup/);
+  assert.doesNotMatch(demo, /variant="pipeline"/);
+  assert.match(home, /opturon-inbox-client-portal\.png/);
+  assert.match(home, /opturon-orders-create-order\.png/);
+  assert.match(home, /opturon-catalog-client-portal\.png/);
+  assert.match(home, /opturon-metrics-client-portal\.png/);
+});
+
 test("continues the product story from conversation to a real order", () => {
   assert.match(home, /De la conversación a la operación/);
   assert.match(home, /opturon-orders-create-order\.png/);

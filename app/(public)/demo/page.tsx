@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { ContactLeadForm } from "@/components/contact/ContactLeadForm";
 import { AuditIntake } from "@/components/lead/AuditIntake";
-import { HomeProductMockup } from "@/components/sections/HomeProductMockup";
 import { Card } from "@/components/ui/card";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SecondaryButton } from "@/components/ui/SecondaryButton";
@@ -227,7 +226,7 @@ export default function DemoPage() {
           ))}
         </div>
 
-        <div className="mt-10 grid gap-5 xl:grid-cols-2">
+        <div className="mt-10 grid gap-6 2xl:grid-cols-2">
           <Card className="overflow-hidden p-5">
             <div className="mb-4 flex items-center gap-3">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/35 bg-brand/10">
@@ -260,7 +259,18 @@ export default function DemoPage() {
                 <p className="text-sm text-muted">El pipeline deja claro que oportunidad mover y cual priorizar.</p>
               </div>
             </div>
-            <HomeProductMockup variant="pipeline" compact />
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1623] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
+              <div className="overflow-x-auto rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <Image
+                  src="/product/opturon-sales-pipeline-client-portal.png"
+                  width={3600}
+                  height={2000}
+                  sizes="(max-width: 1535px) 94vw, 760px"
+                  alt="Pipeline comercial de Opturon con oportunidades en Entrantes, Seguimiento y Cierre"
+                  className="h-auto min-w-[680px] rounded-xl object-contain sm:min-w-0"
+                />
+              </div>
+            </div>
           </Card>
         </div>
       </Section>
