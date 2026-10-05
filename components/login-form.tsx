@@ -6,28 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
+import { normalizeSafeInternalCallback } from "@/lib/safe-internal-callback";
 
 const PARTNER_CALLBACK_PATHS = new Set(["/", "/clients", "/career", "/network", "/commissions", "/profile", "/invite"]);
 
-function normalizeSafeCallbackUrl(value: string | null, fallback: string) {
-  const candidate = String(value || "").trim();
-  if (!candidate) return fallback;
-  if (candidate.startsWith("/") && !candidate.startsWith("//")) return candidate;
-
-  try {
-    const parsed = new URL(candidate);
-    if (parsed.origin === window.location.origin) {
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    }
-  } catch {
-    return fallback;
-  }
-
-  return fallback;
-}
-
 function safeCallbackUrl(value: string | null, fallback: string, authIntent: "portal" | "partner") {
-  const candidate = normalizeSafeCallbackUrl(value, fallback);
+  const origin = typeof window === "undefined" ? "https://opturon.invalid" : window.location.origin;
+  const candidate = normalizeSafeInternalCallback(value, fallback, origin);
   if (authIntent !== "partner") return candidate;
 
   const pathname = candidate.split(/[?#]/)[0] || "/";
@@ -160,6 +145,17 @@ export function LoginForm({
         <p className="mt-1 text-xs">Te enviaremos un enlace temporal para crear una nueva contrasena.</p>
       </div>
       {isDev ? <p className="text-xs text-muted-foreground">Debug status: {debugStatus}</p> : null}
+      {authIntent === "portal" ? (
+        <p className="text-center text-sm text-muted-foreground">
+          ¿Primera vez en Opturon?{" "}
+          <a
+            className="font-semibold text-foreground underline-offset-4 hover:underline"
+            href={`/register?callbackUrl=${encodeURIComponent(safeCallbackUrl(params.get("callbackUrl"), defaultCallbackUrl, "portal"))}`}
+          >
+            Crear cuenta
+          </a>
+        </p>
+      ) : null}
     </form>
   );
 }
