@@ -1076,6 +1076,89 @@ export async function loginPortalUser(email: string, password: string) {
   );
 }
 
+export type PublicPlanDto = {
+  key: "core" | "growth" | "distribution" | "enterprise";
+  displayName: string;
+  description: string;
+  pricingMode: "fixed" | "contact";
+  amount: number | null;
+  currency: string | null;
+  billingCadence: string | null;
+  highlights: string[];
+  recommended: boolean;
+  ctaMode: "select_plan" | "contact";
+};
+
+export async function registerPortalOwnerAccount(input: {
+  name: string;
+  businessName: string;
+  email: string;
+  password: string;
+}, clientIpHint?: string) {
+  return backendPortalFetch<{
+    success: boolean;
+    data: { id: string; email: string; name: string; tenantId: string; tenantRole: TenantRole };
+  }>("/portal/auth/register", {
+    method: "POST",
+    headers: clientIpHint ? { "x-portal-client-ip": clientIpHint } : undefined,
+    body: JSON.stringify(input)
+  }, AUTH_API_TIMEOUT_MS);
+}
+
+export async function createPortalSaasCheckout(tenantId: string, actorUserId: string, planKey: string, clientIpHint?: string) {
+  const safeTenantId = String(tenantId || "").trim();
+  const safeActorId = String(actorUserId || "").trim();
+  if (!safeTenantId || !safeActorId) throw new Error("billing_request_context_invalid");
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      subscriptionId: string;
+      planKey: string;
+      amount: string;
+      currency: string;
+      billingCadence: string;
+      state: string;
+      reused: boolean;
+      authorizationUrl: string;
+    };
+  }>(`/portal/tenants/${encodeURIComponent(safeTenantId)}/billing/checkout`, {
+    method: "POST",
+    headers: {
+      "x-portal-actor-id": safeActorId,
+      "x-active-tenant-id": safeTenantId,
+      ...(clientIpHint ? { "x-portal-client-ip": clientIpHint } : {})
+    },
+    body: JSON.stringify({ planKey })
+  });
+}
+
+export async function getPortalSaasCheckoutStatus(tenantId: string, actorUserId: string) {
+  const safeTenantId = String(tenantId || "").trim();
+  const safeActorId = String(actorUserId || "").trim();
+  if (!safeTenantId || !safeActorId) throw new Error("billing_request_context_invalid");
+  return backendPortalFetch<{
+    success: boolean;
+    data: {
+      planKey: string | null;
+      contractedAmount: string | null;
+      contractedCurrency: string | null;
+      subscriptionStatus: string | null;
+      billingState: string;
+      entitlementState: string;
+      entitlementActive: boolean;
+      paymentPending: boolean;
+      accountActive: boolean;
+      canResume: boolean;
+    };
+  }>(`/portal/tenants/${encodeURIComponent(safeTenantId)}/billing/checkout/status`, {
+    method: "GET",
+    headers: {
+      "x-portal-actor-id": safeActorId,
+      "x-active-tenant-id": safeTenantId
+    }
+  });
+}
+
 export async function requestPortalPasswordReset(email: string) {
   return backendPortalFetch<{
     success: boolean;

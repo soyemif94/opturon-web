@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { PublicPlanPricing } from "@/components/sections/PublicPlanPricing";
 import {
   ArrowRight,
   BarChart3,
@@ -150,6 +151,9 @@ export function SaasHome() {
               </Link>
               <Link href="#producto" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/25 hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
                 Ver la plataforma <ChevronRight className="h-4 w-4" />
+              </Link>
+              <Link href="#planes" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-orange-300/25 bg-orange-300/[0.06] px-5 py-3 text-sm font-semibold text-orange-100 transition hover:border-orange-300/40 hover:bg-orange-300/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+                Ver planes
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-3 text-xs text-slate-500">
@@ -400,6 +404,8 @@ export function SaasHome() {
           </div>
         </div>
       </section>
+
+      <PublicPlanPricing />
 
       <section className="pb-24 sm:pb-28 lg:pb-32">
         <div className="container-opt">
