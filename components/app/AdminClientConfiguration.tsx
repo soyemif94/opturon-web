@@ -24,6 +24,7 @@ import {
   buildAdminEmbeddedSignupErrorMessage,
   buildAdminEmbeddedSignupViewModel
 } from "@/lib/admin-whatsapp-embedded-signup";
+import { formatAdminBillingActionError } from "@/lib/admin-billing-action-error";
 
 const PLAN_OPTIONS = [
   { value: "basic", label: "Inicial" },
@@ -405,6 +406,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [creatingClient, setCreatingClient] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [newClientOpen, setNewClientOpen] = useState(false);
+  const [cancelSubscriptionConfirmationOpen, setCancelSubscriptionConfirmationOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>("summary");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -627,10 +629,11 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       );
       const json = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(json?.message || "La accion no esta disponible para el estado actual de la suscripcion.");
+        throw new Error(formatAdminBillingActionError(response.status, json));
       }
       const subscription = json?.subscription as AdminBillingSubscription;
       setSubscriptions((current) => [subscription, ...current.filter((item) => item.id !== subscription.id)]);
+      if (action === "cancel") setCancelSubscriptionConfirmationOpen(false);
       toast.success(json?.message || "Suscripcion actualizada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la suscripcion.");
@@ -1090,6 +1093,40 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
             <Button type="button" onClick={createClient} disabled={creatingClient} className="gap-2">
               {creatingClient ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {creatingClient ? "Creando cliente" : "Confirmar alta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelSubscriptionConfirmationOpen} onOpenChange={setCancelSubscriptionConfirmationOpen}>
+        <DialogContent data-cancel-subscription-dialog>
+          <DialogHeader>
+            <DialogTitle>Cancelar suscripción</DialogTitle>
+            <DialogDescription>
+              Confirmá la cancelación de la suscripción SaaS. Opturon solicitará la cancelación al proveedor y actualizará el estado local sólo cuando quede confirmada.
+            </DialogDescription>
+          </DialogHeader>
+          {currentSubscription ? (
+            <div className="rounded-xl border border-[color:var(--border)] bg-surface/60 p-3 text-sm">
+              <p><span className="text-muted">Plan:</span> {currentSubscription.planCode}</p>
+              <p className="mt-1"><span className="text-muted">Importe:</span> {formatMoney(currentSubscription.amount, currentSubscription.currency)} / {currentSubscription.billingInterval}</p>
+              <p className="mt-1"><span className="text-muted">Estado:</span> {formatBillingStatus(currentSubscription.localStatus)}</p>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" disabled={actingSubscriptionId !== null}>Volver</Button>
+            </DialogClose>
+            <Button
+              type="button"
+              variant="secondary"
+              data-confirm-subscription-cancellation
+              onClick={() => void runSubscriptionAction("cancel")}
+              disabled={!currentSubscription || actingSubscriptionId === currentSubscription?.id}
+              className="text-red-600"
+            >
+              {actingSubscriptionId === currentSubscription?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Confirmar cancelación
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1563,7 +1600,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => runSubscriptionAction("cancel")}
+                      onClick={() => setCancelSubscriptionConfirmationOpen(true)}
                       disabled={!billingActions.has("cancel") || actingSubscriptionId === currentSubscription.id}
                       className="justify-start gap-2 text-red-600"
                     >
