@@ -52,6 +52,11 @@ export type AdminBillingSubscription = {
   externalReference: string;
   authorizationUrl?: string | null;
   metadata?: Record<string, unknown>;
+  lifecycle?: {
+    entitlementState?: string | null;
+    activatedAt?: string | null;
+    lastSuccessfulPaymentId?: string | null;
+  };
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -285,7 +290,7 @@ export async function getAdminBillingSubscription(subscriptionId: string) {
 
 export async function postAdminBillingSubscriptionAction(
   subscriptionId: string,
-  action: "cancel" | "pause" | "reactivate"
+  action: "cancel" | "pause" | "reactivate" | "abandon"
 ) {
   return backendPortalFetch<{
     success: boolean;
