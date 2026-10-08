@@ -44,11 +44,20 @@ test("public plan checkout uses the canonical catalog and safe account handoff",
     assert.match(publicPlanPricing, /fetch\("\/api\/public\/plans"/);
     assert.match(publicPlanPricing, /plan\.recommended/);
     assert.match(publicPlanPricing, /formatBillingCadence\(plan\.billingCadence\)/);
-    assert.match(publicPlanPricing, /contact \? "\/contacto"/);
+    assert.match(publicPlanPricing, /plan\.key === "enterprise"/);
     assert.match(publicPlanPricing, /checkout\/start\?planKey=/);
     assert.match(publicPlanPricing, /currencyDisplay: "code"/);
     assert.doesNotMatch(publicPlanPricing, /\b(?:49900|69900|89900)\b/);
     assert.doesNotMatch(publicPlanPricing, /\/ mes/);
+    assert.match(publicPlanPricing, /Elegí el plan ideal para tu negocio y activá Opturon en minutos\./);
+    assert.match(publicPlanPricing, /Más elegido/);
+    assert.match(publicPlanPricing, /Comenzar con Core/);
+    assert.match(publicPlanPricing, /Elegir Growth/);
+    assert.match(publicPlanPricing, /Elegir Distribución/);
+    assert.match(publicPlanPricing, /Hablar con Opturon/);
+    assert.match(publicPlanPricing, /WhatsApp e Inbox —/);
+    assert.match(publicPlanPricing, /Bot IA Standard/);
+    assert.match(publicPlanPricing, /Bot IA Avanzado/);
     assert.match(publicPlanPricing, /state === "error"/);
     assert.match(saasHome, /opturon-inbox-client-portal\.png/);
     assert.match(saasHome, /opturon-orders-create-order\.png/);
@@ -97,7 +106,8 @@ test("public plan checkout uses the canonical catalog and safe account handoff",
   });
 
   await t.test("Enterprise routes to contact and never the fixed checkout", () => {
-    assert.match(publicPlanPricing, /contact \? "\/contacto"/);
+    assert.match(publicPlanPricing, /href=\{contact \? "\/contacto"/);
+    assert.match(publicPlanPricing, /presentation\.cta/);
     assert.match(checkoutStartPage, /requested === "enterprise"\) redirect\("\/contacto"\)/);
     assert.ok(checkoutStartPage.indexOf('requested === "enterprise"') < checkoutStartPage.indexOf('<CheckoutStartClient'));
   });
