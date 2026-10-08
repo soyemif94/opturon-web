@@ -228,7 +228,7 @@ export async function getAdminBillingSubscription(subscriptionId: string) {
 
 export async function postAdminBillingSubscriptionAction(
   subscriptionId: string,
-  action: "cancel" | "pause" | "reactivate"
+  action: "cancel" | "pause" | "reactivate" | "abandon"
 ) {
   return backendPortalFetch<{
     success: boolean;

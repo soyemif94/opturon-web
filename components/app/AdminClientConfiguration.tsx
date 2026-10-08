@@ -246,7 +246,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
     }
   }
 
-  async function runSubscriptionAction(action: "pause" | "cancel" | "reactivate") {
+  async function runSubscriptionAction(action: "pause" | "cancel" | "reactivate" | "abandon") {
     if (!currentSubscription) return;
     setActingSubscriptionId(currentSubscription.id);
     try {
@@ -262,7 +262,7 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
       if (!response.ok) throw new Error(json?.error || `billing_subscription_${action}_failed`);
       const subscription = json?.subscription as AdminBillingSubscription;
       setSubscriptions((current) => [subscription, ...current.filter((item) => item.id !== subscription.id)]);
-      toast.success("Suscripcion actualizada");
+      toast.success(action === "abandon" ? "Checkout pendiente descartado" : "Suscripcion actualizada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la suscripcion.");
     } finally {
@@ -511,16 +511,38 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
                       <PlayCircle className="h-4 w-4" />
                       Reactivar suscripcion
                     </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => runSubscriptionAction("cancel")}
-                      disabled={actingSubscriptionId === currentSubscription.id}
-                      className="justify-start gap-2 text-red-600"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Cancelar suscripcion
-                    </Button>
+                    {currentSubscription.mercadoPagoStatus === "pending" &&
+                    currentSubscription.metadata?.checkoutAbandoned !== true ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          if (window.confirm("No se aprobo ningun pago. Se cerrara este checkout de Opturon; el objeto pendiente de Mercado Pago puede permanecer en su historial y este intento no podra activar el plan. Quieres continuar?")) {
+                            void runSubscriptionAction("abandon");
+                          }
+                        }}
+                        disabled={actingSubscriptionId === currentSubscription.id}
+                        className="justify-start gap-2 text-red-600"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Descartar checkout pendiente
+                      </Button>
+                    ) : currentSubscription.metadata?.checkoutAbandoned !== true ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => runSubscriptionAction("cancel")}
+                        disabled={actingSubscriptionId === currentSubscription.id}
+                        className="justify-start gap-2 text-red-600"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Cancelar suscripcion
+                      </Button>
+                    ) : (
+                      <p className="rounded-xl border border-dashed border-[color:var(--border)] px-3 py-2 text-sm text-muted">
+                        Checkout pendiente descartado. No es valido para activar el plan.
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
