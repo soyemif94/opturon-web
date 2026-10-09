@@ -255,7 +255,7 @@ function UnpaidActivationScreen({ tenantLabel, billingStatus }: { tenantLabel?: 
             <Badge variant="muted">Activación pendiente</Badge>
           </div>
           <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-            Hola {tenantLabel || "👋"} <span aria-hidden="true">👋</span>
+            {tenantLabel ? `Hola ${tenantLabel} 👋` : "Hola 👋"}
           </h1>
           <p className="mt-4 text-lg leading-8 text-white/78">Todavía no tenés un plan pago activo.</p>
           <p className="mt-2 max-w-xl text-sm leading-7 text-white/58 sm:text-base">
@@ -908,17 +908,21 @@ export function AppShell({
                         <p className="hidden text-xs uppercase tracking-[0.24em] text-muted sm:block">Portal del cliente</p>
                         <h1 className="text-base font-semibold tracking-tight sm:mt-1 sm:text-xl md:text-2xl">
                           <span className="sm:hidden">Portal del cliente</span>
-                          <span className="hidden sm:inline">Gestiona conversaciones, automatizaciones y crecimiento</span>
+                          <span className="hidden sm:inline">
+                            {unpaidGate ? "Activá tu cuenta para comenzar a usar Opturon" : "Gestiona conversaciones, automatizaciones y crecimiento"}
+                          </span>
                         </h1>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <ThemeToggleButton />
                         <Badge variant="muted" className="hidden md:inline-flex">Espacio del cliente</Badge>
                         <Badge variant={unpaidGate ? "warning" : "success"}>{unpaidGate ? "Activación pendiente" : "Portal activo"}</Badge>
-                        <Badge variant="outline" className="hidden gap-1.5 md:inline-flex">
-                          <Sparkles className="h-3.5 w-3.5" />
-                          Operacion en vivo
-                        </Badge>
+                        {!unpaidGate ? (
+                          <Badge variant="outline" className="hidden gap-1.5 md:inline-flex">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Operacion en vivo
+                          </Badge>
+                        ) : null}
                         {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
                       </div>
                     </div>

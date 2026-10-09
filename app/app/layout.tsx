@@ -64,6 +64,13 @@ export default async function ClientPortalLayout({ children }: { children: React
     : null;
   const effectiveBillingStatus = billingStatus || fallbackBillingStatus;
   const unpaidClient = isClientTenant && effectiveBillingStatus?.entitlementActive !== true;
+  const businessDisplayName = String(tenantContext?.data?.clinic?.name || "").trim();
+  const safeBusinessDisplayName =
+    businessDisplayName &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(businessDisplayName) &&
+    !/^tenant[_-]/i.test(businessDisplayName)
+      ? businessDisplayName
+      : undefined;
   const tenantModules = buildTenantAppModules(tenantContext?.data?.policy || null);
   const whatsappStatus = buildWhatsAppConnectionStatus({
     fallbackReason: ctx.tenantId
@@ -87,7 +94,7 @@ export default async function ClientPortalLayout({ children }: { children: React
       <div className="min-h-screen w-full">
         <AppShell
           tenantId={ctx.tenantId}
-          tenantLabel={tenantLabel}
+          tenantLabel={unpaidClient ? safeBusinessDisplayName : tenantLabel}
           buildMarker={buildMarker}
           buildEnv={buildEnv}
           deploymentId={deploymentId}

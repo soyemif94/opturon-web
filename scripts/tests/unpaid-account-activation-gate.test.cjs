@@ -21,14 +21,26 @@ test("unpaid client access uses the canonical billing entitlement", () => {
 
 test("unpaid clients receive an intentional activation screen and restricted navigation", () => {
   const shell = read("components/layout/app-shell.tsx");
+  const layout = read("app/app/layout.tsx");
 
   assert.match(shell, /function UnpaidActivationScreen/);
+  assert.match(shell, /tenantLabel \? `Hola \$\{tenantLabel\} 👋` : "Hola 👋"/);
   assert.match(shell, /Todavía no tenés un plan pago activo/);
   assert.match(shell, /Continuar contratación/);
   assert.match(shell, /Elegir un plan/);
   assert.match(shell, /unpaidGate \? item\.module === "home"/);
   assert.match(shell, /unpaidGate \? <UnpaidActivationScreen/);
-  assert.match(shell, /item\.module === "home"/);
+  assert.match(layout, /safeBusinessDisplayName/);
+  assert.match(layout, /tenantLabel=\{unpaidClient \? safeBusinessDisplayName : tenantLabel\}/);
+});
+
+test("unpaid header is activation-oriented while active header badges remain unchanged", () => {
+  const shell = read("components/layout/app-shell.tsx");
+
+  assert.match(shell, /unpaidGate \? "Activá tu cuenta para comenzar a usar Opturon"/);
+  assert.match(shell, /!unpaidGate \? \(/);
+  assert.match(shell, /Operacion en vivo/);
+  assert.match(shell, /unpaidGate \? "Activación pendiente" : "Portal activo"/);
 });
 
 test("legacy active entitlements and internal portals remain outside the client gate", () => {
