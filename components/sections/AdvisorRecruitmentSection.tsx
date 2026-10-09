@@ -30,8 +30,9 @@ export function AdvisorRecruitmentSection() {
             <h2 id="advisor-title" className="mt-5 max-w-xl text-balance text-4xl font-semibold tracking-[-0.055em] sm:text-5xl">¿Querés trabajar con nosotros?</h2>
             <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">Convertite en asesor/a comercial de Opturon y ayudá a negocios de tu zona a ordenar, automatizar y hacer crecer su operación.</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/login?callbackUrl=%2Fpartners" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-orange-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-200">Quiero ser asesor/a <ArrowRight className="h-4 w-4" /></Link>
-              <a href="#asesores-pasos" className="inline-flex min-h-12 items-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">Conocer el programa</a>
+              <Link href="/asesores/registro" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-orange-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-200">Quiero ser asesor/a <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/asesores" className="inline-flex min-h-12 items-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">Conocer el programa</Link>
+              <Link href="/login?callbackUrl=%2Fpartners" className="inline-flex min-h-12 items-center rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10">Ya soy asesor/a — Iniciar sesión</Link>
             </div>
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm leading-6 text-slate-300">
               <p className="font-semibold text-white">Una relación comercial independiente</p>
