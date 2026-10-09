@@ -8,7 +8,7 @@ const columns = [
   },
   {
     title: "Opturon",
-    links: [["Contacto", "/contacto"], ["Blog", "/blog"], ["Ingresar", "/app"]]
+    links: [["Contacto", "/contacto"], ["Trabajá con nosotros", "/#asesores"], ["Blog", "/blog"], ["Ingresar", "/app"]]
   }
 ];
 

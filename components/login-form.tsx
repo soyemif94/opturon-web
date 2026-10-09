@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
@@ -44,6 +45,7 @@ export function LoginForm({
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [debugStatus, setDebugStatus] = useState<"idle" | "loading" | "ok" | "error" | "timeout">("idle");
@@ -132,8 +134,25 @@ export function LoginForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Input type="email" placeholder={emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required />
-      <Input type="password" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required />
+      <label className="grid gap-2 text-sm font-medium text-slate-200" htmlFor="login-email">
+        Email
+        <Input id="login-email" autoComplete="email" type="email" placeholder={emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required />
+      </label>
+      <label className="grid gap-2 text-sm font-medium text-slate-200" htmlFor="login-password">
+        Contraseña
+        <span className="relative">
+          <Input id="login-password" autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder="Tu contraseña" value={password} onChange={(e) => setPassword(e.target.value)} className="pr-12" required />
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </span>
+      </label>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Ingresando..." : submitLabel}

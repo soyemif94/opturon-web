@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PublicPlanPricing } from "@/components/sections/PublicPlanPricing";
+import { AdvisorRecruitmentSection } from "@/components/sections/AdvisorRecruitmentSection";
 import {
   ArrowRight,
   BarChart3,
@@ -410,6 +411,7 @@ export function SaasHome() {
       </section>
 
       <PublicPlanPricing />
+      <AdvisorRecruitmentSection />
 
       <section className="pb-24 sm:pb-28 lg:pb-32">
         <div className="container-opt">
