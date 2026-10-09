@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { PortalBotConfig, PortalBotSettings } from "@/lib/api";
+import { effectiveBotPresentation, formatBillingPeriod, provisioningPresentation } from "@/lib/bot-settings-presentation";
 
 type BotConfigFormProps = {
   initialConfig: PortalBotConfig;
@@ -293,10 +294,16 @@ export function BotConfigForm({ initialConfig, initialSettings, tenantName, port
   const pending = ai?.aiProvisioning?.status === "pending";
   const blockedOrFailed = ai?.aiProvisioning?.status === "blocked" || ai?.aiProvisioning?.status === "failed";
   const core = planKey === "core" || !ai?.entitlements?.capabilities?.["bot.enabled"];
-  const toggleDisabled = core || pending || blockedOrFailed || ai?.aiProvisioning?.status === "not_required" || isToggling;
-  const period = usage?.periodStart && usage?.periodEnd
-    ? `${new Date(usage.periodStart).toLocaleDateString("es-AR")} — ${new Date(usage.periodEnd).toLocaleDateString("es-AR")}`
-    : "Período vigente informado por el servidor";
+  const toggleDisabled = core || pending || blockedOrFailed || isToggling;
+  const provisioning = provisioningPresentation(ai?.aiProvisioning?.status);
+  const effective = effectiveBotPresentation({
+    provisioningStatus: ai?.aiProvisioning?.status,
+    botActive,
+    quotaAvailable: usage?.quotaAvailable !== false,
+    channelOperational: portalActive,
+    entitled: !core
+  });
+  const period = formatBillingPeriod(usage?.periodStart || ai?.aiProvisioning?.periodStart, usage?.periodEnd || ai?.aiProvisioning?.periodEnd);
 
   return (
     <form className="space-y-5" onSubmit={save}>
@@ -327,15 +334,25 @@ export function BotConfigForm({ initialConfig, initialSettings, tenantName, port
               <h2 className="mt-2 text-xl font-semibold text-white">Atención automática</h2>
               <p className="mt-2 text-sm leading-6 text-muted">El asistente sólo responde cuando el canal, tu plan, la configuración y el cupo están disponibles.</p>
             </div>
-            <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-3 py-2 text-sm text-white">
-              <span>{botActive ? "ON" : "OFF"}</span>
-              <input aria-label="Atención automática" type="checkbox" checked={botActive} disabled={toggleDisabled} onChange={(event) => toggleBot(event.target.checked)} />
-            </label>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Atención automática"
+              aria-checked={botActive}
+              disabled={toggleDisabled}
+              onClick={() => toggleBot(!botActive)}
+              className="flex min-h-11 items-center gap-3 rounded-2xl border border-white/10 px-3 py-2 text-sm text-white transition hover:border-orange-300/60 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span>{botActive ? "Activada" : "Desactivada"}</span>
+              <span aria-hidden="true" className={`relative h-6 w-11 rounded-full transition ${botActive ? "bg-orange-400" : "bg-white/20"}`}>
+                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${botActive ? "left-6" : "left-1"}`} />
+              </span>
+            </button>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <Metric label="Estado" value={status?.label || (botActive ? "Activo" : "Desactivado por el cliente")} detail={status?.detail || "El asistente está apagado."} />
+            <Metric label="Estado" value={effective.label} detail={effective.detail} />
             <Metric label="Plan" value={planKey === "growth" ? "Growth" : planKey === "distribution" ? "Distribución" : planKey === "enterprise" ? "Enterprise" : "Core"} detail={planKey === "growth" ? "Estándar" : planKey === "distribution" ? "Avanzado" : planKey === "enterprise" ? "Personalizado / Avanzado" : "Sin asistente incluido"} />
-            <Metric label="Configuración inicial" value={pending ? "En proceso" : blockedOrFailed ? "Pendiente" : ai?.aiProvisioning?.status === "ready" ? "Lista" : "No requerida"} detail={pending ? "Puede demorar entre 24 y 48 horas." : blockedOrFailed ? "Contactá a soporte." : "Estado informado por el servidor."} />
+            <Metric label="Configuración inicial" value={provisioning.label} detail={provisioning.detail} />
           </div>
           {core ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-sm text-amber-100"><span>El asistente inteligente no está incluido en Core.</span><a className="font-semibold text-orange-200 underline" href="/#planes">Ver planes</a></div> : null}
           {pending ? <p className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/[0.06] p-4 text-sm leading-6 text-sky-100">Podrás activar la atención automática cuando finalice la configuración.</p> : null}
