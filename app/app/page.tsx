@@ -51,6 +51,12 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
     : [];
   let tenantName = tenant?.name || "Tu empresa";
   let tenantIndustry = tenant?.industry || "Negocio digital";
+  let aiProvisioning: {
+    status: "not_required" | "pending" | "ready" | "blocked" | "failed";
+    planKey: string | null;
+    botTier: string | null;
+    includedResponses: number;
+  } | null = null;
   let onboardingState = {
     hasChannel: false,
     hasProducts: false,
@@ -74,6 +80,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       whatsapp = buildWhatsAppConnectionStatus({ context: contextResult.data, onboarding: null });
       tenantName = contextResult.data.clinic?.name || tenantName;
       tenantIndustry = "Espacio conectado";
+      aiProvisioning = contextResult.data.aiProvisioning || null;
 
       const [conversationsResult, contactsResult, onboardingResult, businessResult, expirationResult] = await Promise.allSettled([
         getPortalConversations(ctx.tenantId, { channel: "whatsapp" }),
@@ -270,6 +277,7 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
         ]}
         contacts={dashboardContacts}
         expirationSummary={expirationSummary}
+        aiProvisioning={aiProvisioning}
         quickLinks={[
           { label: "Abrir inbox", href: "/app/inbox", helper: "Ir a la vista completa de conversaciones y chat." },
           { label: "Abrir agenda", href: "/app/agenda", helper: "Ordenar seguimientos, notas y disponibilidad del negocio." },

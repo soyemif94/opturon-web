@@ -395,6 +395,15 @@ export type PortalTenantContext = {
     planKey?: string | null;
     reason?: string | null;
   };
+  aiProvisioning?: {
+    status: "not_required" | "pending" | "ready" | "blocked" | "failed";
+    planKey: string | null;
+    botTier: string | null;
+    includedResponses: number;
+    provisioningStartedAt?: string | null;
+    readyAt?: string | null;
+    blockedReason?: string | null;
+  } | null;
   reason: string;
 };
 

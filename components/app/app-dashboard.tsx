@@ -71,7 +71,8 @@ export function AppDashboard({
   recentActivity,
   contacts,
   quickLinks,
-  expirationSummary
+  expirationSummary,
+  aiProvisioning
 }: {
   tenantName: string;
   tenantIndustry: string;
@@ -88,6 +89,12 @@ export function AppDashboard({
     criticalLots: number;
     urgentLots: number;
     unitsAtRisk7Days: number;
+  } | null;
+  aiProvisioning?: {
+    status: "not_required" | "pending" | "ready" | "blocked" | "failed";
+    planKey: string | null;
+    botTier: string | null;
+    includedResponses: number;
   } | null;
 }) {
   const conversationsStat = stats.find((item) => item.icon === "conversations") || stats[0];
@@ -282,6 +289,17 @@ export function AppDashboard({
 
   return (
     <div className="space-y-5">
+      {aiProvisioning?.status === "pending" ? (
+        <Card className="border-sky-400/25 bg-sky-400/10">
+          <CardContent className="flex items-start gap-3 p-5">
+            <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-text">Tu plan está activo</p>
+              <p className="mt-1 text-sm text-muted">Estamos configurando tu asistente IA. La configuración inicial puede tardar entre 24 y 48 horas. Mientras tanto podés continuar usando tu espacio y gestionar conversaciones manualmente.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
       {demoMode ? (
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
           Modo demo activo. Esta vista esta preparada para demos comerciales y walkthroughs de producto.
