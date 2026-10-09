@@ -2,32 +2,32 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Menu, Orbit, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
+import { OpturonMark } from "@/components/opturon-mark";
 
 const links = [
   { href: "/#producto", label: "Producto" },
   { href: "/#distribuidoras", label: "Distribuidoras" },
   { href: "/#automatizacion", label: "Automatización" },
-  { href: "/demo", label: "Demo" }
+  { href: "/demo", label: "Demo" },
+  { href: "/#planes", label: "Planes" }
 ];
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#080d14]/88 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050b14]/88 backdrop-blur-xl">
       <div className="container-opt">
         <div className="flex h-[4.5rem] items-center justify-between gap-5">
           <Link href="/" className="inline-flex items-center gap-2.5 font-semibold tracking-[-0.02em] text-white" aria-label="Opturon, inicio">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 text-white shadow-[0_10px_28px_rgba(249,115,22,0.22)]">
-              <Orbit className="h-4.5 w-4.5" />
-            </span>
+            <OpturonMark />
             <span className="text-lg">Opturon</span>
           </Link>
 
           <nav className="hidden items-center gap-1 text-sm text-slate-400 lg:flex" aria-label="Navegación principal">
             {links.map((item) => (
-              <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+              <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
                 {item.label}
               </Link>
             ))}
@@ -35,7 +35,7 @@ export function Navbar() {
 
           <div className="hidden items-center gap-2 sm:flex">
             <Link href="/app" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">Ingresar</Link>
-            <Link href="/contacto" className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
+            <Link href="/contacto" className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200">
               Solicitar demo <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>

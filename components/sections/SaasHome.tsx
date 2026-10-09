@@ -126,11 +126,18 @@ function ProductPreview() {
 
 export function SaasHome() {
   return (
-    <div className="overflow-hidden bg-[#080d14] text-white">
+    <div className="relative overflow-hidden bg-[#050b14] text-white">
+      <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+        <div className="absolute -left-72 -top-80 h-[50rem] w-[50rem] rounded-full border border-sky-400/15 shadow-[0_0_120px_rgba(14,165,233,0.08)]" />
+        <div className="absolute -right-80 top-[28rem] h-[42rem] w-[68rem] rotate-[28deg] rounded-[50%] border border-sky-400/15" />
+        <div className="absolute -bottom-96 left-1/4 h-[40rem] w-[80rem] -rotate-[10deg] rounded-[50%] border border-orange-400/15" />
+      </div>
       <section className="relative pb-24 pt-16 sm:pt-20 lg:pb-32 lg:pt-28">
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
           <div className="absolute left-1/2 top-0 h-[620px] w-[900px] -translate-x-1/2 rounded-full bg-orange-500/[0.08] blur-[120px]" />
-          <div className="absolute -right-32 top-44 h-72 w-72 rounded-full bg-sky-500/[0.06] blur-[100px]" />
+          <div className="absolute -right-32 top-44 h-72 w-72 rounded-full bg-sky-500/[0.1] blur-[100px]" />
+          <div className="absolute left-[-18rem] top-[-22rem] h-[42rem] w-[42rem] rounded-full border border-orange-300/20" />
+          <div className="absolute right-[-20rem] top-[-5rem] h-[38rem] w-[55rem] rotate-[24deg] rounded-[50%] border border-sky-300/20" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
         </div>
         <div className="container-opt relative">
@@ -151,9 +158,6 @@ export function SaasHome() {
               </Link>
               <Link href="#producto" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/25 hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
                 Ver la plataforma <ChevronRight className="h-4 w-4" />
-              </Link>
-              <Link href="#planes" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-orange-300/25 bg-orange-300/[0.06] px-5 py-3 text-sm font-semibold text-orange-100 transition hover:border-orange-300/40 hover:bg-orange-300/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
-                Ver planes
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-3 text-xs text-slate-500">

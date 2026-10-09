@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Orbit } from "lucide-react";
+import { OpturonMark } from "@/components/opturon-mark";
 
 const columns = [
   {
     title: "Plataforma",
-    links: [["Producto", "/#producto"], ["Distribuidoras", "/#distribuidoras"], ["Automatización", "/#automatizacion"], ["Demo", "/demo"]]
+    links: [["Producto", "/#producto"], ["Distribuidoras", "/#distribuidoras"], ["Automatización", "/#automatizacion"], ["Demo", "/demo"], ["Planes", "/#planes"]]
   },
   {
     title: "Opturon",
@@ -14,11 +14,11 @@ const columns = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/10 bg-[#080d14] text-white">
+    <footer className="border-t border-white/10 bg-[#050b14] text-white">
       <div className="container-opt grid gap-12 py-14 md:grid-cols-[1.4fr_2fr] md:py-16">
         <div>
           <Link href="/" className="inline-flex items-center gap-2.5 font-semibold tracking-tight" aria-label="Opturon, inicio">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500"><Orbit className="h-4.5 w-4.5" /></span>
+            <OpturonMark />
             <span className="text-lg">Opturon</span>
           </Link>
           <p className="mt-5 max-w-sm text-sm leading-6 text-slate-400">La plataforma que conecta conversaciones, ventas y operación para que tu equipo trabaje con el mismo contexto.</p>
