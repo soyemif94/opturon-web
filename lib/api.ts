@@ -390,6 +390,11 @@ export type PortalTenantContext = {
     automationsCount: number;
   };
   policy?: TenantPortalPolicy;
+  entitlements?: {
+    state?: string | null;
+    planKey?: string | null;
+    reason?: string | null;
+  };
   reason: string;
 };
 
@@ -1132,24 +1137,28 @@ export async function createPortalSaasCheckout(tenantId: string, actorUserId: st
   });
 }
 
+export type PortalBillingAccessStatus = {
+  planKey: string | null;
+  contractedAmount: string | null;
+  contractedCurrency: string | null;
+  subscriptionStatus: string | null;
+  billingState: string;
+  entitlementState: string;
+  entitlementActive: boolean;
+  paymentPending: boolean;
+  accountActive: boolean;
+  canResume: boolean;
+  checkoutAbandoned?: boolean;
+  checkoutActive?: boolean;
+};
+
 export async function getPortalSaasCheckoutStatus(tenantId: string, actorUserId: string) {
   const safeTenantId = String(tenantId || "").trim();
   const safeActorId = String(actorUserId || "").trim();
   if (!safeTenantId || !safeActorId) throw new Error("billing_request_context_invalid");
   return backendPortalFetch<{
     success: boolean;
-    data: {
-      planKey: string | null;
-      contractedAmount: string | null;
-      contractedCurrency: string | null;
-      subscriptionStatus: string | null;
-      billingState: string;
-      entitlementState: string;
-      entitlementActive: boolean;
-      paymentPending: boolean;
-      accountActive: boolean;
-      canResume: boolean;
-    };
+    data: PortalBillingAccessStatus;
   }>(`/portal/tenants/${encodeURIComponent(safeTenantId)}/billing/checkout/status`, {
     method: "GET",
     headers: {

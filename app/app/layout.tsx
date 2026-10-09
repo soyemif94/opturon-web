@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { CommandPaletteProvider } from "@/components/ui/command-palette";
 import { isStaffRole } from "@/lib/app-permissions";
-import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { getPortalSaasCheckoutStatus, getPortalTenantContext, isBackendConfigured, type PortalBillingAccessStatus } from "@/lib/api";
 import { isOpturonAdminWorkspaceContext, requireAppPage } from "@/lib/saas/access";
 import { readSaasData } from "@/lib/saas/store";
 import { buildTenantAppModules } from "@/lib/tenant-policy";
@@ -38,6 +38,32 @@ export default async function ClientPortalLayout({ children }: { children: React
     ctx.tenantId && isBackendConfigured() && !isOpturonAdminWorkspaceContext(ctx)
       ? await getPortalTenantContext(ctx.tenantId).catch(() => null)
       : null;
+  const isClientTenant = Boolean(
+    ctx.tenantId &&
+    String(ctx.accountScope || "").trim().toLowerCase() === "client" &&
+    !isStaffRole(ctx.globalRole)
+  );
+  const actorUserId = String(ctx.portalActorId || ctx.userId || "").trim();
+  const billingStatus = isClientTenant && isBackendConfigured() && actorUserId
+    ? await getPortalSaasCheckoutStatus(ctx.tenantId!, actorUserId).then((result) => result.data).catch(() => null)
+    : null;
+  const contextEntitlements = tenantContext?.data?.entitlements;
+  const fallbackBillingStatus: PortalBillingAccessStatus | null = contextEntitlements
+    ? {
+        planKey: contextEntitlements.planKey || null,
+        contractedAmount: null,
+        contractedCurrency: null,
+        subscriptionStatus: null,
+        billingState: "awaiting_payment",
+        entitlementState: String(contextEntitlements.state || "unactivated"),
+        entitlementActive: String(contextEntitlements.state || "").toLowerCase() === "active",
+        paymentPending: false,
+        accountActive: true,
+        canResume: false
+      }
+    : null;
+  const effectiveBillingStatus = billingStatus || fallbackBillingStatus;
+  const unpaidClient = isClientTenant && effectiveBillingStatus?.entitlementActive !== true;
   const tenantModules = buildTenantAppModules(tenantContext?.data?.policy || null);
   const whatsappStatus = buildWhatsAppConnectionStatus({
     fallbackReason: ctx.tenantId
@@ -70,6 +96,8 @@ export default async function ClientPortalLayout({ children }: { children: React
           accountScope={ctx.accountScope}
           tenantModules={tenantModules}
           whatsappStatus={whatsappStatus}
+          unpaidGate={unpaidClient}
+          billingStatus={effectiveBillingStatus}
         >
           {children}
         </AppShell>

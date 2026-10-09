@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { canAccessAppModule, hasAppPermission, isStaffRole, type AppModule, type AppPermission } from "@/lib/app-permissions";
 import { authOptions } from "@/lib/auth";
 import { isPartnerLikeIdentity, isStrictPartnerIdentity } from "@/lib/auth-identity";
-import { getPortalTenantContext, isBackendConfigured } from "@/lib/api";
+import { getPortalSaasCheckoutStatus, getPortalTenantContext, isBackendConfigured } from "@/lib/api";
 import { isPartnerPortalHost, PARTNER_PORTAL_PREVIEW_HEADER, partnerLoginCallbackForHost } from "@/lib/partners-portal";
 import { readSaasData } from "@/lib/saas/store";
 import type { GlobalRole } from "@/lib/saas/types";
@@ -177,7 +177,38 @@ export async function requireAppApi(options?: { permission?: AppPermission }) {
   if (!hasAppPermission(ctx, permission)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
+  const paidAccess = await requirePaidClientApiAccess(ctx);
+  if (paidAccess) return { error: paidAccess };
   return { ctx };
+}
+
+async function requirePaidClientApiAccess(ctx: {
+  tenantId?: string;
+  portalActorId?: string;
+  userId?: string;
+  globalRole?: string;
+  accountScope?: string;
+}) {
+  const isClientTenant = Boolean(
+    ctx.tenantId &&
+    normalizeScope(ctx.accountScope) === "client" &&
+    !isStaffRole(ctx.globalRole as Parameters<typeof isStaffRole>[0])
+  );
+  if (!isClientTenant) return null;
+  if (!isBackendConfigured()) {
+    return NextResponse.json({ error: "paid_entitlement_unavailable" }, { status: 503 });
+  }
+
+  const actorUserId = String(ctx.portalActorId || ctx.userId || "").trim();
+  if (!actorUserId) return NextResponse.json({ error: "paid_entitlement_unavailable" }, { status: 503 });
+
+  try {
+    const result = await getPortalSaasCheckoutStatus(ctx.tenantId!, actorUserId);
+    if (result.data?.entitlementActive === true) return null;
+    return NextResponse.json({ error: "paid_entitlement_required" }, { status: 403 });
+  } catch {
+    return NextResponse.json({ error: "paid_entitlement_unavailable" }, { status: 503 });
+  }
 }
 
 export async function requireAppModuleApi(module: AppModule, options?: { permission?: AppPermission }) {

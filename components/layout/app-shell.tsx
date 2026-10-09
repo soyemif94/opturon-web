@@ -36,7 +36,9 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { canAccessAppModule, canManageUsers, canManageWorkspace, type AppModule } from "@/lib/app-permissions";
+import type { PortalBillingAccessStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
@@ -220,6 +222,75 @@ const navItems: Array<{
 const APP_THEME_STORAGE_KEY = "opturon-app-theme";
 const APP_SIDEBAR_STORAGE_KEY = "opturon-desktop-sidebar-expanded";
 
+const PLAN_LABELS: Record<string, string> = {
+  basic: "Basic",
+  core: "Core",
+  growth: "Growth",
+  distribution: "Distribution",
+  enterprise: "Enterprise"
+};
+
+function formatPlanPrice(status: PortalBillingAccessStatus) {
+  const amount = Number(status.contractedAmount);
+  const currency = String(status.contractedCurrency || "ARS").toUpperCase();
+  if (!Number.isFinite(amount) || amount <= 0 || !["ARS", "USD"].includes(currency)) return null;
+  return new Intl.NumberFormat("es-AR", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
+}
+
+function UnpaidActivationScreen({ tenantLabel, billingStatus }: { tenantLabel?: string; billingStatus: PortalBillingAccessStatus | null }) {
+  const planKey = String(billingStatus?.planKey || "").trim().toLowerCase();
+  const planLabel = PLAN_LABELS[planKey] || planKey || null;
+  const price = billingStatus ? formatPlanPrice(billingStatus) : null;
+  const checkoutHref = billingStatus?.canResume && planKey
+    ? `/checkout/start?planKey=${encodeURIComponent(planKey)}`
+    : "/#planes";
+  const checkoutLabel = billingStatus?.canResume ? "Continuar contratación" : "Elegir un plan";
+
+  return (
+    <div className="mx-auto flex min-h-[68vh] w-full max-w-4xl items-center justify-center py-8">
+      <section className="relative w-full overflow-hidden rounded-[32px] border border-brand/25 bg-[radial-gradient(circle_at_top_right,rgba(236,128,38,0.2),transparent_35%),linear-gradient(145deg,rgba(18,18,18,0.98),rgba(7,7,8,0.96))] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.3)] sm:p-10">
+        <div className="relative max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warning">Cuenta creada</Badge>
+            <Badge variant="muted">Activación pendiente</Badge>
+          </div>
+          <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+            Hola {tenantLabel || "👋"} <span aria-hidden="true">👋</span>
+          </h1>
+          <p className="mt-4 text-lg leading-8 text-white/78">Todavía no tenés un plan pago activo.</p>
+          <p className="mt-2 max-w-xl text-sm leading-7 text-white/58 sm:text-base">
+            Elegí un plan para activar Opturon y comenzar a usar las herramientas de tu negocio.
+          </p>
+
+          {planLabel ? (
+            <div className="mt-7 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">Plan seleccionado</p>
+              <div className="mt-2 flex flex-wrap items-baseline gap-3">
+                <p className="text-xl font-semibold text-white">{planLabel}</p>
+                {price ? <p className="text-sm text-white/65">{price} / mes</p> : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild size="md">
+              <Link href={checkoutHref}>{checkoutLabel}<ChevronRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
+            {billingStatus?.canResume ? (
+              <Button asChild size="md" variant="secondary">
+                <Link href="/#planes">Ver otros planes</Link>
+              </Button>
+            ) : null}
+          </div>
+          <p className="mt-6 text-xs leading-6 text-white/45">
+            Tu cuenta ya está creada. Las herramientas operativas se habilitan automáticamente después de confirmar un pago aprobado.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function SidebarPanel({
   pathname,
   visibleNavItems,
@@ -232,6 +303,7 @@ function SidebarPanel({
   sidebarActionLabel,
   showManageShortcut,
   showUsersShortcut,
+  unpaidGate,
   onNavigate,
   onSignOut,
   inventoryAlertCount
@@ -247,6 +319,7 @@ function SidebarPanel({
   sidebarActionLabel: string;
   showManageShortcut: boolean;
   showUsersShortcut: boolean;
+  unpaidGate?: boolean;
   onNavigate?: () => void;
   onSignOut: () => void;
   inventoryAlertCount: number;
@@ -266,7 +339,7 @@ function SidebarPanel({
           </p>
           <div className="mt-2 flex flex-wrap gap-2 sm:mt-5">
             {tenantLabel ? <Badge variant="muted">{tenantLabel}</Badge> : null}
-            <Badge variant="success">Espacio activo</Badge>
+            <Badge variant={unpaidGate ? "warning" : "success"}>{unpaidGate ? "Activación pendiente" : "Espacio activo"}</Badge>
             {buildMarker ? <Badge variant="outline">Build {buildMarker}</Badge> : null}
           </div>
           {buildLabel ? (
@@ -586,7 +659,9 @@ export function AppShell({
   tenantRole,
   accountScope,
   tenantModules,
-  whatsappStatus
+  whatsappStatus,
+  unpaidGate,
+  billingStatus
 }: {
   children: React.ReactNode;
   tenantId?: string | null;
@@ -600,14 +675,19 @@ export function AppShell({
   accountScope?: string;
   tenantModules?: Record<string, boolean> | null;
   whatsappStatus?: WhatsAppConnectionStatus;
+  unpaidGate?: boolean;
+  billingStatus?: PortalBillingAccessStatus | null;
 }) {
   const pathname = usePathname();
   const isInboxRoute = pathname.startsWith("/app/inbox");
   const accessContext = { globalRole, tenantRole, accountScope, tenantModules };
   const isOpturonAdmin = (globalRole === "superadmin" || globalRole === "ops_admin") && accountScope === "opturon_admin";
-  const visibleNavItems = navItems.filter((item) => canAccessAppModule(accessContext, item.module) && (!item.adminOnly || isOpturonAdmin));
-  const showManageShortcut = canManageWorkspace(accessContext);
-  const showUsersShortcut = canManageUsers(accessContext);
+  const visibleNavItems = navItems.filter((item) =>
+    (unpaidGate ? item.module === "home" : canAccessAppModule(accessContext, item.module)) &&
+    (!item.adminOnly || isOpturonAdmin)
+  );
+  const showManageShortcut = !unpaidGate && canManageWorkspace(accessContext);
+  const showUsersShortcut = !unpaidGate && canManageUsers(accessContext);
   const [sidebarStatus, setSidebarStatus] = useState<WhatsAppConnectionStatus | undefined>(whatsappStatus);
   const [inventoryAlertCount, setInventoryAlertCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -834,7 +914,7 @@ export function AppShell({
                       <div className="flex flex-wrap items-center gap-2">
                         <ThemeToggleButton />
                         <Badge variant="muted" className="hidden md:inline-flex">Espacio del cliente</Badge>
-                        <Badge variant="success">Portal activo</Badge>
+                        <Badge variant={unpaidGate ? "warning" : "success"}>{unpaidGate ? "Activación pendiente" : "Portal activo"}</Badge>
                         <Badge variant="outline" className="hidden gap-1.5 md:inline-flex">
                           <Sparkles className="h-3.5 w-3.5" />
                           Operacion en vivo
@@ -864,7 +944,7 @@ export function AppShell({
                   : "overflow-x-visible overflow-y-auto bg-[image:var(--panel-glow)] p-5 xl:p-8"
               )}
             >
-              {children}
+              {unpaidGate ? <UnpaidActivationScreen tenantLabel={tenantLabel} billingStatus={billingStatus || null} /> : children}
             </main>
           </div>
         </div>
@@ -888,6 +968,7 @@ export function AppShell({
             sidebarActionLabel={sidebarActionLabel}
             showManageShortcut={showManageShortcut}
             showUsersShortcut={showUsersShortcut}
+            unpaidGate={unpaidGate}
             onNavigate={() => setSidebarOpen(false)}
             inventoryAlertCount={inventoryAlertCount}
             onSignOut={() => void signOut({ callbackUrl: "/login" })}
