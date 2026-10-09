@@ -1781,6 +1781,29 @@ export type PortalBotSettings = {
   clinicName: string | null;
   mode: "automatic" | "sales" | "agenda";
   botConfig: PortalBotConfig;
+  botActive: boolean;
+  entitlements?: { planKey?: string | null; state?: string | null; botActive?: boolean; capabilities?: Record<string, boolean> };
+  aiProvisioning?: {
+    status?: string | null;
+    planKey?: string | null;
+    botTier?: string | null;
+    includedResponses?: number | null;
+    periodStart?: string | null;
+    periodEnd?: string | null;
+    blockedReason?: string | null;
+  } | null;
+  aiUsage?: {
+    usedResponses: number;
+    reservedResponses?: number;
+    includedResponses: number | null;
+    remainingResponses: number | null;
+    percent: number | null;
+    quotaAvailable: boolean;
+    periodStart?: string | null;
+    periodEnd?: string | null;
+  } | null;
+  botStatus?: { code: string; label: string; detail: string };
+  quotaWarnings?: number[];
 };
 
 export async function getPortalBusinessSettings(tenantId: string) {

@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const schema = z.object({
+  botActive: z.boolean().optional(),
   name: z.string().max(80).optional(),
   greetingMessage: z.string().max(500).optional(),
   tone: z.enum(["amigable", "profesional", "calido"]).optional(),
@@ -58,6 +59,7 @@ function normalizeText(value: unknown, maxLength: number) {
 
 function normalizePayload(payload: z.infer<typeof schema>) {
   return {
+    ...(payload.botActive === undefined ? {} : { botActive: payload.botActive }),
     name: normalizeText(payload.name, 80),
     greetingMessage: normalizeText(payload.greetingMessage, 500),
     tone: payload.tone || "amigable",
@@ -133,8 +135,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalized = normalizePayload(parsed.data);
+    const { botActive, ...botConfig } = normalized;
+    const botActiveOnly = parsed.data.botActive !== undefined && Object.keys(parsed.data).length === 1;
     const result = await patchPortalBotSettings(tenantId, {
-      botConfig: normalizePayload(parsed.data)
+      ...(botActive === undefined ? {} : { botActive }),
+      ...(botActiveOnly ? {} : (Object.keys(botConfig).length ? { botConfig } : {}))
     });
     return noStore(NextResponse.json({ ok: true, settings: result.data.settings, source: "backend_real_tenant" }));
   } catch (error) {

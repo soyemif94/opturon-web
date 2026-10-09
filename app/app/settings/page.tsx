@@ -114,7 +114,8 @@ export default async function AppSettingsPage() {
     clinicId: "",
     clinicName: clinicName,
     mode: "automatic",
-    botConfig: EMPTY_BOT_CONFIG
+    botConfig: EMPTY_BOT_CONFIG,
+    botActive: false
   };
   let users: PortalUser[] = [];
   let usersMeta: PortalUsersMeta = DEFAULT_USERS_META;

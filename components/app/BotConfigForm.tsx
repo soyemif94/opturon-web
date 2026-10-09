@@ -1,15 +1,16 @@
 "use client";
 
-import { FormEvent, ReactNode, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import type { PortalBotConfig } from "@/lib/api";
+import type { PortalBotConfig, PortalBotSettings } from "@/lib/api";
 
 type BotConfigFormProps = {
   initialConfig: PortalBotConfig;
+  initialSettings?: PortalBotSettings | null;
   tenantName?: string;
   portalActive?: boolean;
 };
@@ -146,13 +147,29 @@ async function safeJson(response: Response) {
   }
 }
 
-export function BotConfigForm({ initialConfig, tenantName, portalActive = true }: BotConfigFormProps) {
+export function BotConfigForm({ initialConfig, initialSettings, tenantName, portalActive = true }: BotConfigFormProps) {
   const normalizedInitial = useMemo(() => normalizeForm(initialConfig), [initialConfig]);
   const [form, setForm] = useState<PortalBotConfig>(normalizedInitial);
   const [savedConfig, setSavedConfig] = useState<PortalBotConfig>(normalizedInitial);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string }>({ tone: null, text: "" });
   const [isSaving, setIsSaving] = useState(false);
+  const [botActive, setBotActive] = useState(initialSettings?.botActive === true);
+  const [isToggling, setIsToggling] = useState(false);
+  const [settings, setSettings] = useState<PortalBotSettings | null>(initialSettings || null);
+
+  useEffect(() => {
+    const warnings = (initialSettings?.quotaWarnings || []).sort((a, b) => b - a);
+    const highest = warnings[0];
+    if (highest) {
+      const copy: Record<number, [string, string]> = {
+        50: ["Consumo de respuestas", "Ya utilizaste el 50% de tus respuestas inteligentes incluidas."],
+        70: ["Consumo elevado", "Ya utilizaste el 70% de las respuestas inteligentes de tu plan."],
+        100: ["Cupo agotado", "Alcanzaste el cupo de respuestas inteligentes incluido en tu plan."]
+      };
+      toast.success(copy[highest][0], copy[highest][1]);
+    }
+  }, [initialSettings]);
 
   const normalizedCurrent = useMemo(() => normalizeForm(form), [form]);
   const isDirty = useMemo(
@@ -228,6 +245,10 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
       }
 
       const nextConfig = normalizeForm(json?.settings?.botConfig || normalized);
+      if (json?.settings) {
+        setSettings(json.settings as PortalBotSettings);
+        setBotActive(json.settings.botActive === true);
+      }
       setForm(nextConfig);
       setSavedConfig(nextConfig);
       setFieldErrors({});
@@ -240,6 +261,42 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
       setIsSaving(false);
     }
   }
+
+  async function toggleBot(next: boolean) {
+    setIsToggling(true);
+    try {
+      const response = await fetch("/api/app/settings/bot-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botActive: next })
+      });
+      const json = await safeJson(response);
+      if (!response.ok) {
+        toast.error("No se pudo actualizar la atención automática", json?.detail || "La configuración no está disponible todavía.");
+        return;
+      }
+      setBotActive(json?.settings?.botActive === true);
+      if (json?.settings) setSettings(json.settings as PortalBotSettings);
+      toast.success(next ? "Atención automática activada" : "Atención automática desactivada");
+    } catch {
+      toast.error("Error de red", "No pudimos actualizar la atención automática.");
+    } finally {
+      setIsToggling(false);
+    }
+  }
+
+  const ai = settings || initialSettings;
+  const planKey = String(ai?.entitlements?.planKey || ai?.aiProvisioning?.planKey || "core").toLowerCase();
+  const included = ai?.aiUsage?.includedResponses ?? ai?.aiProvisioning?.includedResponses ?? (planKey === "growth" ? 2000 : planKey === "distribution" ? 3500 : null);
+  const usage = ai?.aiUsage;
+  const status = ai?.botStatus;
+  const pending = ai?.aiProvisioning?.status === "pending";
+  const blockedOrFailed = ai?.aiProvisioning?.status === "blocked" || ai?.aiProvisioning?.status === "failed";
+  const core = planKey === "core" || !ai?.entitlements?.capabilities?.["bot.enabled"];
+  const toggleDisabled = core || pending || blockedOrFailed || ai?.aiProvisioning?.status === "not_required" || isToggling;
+  const period = usage?.periodStart && usage?.periodEnd
+    ? `${new Date(usage.periodStart).toLocaleDateString("es-AR")} — ${new Date(usage.periodEnd).toLocaleDateString("es-AR")}`
+    : "Período vigente informado por el servidor";
 
   return (
     <form className="space-y-5" onSubmit={save}>
@@ -259,6 +316,42 @@ export function BotConfigForm({ initialConfig, tenantName, portalActive = true }
               {portalActive ? "WhatsApp activo" : "Canal pendiente"}
             </Badge>
           </div>
+        </div>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] p-5 shadow-[var(--card-shadow)]">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-[#fdba74]">Asistente inteligente</p>
+              <h2 className="mt-2 text-xl font-semibold text-white">Atención automática</h2>
+              <p className="mt-2 text-sm leading-6 text-muted">El asistente sólo responde cuando el canal, tu plan, la configuración y el cupo están disponibles.</p>
+            </div>
+            <label className="flex items-center gap-3 rounded-2xl border border-white/10 px-3 py-2 text-sm text-white">
+              <span>{botActive ? "ON" : "OFF"}</span>
+              <input aria-label="Atención automática" type="checkbox" checked={botActive} disabled={toggleDisabled} onChange={(event) => toggleBot(event.target.checked)} />
+            </label>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <Metric label="Estado" value={status?.label || (botActive ? "Activo" : "Desactivado por el cliente")} detail={status?.detail || "El asistente está apagado."} />
+            <Metric label="Plan" value={planKey === "growth" ? "Growth" : planKey === "distribution" ? "Distribución" : planKey === "enterprise" ? "Enterprise" : "Core"} detail={planKey === "growth" ? "Estándar" : planKey === "distribution" ? "Avanzado" : planKey === "enterprise" ? "Personalizado / Avanzado" : "Sin asistente incluido"} />
+            <Metric label="Configuración inicial" value={pending ? "En proceso" : blockedOrFailed ? "Pendiente" : ai?.aiProvisioning?.status === "ready" ? "Lista" : "No requerida"} detail={pending ? "Puede demorar entre 24 y 48 horas." : blockedOrFailed ? "Contactá a soporte." : "Estado informado por el servidor."} />
+          </div>
+          {core ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-sm text-amber-100"><span>El asistente inteligente no está incluido en Core.</span><a className="font-semibold text-orange-200 underline" href="/#planes">Ver planes</a></div> : null}
+          {pending ? <p className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/[0.06] p-4 text-sm leading-6 text-sky-100">Podrás activar la atención automática cuando finalice la configuración.</p> : null}
+          {blockedOrFailed ? <a className="mt-4 inline-block rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white" href="/contacto">Contactar soporte</a> : null}
+        </div>
+        <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(12,20,32,0.98),rgba(8,14,23,0.96))] p-5 shadow-[var(--card-shadow)]">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-[#fdba74]">Consumo</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">Uso de respuestas inteligentes</h2>
+          <p className="mt-2 text-sm text-muted">Período actual: {period}</p>
+          <p className="mt-5 text-lg font-semibold text-white">{included == null ? `${usage?.usedResponses || 0} respuestas utilizadas` : `${usage?.usedResponses || 0} de ${included.toLocaleString("es-AR")} respuestas utilizadas`}</p>
+          {included != null ? <>
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.min(100, usage?.percent || 0)}%` }} /></div>
+            <div className="mt-3 flex justify-between text-sm text-muted"><span>{usage?.remainingResponses ?? included} respuestas disponibles</span><span>{usage?.percent || 0}%</span></div>
+          </> : <p className="mt-4 text-sm text-muted">Cupo personalizado según contrato.</p>}
+          {usage && !usage.quotaAvailable ? <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-sm leading-6 text-amber-100">La atención manual y el resto de Opturon continúan funcionando. El asistente está pausado hasta disponer de capacidad.</p> : null}
+          {planKey === "growth" && (usage?.percent || 0) >= 70 ? <a className="mt-4 inline-block text-sm font-semibold text-orange-200 underline" href="/contacto">Solicitar ampliación</a> : null}
         </div>
       </section>
 
@@ -476,4 +569,8 @@ function PreviewBlock({ label, text }: { label: string; text: string }) {
       <p className="mt-1 whitespace-pre-wrap">{text}</p>
     </div>
   );
+}
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3"><p className="text-[10px] uppercase tracking-[0.16em] text-muted">{label}</p><p className="mt-2 text-sm font-semibold text-white">{value}</p><p className="mt-1 text-xs leading-5 text-muted">{detail}</p></div>;
 }

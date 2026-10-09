@@ -1,5 +1,5 @@
 import { BotConfigForm } from "@/components/app/BotConfigForm";
-import { getPortalBotSettings, getPortalTenantContext, isBackendConfigured, type PortalBotConfig } from "@/lib/api";
+import { getPortalBotSettings, getPortalTenantContext, isBackendConfigured, type PortalBotConfig, type PortalBotSettings } from "@/lib/api";
 import { requireAppPage } from "@/lib/saas/access";
 
 const EMPTY_BOT_CONFIG: PortalBotConfig = {
@@ -23,6 +23,7 @@ export default async function AppBotSettingsPage() {
   let initialConfig = EMPTY_BOT_CONFIG;
   let clinicName = "Espacio del cliente";
   let portalActive = false;
+  let initialSettings: PortalBotSettings | null = null;
 
   if (tenantId && isBackendConfigured()) {
     try {
@@ -32,6 +33,7 @@ export default async function AppBotSettingsPage() {
       ]);
 
       initialConfig = settingsResult?.data.settings?.botConfig || EMPTY_BOT_CONFIG;
+      initialSettings = settingsResult?.data.settings || null;
       clinicName = tenantContext?.data?.clinic?.name || settingsResult?.data.settings?.clinicName || clinicName;
       portalActive = Boolean(tenantContext?.data?.onboarding?.hasChannel);
     } catch {
@@ -39,5 +41,5 @@ export default async function AppBotSettingsPage() {
     }
   }
 
-  return <BotConfigForm initialConfig={initialConfig} tenantName={clinicName} portalActive={portalActive} />;
+  return <BotConfigForm initialConfig={initialConfig} initialSettings={initialSettings} tenantName={clinicName} portalActive={portalActive} />;
 }
