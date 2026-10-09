@@ -869,7 +869,7 @@ export function AppShell({
     <section
       data-app-shell
       data-desktop-sidebar-state={desktopNavExpanded ? "expanded" : "collapsed"}
-      className="min-h-dvh w-full overflow-x-hidden bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5"
+      className="app-shell-visual-surface min-h-dvh w-full overflow-x-hidden bg-[color:var(--bg)] px-3 py-3 text-[color:var(--text)] md:px-5 md:py-5"
     >
       <div className="flex min-h-[calc(100dvh-1.5rem)] w-full items-stretch gap-3 md:min-h-[calc(100dvh-2.5rem)] md:gap-5">
         <DesktopRail

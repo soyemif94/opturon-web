@@ -171,6 +171,94 @@ body {
   scrollbar-width: thin;
 }
 
+/* Keep the authenticated workspace in the same visual world as the public Home
+   without changing the shell's cards, navigation, or page-level surfaces. */
+.app-shell-visual-surface {
+  position: relative;
+  isolation: isolate;
+  background-image:
+    radial-gradient(ellipse 48rem 30rem at 8% 4%, rgba(14, 165, 233, 0.13), transparent 68%),
+    radial-gradient(ellipse 40rem 26rem at 94% 12%, rgba(249, 115, 22, 0.12), transparent 70%),
+    linear-gradient(135deg, rgba(5, 11, 20, 0.18), transparent 48%, rgba(8, 34, 62, 0.16));
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+.app-shell-visual-surface::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    radial-gradient(circle at 15% 2%, rgba(255, 255, 255, 0.055), transparent 18%),
+    radial-gradient(circle at 78% 88%, rgba(14, 165, 233, 0.08), transparent 24%);
+}
+
+.app-shell-visual-surface::after {
+  position: absolute;
+  top: -14rem;
+  right: -13rem;
+  z-index: 0;
+  width: 48rem;
+  height: 28rem;
+  pointer-events: none;
+  content: "";
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2.5rem rgba(249, 115, 22, 0.045),
+    0 0 0 5rem rgba(56, 189, 248, 0.035);
+  opacity: 0.7;
+  transform: rotate(-18deg);
+}
+
+.app-shell-visual-surface > div {
+  position: relative;
+  z-index: 1;
+}
+
+[data-app-theme="light"] .app-shell-visual-surface {
+  background-image:
+    radial-gradient(ellipse 48rem 30rem at 8% 4%, rgba(14, 165, 233, 0.08), transparent 68%),
+    radial-gradient(ellipse 40rem 26rem at 94% 12%, rgba(249, 115, 22, 0.07), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 48%, rgba(224, 242, 254, 0.22));
+}
+
+[data-app-theme="light"] .app-shell-visual-surface::before {
+  background:
+    radial-gradient(circle at 15% 2%, rgba(255, 255, 255, 0.7), transparent 18%),
+    radial-gradient(circle at 78% 88%, rgba(14, 165, 233, 0.06), transparent 24%);
+}
+
+[data-app-theme="light"] .app-shell-visual-surface::after {
+  border-color: rgba(14, 116, 144, 0.12);
+  box-shadow:
+    0 0 0 2.5rem rgba(249, 115, 22, 0.035),
+    0 0 0 5rem rgba(14, 116, 144, 0.025);
+  opacity: 0.55;
+}
+
+@media (max-width: 767px) {
+  .app-shell-visual-surface {
+    background-attachment: scroll;
+  }
+
+  .app-shell-visual-surface::after {
+    top: -9rem;
+    right: -20rem;
+    width: 38rem;
+    height: 23rem;
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell-visual-surface {
+    background-attachment: scroll;
+  }
+}
+
 .app-scroll-surface:hover,
 .app-scroll-surface:focus-within {
   scrollbar-color: var(--app-scrollbar-thumb-hover) transparent;
