@@ -58,6 +58,23 @@ test("advisor recruitment section is public, connected to partner entry, and avo
   assert.doesNotMatch(section, /\b(?:25|27,5|30|32,5)%/);
 });
 
+test("public advisor application has a public information route, form route, BFF, and onboarding material", () => {
+  const info = read("app/(public)/asesores/page.tsx");
+  const form = read("app/(public)/asesores/registro/page.tsx");
+  const bff = read("app/api/public/advisors/apply/route.ts");
+  assert.match(info, /\/asesores\/registro/);
+  assert.match(info, /Portal del Asesor/);
+  assert.match(form, /cuit/);
+  assert.match(form, /hasMonotributo/);
+  assert.match(form, /independentRelationshipAcknowledged/);
+  assert.match(form, /monotributoAcknowledged/);
+  assert.match(form, /Solicitud enviada/);
+  assert.match(form, /\/api\/public\/advisors\/apply/);
+  assert.match(bff, /public-advisor-applications/);
+  assert.match(read("public/onboarding/Opturon_Primeros_Pasos_Cliente.pptx"), /PK/);
+  assert.match(read("public/onboarding/Opturon_Guia_Asesor_Comercial.pptx"), /PK/);
+});
+
 test("the milestone does not touch the authenticated portal or billing authority", () => {
   const changed = [
     "components/auth/LoginScreen.tsx",
