@@ -45,30 +45,6 @@ const flowSteps = [
   }
 ];
 
-const serviceLevels = [
-  {
-    name: "Starter",
-    summary: "Para negocios que reciben consultas, pero todavia atienden WhatsApp de forma improvisada.",
-    bullets: ["Inbox centralizado", "Contactos con contexto", "Primer seguimiento visible"],
-    highlight: "Ideal para ordenar la base",
-    fit: "Si hoy respondes todo manualmente y sin un criterio comun."
-  },
-  {
-    name: "Sales System",
-    summary: "Para equipos que ya venden por WhatsApp y necesitan seguimiento comercial serio.",
-    bullets: ["Pipeline comercial", "Owners y subcuentas", "OPS con alertas y SLA basico"],
-    highlight: "El nivel mas pedido",
-    fit: "Si ya hay volumen comercial y el problema es seguimiento, cierres y orden."
-  },
-  {
-    name: "Ops & Scale",
-    summary: "Para operaciones con volumen que necesitan trazabilidad, supervision y mas control.",
-    bullets: ["Mas usuarios y control por tenant", "Seguimiento operativo", "Base lista para escalar"],
-    highlight: "Pensado para equipos con crecimiento",
-    fit: "Si ya necesitas supervision, multiusuario y menos dependencia de personas clave."
-  }
-];
-
 const tangibleOutcomes = [
   "Entiendes rapido como evitar leads frios y conversaciones perdidas.",
   "Ves que nivel de sistema necesita hoy tu operacion.",
@@ -275,48 +251,6 @@ export default function DemoPage() {
         </div>
       </Section>
 
-      <Section id="planes-demo">
-        <div className="max-w-3xl">
-          <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Niveles de servicio</p>
-          <h2 className="mt-3 text-balance text-3xl font-semibold md:text-5xl">
-            Elige el nivel que mejor encaja con tu momento comercial
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-8 text-muted">
-            No todos los negocios necesitan lo mismo. Aqui la idea es que ubiques rapido si necesitas ordenar, vender
-            con mas seguimiento o escalar con mas control.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {serviceLevels.map((level) => (
-            <Card
-              key={level.name}
-              cardGlow="orange"
-              className={level.name === "Sales System" ? "border-brand/40 bg-brand/5 p-7" : "p-7"}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-2xl font-semibold">{level.name}</h3>
-                  <p className="mt-3 text-sm leading-7 text-muted">{level.summary}</p>
-                  <p className="mt-3 text-sm font-medium text-text/90">{level.fit}</p>
-                </div>
-                <span className="rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brandBright">
-                  {level.highlight}
-                </span>
-              </div>
-
-              <div className="mt-6 grid gap-3">
-                {level.bullets.map((bullet) => (
-                  <div key={bullet} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-text">
-                    {bullet}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </Section>
-
       <Section id="demo-intake" className="pb-24 md:pb-28">
         <div className="max-w-3xl">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-brandBright">Avance comercial</p>
@@ -343,8 +277,7 @@ export default function DemoPage() {
                 <div>
                   <h3 className="text-xl font-semibold">Tambien puedes dejar tu consulta</h3>
                   <p className="mt-2 text-sm leading-7 text-muted">
-                    Esto sirve para negocios que quieren avanzar, pero antes necesitan ordenar objetivo, rubro y nivel
-                    de servicio.
+                    Esto sirve para negocios que quieren avanzar, pero antes necesitan ordenar objetivo, rubro y plan.
                   </p>
                 </div>
               </div>

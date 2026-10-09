@@ -76,7 +76,7 @@ export function HomePackages() {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-3">
-        <PrimaryButton href="/demo#planes-demo" ariaLabel="Ver el recorrido comercial y los niveles de servicio">
+        <PrimaryButton href="/#planes" ariaLabel="Ver los planes vigentes de Opturon">
           Ver recorrido comercial
           <ArrowRight className="ml-2 h-4 w-4" />
         </PrimaryButton>

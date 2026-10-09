@@ -6,7 +6,7 @@ import { WhatsAppCtaLink } from "@/components/ui/WhatsAppCtaLink";
 import { getTrackedWhatsAppLink, isWhatsAppExternalLink } from "@/lib/whatsapp";
 import { Input } from "@/components/ui/input";
 
-type PackageInterest = "starter" | "sales-system" | "ops-scale" | "not-sure";
+type PackageInterest = "core" | "growth" | "distribution" | "enterprise" | "not-sure";
 type Objective = "ventas" | "soporte" | "ambos";
 
 type IntakeState = {
@@ -19,9 +19,10 @@ type IntakeState = {
 };
 
 const PACKAGE_LABELS: Record<PackageInterest, string> = {
-  starter: "Starter",
-  "sales-system": "Sales System (recomendado)",
-  "ops-scale": "Ops & Scale",
+  core: "Core",
+  growth: "Growth (recomendado)",
+  distribution: "Distribución",
+  enterprise: "Enterprise",
   "not-sure": "No estoy seguro"
 };
 
@@ -31,7 +32,7 @@ const INITIAL_STATE: IntakeState = {
   monthlyInquiries: "",
   crmCurrent: "",
   objective: "ventas",
-  packageInterest: "sales-system"
+  packageInterest: "growth"
 };
 
 function sanitize(value: string) {
@@ -51,7 +52,7 @@ export function AuditIntake() {
       `Consultas/mes: ${sanitize(state.monthlyInquiries)}`,
       `CRM actual: ${sanitize(state.crmCurrent)}`,
       `Objetivo: ${sanitize(state.objective)}`,
-      `Paquete de interés: ${PACKAGE_LABELS[state.packageInterest]}`,
+      `Plan de interés: ${PACKAGE_LABELS[state.packageInterest]}`,
       "",
       "¿Me indican próximos pasos y disponibilidad?"
     ].join("\n");
@@ -110,7 +111,7 @@ export function AuditIntake() {
         </div>
       </Field>
 
-      <Field label="Paquete de interés">
+      <Field label="Plan de interés">
         <div className="grid gap-2 sm:grid-cols-2">
           {(Object.keys(PACKAGE_LABELS) as PackageInterest[]).map((item) => (
             <label key={item} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[color:var(--border)] bg-surface/60 px-3 py-2 text-sm text-text">

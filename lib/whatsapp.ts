@@ -15,12 +15,6 @@ const PREFILL_BY_ORIGIN: Record<string, string> = {
     "Hola Opturon. Vengo desde Portfolio y quiero probar cómo funciona el sistema de Opturon en una conversación real por WhatsApp.\n\nRubro:\nTipo de consultas que recibo:\nObjetivo principal:",
   "demo-page":
     "Hola Opturon. Vengo desde la demo web y quiero una demo guiada por WhatsApp para entender como funciona Opturon en una conversacion real.",
-  "package-starter":
-    "Hola Opturon. Me interesa el paquete WhatsApp Starter y quiero una auditoria estrategica inicial (15 min).\n\nRubro:\nConsultas/mes:\nCRM:\nObjetivo principal:",
-  "package-sales":
-    "Hola Opturon. Me interesa el paquete Sales System y quiero una auditoria estrategica inicial (15 min).\n\nRubro:\nConsultas/mes:\nCRM:\nObjetivo principal:",
-  "package-scale":
-    "Hola Opturon. Me interesa el paquete Ops & Scale y quiero una auditoria estrategica inicial (15 min).\n\nRubro:\nConsultas/mes:\nCRM:\nObjetivo principal:",
   "audit-intake":
     "Hola Opturon. Quiero una auditoria estrategica inicial (15 min) para automatizar WhatsApp comercial e integrarlo con CRM.\n\nRubro:\nEquipo comercial:\nConsultas/mes:\nCRM actual:\nObjetivo:\nPaquete de interes:\n\nMe indican proximos pasos y disponibilidad?"
 };
@@ -72,9 +66,6 @@ type TrackedWhatsAppLinkParams = {
     | "hero"
     | "cta-final"
     | "sticky"
-    | "package-starter"
-    | "package-sales"
-    | "package-scale"
     | "audit-intake"
     | string;
   prefill?: string;
