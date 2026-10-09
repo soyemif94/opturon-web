@@ -63,6 +63,21 @@ export type AdminBillingSubscription = {
   updatedAt?: string | null;
 };
 
+export type AdminAiProvisioningRow = {
+  clinicId: string;
+  clinicName?: string | null;
+  planKey: string;
+  botTier: string;
+  status: string;
+  includedResponses: number;
+  usedResponses: number;
+  remainingResponses: number;
+  provisioningStartedAt?: string | null;
+  readyAt?: string | null;
+  hoursElapsed?: number;
+  over48Hours?: boolean;
+};
+
 export type CreateAdminBillingSubscriptionPayload = {
   tenantId: string;
   planCode: "inicial" | "crecimiento" | "empresa";
@@ -207,6 +222,16 @@ export async function getAdminTenantPolicies(options: { actorUserId: string }) {
       tenants: AdminTenantPolicyRow[];
     };
   }>("/api/admin/tenants", undefined, API_TIMEOUT_MS, options);
+}
+
+export async function listAdminAiProvisioning() {
+  return backendPortalFetch<{ success: boolean; data: AdminAiProvisioningRow[] }>('/api/admin/ai/provisioning');
+}
+
+export async function updateAdminAiProvisioning(clinicId: string, action: 'mark_ready' | 'block' | 'retry', reason?: string) {
+  return backendPortalFetch<{ success: boolean; data: AdminAiProvisioningRow }>(`/api/admin/ai/provisioning/${encodeURIComponent(clinicId)}`, {
+    method: 'POST', body: JSON.stringify({ action, reason: reason || null })
+  });
 }
 
 export async function getAdminTenantPolicy(tenantId: string, options?: { actorUserId?: string | null }) {

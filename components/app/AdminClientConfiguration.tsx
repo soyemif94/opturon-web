@@ -12,7 +12,9 @@ import type {
   MetaEmbeddedReadinessCheck,
   MetaEmbeddedSignupReadiness,
   TenantPolicy
+  ,AdminAiProvisioningRow
 } from "@/lib/admin-client-policy";
+import { listAdminAiProvisioning, updateAdminAiProvisioning } from "@/lib/admin-client-policy";
 import type { PortalWhatsAppEmbeddedSignupStatus, PortalWhatsAppStatus } from "@/lib/api";
 import { buildEnabledModulesFromCapabilities, getCapabilityForAppModule } from "@/lib/tenant-policy";
 import {
@@ -409,6 +411,8 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   const [cancelSubscriptionConfirmationOpen, setCancelSubscriptionConfirmationOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>("summary");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [aiProvisioningRows, setAiProvisioningRows] = useState<AdminAiProvisioningRow[]>([]);
+  const [aiProvisioningBusy, setAiProvisioningBusy] = useState<string | null>(null);
 
   const currentSubscription = subscriptions[0] || null;
   const filteredTenants = useMemo(() => {
@@ -488,6 +492,24 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
   useEffect(() => {
     void loadWhatsappStatus();
   }, [selectedTenant?.tenantId]);
+
+  useEffect(() => {
+    void listAdminAiProvisioning().then((result) => setAiProvisioningRows(result.data || [])).catch(() => setAiProvisioningRows([]));
+  }, []);
+
+  async function runAiProvisioningAction(row: AdminAiProvisioningRow, action: "mark_ready" | "block" | "retry") {
+    if (action === "mark_ready" && !window.confirm(`¿Marcar la configuración de ${row.clinicName || "este cliente"} como lista?`)) return;
+    setAiProvisioningBusy(`${row.clinicId}:${action}`);
+    try {
+      const result = await updateAdminAiProvisioning(row.clinicId, action);
+      setAiProvisioningRows((current) => current.map((item) => item.clinicId === row.clinicId ? result.data : item));
+      toast.success("Estado de configuración actualizado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar la configuración.");
+    } finally {
+      setAiProvisioningBusy(null);
+    }
+  }
 
   useEffect(() => {
     void loadEmbeddedSignupStatus();
@@ -949,6 +971,28 @@ export function AdminClientConfiguration({ initialTenants }: { initialTenants: A
 
   return (
     <div data-client-management-workspace className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
+      <section className="rounded-2xl border border-[color:var(--border)] bg-card/90 p-4 sm:p-5" data-ai-provisioning-queue>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h2 className="font-semibold">Configuración inicial de IA</h2><p className="mt-1 text-sm text-muted">Cola Admin: estado, cupo y ventana inicial de 48 horas.</p></div>
+          <Button type="button" variant="secondary" onClick={() => listAdminAiProvisioning().then((result) => setAiProvisioningRows(result.data || []))}>Actualizar</Button>
+        </div>
+        <div className="mt-4 space-y-3">
+          {aiProvisioningRows.length === 0 ? <p className="text-sm text-muted">No hay tenants con provisioning registrado.</p> : aiProvisioningRows.map((row) => (
+            <div key={row.clinicId} className="grid gap-3 rounded-xl border border-[color:var(--border)] bg-surface p-3 md:grid-cols-[1.4fr_repeat(4,1fr)_auto] md:items-center">
+              <div><p className="font-medium">{row.clinicName || "Cliente"}</p><p className="text-xs text-muted">{row.planKey} · tier {row.botTier}</p></div>
+              <div><p className="text-xs text-muted">Estado</p><p className="font-medium">{row.status}</p></div>
+              <div><p className="text-xs text-muted">Cupo</p><p className="font-medium">{row.usedResponses}/{row.includedResponses} · quedan {row.remainingResponses}</p></div>
+              <div><p className="text-xs text-muted">Tiempo</p><p className={row.over48Hours ? "font-medium text-amber-600" : "font-medium"}>{Number(row.hoursElapsed || 0).toFixed(1)} h{row.over48Hours ? " · +48 h" : ""}</p></div>
+              <div><p className="text-xs text-muted">Inicio</p><p className="text-sm">{row.provisioningStartedAt ? new Date(row.provisioningStartedAt).toLocaleString("es-AR") : "-"}</p></div>
+              <div className="flex flex-wrap gap-2">
+                {row.status !== "ready" ? <Button size="sm" onClick={() => runAiProvisioningAction(row, "mark_ready")} disabled={aiProvisioningBusy !== null}>Marcar lista</Button> : null}
+                {row.status !== "blocked" ? <Button size="sm" variant="secondary" onClick={() => runAiProvisioningAction(row, "block")} disabled={aiProvisioningBusy !== null}>Bloquear</Button> : null}
+                {(row.status === "blocked" || row.status === "failed") ? <Button size="sm" variant="secondary" onClick={() => runAiProvisioningAction(row, "retry")} disabled={aiProvisioningBusy !== null}>Reintentar</Button> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-card/90 p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block min-w-0 flex-1 sm:max-w-md">
           <span className="sr-only">Buscar clientes</span>
