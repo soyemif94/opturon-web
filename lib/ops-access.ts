@@ -5,7 +5,7 @@ export const OPS_ACCESS_MAX_AGE_SECONDS = 60 * 60 * 12;
 type CookieReader = { get(name: string): { value?: string } | undefined };
 
 function getOpsPassword() {
-  return String(process.env.OPS_PASSWORD || process.env.PORTAL_INTERNAL_KEY || "").trim();
+  return String(process.env.OPS_PASSWORD || "").trim();
 }
 
 function getOpsSecret() {

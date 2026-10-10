@@ -900,7 +900,7 @@ export function AppShell({
                         <h1 className="text-base font-semibold tracking-tight sm:mt-1 sm:text-xl md:text-2xl">
                           <span className="sm:hidden">Portal del cliente</span>
                           <span className="hidden sm:inline">
-                            {unpaidGate ? "Activá tu cuenta para comenzar a usar Opturon" : "Gestiona conversaciones, automatizaciones y crecimiento"}
+                            {unpaidGate ? "Activá tu cuenta para comenzar a usar Opturon" : "Gestioná conversaciones, ventas y operación comercial"}
                           </span>
                         </h1>
                       </div>
