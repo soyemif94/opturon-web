@@ -9,6 +9,7 @@ function formatTime(iso: string) {
 
 export function MessageBubble({
   direction,
+  origin,
   type,
   text,
   caption,
@@ -19,6 +20,7 @@ export function MessageBubble({
   optimistic
 }: {
   direction: string;
+  origin?: "human_whatsapp_business_app" | "history_import" | null;
   type?: string;
   text: string;
   caption?: string;
@@ -39,6 +41,8 @@ export function MessageBubble({
   const mediaUrl = media?.previewUrl || media?.downloadUrl || null;
   const captionText = caption || text;
   const senderLabel = outbound ? "Negocio" : system ? "Evento del bot" : "Cliente";
+  const originLabel = origin === "human_whatsapp_business_app" ? "WhatsApp Business"
+    : origin === "history_import" ? "Historial importado" : null;
   const senderTone = system
     ? "var(--inbox-system-bubble-muted)"
     : outbound
@@ -74,6 +78,7 @@ export function MessageBubble({
         >
           {system ? <Bot className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
           <span>{senderLabel}</span>
+          {originLabel ? <span className="normal-case tracking-normal opacity-80">· {originLabel}</span> : null}
         </div>
         {isImage ? (
           <div className="space-y-2">
@@ -83,7 +88,7 @@ export function MessageBubble({
               </a>
             ) : (
               <div className="rounded-2xl border border-dashed border-[color:var(--border)] px-3 py-4 text-xs text-muted">
-                Imagen recibida. Todavia no se pudo cargar la vista previa.
+                {origin === "history_import" ? "Imagen del historial importado no disponible." : "Imagen recibida. Todavia no se pudo cargar la vista previa."}
               </div>
             )}
             {captionText ? <p className="whitespace-pre-wrap leading-5">{captionText}</p> : null}

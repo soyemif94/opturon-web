@@ -50,6 +50,7 @@ export type DetailPayload = {
   messages: Array<{
     id: string;
     direction: string;
+    origin?: "human_whatsapp_business_app" | "history_import" | null;
     type?: string;
     text: string;
     caption?: string;

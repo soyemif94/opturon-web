@@ -251,6 +251,7 @@ export function ChatPanel({
                 <MessageBubble
                   key={item.id}
                   direction={item.payload.direction}
+                  origin={item.payload.origin}
                   type={item.payload.type}
                   text={item.payload.text}
                   caption={item.payload.caption}

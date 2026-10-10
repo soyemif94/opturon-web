@@ -546,7 +546,25 @@ export type PortalWhatsAppStatus = {
     wabaId: string | null;
     displayPhoneNumber: string | null;
     verifiedName: string | null;
+    connectionMode?: "API_ONLY" | "COEXISTENCE" | null;
     status: string | null;
+  };
+  coexistence?: null | {
+    status: string;
+    isOnBizApp: boolean | null;
+    platformType: string | null;
+    phoneLast4: string | null;
+    historySyncStatus: string;
+    contactsSyncStatus: string;
+    historyPhase: string | null;
+    historyChunkOrder: number | null;
+    historyProgress: number | null;
+    historyStartedAt: string | null;
+    historyUpdatedAt: string | null;
+    contactsUpdatedAt: string | null;
+    lastWebhookAt: string | null;
+    lastEchoAt: string | null;
+    lastAccountEvent: string | null;
   };
   botRuntime: {
     enabled: boolean | null;

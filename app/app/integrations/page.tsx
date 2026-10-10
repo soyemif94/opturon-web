@@ -17,6 +17,7 @@ export default async function AppIntegrationsPage() {
   const isOpturonAdmin = isOpturonAdminWorkspaceContext(ctx);
   let whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "workspace_without_backend" });
   let whatsappStatus: PortalWhatsAppStatus | null = null;
+  let clientCoexistenceStatus: PortalWhatsAppStatus["coexistence"] = null;
   let instagramStatus: PortalInstagramStatus | null = null;
 
   if (ctx.tenantId && isBackendConfigured()) {
@@ -24,11 +25,12 @@ export default async function AppIntegrationsPage() {
       const [result, onboarding, statusResult, instagramResult] = await Promise.all([
         getPortalTenantContext(ctx.tenantId),
         getPortalWhatsAppEmbeddedSignupStatus(ctx.tenantId).catch(() => null),
-        isOpturonAdmin ? getPortalWhatsAppStatus(ctx.tenantId).catch(() => null) : Promise.resolve(null),
+        getPortalWhatsAppStatus(ctx.tenantId).catch(() => null),
         getPortalInstagramStatus(ctx.tenantId).catch(() => null)
       ]);
       whatsapp = buildWhatsAppConnectionStatus({ context: result.data, onboarding: onboarding?.data || null });
-      whatsappStatus = statusResult?.data || null;
+      whatsappStatus = isOpturonAdmin ? statusResult?.data || null : null;
+      clientCoexistenceStatus = !isOpturonAdmin ? statusResult?.data?.coexistence || null : null;
       instagramStatus = instagramResult?.data || null;
     } catch {
       whatsapp = buildWhatsAppConnectionStatus({ fallbackReason: "portal_tenant_context_failed" });
@@ -45,6 +47,7 @@ export default async function AppIntegrationsPage() {
         <IntegrationsHub
           whatsapp={whatsapp}
           whatsappStatus={whatsappStatus}
+          clientCoexistenceStatus={clientCoexistenceStatus}
           instagramStatus={instagramStatus}
           isOpturonAdmin={false}
         />
@@ -61,6 +64,7 @@ export default async function AppIntegrationsPage() {
       <IntegrationsHub
         whatsapp={whatsapp}
         whatsappStatus={whatsappStatus}
+        clientCoexistenceStatus={clientCoexistenceStatus}
         instagramStatus={instagramStatus}
         isOpturonAdmin
       />

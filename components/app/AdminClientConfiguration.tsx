@@ -1778,6 +1778,8 @@ function AdminIntegrationOverview({
 }) {
   const connected = Boolean(status?.channel.connected);
   const onboardingState = String(embeddedSignupStatus?.onboardingState || "").trim().toLowerCase();
+  const coexistence = status?.coexistence || null;
+  const coexMode = status?.channel.connectionMode === "COEXISTENCE";
 
   return (
     <div className="min-w-0 rounded-2xl border border-[color:var(--border)] bg-card/90 p-5">
@@ -1790,11 +1792,56 @@ function AdminIntegrationOverview({
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <ClientSummaryMetric label="Canal" value={status?.channel.provider || "Sin canal"} />
-        <ClientSummaryMetric label="Número" value={status?.channel.displayPhoneNumber || "Sin número"} />
+        <ClientSummaryMetric label="Número" value={coexMode ? coexistence?.phoneLast4 ? `•••• ${coexistence.phoneLast4}` : "•••• —" : status?.channel.displayPhoneNumber || "Sin número"} />
         <ClientSummaryMetric label="Onboarding" value={connected ? "Completado" : onboardingState || "Sin iniciar"} />
       </div>
+      {coexMode ? (
+        <div className="mt-4 rounded-xl border border-[color:var(--border)] bg-surface/55 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Diagnóstico de Coexistence</p>
+            <Badge variant={coexistence?.status === "active" ? "success" : "warning"}>
+              {coexistenceStatusLabel(coexistence?.status)}
+            </Badge>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <ClientSummaryMetric label="Modo" value="WhatsApp Business + Opturon" />
+            <ClientSummaryMetric label="Estado del canal" value={status?.channel.status || "Desconocido"} />
+            <ClientSummaryMetric label="App Business / plataforma" value={`${coexistence?.isOnBizApp === true ? "Activa" : coexistence?.isOnBizApp === false ? "Inactiva" : "Sin verificar"} · ${coexistence?.platformType || "sin dato"}`} />
+            <ClientSummaryMetric label="Historial" value={coexistence?.historySyncStatus || "Sin dato"} />
+            <ClientSummaryMetric label="Contactos" value={coexistence?.contactsSyncStatus || "Sin dato"} />
+            <ClientSummaryMetric label="Último webhook" value={formatCoexistenceDate(coexistence?.lastWebhookAt)} />
+            <ClientSummaryMetric label="Último eco desde la app" value={formatCoexistenceDate(coexistence?.lastEchoAt)} />
+            <ClientSummaryMetric label="Último mensaje entrante" value={formatCoexistenceDate(status?.messages.lastInbound?.createdAt)} />
+          </div>
+          {coexistence?.historyProgress !== null && coexistence?.historyProgress !== undefined ? (
+            <p className="mt-3 text-xs text-muted">Progreso de historial: {coexistence.historyProgress}%{coexistence.historyPhase ? ` · fase ${coexistence.historyPhase}` : ""}{coexistence.historyChunkOrder !== null ? ` · bloque ${coexistence.historyChunkOrder}` : ""}</p>
+          ) : null}
+          {coexistence?.status === "reconnection_required" || coexistence?.status === "disconnected" || coexistence?.historySyncStatus === "failed" || coexistence?.historySyncStatus === "expired" ? (
+            <p role="status" className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-100">
+              {coexistence.status === "reconnection_required" || coexistence.status === "disconnected"
+                ? "El canal necesita revisión o reconexión antes de considerarse operativo."
+                : coexistence.historySyncStatus === "expired"
+                  ? "La ventana de importación del historial expiró; los mensajes nuevos pueden seguir operando si el canal está activo."
+                  : "Falló la importación histórica. Revisar diagnóstico; esto no genera respuestas ni alertas comerciales."}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function coexistenceStatusLabel(status?: string | null) {
+  if (status === "active") return "Coexistencia activa";
+  if (status === "reconnection_required") return "Requiere reconexión";
+  if (status === "disconnected") return "Desconectada";
+  return "Estado sin verificar";
+}
+
+function formatCoexistenceDate(value?: string | null) {
+  if (!value) return "Sin actividad registrada";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Sin actividad registrada" : date.toLocaleString("es-AR");
 }
 
 function AdminMetaAdvancedConfiguration({ readiness }: { readiness: MetaEmbeddedSignupReadiness | null }) {

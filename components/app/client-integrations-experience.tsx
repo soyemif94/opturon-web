@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
-import type { PortalInstagramCandidate, PortalInstagramStatus } from "@/lib/api";
+import type { PortalInstagramCandidate, PortalInstagramStatus, PortalWhatsAppStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import {
   beginMetaWhatsAppConnection,
@@ -31,6 +31,7 @@ const WHATSAPP_MANAGE_LINK = getTrackedWhatsAppLink({
 
 export function ClientIntegrationsExperience({
   whatsapp,
+  coexistenceStatus,
   instagramStatus,
   instagramError,
   instagramMode,
@@ -43,6 +44,7 @@ export function ClientIntegrationsExperience({
   onDisconnectInstagram
 }: {
   whatsapp: WhatsAppConnectionStatus;
+  coexistenceStatus: PortalWhatsAppStatus["coexistence"];
   instagramStatus: PortalInstagramStatus | null;
   instagramError?: string | null;
   instagramMode?: string | null;
@@ -58,7 +60,10 @@ export function ClientIntegrationsExperience({
   const [whatsappSignupBusy, setWhatsAppSignupBusy] = useState(false);
   const [whatsappSignupReady, setWhatsAppSignupReady] = useState(false);
   const [whatsappSignupError, setWhatsAppSignupError] = useState<string | null>(null);
-  const whatsappState = resolveWhatsAppState(whatsapp);
+  const isCoexistence = whatsapp.connectionMode === "COEXISTENCE";
+  const whatsappState = isCoexistence && coexistenceStatus?.status !== "active"
+    ? "error"
+    : resolveWhatsAppState(whatsapp);
   const instagramState = resolveInstagramState({
     status: instagramStatus,
     error: instagramError,
@@ -117,9 +122,19 @@ export function ClientIntegrationsExperience({
         icon={<MessageCircle className="h-6 w-6" />}
         iconClassName="border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
         title="WhatsApp Business"
-        description={whatsappCopy(whatsappState)}
+        description={whatsappCopy(whatsappState, isCoexistence, coexistenceStatus?.status)}
         state={whatsappState}
-        detail={whatsappState === "connected" ? connectedNumber : undefined}
+        detail={whatsappState === "connected"
+          ? isCoexistence ? `Modo: WhatsApp Business + Opturon · ${formatCoexistencePhone(coexistenceStatus?.phoneLast4)}` : connectedNumber
+          : undefined}
+        children={isCoexistence ? (
+          <div className={`mt-4 rounded-xl border px-3 py-2.5 text-xs leading-5 ${coexistenceStatus?.status === "active" ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-100" : "border-amber-400/20 bg-amber-400/5 text-amber-100"}`}>
+            <p className="font-medium">{coexistenceStatus?.status === "active" ? "Coexistencia activa" : coexistenceStatus?.status === "reconnection_required" ? "WhatsApp Business requiere reconexión" : coexistenceStatus?.status === "disconnected" ? "Coexistencia desconectada" : "Estado de Coexistence sin verificar"}</p>
+            {coexistenceStatus?.status === "active" ? (
+              <p className="mt-1">Historial anterior: {customerSyncLabel(coexistenceStatus.historySyncStatus)}. Contactos: {customerSyncLabel(coexistenceStatus.contactsSyncStatus)}.</p>
+            ) : <p className="mt-1">La conexión no se considera activa hasta que Meta confirme el estado del número.</p>}
+          </div>
+        ) : undefined}
         actions={
           whatsappState === "connected" ? (
             <Button asChild variant="secondary" className="w-full rounded-xl sm:w-auto">
@@ -139,6 +154,11 @@ export function ClientIntegrationsExperience({
                 </Button>
               ) : null}
               <div className="flex w-full flex-col gap-2 sm:w-auto">
+                {whatsapp.coexistencePilotEnabled ? (
+                  <p className="max-w-sm text-xs leading-5 text-muted">
+                    Conectá el número que ya usás en WhatsApp Business y seguí respondiendo desde tu teléfono mientras Opturon gestiona los mensajes. El historial previo solo se importa si Meta lo ofrece y aceptás compartirlo durante el alta.
+                  </p>
+                ) : null}
                 <Button
                   type="button"
                   className="w-full rounded-xl sm:w-auto"
@@ -342,11 +362,33 @@ function friendlyStateMeta(state: FriendlyState): {
   return { label: "Sin conectar", variant: "muted" };
 }
 
-function whatsappCopy(state: FriendlyState) {
+function whatsappCopy(state: FriendlyState, isCoexistence = false, coexistenceStatus?: string | null) {
+  if (state === "connected" && isCoexistence) return "Seguí respondiendo desde WhatsApp Business y gestioná las conversaciones desde Opturon.";
+  if (state === "error" && isCoexistence) return coexistenceStatus === "reconnection_required" || coexistenceStatus === "disconnected"
+    ? "Meta indica que este número necesita reconectarse antes de operar en modo Coexistence."
+    : "No pudimos verificar que WhatsApp Business + Opturon siga activo. Revisá el estado antes de operar.";
   if (state === "connected") return "Tu equipo ya puede gestionar las conversaciones de WhatsApp desde Opturon.";
   if (state === "connecting") return "Estamos completando la conexión de tu cuenta. Esto puede demorar unos minutos.";
   if (state === "error") return "No pudimos confirmar la conexión. Te ayudamos a revisarla sin pedirte datos técnicos.";
   return "Conectá tu número de negocio para recibir y gestionar conversaciones en Opturon.";
+}
+
+function formatCoexistencePhone(value?: string | null) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length === 4 ? `•••• ${digits}` : "Número protegido";
+}
+
+function customerSyncLabel(status: string) {
+  const labels: Record<string, string> = {
+    not_requested: "no importado",
+    requested: "pendiente",
+    syncing: "sincronizando",
+    completed: "sincronización completada",
+    declined: "no importado (no compartido)",
+    failed: "no disponible; los mensajes nuevos siguen funcionando",
+    expired: "fuera de la ventana de importación"
+  };
+  return labels[status] || "sin verificar";
 }
 
 function instagramCopy(state: FriendlyState) {

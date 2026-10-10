@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
@@ -71,11 +71,13 @@ const productCards: ProductCard[] = [
 export function IntegrationsHub({
   whatsapp,
   whatsappStatus,
+  clientCoexistenceStatus,
   instagramStatus,
   isOpturonAdmin
 }: {
   whatsapp: WhatsAppConnectionStatus;
   whatsappStatus: PortalWhatsAppStatus | null;
+  clientCoexistenceStatus: PortalWhatsAppStatus["coexistence"];
   instagramStatus: PortalInstagramStatus | null;
   isOpturonAdmin: boolean;
 }) {
@@ -83,11 +85,16 @@ export function IntegrationsHub({
   const searchParams = useSearchParams();
   const [liveWhatsApp, setLiveWhatsApp] = useState(whatsapp);
   const [liveWhatsAppStatus, setLiveWhatsAppStatus] = useState(whatsappStatus);
+  const [liveClientCoexistenceStatus, setLiveClientCoexistenceStatus] = useState(clientCoexistenceStatus);
   const [liveInstagramStatus, setLiveInstagramStatus] = useState(instagramStatus);
   const [instagramBusy, setInstagramBusy] = useState(false);
   const [instagramError, setInstagramError] = useState<string | null>(null);
   const [assetSelection, setAssetSelection] = useState(() => readInstagramAssetSelection(searchParams));
   const [selectedInstagramAssetKey, setSelectedInstagramAssetKey] = useState(() => assetSelection?.candidates[0] ? instagramAssetKey(assetSelection.candidates[0]) : "");
+
+  useEffect(() => {
+    setLiveClientCoexistenceStatus(clientCoexistenceStatus);
+  }, [clientCoexistenceStatus]);
 
   const effectiveState = liveWhatsApp.state;
 
@@ -113,6 +120,7 @@ export function IntegrationsHub({
       const statusJson = (await statusResponse.json().catch(() => null)) as { data?: PortalWhatsAppStatus } | null;
       if (statusJson?.data) {
         setLiveWhatsAppStatus(statusJson.data);
+        setLiveClientCoexistenceStatus(statusJson.data.coexistence || null);
       }
     }
 
@@ -187,7 +195,10 @@ export function IntegrationsHub({
     }
   }
 
-  const connected = liveWhatsApp.state === "connected" || Boolean(liveWhatsAppStatus?.channel.connected);
+  const coexVerifiedActive = liveWhatsApp.connectionMode !== "COEXISTENCE"
+    || liveClientCoexistenceStatus?.status === "active"
+    || liveWhatsAppStatus?.coexistence?.status === "active";
+  const connected = (liveWhatsApp.state === "connected" || Boolean(liveWhatsAppStatus?.channel.connected)) && coexVerifiedActive;
   const webhookRecent = Number(liveWhatsAppStatus?.webhook.events24h || 0) > 0;
   const handoffsOpen = Number(liveWhatsAppStatus?.handoffs.openCount || 0) > 0;
   const connectedNumber = liveWhatsAppStatus?.channel.displayPhoneNumber || liveWhatsApp.connectedNumber || liveWhatsAppStatus?.channel.phoneNumberId || "Pendiente";
@@ -198,6 +209,7 @@ export function IntegrationsHub({
     return (
       <ClientIntegrationsExperience
         whatsapp={liveWhatsApp}
+        coexistenceStatus={liveClientCoexistenceStatus}
         instagramStatus={liveInstagramStatus}
         instagramError={instagramError || searchParams.get("reason")}
         instagramMode={searchParams.get("instagram")}
