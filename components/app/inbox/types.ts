@@ -33,6 +33,7 @@ export type ConversationRowData = {
   nextActionNote?: string | null;
   lastCommercialActivityAt?: string | null;
   lastReassignedAt?: string | null;
+  recoveryStartedAt?: string | null;
   commercialTimeline?: CommercialTimelineEntry[];
   transferPaymentStatus?: string | null;
   transferPaymentOrderId?: string | null;

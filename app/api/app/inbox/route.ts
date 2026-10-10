@@ -11,12 +11,19 @@ import {
 import { resolveAppTenant } from "@/lib/saas/access";
 import { applyCommercialBotHandoff, listInboxConversations } from "@/lib/saas/store";
 import { buildWhatsAppConnectionStatus, hasOperationalWhatsAppChannel } from "@/lib/whatsapp-channel-state";
+import { isColdLead, isInRecovery } from "@/lib/ops/commercial-state";
+import type { ConversationRowData } from "@/components/app/inbox/types";
 
 const filtersSchema = z.object({
   filter: z.enum(["all", "new", "in_conversation", "follow_up", "closed", "unassigned", "with_follow_up", "overdue", "today", "nuevas", "asignadas"]).optional(),
   q: z.string().optional(),
   visibility: z.enum(["active", "archived"]).optional(),
-  channel: z.enum(["whatsapp", "instagram"]).optional(),
+  channel: z.enum(["all", "whatsapp", "instagram"]).optional(),
+  sellerId: z.string().optional(),
+  stage: z.enum(["NEW", "IN_CONVERSATION", "FOLLOW_UP", "CLOSED"]).optional(),
+  operationalState: z.enum(["all", "active", "cold", "recovery"]).optional(),
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   tenantId: z.string().optional(),
   demo: z.string().optional()
 });
@@ -118,13 +125,40 @@ export async function GET(request: NextRequest) {
   conversations = conversations.filter((item) => {
     const conversation = item as typeof item & { channelType?: string | null };
     const itemChannel = String(conversation.channelType || "whatsapp").toLowerCase();
-    return itemChannel === channel;
+    return channel === "all" || itemChannel === channel;
   });
 
   if (q) {
     conversations = conversations.filter((item) => {
       const text = `${item.contact?.name || ""} ${item.contact?.phone || ""} ${item.contact?.email || ""}`.toLowerCase();
       return text.includes(q);
+    });
+  }
+
+  if (params.sellerId) {
+    conversations = conversations.filter((item) => item.assignedSellerUserId === params.sellerId);
+  }
+  if (params.stage) {
+    conversations = conversations.filter((item) => item.leadStatus === params.stage);
+  }
+  if (params.dateFrom || params.dateTo) {
+    conversations = conversations.filter((item) => {
+      const row = item as typeof item & { lastCommercialActivityAt?: string | null };
+      const raw = row.lastCommercialActivityAt || item.lastMessageAt;
+      if (!raw) return false;
+      const activityDate = String(raw).slice(0, 10);
+      return (!params.dateFrom || activityDate >= params.dateFrom) && (!params.dateTo || activityDate <= params.dateTo);
+    });
+  }
+  if (params.operationalState && params.operationalState !== "all") {
+    const now = new Date();
+    conversations = conversations.filter((item) => {
+      const row = item as typeof item & { recoveryStartedAt?: string | null; lastReassignedAt?: string | null };
+      const isRecovery = isInRecovery(row as unknown as ConversationRowData, now);
+      const cold = isColdLead(row as unknown as ConversationRowData, now);
+      if (params.operationalState === "cold") return cold;
+      if (params.operationalState === "recovery") return isRecovery;
+      return !cold && !isRecovery;
     });
   }
 

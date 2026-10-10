@@ -7,7 +7,7 @@ import type { ConversationRowData, LeadStatus } from "@/components/app/inbox/typ
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { isColdLead, isRecentlyReassigned } from "@/lib/ops/commercial-state";
+import { COLD_LEAD_HOURS, isColdLead } from "@/lib/ops/commercial-state";
 
 export type OpsSellerOption = {
   id: string;
@@ -102,7 +102,7 @@ export function OpsLeadTable({
   showSlaSignals?: boolean;
   sectionVariant?: "default" | "unassigned" | "cold";
   compact?: boolean;
-  onAssign: (conversationId: string, sellerUserId: string) => void;
+  onAssign: (conversationId: string, sellerUserId: string, startRecovery?: boolean) => void;
   completingFollowUpId?: string | null;
   onCompleteFollowUp?: (conversationId: string) => void;
 }) {
@@ -151,11 +151,17 @@ export function OpsLeadTable({
             const isBusy = assigningId === row.id;
             const urgent = showSlaSignals && isUrgentLead(row);
             const cold = showSlaSignals && !urgent && isColdLead(row);
-            const recovery = isRecentlyReassigned(row);
+            const recoveryAt = row.recoveryStartedAt || row.lastReassignedAt;
+            const recoveryTimestamp = recoveryAt ? new Date(recoveryAt).getTime() : Number.NaN;
+            const recovery = Number.isFinite(recoveryTimestamp) && Date.now() - recoveryTimestamp >= 0 && Date.now() - recoveryTimestamp < COLD_LEAD_HOURS * 60 * 60 * 1000;
             const unassigned = !row.assignedSellerUserId;
+            const hasAlternateSeller = sellers.some((seller) => seller.id !== row.assignedSellerUserId);
+            const showAssignmentControls = unassigned || hasAlternateSeller || cold;
+            const selectedSellerDiffers = Boolean(draftSellerId && draftSellerId !== row.assignedSellerUserId);
             const inboxHref = row.id ? `/app/inbox/${row.id}` : null;
             const lastActivityLabel = formatDateTime(row.lastCommercialActivityAt || row.lastMessageAt);
             const timeline = Array.isArray(row.commercialTimeline) ? [...row.commercialTimeline].reverse() : [];
+            const recoveryEvent = timeline.find((event) => event.type === "recovery_started");
             const latestReassignment = timeline.find((event) => event.type === "seller_reassigned");
 
             return (
@@ -175,7 +181,7 @@ export function OpsLeadTable({
                   event.preventDefault();
                   router.push(inboxHref);
                 }}
-                className={`grid ${compact ? "gap-3 p-3.5" : "gap-4 p-4"} rounded-[22px] border transition-all lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] ${rowTone({
+                className={`grid ${compact ? "gap-3 p-3.5" : "gap-4 p-4"} rounded-[22px] border transition-all lg:grid-cols-[minmax(0,2fr)_minmax(220px,0.8fr)] ${rowTone({
                   unassigned,
                   cold,
                   urgent
@@ -206,10 +212,15 @@ export function OpsLeadTable({
                     ) : null}
                   </div>
 
-                  <p className={`line-clamp-2 text-sm text-muted ${compact ? "leading-5" : "leading-6"}`}>{row.lastMessagePreview || "Sin mensajes recientes"}</p>
+                  <p className={`break-words whitespace-pre-wrap text-sm text-muted ${compact ? "leading-5" : "leading-6"}`}>{row.lastMessagePreview || "Sin mensajes recientes"}</p>
 
-                  <div className="flex flex-wrap gap-2 text-xs text-muted">
-                    {showFollowUp && row.nextActionNote ? <span>Nota: {row.nextActionNote}</span> : null}
+                  <div className="space-y-1 text-xs text-muted">
+                    {showFollowUp && row.nextActionNote ? <p className="break-words whitespace-pre-wrap">Próxima acción: {row.nextActionNote}</p> : null}
+                    {recoveryEvent ? (
+                      <p className="break-words">
+                        Reactivado: {formatDateTime(recoveryEvent.createdAt)} · Responsable: {String(recoveryEvent.data.sellerName || ownerLabel)}
+                      </p>
+                    ) : null}
                     {inboxHref ? <span className="text-brandBright">Click para abrir hilo</span> : null}
                   </div>
 
@@ -219,7 +230,9 @@ export function OpsLeadTable({
                       <ol className="mt-2 space-y-2">
                         {timeline.map((event) => {
                           const data = event.data || {};
-                          const eventLabel = event.type === "seller_reassigned"
+                          const eventLabel = event.type === "recovery_started"
+                            ? `Lead reactivado para ${String(data.sellerName || "vendedor")}`
+                            : event.type === "seller_reassigned"
                             ? `Reasignado de ${String(data.fromSellerName || "sin vendedor")} a ${String(data.toSellerName || "vendedor")}`
                             : event.type === "seller_assigned"
                               ? `Asignado a ${String(data.toSellerName || "vendedor")}`
@@ -244,7 +257,7 @@ export function OpsLeadTable({
                 <div className={`rounded-[18px] border border-[color:var(--border)] bg-bg/45 ${compact ? "p-2.5" : "p-3"}`}>
                   <div className="flex flex-wrap gap-2">
                     <Button asChild type="button" variant="secondary" size="sm">
-                      <Link href={`/app/inbox/${row.id}`}>Abrir</Link>
+                      <Link href={`/app/inbox/${row.id}`}>Abrir conversación</Link>
                     </Button>
                     {showFollowUp ? (
                       <Button asChild type="button" variant="secondary" size="sm">
@@ -264,34 +277,55 @@ export function OpsLeadTable({
                     ) : null}
                   </div>
 
-                  <div className={`${compact ? "mt-2.5" : "mt-3"} grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]`}>
-                    <select
-                      className={`w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text ${compact ? "h-9" : "h-10"}`}
-                      value={draftSellerId}
-                      onChange={(event) =>
-                        setDraftAssignments((current) => ({
-                          ...current,
-                          [row.id]: event.target.value
-                        }))
-                      }
-                      disabled={readOnly || isBusy || sellers.length === 0}
-                    >
-                      <option value="">{sellers.length ? "Selecciona un vendedor" : "Sin vendedores"}</option>
-                      {sellers.map((seller) => (
-                        <option key={seller.id} value={seller.id}>
-                          {seller.name}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={readOnly || isBusy || !draftSellerId}
-                      onClick={() => onAssign(row.id, draftSellerId)}
-                    >
-                      {isBusy ? "Guardando..." : row.assignedSellerUserId ? "Reasignar" : "Asignar"}
+                  {sectionVariant === "cold" ? (
+                    <Button asChild type="button" variant="secondary" size="sm" className="mt-2.5">
+                      <Link href={`/app/inbox/${row.id}`}>Programar seguimiento</Link>
                     </Button>
-                  </div>
+                  ) : null}
+
+                  {showAssignmentControls ? (
+                    <div className={`${compact ? "mt-2.5" : "mt-3"} grid gap-2 ${hasAlternateSeller || unassigned ? "sm:grid-cols-[minmax(0,1fr)_auto]" : ""}`}>
+                      {hasAlternateSeller || unassigned ? (
+                        <select
+                          aria-label={`Vendedor responsable de ${row.contact?.name || "lead"}`}
+                          className={`w-full rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text ${compact ? "h-9" : "h-10"}`}
+                          value={draftSellerId}
+                          onChange={(event) =>
+                            setDraftAssignments((current) => ({
+                              ...current,
+                              [row.id]: event.target.value
+                            }))
+                          }
+                          disabled={readOnly || isBusy || sellers.length === 0}
+                        >
+                          <option value="">{sellers.length ? "Selecciona un vendedor" : "Sin vendedores"}</option>
+                          {sellers.map((seller) => (
+                            <option key={seller.id} value={seller.id}>
+                              {seller.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={readOnly || isBusy || !(draftSellerId || row.assignedSellerUserId)}
+                        onClick={() => onAssign(
+                          row.id,
+                          draftSellerId || row.assignedSellerUserId || "",
+                          sectionVariant === "cold" || (Boolean(row.assignedSellerUserId) && !selectedSellerDiffers)
+                        )}
+                      >
+                        {isBusy
+                          ? "Guardando..."
+                          : sectionVariant === "cold"
+                            ? selectedSellerDiffers ? "Reasignar" : row.assignedSellerUserId ? "Reactivar" : "Asignar y reactivar"
+                            : row.assignedSellerUserId
+                              ? selectedSellerDiffers ? "Reasignar" : "Iniciar recuperación"
+                              : "Asignar"}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );

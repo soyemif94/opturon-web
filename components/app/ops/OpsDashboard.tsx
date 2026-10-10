@@ -5,10 +5,15 @@ import { type ComponentType, useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
   ArrowRight,
+  BarChart3,
   BellRing,
   CalendarClock,
   Clock3,
+  Download,
+  Filter,
   Inbox,
+  Package,
+  Search,
   ShieldCheck,
   UserMinus,
   UsersRound
@@ -17,10 +22,10 @@ import type { ConversationRowData } from "@/components/app/inbox/types";
 import { OpsLeadTable, type OpsSellerOption } from "@/components/app/ops/OpsLeadTable";
 import { OpsSellerLoad, type OpsSellerLoadItem } from "@/components/app/ops/OpsSellerLoad";
 import type { PortalSellerMetrics } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
-import { isActiveCommercialFollowUp, isColdLead, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
+import { isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
+import { formatMoney } from "@/lib/billing";
 
 type InboxListResponse = {
   readOnly: boolean;
@@ -35,6 +40,23 @@ type OrdersMetaResponse = {
 type SellerMetricsResponse = {
   success?: boolean;
   data?: PortalSellerMetrics;
+};
+
+type OpsTab = "summary" | "team" | "followups" | "recovery" | "sales" | "reports";
+type OpsReportModules = {
+  sales: boolean;
+  inventory: boolean;
+  contacts: boolean;
+  metrics: boolean;
+  orders: boolean;
+  invoices: boolean;
+  payments: boolean;
+  cash: boolean;
+  catalog: boolean;
+};
+type SalesSnapshot = {
+  summary?: { operationCount?: number; revenue?: number; averageTicket?: number; openPipelineCount?: number; currency?: string };
+  bySeller?: Array<{ sellerId: string; sellerName: string; paidOperations: number; revenue: number; currency: string }>;
 };
 
 const defaultSellerMetrics: PortalSellerMetrics = {
@@ -86,12 +108,14 @@ export function OpsDashboard({
   initialConversations,
   initialSellers,
   readOnly = false,
-  backendReady
+  backendReady,
+  reportModules = { sales: false, inventory: false, contacts: false, metrics: false, orders: false, invoices: false, payments: false, cash: false, catalog: false }
 }: {
   initialConversations: ConversationRowData[];
   initialSellers: OpsSellerOption[];
   readOnly?: boolean;
   backendReady: boolean;
+  reportModules?: OpsReportModules;
 }) {
   const [conversations, setConversations] = useState<ConversationRowData[]>(initialConversations);
   const [sellers, setSellers] = useState<OpsSellerOption[]>(initialSellers);
@@ -100,6 +124,25 @@ export function OpsDashboard({
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
   const [focusedSection, setFocusedSection] = useState<OpsAlert["target"] | null>(null);
+  const [activeTab, setActiveTab] = useState<OpsTab>("summary");
+  const [filterSellerId, setFilterSellerId] = useState("");
+  const [filterStage, setFilterStage] = useState("");
+  const [filterCondition, setFilterCondition] = useState("all");
+  const [filterChannel, setFilterChannel] = useState("all");
+  const [filterCustomer, setFilterCustomer] = useState("");
+  const [filterProduct, setFilterProduct] = useState("");
+  const [filterSupplier, setFilterSupplier] = useState("");
+  const [filterWarehouse, setFilterWarehouse] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [salesSnapshot, setSalesSnapshot] = useState<SalesSnapshot | null>(null);
+  const [salesRequested, setSalesRequested] = useState(false);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesError, setSalesError] = useState(false);
+  const [sellerReport, setSellerReport] = useState<OpsSellerLoadItem[] | null>(null);
+  const [sellerReportRequested, setSellerReportRequested] = useState(false);
+  const [sellerReportLoading, setSellerReportLoading] = useState(false);
+  const [sellerReportError, setSellerReportError] = useState(false);
   const kpisRef = useRef<HTMLDivElement | null>(null);
   const unassignedRef = useRef<HTMLDivElement | null>(null);
   const overdueRef = useRef<HTMLDivElement | null>(null);
@@ -114,15 +157,22 @@ export function OpsDashboard({
     if (!backendReady) return;
     if (!options?.silent) setLoading(true);
     try {
+      const inboxQuery = new URLSearchParams({ filter: "all", visibility: "active", channel: filterChannel });
+      if (filterSellerId) inboxQuery.set("sellerId", filterSellerId);
+      if (filterStage) inboxQuery.set("stage", filterStage);
+      if (filterCondition !== "all") inboxQuery.set("operationalState", filterCondition);
+      if (filterCustomer.trim()) inboxQuery.set("q", filterCustomer.trim());
+      if (filterDateFrom) inboxQuery.set("dateFrom", filterDateFrom);
+      if (filterDateTo) inboxQuery.set("dateTo", filterDateTo);
       const [inboxResponse, metaResponse, sellerMetricsHttp] = await Promise.all([
-        fetch("/api/app/inbox?filter=all&visibility=active", { cache: "no-store" }),
+        fetch(`/api/app/inbox?${inboxQuery.toString()}`, { cache: "no-store" }),
         fetch("/api/app/orders/meta", { cache: "no-store" }),
-        fetch("/api/app/orders/seller-metrics", { cache: "no-store" })
+        !readOnly && reportModules.orders ? fetch("/api/app/orders/seller-metrics", { cache: "no-store" }) : Promise.resolve(null)
       ]);
 
       const inboxJson = (await inboxResponse.json().catch(() => null)) as InboxListResponse | null;
       const metaJson = (await metaResponse.json().catch(() => null)) as OrdersMetaResponse | null;
-      const sellerMetricsJson = (await sellerMetricsHttp.json().catch(() => null)) as SellerMetricsResponse | PortalSellerMetrics | null;
+      const sellerMetricsJson = sellerMetricsHttp ? (await sellerMetricsHttp.json().catch(() => null)) as SellerMetricsResponse | PortalSellerMetrics | null : null;
 
       if (!inboxResponse.ok) {
         throw new Error("ops_inbox_failed");
@@ -133,7 +183,7 @@ export function OpsDashboard({
 
       setConversations(Array.isArray(inboxJson?.conversations) ? inboxJson.conversations : []);
       setSellers(Array.isArray(metaJson?.sellers) ? metaJson.sellers : []);
-      if (sellerMetricsHttp.ok) {
+      if (sellerMetricsHttp?.ok) {
         const payload = sellerMetricsJson && "data" in sellerMetricsJson ? sellerMetricsJson.data : sellerMetricsJson;
         setSellerMetrics(payload && typeof payload === "object" ? { ...defaultSellerMetrics, ...payload } : defaultSellerMetrics);
       } else {
@@ -148,9 +198,76 @@ export function OpsDashboard({
 
   useEffect(() => {
     if (!backendReady) return;
-    void loadOpsData({ silent: initialConversations.length > 0 });
+    const timer = window.setTimeout(() => {
+      void loadOpsData({ silent: initialConversations.length > 0 });
+    }, 180);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backendReady]);
+  }, [backendReady, filterSellerId, filterStage, filterCondition, filterChannel, filterCustomer, filterDateFrom, filterDateTo]);
+
+  useEffect(() => {
+    if (activeTab !== "sales" || readOnly || !backendReady || !reportModules.sales || salesRequested) return;
+    let cancelled = false;
+    setSalesRequested(true);
+    setSalesLoading(true);
+    const salesUrl = reportHref("sales");
+    fetch(`${salesUrl}${salesUrl.includes("?") ? "&" : "?"}format=json`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error("sales_report_unavailable");
+        if (!cancelled) setSalesSnapshot(data as SalesSnapshot);
+      })
+      .catch(() => {
+        if (!cancelled) setSalesError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setSalesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeTab, backendReady, readOnly, reportModules.sales, salesRequested]);
+
+  useEffect(() => {
+    if (activeTab !== "team" || readOnly || !backendReady || !reportModules.orders || sellerReportRequested) return;
+    let cancelled = false;
+    setSellerReportRequested(true);
+    setSellerReportLoading(true);
+    const url = reportHref("sellers");
+    fetch(`${url}${url.includes("?") ? "&" : "?"}format=json`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error("seller_report_unavailable");
+        if (!cancelled) {
+          const items = Array.isArray(data?.sellers) ? data.sellers : [];
+          setSellerReport(items.map((item: Record<string, unknown>) => ({
+            sellerUserId: String(item.sellerUserId || ""),
+            sellerName: String(item.sellerName || "Vendedor"),
+            totalActiveLeads: Number(item.activeLeads || 0),
+            newLeads: Number(item.newLeads || 0),
+            overdueLeads: Number(item.overdueFollowUps || 0),
+            followUpLeads: Number(item.followUps || 0),
+            coldLeads: Number(item.coldLeads || 0),
+            recoveryLeads: Number(item.recoveryStarted72h || 0),
+            totalOrders: Number(item.salesCount || 0),
+            totalPaidOrders: Number(item.paidSalesCount || 0),
+            totalRevenue: Number(item.revenue || 0),
+            averageTicket: Number(item.averageTicket || 0),
+            currency: String(item.currency || "ARS")
+          })));
+        }
+      })
+      .catch(() => { if (!cancelled) setSellerReportError(true); })
+      .finally(() => { if (!cancelled) setSellerReportLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, backendReady, readOnly, reportModules.orders, sellerReportRequested]);
+
+  useEffect(() => {
+    setSalesSnapshot(null);
+    setSalesRequested(false);
+    setSalesError(false);
+    setSellerReport(null);
+    setSellerReportRequested(false);
+    setSellerReportError(false);
+  }, [filterSellerId, filterStage, filterChannel, filterCustomer, filterProduct, filterDateFrom, filterDateTo]);
 
   const activeConversations = useMemo(() => conversations.filter((row) => isActiveLead(row)), [conversations]);
   const now = new Date();
@@ -205,8 +322,11 @@ export function OpsDashboard({
         sellerUserId: row.assignedSellerUserId,
         sellerName: row.assignedSellerName || row.assignedTo || "Sin nombre",
         totalActiveLeads: 0,
+        newLeads: 0,
         overdueLeads: 0,
         followUpLeads: 0,
+        coldLeads: 0,
+        recoveryLeads: 0,
         totalOrders: Number(sellerMetric?.totalOrders || 0),
         totalPaidOrders: Number(sellerMetric?.totalPaidOrders || 0),
         totalRevenue: Number(sellerMetric?.totalRevenue || 0),
@@ -215,8 +335,11 @@ export function OpsDashboard({
       };
 
       current.totalActiveLeads += 1;
+      if (row.leadStatus === "NEW") current.newLeads += 1;
       if (isActiveCommercialFollowUp(row)) current.followUpLeads += 1;
       if (isOverdue(row, now)) current.overdueLeads += 1;
+      if (isColdLead(row, now)) current.coldLeads += 1;
+      if (isInRecovery(row, now)) current.recoveryLeads += 1;
       buckets.set(row.assignedSellerUserId, current);
     }
 
@@ -226,8 +349,11 @@ export function OpsDashboard({
         sellerUserId: metric.sellerUserId,
         sellerName: metric.sellerName || "Sin nombre",
         totalActiveLeads: 0,
+        newLeads: 0,
         overdueLeads: 0,
         followUpLeads: 0,
+        coldLeads: 0,
+        recoveryLeads: 0,
         totalOrders: Number(metric.totalOrders || 0),
         totalPaidOrders: Number(metric.totalPaidOrders || 0),
         totalRevenue: Number(metric.totalRevenue || 0),
@@ -243,8 +369,11 @@ export function OpsDashboard({
         sellerUserId: seller.id,
         sellerName: seller.name || "Sin nombre",
         totalActiveLeads: 0,
+        newLeads: 0,
         overdueLeads: 0,
         followUpLeads: 0,
+        coldLeads: 0,
+        recoveryLeads: 0,
         totalOrders: Number(sellerMetric?.totalOrders || 0),
         totalPaidOrders: Number(sellerMetric?.totalPaidOrders || 0),
         totalRevenue: Number(sellerMetric?.totalRevenue || 0),
@@ -261,12 +390,6 @@ export function OpsDashboard({
         left.sellerName.localeCompare(right.sellerName)
     );
   }, [activeConversations, now, sellerMetrics, sellers]);
-
-  const topSeller = sellerLoad[0] || null;
-  const sellerNeedingHelp =
-    sellerLoad
-      .filter((item) => item.totalActiveLeads > 0)
-      .sort((left, right) => right.overdueLeads - left.overdueLeads || right.totalActiveLeads - left.totalActiveLeads)[0] || null;
 
   const opsAlerts = useMemo(() => {
     const alerts: OpsAlert[] = [];
@@ -340,34 +463,39 @@ export function OpsDashboard({
   }, [coldLeads, overdueLeads, sellerLoad, todayLeads, unassignedLeads, urgentLeads]);
 
   function scrollToSection(target: NonNullable<OpsAlert["target"]>) {
+    const tabForTarget: OpsTab =
+      target === "seller_load" ? "team" :
+        ["overdue", "today", "future", "completed"].includes(target) ? "followups" :
+          ["cold", "urgent"].includes(target) ? "recovery" : "summary";
+    setActiveTab(tabForTarget);
     setFocusedSection(target);
-    const node =
-      target === "unassigned"
-        ? unassignedRef.current
-        : target === "overdue"
-          ? overdueRef.current
-          : target === "today"
-            ? todayRef.current
-          : target === "future"
-            ? futureRef.current
-            : target === "completed"
-              ? completedRef.current
-              : target === "urgent"
-                ? urgentRef.current
-                : target === "cold"
-                  ? coldRef.current
-                  : target === "seller_load"
-                    ? sellerLoadRef.current
-                    : kpisRef.current;
-    if (node) {
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    window.setTimeout(() => {
+      const node =
+        target === "unassigned"
+          ? unassignedRef.current
+          : target === "overdue"
+            ? overdueRef.current
+            : target === "today"
+              ? todayRef.current
+              : target === "future"
+                ? futureRef.current
+                : target === "completed"
+                  ? completedRef.current
+                  : target === "urgent"
+                    ? urgentRef.current
+                    : target === "cold"
+                      ? coldRef.current
+                      : target === "seller_load"
+                        ? sellerLoadRef.current
+                        : kpisRef.current;
+      node?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
     window.setTimeout(() => {
       setFocusedSection((current) => (current === target ? null : current));
     }, 1800);
   }
 
-  async function assignSeller(conversationId: string, sellerUserId: string) {
+  async function assignSeller(conversationId: string, sellerUserId: string, startRecovery = false) {
     const seller = sellers.find((item) => item.id === sellerUserId);
     if (!seller || readOnly || !backendReady || assigningId) return;
 
@@ -377,14 +505,17 @@ export function OpsDashboard({
       const response = await fetch(`/api/app/inbox/${conversationId}/assign-seller`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sellerUserId })
+        body: JSON.stringify({ sellerUserId, startRecovery })
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(String(json?.error || "assign_seller_failed"));
       }
       await loadOpsData({ silent: true });
-      toast.success("Lead actualizado", "La asignacion se reflejo al instante en OPS.");
+      toast.success(
+        startRecovery ? "Lead en recuperación" : "Lead actualizado",
+        startRecovery ? "La intervención quedó registrada en el historial comercial." : "La asignación se reflejó al instante en OPS."
+      );
     } catch (error) {
       toast.error("No se pudo asignar el lead", error instanceof Error ? error.message : "unknown_error");
     } finally {
@@ -450,6 +581,32 @@ export function OpsDashboard({
     }
   ] as const;
 
+  function reportHref(report: "sales" | "sellers" | "followups" | "inventory" | "movements" | "expirations") {
+    const params = new URLSearchParams();
+    if (filterDateFrom) params.set("dateFrom", filterDateFrom);
+    if (filterDateTo) params.set("dateTo", filterDateTo);
+    if (filterSellerId) params.set("sellerId", filterSellerId);
+    if (filterStage) params.set("stage", filterStage);
+    if (filterChannel !== "all") params.set("channel", filterChannel);
+    if (report !== "sales" && filterCondition !== "all") params.set("operationalState", filterCondition);
+    if (filterCustomer.trim()) params.set("customer", filterCustomer.trim());
+    if (filterProduct.trim()) params.set("product", filterProduct.trim());
+    if (filterSupplier.trim() && report === "expirations") params.set("supplier", filterSupplier.trim());
+    if (filterWarehouse.trim() && report === "expirations") params.set("warehouse", filterWarehouse.trim());
+    return `/api/app/ops/reports/${report}${params.size ? `?${params.toString()}` : ""}`;
+  }
+
+  const tabs: Array<{ id: OpsTab; label: string; count?: number }> = [
+    { id: "summary", label: "Resumen" },
+    { id: "followups", label: "Seguimientos", count: overdueLeads.length + todayLeads.length + futureLeads.length },
+    { id: "recovery", label: "Recuperación", count: coldLeads.length },
+    ...(!readOnly ? [
+      { id: "team" as const, label: "Equipo", count: sellerLoad.length },
+      { id: "sales" as const, label: "Ventas" },
+      { id: "reports" as const, label: "Informes" }
+    ] : [])
+  ];
+
   return (
     <div className="space-y-4">
       {!backendReady ? (
@@ -460,6 +617,73 @@ export function OpsDashboard({
         </Card>
       ) : null}
 
+      <div className="rounded-2xl border border-[color:var(--border)] bg-card/80 p-3 shadow-[var(--card-shadow)]">
+        <div role="tablist" aria-label="Secciones de supervisión OPS" className="flex gap-2 overflow-x-auto pb-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              data-testid={`ops-tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-brand text-white" : "text-muted hover:bg-surface hover:text-text"}`}
+            >
+              {tab.label}{tab.count !== undefined ? <span className="ml-2 text-xs opacity-75">{tab.count}</span> : null}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 border-t border-[color:var(--border)] pt-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7" aria-label="Filtros globales del informe">
+          <label className="relative block">
+            <span className="sr-only">Buscar cliente</span>
+            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted" />
+            <input value={filterCustomer} onChange={(event) => setFilterCustomer(event.target.value)} placeholder="Cliente" className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg pl-9 pr-3 text-sm text-text" />
+          </label>
+          <select aria-label="Filtrar por vendedor" value={filterSellerId} onChange={(event) => setFilterSellerId(event.target.value)} className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text">
+            <option value="">Todos los vendedores</option>
+            {sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.name}</option>)}
+          </select>
+          <select aria-label="Filtrar por etapa" value={filterStage} onChange={(event) => setFilterStage(event.target.value)} className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text">
+            <option value="">Todas las etapas</option>
+            <option value="NEW">Nuevo</option>
+            <option value="IN_CONVERSATION">En conversación</option>
+            <option value="FOLLOW_UP">Seguimiento</option>
+          </select>
+          <select aria-label="Filtrar condición operativa" value={filterCondition} onChange={(event) => setFilterCondition(event.target.value)} className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text">
+            <option value="all">Toda condición</option>
+            <option value="active">Activos</option>
+            <option value="cold">Fríos</option>
+            <option value="recovery">En recuperación</option>
+          </select>
+          <select aria-label="Filtrar canal" value={filterChannel} onChange={(event) => setFilterChannel(event.target.value)} className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text">
+            <option value="all">Todos los canales</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="instagram">Instagram</option>
+          </select>
+          <label className="flex h-10 items-center gap-2 rounded-xl border border-[color:var(--border)] bg-bg px-2 text-xs text-muted">
+            Desde <input type="date" aria-label="Actividad desde" value={filterDateFrom} onChange={(event) => setFilterDateFrom(event.target.value)} className="min-w-0 bg-transparent text-xs text-text" />
+          </label>
+          <label className="flex h-10 items-center gap-2 rounded-xl border border-[color:var(--border)] bg-bg px-2 text-xs text-muted">
+            Hasta <input type="date" aria-label="Actividad hasta" value={filterDateTo} onChange={(event) => setFilterDateTo(event.target.value)} className="min-w-0 bg-transparent text-xs text-text" />
+          </label>
+          <button type="button" onClick={() => { setFilterSellerId(""); setFilterStage(""); setFilterCondition("all"); setFilterChannel("all"); setFilterCustomer(""); setFilterProduct(""); setFilterSupplier(""); setFilterWarehouse(""); setFilterDateFrom(""); setFilterDateTo(""); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--border)] px-3 text-sm text-muted hover:text-text">
+            <Filter className="h-4 w-4" /> Limpiar filtros
+          </button>
+          {!readOnly && (activeTab === "sales" || activeTab === "reports") ? (
+            <label className="relative block">
+              <span className="sr-only">Filtrar por producto</span>
+              <Package className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted" />
+              <input value={filterProduct} onChange={(event) => setFilterProduct(event.target.value)} placeholder="Producto o SKU" className="h-10 w-full rounded-xl border border-[color:var(--border)] bg-bg pl-9 pr-3 text-sm text-text" />
+            </label>
+          ) : null}
+          {!readOnly && activeTab === "reports" && reportModules.inventory ? <>
+            <input aria-label="Filtrar vencimientos por proveedor" value={filterSupplier} onChange={(event) => setFilterSupplier(event.target.value)} placeholder="Proveedor" className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text" />
+            <input aria-label="Filtrar vencimientos por depósito" value={filterWarehouse} onChange={(event) => setFilterWarehouse(event.target.value)} placeholder="Depósito" className="h-10 rounded-xl border border-[color:var(--border)] bg-bg px-3 text-sm text-text" />
+          </> : null}
+        </div>
+      </div>
+
+      {activeTab === "summary" ? <>
       <section ref={kpisRef} className={sectionClassName(focusedSection === "kpis", "grid gap-3 md:grid-cols-2 xl:grid-cols-6")}>
         <KpiCard
           icon={AlertTriangle}
@@ -480,9 +704,6 @@ export function OpsDashboard({
           helper="En pipeline actualmente"
           loading={loading}
           href="/app/inbox"
-          trendLabel="12% vs semana anterior"
-          trendMode="up"
-          sparkline={[22, 24, 28, 26, 29, 32, 30, 35]}
         />
         <KpiCard
           icon={UserMinus}
@@ -495,7 +716,6 @@ export function OpsDashboard({
           onClick={() => scrollToSection("unassigned")}
           trendLabel={unassignedLeads.length > 0 ? "Requiere accion" : "Todo cubierto"}
           trendMode="alert"
-          sparkline={[9, 8, 7, 6, 7, 6, 5, 6]}
         />
         <KpiCard
           icon={BellRing}
@@ -508,7 +728,6 @@ export function OpsDashboard({
           onClick={() => scrollToSection("cold")}
           trendLabel={coldLeads.length > 0 ? "Requiere seguimiento" : "Sin riesgo frio"}
           trendMode="info"
-          sparkline={[2, 3, 2, 4, 4, 5, 5, 6]}
         />
         <KpiCard
           icon={ShieldCheck}
@@ -521,7 +740,6 @@ export function OpsDashboard({
           onClick={() => scrollToSection("overdue")}
           trendLabel={overdueLeads.length > 0 ? "Atencion inmediata" : "Todo al dia"}
           trendMode={overdueLeads.length > 0 ? "alert" : "success"}
-          sparkline={[1, 1, 1, 0, 0, 0, 0, 0]}
         />
         <KpiCard
           icon={Clock3}
@@ -594,8 +812,11 @@ export function OpsDashboard({
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(350px,0.8fr)]">
+      </> : null}
+
+      {activeTab === "summary" || activeTab === "team" || activeTab === "followups" || activeTab === "recovery" ? <section className="grid gap-4">
         <div className="space-y-5">
+          {activeTab === "summary" ? (
           <div ref={unassignedRef} className={sectionClassName(focusedSection === "unassigned")}>
             <OpsLeadTable
               title="Leads sin asignar"
@@ -609,8 +830,10 @@ export function OpsDashboard({
               onAssign={assignSeller}
             />
           </div>
+          ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)]">
+          {activeTab === "followups" ? <>
+          <div className="grid gap-4 xl:grid-cols-2">
             <div ref={overdueRef} className={sectionClassName(focusedSection === "overdue")}>
               <OpsLeadTable
                 title="Seguimientos vencidos"
@@ -682,55 +905,32 @@ export function OpsDashboard({
               />
             </div>
           </div>
+          </> : null}
         </div>
 
         <div className="space-y-4">
-          <Card className="border-white/6 bg-card/90 shadow-[var(--card-shadow)]">
-            <CardHeader className="pb-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-[28px] leading-none tracking-tight">Carga por vendedor</CardTitle>
-                  <CardDescription className="mt-2 text-sm">
-                    Distribucion actual del pipeline por vendedor.
-                  </CardDescription>
-                </div>
-                <Badge variant="warning">{topSeller?.totalActiveLeads || 0} activos</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-3 pt-0">
-              <div className="grid gap-3 xl:grid-cols-[140px_minmax(0,1fr)]">
-                <SellerLoadRing total={activeConversations.length} />
-                <div className="rounded-[22px] border border-[color:var(--border)] bg-surface/60 p-4">
-                  <p className="text-sm font-semibold">{topSeller?.sellerName || "Sin datos"}</p>
-                  <div className="mt-3 grid grid-cols-3 gap-3">
-                    <OpsMicroMetric label="Activos" value={topSeller?.totalActiveLeads || 0} helper="" />
-                    <OpsMicroMetric label="Vencidos" value={topSeller?.overdueLeads || 0} helper="" />
-                    <OpsMicroMetric label="Seguimiento" value={topSeller?.followUpLeads || 0} helper="" />
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-                    <Badge variant={sellerNeedingHelp?.overdueLeads ? "warning" : "success"}>
-                      {sellerNeedingHelp?.overdueLeads ? "Necesita seguimiento" : "Carga estable"}
-                    </Badge>
-                    <span>Conversion pagada: {topSeller && topSeller.totalOrders ? Math.round(((topSeller.totalPaidOrders || 0) / topSeller.totalOrders) * 100) : 0}%</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {activeTab === "team" ? (
+            <div ref={sellerLoadRef} className={sectionClassName(focusedSection === "seller_load")}>
+              {!readOnly && reportModules.orders ? (
+                sellerReportError
+                  ? <Card><CardContent className="p-5 text-sm text-muted">No se pudo cargar el detalle de vendedor con los filtros actuales.</CardContent></Card>
+                  : sellerReportLoading || !sellerReport
+                    ? <Card><CardContent className="p-5 text-sm text-muted">Cargando el informe de equipo…</CardContent></Card>
+                    : <OpsSellerLoad items={sellerReport} />
+              ) : <OpsSellerLoad items={sellerLoad} />}
+            </div>
+          ) : null}
 
-          <div ref={sellerLoadRef} className={sectionClassName(focusedSection === "seller_load")}>
-            <OpsSellerLoad items={sellerLoad} />
-          </div>
-
+          {activeTab === "recovery" ? <>
           <div ref={coldRef} className={sectionClassName(focusedSection === "cold")}>
             <OpsLeadTable
               title="Clientes frios"
-              description="Sin movimiento reciente ni seguimiento activo para reactivar o cerrar criterio."
+              description="Sin movimiento comercial reciente ni seguimiento activo. Reactivar registra una intervención, no envía mensajes."
               rows={coldLeads}
               sellers={sellers}
               readOnly={readOnly || !backendReady}
               assigningId={assigningId}
-              emptyMessage="No hay leads frios segun el criterio basico actual."
+              emptyMessage="No hay leads fríos según la regla de 72 horas."
               showOwner
               showSlaSignals
               sectionVariant="cold"
@@ -740,22 +940,158 @@ export function OpsDashboard({
           </div>
 
           <div ref={urgentRef} className={sectionClassName(focusedSection === "urgent")}>
-          <OpsLeadTable
-            title="Oportunidades que requieren accion"
-            description="Inbound reciente con demora operativa segun el SLA basico."
-            rows={urgentLeads}
-            sellers={sellers}
-            readOnly={readOnly || !backendReady}
-            assigningId={assigningId}
-            emptyMessage="No hay leads urgentes segun el SLA basico actual."
-            showOwner
-            showSlaSignals
-            compact
-            onAssign={assignSeller}
-          />
-        </div>
+            <OpsLeadTable
+              title="Recuperados y atención prioritaria"
+              description="Reactivaciones recientes y conversaciones con demora operativa por SLA."
+              rows={[...urgentLeads, ...activeConversations.filter((row) => {
+                return isInRecovery(row) && !urgentLeads.some((urgent) => urgent.id === row.id);
+              })]}
+              sellers={sellers}
+              readOnly={readOnly || !backendReady}
+              assigningId={assigningId}
+              emptyMessage="No hay recuperaciones recientes ni leads urgentes."
+              showOwner
+              showSlaSignals
+              compact
+              onAssign={assignSeller}
+            />
+          </div>
+          </>
+          : null}
         </div>
       </section>
+      : null}
+
+      {activeTab === "sales" ? (
+        <SalesOverview snapshot={salesSnapshot} loading={salesLoading} error={salesError} enabled={reportModules.sales} reportHref={reportHref("sales")} />
+      ) : null}
+
+      {activeTab === "reports" ? (
+        <OpsReportsCenter
+          modules={reportModules}
+          readOnly={readOnly}
+          reportHrefs={{
+            sales: reportHref("sales"), sellers: reportHref("sellers"), followups: reportHref("followups"),
+            inventory: reportHref("inventory"), movements: reportHref("movements"), expirations: reportHref("expirations")
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SalesOverview({
+  snapshot,
+  loading,
+  error,
+  enabled,
+  reportHref
+}: {
+  snapshot: SalesSnapshot | null;
+  loading: boolean;
+  error: boolean;
+  enabled: boolean;
+  reportHref: string;
+}) {
+  if (!enabled) return <Card><CardContent className="p-5 text-sm text-muted">El módulo de ventas no está habilitado para este espacio.</CardContent></Card>;
+  const currency = snapshot?.summary?.currency || "ARS";
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 className="text-2xl font-semibold">Ventas del período</h2><p className="mt-1 text-sm text-muted">Pedidos cobrados y pipeline abiertos, tenant-scoped y filtrados en servidor.</p></div>
+        <div className="flex gap-2">
+          <a href={reportHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Descargar CSV</a>
+          <Link href="/app/sales" className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--border)] px-4 text-sm font-semibold">Abrir ventas</Link>
+        </div>
+      </div>
+      {error ? <Card><CardContent className="p-5 text-sm text-muted">No se pudo cargar el resumen. El resto de OPS y los informes disponibles siguen operativos.</CardContent></Card> : null}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard icon={BarChart3} label="Operaciones cobradas" value={Number(snapshot?.summary?.operationCount || 0)} helper="Pedidos pagados no cancelados" loading={loading} />
+        <Card className="border-white/6 bg-card/90"><CardContent className="p-4"><p className="text-[11px] uppercase tracking-[0.18em] text-muted">Importe cobrado</p><p className="mt-2 text-2xl font-semibold">{loading ? "…" : formatMoney(Number(snapshot?.summary?.revenue || 0), currency)}</p><p className="mt-1 text-sm text-muted">Según pedidos reales del período</p></CardContent></Card>
+        <KpiCard icon={Inbox} label="Pipeline abierto" value={Number(snapshot?.summary?.openPipelineCount || 0)} helper="Conversaciones no cerradas" loading={loading} />
+        <Card className="border-white/6 bg-card/90"><CardContent className="p-4"><p className="text-[11px] uppercase tracking-[0.18em] text-muted">Ticket promedio cobrado</p><p className="mt-2 text-2xl font-semibold">{loading ? "…" : formatMoney(Number(snapshot?.summary?.averageTicket || 0), currency)}</p><p className="mt-1 text-sm text-muted">Importe cobrado ÷ operaciones cobradas</p></CardContent></Card>
+      </div>
+      <Card className="border-white/6 bg-card/90">
+        <CardHeader><CardTitle className="text-lg">Ventas por vendedor</CardTitle><CardDescription>Operaciones cobradas agrupadas por responsable.</CardDescription></CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {(snapshot?.bySeller || []).map((seller) => (
+            <div key={seller.sellerId} className="rounded-xl border border-[color:var(--border)] p-4">
+              <p className="font-semibold">{seller.sellerName}</p>
+              <p className="mt-2 text-sm text-muted">Operaciones cobradas: {seller.paidOperations}</p>
+              <p className="mt-1 text-sm">Importe cobrado: {formatMoney(Number(seller.revenue || 0), seller.currency || currency)}</p>
+            </div>
+          ))}
+          {!loading && !snapshot?.bySeller?.length ? <p className="text-sm text-muted">No hay ventas cobradas por vendedor en este período.</p> : null}
+        </CardContent>
+      </Card>
+      <p className="text-xs text-muted">La comparación con períodos anteriores y el forecast requieren fuentes históricas adicionales; no se muestran estimaciones.</p>
+    </div>
+  );
+}
+
+function OpsReportsCenter({
+  modules,
+  readOnly,
+  reportHrefs
+}: {
+  modules: OpsReportModules;
+  readOnly: boolean;
+  reportHrefs: { sales: string; sellers: string; followups: string; inventory: string; movements: string; expirations: string };
+}) {
+  const reports = [
+    ...(modules.sales && modules.orders ? [
+      { title: "Ventas y operaciones", description: "Operaciones, responsable, cliente, canal, estado, importe y productos.", href: reportHrefs.sales }
+    ] : []),
+    ...(modules.sales && modules.orders ? [
+      { title: "Rendimiento por vendedor", description: "Leads activos, nuevos, seguimientos, recuperaciones y ventas cobradas.", href: reportHrefs.sellers }
+    ] : []),
+    { title: "Actividad y seguimientos", description: "Fechas de próxima acción, cumplimiento y responsable; sin teléfonos ni correos.", href: reportHrefs.followups },
+    ...(modules.inventory ? [
+      { title: "Inventario actual", description: "Stock por producto, SKU, categoría y ubicación según existencias reales.", href: reportHrefs.inventory },
+      { title: "Movimientos de inventario", description: "Entradas, salidas y ajustes con fecha, producto, cantidad, motivo y actor.", href: reportHrefs.movements },
+      { title: "Lotes y vencimientos", description: "Lotes persistidos y estados de vencimiento; exportación limitada a 250 filas por descarga.", href: reportHrefs.expirations }
+    ] : [])
+  ];
+  const destinations = [
+    ...(modules.sales ? [{ title: "Ventas y pipeline", href: "/app/sales" }] : []),
+    ...(modules.metrics ? [{ title: "Métricas", href: "/app/metrics" }] : []),
+    ...(modules.contacts ? [{ title: "Clientes", href: "/app/contacts" }] : []),
+    ...(modules.catalog ? [{ title: "Productos", href: "/app/catalog" }] : []),
+    ...(modules.inventory ? [
+      { title: "Inventario", href: "/app/inventory" },
+      { title: "Movimientos", href: "/app/inventory/movements" },
+      { title: "Lotes y vencimientos", href: "/app/inventory/lots" },
+      { title: "Compras y proveedores", href: "/app/inventory/receipts" }
+    ] : []),
+    ...(modules.orders ? [{ title: "Pedidos", href: "/app/orders" }] : []),
+    ...(modules.invoices ? [{ title: "Comprobantes", href: "/app/invoices" }] : []),
+    ...(modules.payments ? [{ title: "Cobros", href: "/app/payments" }] : []),
+    ...(modules.cash ? [{ title: "Caja", href: "/app/cash" }] : [])
+  ];
+  return (
+    <div className="space-y-5">
+      <div><h2 className="text-2xl font-semibold">Centro de informes</h2><p className="mt-1 text-sm text-muted">Descargas generadas en servidor, dentro del tenant activo y con filtros aplicados.</p></div>
+      {readOnly ? <Card><CardContent className="p-5 text-sm text-muted">Los informes gerenciales requieren permiso de supervisión.</CardContent></Card> : (
+        <div className="grid gap-3 lg:grid-cols-3">
+          {reports.map((report) => (
+            <Card key={report.title} className="border-white/6 bg-card/90">
+              <CardContent className="flex h-full flex-col p-5">
+                <h3 className="font-semibold">{report.title}</h3>
+                <p className="mt-2 flex-1 text-sm leading-6 text-muted">{report.description}</p>
+                <a href={report.href} className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Descargar CSV</a>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      <Card className="border-white/6 bg-card/90">
+        <CardHeader><CardTitle className="text-lg">Fuentes disponibles por plan</CardTitle><CardDescription>Se muestran sólo destinos habilitados por módulos y capabilities efectivos.</CardDescription></CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {destinations.map((item) => <Link key={item.href} href={item.href} className="rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm hover:border-brand/40">{item.title} →</Link>)}
+          {!destinations.length ? <p className="text-sm text-muted">No hay módulos de informes habilitados.</p> : null}
+        </CardContent>
+      </Card>
+      <p className="text-xs text-muted">XLSX/PDF ejecutivos y reportes programados quedan diferidos; no se simulan datos ni variaciones sin fuente histórica confiable.</p>
     </div>
   );
 }

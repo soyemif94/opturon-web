@@ -3,10 +3,12 @@ import { z } from "zod";
 import { assignPortalConversationSeller, getBackendErrorStatus, isBackendConfigured } from "@/lib/api";
 import { isOperationalPortalAssigneeRole } from "@/lib/portal-users";
 import { resolveAppTenant } from "@/lib/saas/access";
+import { canManageWorkspace } from "@/lib/app-permissions";
 import { appendAuditLog, readSaasData, touchTenantActivity, writeSaasData } from "@/lib/saas/store";
 
 const patchSchema = z.object({
-  sellerUserId: z.string().uuid()
+  sellerUserId: z.string().uuid(),
+  startRecovery: z.boolean().optional().default(false)
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +24,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const parsed = patchSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (parsed.data.startRecovery && !canManageWorkspace(tenantContext.ctx!)) {
+    return NextResponse.json({ error: "recovery_supervisor_required" }, { status: 403 });
+  }
 
   if (!tenantContext.readOnly && !isBackendConfigured()) {
     return NextResponse.json({ error: "portal_inbox_backend_unavailable" }, { status: 503 });
@@ -33,7 +38,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         tenantContext.tenantId,
         id,
         parsed.data.sellerUserId,
-        tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId
+        tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId,
+        parsed.data.startRecovery
       );
       return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
@@ -62,30 +68,54 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   conversation.assignedSellerUserId = user.id;
   conversation.assignedSellerName = user.name;
   conversation.assignedSellerRole = membership?.role || "seller";
-  if (previousSellerId !== user.id) {
+  if (previousSellerId !== user.id || parsed.data.startRecovery) {
     const actor = data.users.find((item) => item.id === actorUserId);
     const now = new Date().toISOString();
     const tracked = conversation as typeof conversation & {
       commercialTimeline?: Array<Record<string, unknown>>;
       lastReassignedAt?: string | null;
+      recoveryStartedAt?: string | null;
+      lastCommercialActivityAt?: string | null;
     };
     const timeline = Array.isArray(tracked.commercialTimeline) ? tracked.commercialTimeline : [];
     const previousSeller = data.users.find((item) => item.id === previousSellerId);
-    const type = previousSellerId ? "seller_reassigned" : "seller_assigned";
-    tracked.commercialTimeline = [{
-      id: `event-${Date.now()}-assignment`,
-      type,
-      data: {
-        fromSellerId: previousSellerId,
-        fromSellerName: previousSeller?.name || null,
-        toSellerId: user.id,
-        toSellerName: user.name,
-        changedBy: actor?.id || null,
-        changedByName: actor?.name || null
-      },
-      createdAt: now
-    }, ...timeline].slice(0, 30);
-    if (type === "seller_reassigned") tracked.lastReassignedAt = now;
+    const events: Array<Record<string, unknown>> = [];
+    if (previousSellerId !== user.id) {
+      const type = previousSellerId ? "seller_reassigned" : "seller_assigned";
+      events.push({
+        id: `event-${Date.now()}-assignment`,
+        type,
+        data: {
+          fromSellerId: previousSellerId,
+          fromSellerName: previousSeller?.name || null,
+          toSellerId: user.id,
+          toSellerName: user.name,
+          changedBy: actor?.id || null,
+          changedByName: actor?.name || null
+        },
+        createdAt: now
+      });
+      if (type === "seller_reassigned") tracked.lastReassignedAt = now;
+    }
+    if (parsed.data.startRecovery) {
+      events.push({
+        id: `event-${Date.now()}-recovery`,
+        type: "recovery_started",
+        data: {
+          sellerId: user.id,
+          sellerName: user.name,
+          fromSellerId: previousSellerId,
+          fromSellerName: previousSeller?.name || null,
+          changedBy: actor?.id || null,
+          changedByName: actor?.name || null,
+          source: "ops"
+        },
+        createdAt: now
+      });
+      tracked.recoveryStartedAt = now;
+    }
+    tracked.commercialTimeline = [...events, ...timeline].slice(0, 30);
+    tracked.lastCommercialActivityAt = now;
   }
   writeSaasData(data);
 

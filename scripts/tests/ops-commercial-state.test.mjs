@@ -6,7 +6,7 @@ import { join } from "node:path";
 const projectRoot = process.cwd();
 const source = readFileSync(join(projectRoot, "lib/ops/commercial-state.ts"), "utf8");
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source, { mode: "transform" })).toString("base64")}`;
-const { getLastCommercialActivityTimestamp, getOperationalAttentionState, isActiveCommercialFollowUp, isColdLead, isRecentlyCompletedFollowUp, isRecentlyReassigned } = await import(moduleUrl);
+const { getLastCommercialActivityTimestamp, getOperationalAttentionState, isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp, isRecentlyReassigned } = await import(moduleUrl);
 
 const now = new Date("2026-10-10T12:00:00.000Z");
 const fourDaysAgo = "2026-10-06T12:00:00.000Z";
@@ -32,14 +32,28 @@ assert.equal(isActiveCommercialFollowUp({ ...base, nextActionAt: "2026-10-09T12:
 
 const recentlyReassigned = {
   ...base,
-  lastCommercialActivityAt: fourDaysAgo,
-  lastReassignedAt: "2026-10-10T11:00:00.000Z"
+  lastCommercialActivityAt: "2026-10-10T11:00:00.000Z",
+  lastReassignedAt: "2026-10-10T11:00:00.000Z",
+  commercialTimeline: [{ id: "reassign-1", type: "seller_reassigned", createdAt: "2026-10-10T11:00:00.000Z", data: { fromSellerId: "seller-a", toSellerId: "seller-b" } }]
 };
 assert.equal(isRecentlyReassigned(recentlyReassigned, now), true);
-assert.equal(getOperationalAttentionState(recentlyReassigned, now), "reassigned_recently");
-assert.equal(isColdLead(recentlyReassigned, now), false, "recent reassignment excludes a stale lead from the recovery queue without changing its commercial activity timestamp");
-assert.equal(getLastCommercialActivityTimestamp(recentlyReassigned), new Date(fourDaysAgo).getTime(), "reassignment does not fake commercial activity");
+assert.equal(getOperationalAttentionState(recentlyReassigned, now), "in_recovery");
+assert.equal(isInRecovery(recentlyReassigned, now), true);
+assert.equal(isColdLead(recentlyReassigned, now), false, "canonical reassignment activity moves the lead out of cold");
+assert.equal(getLastCommercialActivityTimestamp(recentlyReassigned), new Date("2026-10-10T11:00:00.000Z").getTime(), "assignment/reassignment is tracked as commercial activity");
 assert.equal(recentlyReassigned.leadStatus, "NEW", "operational state is separate from commercial stage");
+
+const sameSellerRecovery = {
+  ...base,
+  recoveryStartedAt: "2026-10-10T11:30:00.000Z",
+  lastCommercialActivityAt: "2026-10-10T11:30:00.000Z",
+  commercialTimeline: [{ id: "recovery-1", type: "recovery_started", createdAt: "2026-10-10T11:30:00.000Z", data: { sellerId: "seller-a", changedBy: "manager-1" } }]
+};
+assert.equal(isColdLead(sameSellerRecovery, now), false, "reactivation leaves cold without an outbound message");
+assert.equal(isInRecovery(sameSellerRecovery, now), true);
+assert.equal(getLastCommercialActivityTimestamp(sameSellerRecovery), new Date("2026-10-10T11:30:00.000Z").getTime());
+assert.equal(sameSellerRecovery.leadStatus, "NEW", "recovery preserves commercial stage");
+assert.equal(isColdLead(sameSellerRecovery, new Date("2026-10-14T12:00:00.000Z")), true, "recovered lead can become cold again after the same 72h threshold");
 
 const reassignedAgainCold = {
   ...base,
@@ -73,14 +87,22 @@ const opsPage = readFileSync(join(projectRoot, "app/app/ops/page.tsx"), "utf8");
 const inboxPage = readFileSync(join(projectRoot, "app/app/inbox/page.tsx"), "utf8");
 const profilePanel = readFileSync(join(projectRoot, "components/app/inbox/ProfilePanel.tsx"), "utf8");
 const nextActionRoute = readFileSync(join(projectRoot, "app/api/app/inbox/[id]/next-action/route.ts"), "utf8");
-assert.match(dashboard, /import \{ isActiveCommercialFollowUp, isColdLead, isRecentlyCompletedFollowUp \} from "@\/lib\/ops\/commercial-state"/);
-assert.match(table, /import \{ isColdLead, isRecentlyReassigned \} from "@\/lib\/ops\/commercial-state"/);
+assert.match(dashboard, /import \{ isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp \} from "@\/lib\/ops\/commercial-state"/);
+assert.match(table, /import \{ COLD_LEAD_HOURS, isColdLead \} from "@\/lib\/ops\/commercial-state"/);
 assert.match(dashboard, /await loadOpsData\(\{ silent: true \}\)/, "assignment refetches canonical backend data");
+assert.match(dashboard, /role="tablist"/);
+for (const tab of ["Resumen", "Equipo", "Seguimientos", "Recuperación", "Ventas", "Informes"]) assert.ok(dashboard.includes(`label: "${tab}"`), `OPS has the ${tab} tab`);
+assert.match(dashboard, /filterSellerId/);
+assert.match(dashboard, /filterDateFrom/);
+assert.match(dashboard, /filterCondition/);
+assert.doesNotMatch(dashboard, /12% vs semana anterior/);
+assert.match(dashboard, /Descargar CSV/);
 assert.doesNotMatch(dashboard, /leadStatus: row\.leadStatus === "NEW" \? "IN_CONVERSATION"/);
 assert.doesNotMatch(inbox, /leadStatus: row\.leadStatus === "NEW" \? "IN_CONVERSATION"/);
 assert.doesNotMatch(assignRoute, /conversation\.leadStatus = "IN_CONVERSATION"/);
 assert.match(table, /Historial comercial/);
 assert.match(table, /Reasignado a/);
+assert.match(table, /Iniciar recuperación/);
 assert.match(dashboard, /Seguimientos futuros/);
 assert.match(dashboard, /Seguimientos completados recientemente/);
 assert.match(dashboard, /completed: true/);
@@ -88,7 +110,14 @@ assert.match(opsPage, /canManageWorkspace/);
 assert.match(inboxPage, /canReassignConversations=\{canManageWorkspace\(ctx\)\}/);
 assert.match(profilePanel, /disabled=\{readOnly \|\| !canReassignConversations\}/);
 assert.match(assignRoute, /tenantContext\.ctx\?\.portalActorId \|\| tenantContext\.ctx\?\.userId/);
+assert.match(assignRoute, /startRecovery/);
 assert.match(nextActionRoute, /"x-portal-actor-id": actorUserId/);
 assert.match(inboxPage, /currentUserId=\{ctx\.portalActorId \|\| ctx\.userId\}/);
+
+const reportRoute = readFileSync(join(projectRoot, "app/api/app/ops/reports/[report]/route.ts"), "utf8");
+assert.match(reportRoute, /hasOpsAccessCookie\(cookieStore\)/, "reports require OPS unlock");
+assert.match(reportRoute, /requireAppModuleApi\(requiredModule, \{ permission: "manage_workspace" \}\)/, "reports require manager RBAC");
+assert.match(reportRoute, /resolveAppTenant\(\{ permission: "manage_workspace" \}\)/, "exports resolve the authenticated tenant");
+assert.doesNotMatch(reportRoute, /requestedTenantId|tenantId:.*searchParams/, "caller cannot select another tenant");
 
 console.log("ops-commercial-state.test.mjs passed");

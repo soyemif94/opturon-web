@@ -2,11 +2,11 @@ import { cookies } from "next/headers";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { OpsAccessGate } from "@/components/app/ops/OpsAccessGate";
 import { OpsDashboard } from "@/components/app/ops/OpsDashboard";
-import { canManageWorkspace } from "@/lib/app-permissions";
+import { canAccessAppModule, canManageWorkspace } from "@/lib/app-permissions";
 import { getPortalConversations, getPortalUsers, isBackendConfigured } from "@/lib/api";
 import { hasOpsAccessCookie, isOpsAccessConfigured } from "@/lib/ops-access";
 import { isOperationalPortalAssigneeUser } from "@/lib/portal-users";
-import { requireAppPage } from "@/lib/saas/access";
+import { requireAppModulePage } from "@/lib/saas/access";
 import type { ConversationRowData } from "@/components/app/inbox/types";
 
 type SellerOption = {
@@ -16,7 +16,7 @@ type SellerOption = {
 };
 
 export default async function AppOpsPage() {
-  const ctx = await requireAppPage();
+  const ctx = await requireAppModulePage("ops");
   const cookieStore = await cookies();
   const accessConfigured = isOpsAccessConfigured();
   const opsUnlocked = accessConfigured && hasOpsAccessCookie(cookieStore);
@@ -63,6 +63,17 @@ export default async function AppOpsPage() {
             initialSellers={initialSellers}
             readOnly={!ctx.tenantId || readOnly}
             backendReady={backendReady}
+            reportModules={{
+              sales: canAccessAppModule(ctx, "sales") && canAccessAppModule(ctx, "orders"),
+              inventory: canAccessAppModule(ctx, "inventory"),
+              contacts: canAccessAppModule(ctx, "contacts"),
+              metrics: canAccessAppModule(ctx, "metrics"),
+              orders: canAccessAppModule(ctx, "orders"),
+              invoices: canAccessAppModule(ctx, "invoices"),
+              payments: canAccessAppModule(ctx, "payments"),
+              cash: canAccessAppModule(ctx, "cash"),
+              catalog: canAccessAppModule(ctx, "catalog")
+            }}
           />
         ) : null}
       </OpsAccessGate>

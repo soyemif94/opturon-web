@@ -1524,11 +1524,11 @@ export async function acceptPortalInvitation(token: string, password: string) {
 
 export async function getPortalConversations(
   tenantId: string,
-  options?: { visibility?: "active" | "archived"; channel?: "whatsapp" | "instagram" }
+  options?: { visibility?: "active" | "archived"; channel?: "all" | "whatsapp" | "instagram" }
 ) {
   const params = new URLSearchParams();
   if (options?.visibility === "archived") params.set("visibility", "archived");
-  if (options?.channel === "whatsapp" || options?.channel === "instagram") params.set("channel", options.channel);
+  if (options?.channel === "all" || options?.channel === "whatsapp" || options?.channel === "instagram") params.set("channel", options.channel);
   return backendFetch<{
     success: boolean;
     data: {
@@ -1945,14 +1945,15 @@ export async function assignPortalConversationSeller(
   tenantId: string,
   conversationId: string,
   sellerUserId: string,
-  actorUserId?: string | null
+  actorUserId?: string | null,
+  startRecovery = false
 ) {
   return backendFetch<{ success: boolean; data: any }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}/assign-seller`,
     {
       method: "PATCH",
       headers: actorUserId ? { "x-portal-actor-id": actorUserId } : undefined,
-      body: JSON.stringify({ sellerUserId })
+      body: JSON.stringify({ sellerUserId, startRecovery })
     },
     false
   );

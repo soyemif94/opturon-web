@@ -7,8 +7,11 @@ export type OpsSellerLoadItem = {
   sellerUserId: string;
   sellerName: string;
   totalActiveLeads: number;
+  newLeads: number;
   overdueLeads: number;
   followUpLeads: number;
+  coldLeads: number;
+  recoveryLeads: number;
   totalOrders?: number;
   totalPaidOrders?: number;
   totalRevenue?: number;
@@ -58,11 +61,14 @@ export function OpsSellerLoad({
                   <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>{item.totalActiveLeads} activos</Badge>
                 </div>
 
-                <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
                   <Metric label="Activos" value={item.totalActiveLeads} />
+                  <Metric label="Nuevos" value={item.newLeads} />
+                  <Metric label="Fríos" value={item.coldLeads} />
+                  <Metric label="En recuperación" value={item.recoveryLeads} />
                   <Metric label="Vencidos" value={item.overdueLeads} />
                   <Metric label="Con seguimiento" value={item.followUpLeads} />
-                  <Metric label="Ventas" value={totalOrders} />
+                  <Metric label="Pedidos" value={totalOrders} />
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -71,7 +77,7 @@ export function OpsSellerLoad({
                   </Badge>
                   <span>Total vendido: {formatCurrency(item.totalRevenue || 0, item.currency || "ARS")}</span>
                   <span>Ticket promedio: {formatCurrency(item.averageTicket || 0, item.currency || "ARS")}</span>
-                  <span>Conversion pagada: {paidRate}%</span>
+                  <span>Pedidos cobrados: {paidOrders}/{totalOrders} ({paidRate}%)</span>
                   {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
                 </div>
               </div>
