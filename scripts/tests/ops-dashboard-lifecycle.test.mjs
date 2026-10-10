@@ -21,8 +21,14 @@ assert.match(reportRoute, /summarizeSellerRows\(filteredLeads, filteredSales, ge
 assert.match(reportRoute, /hasOpsAccessCookie\(cookieStore\)/);
 assert.match(reportRoute, /requireAppModuleApi\(requiredModule, \{ permission: "manage_workspace" \}\)/);
 assert.match(reportRoute, /resolveAppTenant\(\{ permission: "manage_workspace" \}\)/);
-assert.doesNotMatch(appShell, /document\.addEventListener\("visibilitychange"[^;]*sendOpsLockRequest/,
-  "switching to a downloaded workbook must not revoke the OPS cookie while the OPS route remains open");
+assert.match(appShell, /document\.addEventListener\("visibilitychange", handleVisibilityChange\)/,
+  "OPS still auto-locks when hidden if no report export is active");
+assert.match(appShell, /if \(hasActiveOpsReportExports\(\)\) \{\s*lockWhenQueueSettles = true;/,
+  "backgrounding OPS defers locking while a report export queue is active");
+assert.match(appShell, /subscribeToOpsReportQueue\(\(\) => \{\s*if \(!lockWhenQueueSettles \|\| document\.visibilityState !== "hidden" \|\| hasActiveOpsReportExports\(\)\) return;\s*lockWhenQueueSettles = false;\s*sendOpsLockRequest\(\);/,
+  "a deferred hidden-tab lock runs as soon as the report queue drains");
+assert.match(appShell, /unsubscribeFromQueue\(\)/,
+  "the deferred lock subscription is cleaned up with AppShell");
 assert.match(appShell, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/,
   "closing/reloading the document still locks OPS");
 assert.match(appShell, /if \(!previousPathname\.startsWith\("\/app\/ops"\) \|\| pathname\.startsWith\("\/app\/ops"\)\)/,

@@ -41,6 +41,7 @@ import type { PortalBillingAccessStatus } from "@/lib/api";
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import type { GlobalRole, TenantRole } from "@/lib/saas/types";
 import { cn } from "@/lib/ui/cn";
+import { hasActiveOpsReportExports, subscribeToOpsReportQueue } from "@/lib/ops/report-download";
 
 type AuthGlobalRole = GlobalRole | "partner";
 
@@ -763,14 +764,34 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
+    let lockWhenQueueSettles = false;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "hidden") return;
+      if (hasActiveOpsReportExports()) {
+        lockWhenQueueSettles = true;
+        return;
+      }
+      sendOpsLockRequest();
+    }
+
+    const unsubscribeFromQueue = subscribeToOpsReportQueue(() => {
+      if (!lockWhenQueueSettles || document.visibilityState !== "hidden" || hasActiveOpsReportExports()) return;
+      lockWhenQueueSettles = false;
+      sendOpsLockRequest();
+    });
+
     function handleBeforeUnload() {
       sendOpsLockRequest();
     }
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      unsubscribeFromQueue();
     };
   }, []);
 

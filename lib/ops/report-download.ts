@@ -81,6 +81,7 @@ function pumpQueue() {
     } finally {
       activeJob = null;
       refreshQueuePositions();
+      notify();
       pumpQueue();
     }
   })();
@@ -104,6 +105,10 @@ export function enqueueOpsReportDownload(
 
 export function getOpsReportQueueSnapshot(report: OpsReportType, format: OpsReportDownloadFormat) {
   return snapshots.get(reportKey(report, format)) || idleSnapshot;
+}
+
+export function hasActiveOpsReportExports() {
+  return activeJob !== null || queue.length > 0;
 }
 
 export function subscribeToOpsReportQueue(listener: () => void) {
