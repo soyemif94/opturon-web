@@ -69,7 +69,7 @@ test("detail errors are explicit and never degrade into the desktop empty state"
 test("back returns to LIST through controlled cleanup", () => {
   const workspace = read("components/app/InboxWorkspace.tsx");
   assert.match(workspace, /function closeMobileDetail\(\)[\s\S]*selectedIdRef\.current = undefined[\s\S]*setSelectedId\(undefined\)/);
-  assert.match(workspace, /function backToConversationList\(\)[\s\S]*closeMobileDetail\(\)/);
+  assert.match(workspace, /function backToConversationList\(force = false\)[\s\S]*closeMobileDetail\(\)/);
   assert.equal(resolveInboxDetailMode({}), "LIST");
 });
 

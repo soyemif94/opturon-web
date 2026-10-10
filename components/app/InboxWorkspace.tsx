@@ -18,6 +18,19 @@ import { shouldShowInboxChannelEmptyState } from "@/lib/whatsapp-channel-state";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { preserveSelectedConversationId, resolveInboxDetailMode } from "@/components/app/inbox/mobile-behavior";
 import {
+  commitProfileDraftFields,
+  discardProfileDraft,
+  findOtherDirtyProfileDraft,
+  getProfileDraftConflicts,
+  hasDirtyProfileDraft,
+  hasDirtyProfileDraftField,
+  reconcileProfileDraft,
+  type ProfileDraftField,
+  type ProfileDraftTracker,
+  type ProfileDraftValues,
+  updateProfileDraftField
+} from "@/lib/inbox/profile-draft";
+import {
   hasInboxChannel,
   resolveInitialInboxChannel,
   type InboxChannelAvailability
@@ -88,6 +101,28 @@ function fromDateTimeLocalValue(value: string) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function profileDraftValuesFromDetail(detail: DetailPayload): ProfileDraftValues {
+  return {
+    assignedSeller: detail.conversation.assignedSellerUserId || "",
+    commercialStatus: detail.conversation.leadStatus || "NEW",
+    dealStage: detail.deal?.stage || "lead",
+    followUpAt: toDateTimeLocalValue(detail.conversation.nextActionAt),
+    nextAction: detail.conversation.nextActionNote || "",
+    notes: "",
+    taskTitle: ""
+  };
+}
+
+const EMPTY_PROFILE_DRAFT_VALUES: ProfileDraftValues = {
+  assignedSeller: "",
+  commercialStatus: "NEW",
+  dealStage: "lead",
+  followUpAt: "",
+  nextAction: "",
+  notes: "",
+  taskTitle: ""
+};
+
 export function InboxWorkspace({
   initialConversationId,
   demo,
@@ -133,13 +168,18 @@ export function InboxWorkspace({
   const [noteText, setNoteText] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [dealStage, setDealStage] = useState("lead");
+  const [dealStageBusy, setDealStageBusy] = useState(false);
   const [assignTo, setAssignTo] = useState("");
   const [sellerOptions, setSellerOptions] = useState<SellerOption[]>([]);
   const [assigningSeller, setAssigningSeller] = useState(false);
   const [leadStatusBusy, setLeadStatusBusy] = useState(false);
+  const [leadStatusInput, setLeadStatusInput] = useState<LeadStatus>("NEW");
   const [nextActionBusy, setNextActionBusy] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [taskSaving, setTaskSaving] = useState(false);
   const [resetConversationBusy, setResetConversationBusy] = useState(false);
   const [deleteConversationOpen, setDeleteConversationOpen] = useState(false);
+  const [pendingConversationSwitch, setPendingConversationSwitch] = useState<{ fromId: string; toId: string } | null>(null);
   const [nextActionAtInput, setNextActionAtInput] = useState("");
   const [nextActionNoteInput, setNextActionNoteInput] = useState("");
   const [onlyUnread, setOnlyUnread] = useState(false);
@@ -152,6 +192,8 @@ export function InboxWorkspace({
   const rowsRequestSeqRef = useRef(0);
   const detailRequestSeqRef = useRef(0);
   const detailAbortControllerRef = useRef<AbortController | null>(null);
+  const profileDraftTrackerRef = useRef<ProfileDraftTracker>(new Map());
+  const latestProfileDraftValuesRef = useRef<Map<string, ProfileDraftValues>>(new Map());
   const selectedIdRef = useRef<string | undefined>(initialConversationId);
   const mobileHistoryDetailRef = useRef(false);
   const pollInFlightRef = useRef(false);
@@ -323,16 +365,22 @@ export function InboxWorkspace({
 
       if (requestSeq === detailRequestSeqRef.current && selectedIdRef.current === conversationId) {
         detailSnapshotRef.current = nextSnapshot;
+        const serverDraftValues = profileDraftValuesFromDetail(json);
+        latestProfileDraftValuesRef.current.set(conversationId, serverDraftValues);
+        const profileDraft = reconcileProfileDraft(profileDraftTrackerRef.current, conversationId, serverDraftValues);
         setDetail((current) => (changed || current?.conversation.id !== conversationId ? json : current));
         setDetailError(null);
         setReadOnly(nextReadOnly);
         if ((json.conversation?.channelType === "instagram" || json.conversation?.channelType === "whatsapp") && json.conversation.channelType !== channel) {
           setChannel(json.conversation.channelType);
         }
-        if (json.deal?.stage) setDealStage(json.deal.stage);
-        setAssignTo(json.conversation?.assignedSellerUserId || "");
-        setNextActionAtInput(toDateTimeLocalValue(json.conversation?.nextActionAt));
-        setNextActionNoteInput(json.conversation?.nextActionNote || "");
+        setDealStage(profileDraft.values.dealStage);
+        setAssignTo(profileDraft.values.assignedSeller);
+        setLeadStatusInput(profileDraft.values.commercialStatus as LeadStatus);
+        setNextActionAtInput(profileDraft.values.followUpAt);
+        setNextActionNoteInput(profileDraft.values.nextAction);
+        setNoteText(profileDraft.values.notes);
+        setTaskTitle(profileDraft.values.taskTitle);
         const latestMessage = Array.isArray(json.messages) && json.messages.length > 0 ? json.messages[json.messages.length - 1] : null;
         if (json.conversation?.id) {
           setRows((prev) =>
@@ -404,7 +452,67 @@ export function InboxWorkspace({
     }
   }
 
-  function backToConversationList() {
+  function requestOpenConversation(conversationId: string) {
+    if (conversationId === selectedIdRef.current) return;
+    const dirtyConversationId = findOtherDirtyProfileDraft(profileDraftTrackerRef.current, conversationId);
+    if (dirtyConversationId) {
+      setPendingConversationSwitch({ fromId: dirtyConversationId, toId: conversationId });
+      return;
+    }
+    openConversation(conversationId);
+  }
+
+  function discardDraftAndSwitchConversation() {
+    if (!pendingConversationSwitch) return;
+    const { fromId, toId } = pendingConversationSwitch;
+    const latest = latestProfileDraftValuesRef.current.get(fromId) || EMPTY_PROFILE_DRAFT_VALUES;
+    const discarded = discardProfileDraft(profileDraftTrackerRef.current, fromId, latest);
+    if (selectedIdRef.current === fromId) {
+      setAssignTo(discarded.assignedSeller);
+      setLeadStatusInput(discarded.commercialStatus as LeadStatus);
+      setDealStage(discarded.dealStage);
+      setNextActionAtInput(discarded.followUpAt);
+      setNextActionNoteInput(discarded.nextAction);
+      setNoteText(discarded.notes);
+      setTaskTitle(discarded.taskTitle);
+    }
+    setPendingConversationSwitch(null);
+    if (toId) openConversation(toId);
+    else backToConversationList(true);
+  }
+
+  function markProfileFieldDraft(field: ProfileDraftField, value: string, conversationId = selectedIdRef.current) {
+    if (!conversationId) return { dirty: false, conflicting: false };
+    const serverValues = latestProfileDraftValuesRef.current.get(conversationId) || EMPTY_PROFILE_DRAFT_VALUES;
+    return updateProfileDraftField(profileDraftTrackerRef.current, conversationId, field, value, serverValues);
+  }
+
+  function hasProfileDraftConflict(conversationId: string, fields: ProfileDraftField[]) {
+    const conflicts = getProfileDraftConflicts(profileDraftTrackerRef.current, conversationId);
+    if (!fields.some((field) => conflicts.has(field))) return true;
+    return typeof window !== "undefined" && window.confirm(
+      "Este dato cambió en otra sesión mientras lo editabas. Si guardás, tu borrador reemplazará el valor actual del servidor. ¿Querés continuar?"
+    );
+  }
+
+  function rebaseProfileDraft(conversationId: string, fields: ProfileDraftField[], canonicalValues: Partial<ProfileDraftValues>) {
+    const currentServer = latestProfileDraftValuesRef.current.get(conversationId) || EMPTY_PROFILE_DRAFT_VALUES;
+    const nextServer = { ...currentServer, ...canonicalValues };
+    latestProfileDraftValuesRef.current.set(conversationId, nextServer);
+    commitProfileDraftFields(profileDraftTrackerRef.current, conversationId, fields, canonicalValues);
+  }
+
+  function supersedePendingDetailRequests() {
+    detailAbortControllerRef.current?.abort();
+    detailRequestSeqRef.current += 1;
+  }
+
+  function backToConversationList(force = false) {
+    const currentConversationId = selectedIdRef.current;
+    if (!force && currentConversationId && hasDirtyProfileDraft(profileDraftTrackerRef.current, currentConversationId)) {
+      setPendingConversationSwitch({ fromId: currentConversationId, toId: "" });
+      return;
+    }
     const shouldPopHistory =
       typeof window !== "undefined" &&
       mobileHistoryDetailRef.current &&
@@ -834,7 +942,7 @@ export function InboxWorkspace({
             : "Nuevo";
 
     setRows((prev) => {
-      const nextRows = prev.map((row) =>
+      return prev.map((row) =>
         row.id === conversationId
           ? {
               ...row,
@@ -843,13 +951,6 @@ export function InboxWorkspace({
             }
           : row
       );
-
-      const updatedRow = nextRows.find((row) => row.id === conversationId);
-      if (updatedRow && !matchesInboxFilter(updatedRow, filter)) {
-        return nextRows.filter((row) => row.id !== conversationId);
-      }
-
-      return nextRows;
     });
 
     setDetail((prev) =>
@@ -902,6 +1003,8 @@ export function InboxWorkspace({
 
   async function assignSeller(conversationId: string, sellerUserId: string) {
     if (!conversationId || !sellerUserId || readOnly || assigningSeller) return false;
+    markProfileFieldDraft("assignedSeller", sellerUserId, conversationId);
+    if (!hasProfileDraftConflict(conversationId, ["assignedSeller"])) return false;
     const fallbackSeller = sellerOptions.find((item) => item.id === sellerUserId);
 
     setAssigningSeller(true);
@@ -931,6 +1034,16 @@ export function InboxWorkspace({
         throw new Error("assign_seller_response_missing_conversation");
       }
 
+      const canonicalSellerId = String(assignedConversation?.assignedSellerUserId || fallbackSeller?.id || sellerUserId);
+      const canonicalLeadStatus = String(assignedConversation?.leadStatus || detail?.conversation.leadStatus || "IN_CONVERSATION") as LeadStatus;
+      rebaseProfileDraft(conversationId, ["assignedSeller", "commercialStatus"], {
+        assignedSeller: canonicalSellerId,
+        commercialStatus: canonicalLeadStatus
+      });
+      setAssignTo(canonicalSellerId);
+      setLeadStatusInput(canonicalLeadStatus);
+      supersedePendingDetailRequests();
+
       if (selectedId === conversationId && filter === "unassigned") {
         backToConversationList();
       }
@@ -952,6 +1065,9 @@ export function InboxWorkspace({
 
     const snapshotDetail = detail;
     const snapshotRows = rows;
+    markProfileFieldDraft("commercialStatus", nextLeadStatus, conversationId);
+    setLeadStatusInput(nextLeadStatus);
+    if (!hasProfileDraftConflict(conversationId, ["commercialStatus"])) return false;
     setLeadStatusBusy(true);
     applyLeadStatusLocally(conversationId, nextLeadStatus);
 
@@ -965,6 +1081,12 @@ export function InboxWorkspace({
       if (!response.ok) {
         throw new Error(String(json?.error || "lead_status_failed"));
       }
+
+      const returnedConversation = json?.conversation || json?.data?.conversation || json?.data || {};
+      const canonicalLeadStatus = String(returnedConversation?.leadStatus || nextLeadStatus) as LeadStatus;
+      rebaseProfileDraft(conversationId, ["commercialStatus"], { commercialStatus: canonicalLeadStatus });
+      setLeadStatusInput(canonicalLeadStatus);
+      supersedePendingDetailRequests();
 
       const stillVisible = matchesInboxFilter(
         {
@@ -1015,6 +1137,8 @@ export function InboxWorkspace({
       ? patch.nextActionNote || null
       : detail.conversation.nextActionNote || null;
 
+    if (!hasProfileDraftConflict(conversationId, ["followUpAt", "nextAction"])) return false;
+
     setNextActionBusy(true);
     applyNextActionLocally(conversationId, nextActionAt, nextActionNote);
 
@@ -1028,6 +1152,23 @@ export function InboxWorkspace({
       if (!response.ok) {
         throw new Error(String(json?.error || "next_action_failed"));
       }
+
+      const returnedConversation = json?.conversation || json?.data?.conversation || json?.data || {};
+      const canonicalAt = Object.prototype.hasOwnProperty.call(returnedConversation, "nextActionAt")
+        ? returnedConversation.nextActionAt || null
+        : nextActionAt;
+      const canonicalNote = Object.prototype.hasOwnProperty.call(returnedConversation, "nextActionNote")
+        ? returnedConversation.nextActionNote || null
+        : nextActionNote;
+      const canonicalDraftValues = {
+        followUpAt: toDateTimeLocalValue(canonicalAt),
+        nextAction: canonicalNote || ""
+      };
+      rebaseProfileDraft(conversationId, ["followUpAt", "nextAction"], canonicalDraftValues);
+      setNextActionAtInput(canonicalDraftValues.followUpAt);
+      setNextActionNoteInput(canonicalDraftValues.nextAction);
+      applyNextActionLocally(conversationId, canonicalAt, canonicalNote);
+      supersedePendingDetailRequests();
 
       if (
         selectedId === conversationId &&
@@ -1052,12 +1193,40 @@ export function InboxWorkspace({
       }
       return true;
     } catch (error) {
-      setDetail(snapshotDetail);
-      setRows(snapshotRows);
+      setDetail((current) => current && current.conversation.id === conversationId
+        ? { ...current, conversation: { ...current.conversation, nextActionAt: snapshotDetail.conversation.nextActionAt, nextActionNote: snapshotDetail.conversation.nextActionNote } }
+        : current);
+      setRows((current) => current.map((row) => row.id === conversationId
+        ? { ...row, nextActionAt: snapshotRows.find((item) => item.id === conversationId)?.nextActionAt || null, nextActionNote: snapshotRows.find((item) => item.id === conversationId)?.nextActionNote || null }
+        : row));
       toast.error("No se pudo guardar el seguimiento", error instanceof Error ? error.message : "unknown_error");
       return false;
     } finally {
       setNextActionBusy(false);
+    }
+  }
+
+  async function saveDealStage() {
+    if (!selectedId || !detail || readOnly || dealStageBusy) return false;
+    const conversationId = selectedId;
+    markProfileFieldDraft("dealStage", dealStage, conversationId);
+    if (!hasProfileDraftConflict(conversationId, ["dealStage"])) return false;
+    setDealStageBusy(true);
+    try {
+      const ok = await mutateConversation(conversationId, "change_stage", { stage: dealStage });
+      if (!ok) {
+        toast.error("No se pudo guardar la etapa");
+        return false;
+      }
+      rebaseProfileDraft(conversationId, ["dealStage"], { dealStage });
+      supersedePendingDetailRequests();
+      void loadDetail(conversationId, { silent: true });
+      return true;
+    } catch (error) {
+      toast.error("No se pudo guardar la etapa", error instanceof Error ? error.message : "unknown_error");
+      return false;
+    } finally {
+      setDealStageBusy(false);
     }
   }
 
@@ -1136,7 +1305,7 @@ export function InboxWorkspace({
       setRows(remaining);
       setSelectedIds([]);
       if (selectedId && archivedIds.includes(selectedId)) {
-        if (remaining[0]) openConversation(remaining[0].id);
+        if (remaining[0]) requestOpenConversation(remaining[0].id);
         else backToConversationList();
       }
       toast.success("Conversaciones ocultadas", "Ya no aparecen en el inbox, pero el historial sigue preservado.");
@@ -1173,7 +1342,7 @@ export function InboxWorkspace({
       setRows(remaining);
       setSelectedIds([]);
       if (selectedId && restoredIds.includes(selectedId)) {
-        if (remaining[0]) openConversation(remaining[0].id);
+        if (remaining[0]) requestOpenConversation(remaining[0].id);
         else backToConversationList();
       }
       toast.success("Conversaciones restauradas", "Ya vuelven a aparecer en el inbox activo.");
@@ -1190,7 +1359,7 @@ export function InboxWorkspace({
       applyFilter: (nextFilter) => setFilter(nextFilter as FilterKey),
       toggleOnlyUnread: () => setOnlyUnread((prev) => !prev),
       setSearch: (query) => setSearch(query),
-      openConversation,
+      openConversation: requestOpenConversation,
       runAction: async (action, payload) => {
         const ok = await runOptimisticAction(action, payload || {});
         if (!ok) toast.error("No se pudo aplicar la accion");
@@ -1264,14 +1433,13 @@ export function InboxWorkspace({
     const payload: Record<string, unknown> = {};
     if (action === "toggle_bot") payload.botEnabled = !detail.conversation.botEnabled;
     if (action === "assign") payload.assignedTo = assignTo || undefined;
-    if (action === "change_stage") payload.stage = dealStage;
-
-    const ok = action === "change_stage" ? await mutateConversation(selectedId, action, payload) : await runOptimisticAction(action, payload);
+    const ok = action === "change_stage" ? await saveDealStage() : await runOptimisticAction(action, payload);
     if (!ok) toast.error("No se pudo guardar el cambio");
   }
 
   async function takeConversation() {
     if (!selectedId || !currentUserId || readOnly) return;
+    markProfileFieldDraft("assignedSeller", currentUserId);
     setAssignTo(currentUserId);
     const ok = await assignSeller(selectedId, currentUserId);
     if (!ok) toast.error("No se pudo tomar la conversacion");
@@ -1287,29 +1455,51 @@ export function InboxWorkspace({
 
   async function addNote() {
     const text = noteText.trim();
-    if (!selectedId || !detail || !text || readOnly) return;
+    if (!selectedId || !detail || !text || readOnly || noteSaving) return;
+    const conversationId = selectedId;
+    markProfileFieldDraft("notes", noteText, conversationId);
+    setNoteSaving(true);
     const optimisticNote = { id: `note-${Date.now()}`, text, createdAt: new Date().toISOString() };
     setDetail((prev) => (prev ? { ...prev, notes: [optimisticNote, ...prev.notes] } : prev));
-    setNoteText("");
-    const ok = await mutateConversation(selectedId, "add_note", { text });
-    if (!ok) {
+    try {
+      const ok = await mutateConversation(conversationId, "add_note", { text });
+      if (!ok) {
+        setDetail((prev) => (prev ? { ...prev, notes: prev.notes.filter((item) => item.id !== optimisticNote.id) } : prev));
+        toast.error("No se pudo guardar la nota");
+        return;
+      }
+      rebaseProfileDraft(conversationId, ["notes"], { notes: "" });
+      setNoteText("");
+    } catch (error) {
       setDetail((prev) => (prev ? { ...prev, notes: prev.notes.filter((item) => item.id !== optimisticNote.id) } : prev));
-      setNoteText(text);
-      toast.error("No se pudo guardar la nota");
+      toast.error("No se pudo guardar la nota", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setNoteSaving(false);
     }
   }
 
   async function addTask() {
     const title = taskTitle.trim();
-    if (!selectedId || !detail || !title || readOnly) return;
+    if (!selectedId || !detail || !title || readOnly || taskSaving) return;
+    const conversationId = selectedId;
+    markProfileFieldDraft("taskTitle", taskTitle, conversationId);
+    setTaskSaving(true);
     const optimisticTask = { id: `task-${Date.now()}`, title, status: "todo", dueDate: undefined };
     setDetail((prev) => (prev ? { ...prev, tasks: [optimisticTask, ...prev.tasks] } : prev));
-    setTaskTitle("");
-    const ok = await mutateConversation(selectedId, "add_task", { title });
-    if (!ok) {
+    try {
+      const ok = await mutateConversation(conversationId, "add_task", { title });
+      if (!ok) {
+        setDetail((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((item) => item.id !== optimisticTask.id) } : prev));
+        toast.error("No se pudo guardar la tarea");
+        return;
+      }
+      rebaseProfileDraft(conversationId, ["taskTitle"], { taskTitle: "" });
+      setTaskTitle("");
+    } catch (error) {
       setDetail((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((item) => item.id !== optimisticTask.id) } : prev));
-      setTaskTitle(title);
-      toast.error("No se pudo guardar la tarea");
+      toast.error("No se pudo guardar la tarea", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setTaskSaving(false);
     }
   }
 
@@ -1357,7 +1547,7 @@ export function InboxWorkspace({
     detailRequestSeqRef.current += 1;
     setRows((current) => current.filter((row) => row.id !== deletingId));
     setSelectedIds((current) => current.filter((id) => id !== deletingId));
-    backToConversationList();
+    backToConversationList(true);
     setComposer("");
     setContextOpen(false);
     toast.success("Conversación eliminada. El contacto y sus datos comerciales se conservaron.");
@@ -1431,7 +1621,7 @@ export function InboxWorkspace({
                   compact
                   onImported={(conversationId) => {
                     void loadRows();
-                    if (conversationId) openConversation(conversationId);
+                    if (conversationId) requestOpenConversation(conversationId);
                   }}
                 />
               }
@@ -1456,7 +1646,7 @@ export function InboxWorkspace({
               }}
               onSearchChange={setSearch}
               onSelect={(id) => {
-                openConversation(id);
+                requestOpenConversation(id);
               }}
               onMarkHot={(id) => void rowAction(id, "mark_hot")}
               onClose={(id) => void rowAction(id, "close")}
@@ -1516,15 +1706,26 @@ export function InboxWorkspace({
               loading={detailLoading}
               readOnly={readOnly}
               dealStage={dealStage}
-              onDealStageChange={setDealStage}
-              onSaveDealStage={() => void runAction("change_stage")}
+              dealStageBusy={dealStageBusy}
+              onDealStageChange={(value) => {
+                markProfileFieldDraft("dealStage", value);
+                setDealStage(value);
+              }}
+              onSaveDealStage={() => void saveDealStage()}
               assignTo={assignTo}
-              onAssignToChange={setAssignTo}
+              onAssignToChange={(value) => {
+                markProfileFieldDraft("assignedSeller", value);
+                setAssignTo(value);
+              }}
               sellerOptions={sellerOptions}
               assigningSeller={assigningSeller}
               onTakeConversation={() => void takeConversation()}
-              leadStatus={detail?.conversation?.leadStatus || "NEW"}
+              leadStatus={leadStatusInput}
               leadStatusBusy={leadStatusBusy}
+              leadStatusDirty={hasDirtyProfileDraftField(profileDraftTrackerRef.current, selectedId, "commercialStatus")}
+              onRetryLeadStatus={() => {
+                if (selectedId) void changeLeadStatus(selectedId, leadStatusInput);
+              }}
               onLeadStatusChange={(value) => {
                 if (!selectedId) return;
                 void changeLeadStatus(selectedId, value);
@@ -1532,8 +1733,14 @@ export function InboxWorkspace({
               nextActionAt={nextActionAtInput}
               nextActionNote={nextActionNoteInput}
               nextActionBusy={nextActionBusy}
-              onNextActionAtChange={setNextActionAtInput}
-              onNextActionNoteChange={setNextActionNoteInput}
+              onNextActionAtChange={(value) => {
+                markProfileFieldDraft("followUpAt", value);
+                setNextActionAtInput(value);
+              }}
+              onNextActionNoteChange={(value) => {
+                markProfileFieldDraft("nextAction", value);
+                setNextActionNoteInput(value);
+              }}
               onSaveNextAction={() => {
                 if (!selectedId) return;
                 void saveNextAction(selectedId, {
@@ -1543,6 +1750,8 @@ export function InboxWorkspace({
               }}
               onClearNextAction={() => {
                 if (!selectedId) return;
+                markProfileFieldDraft("followUpAt", "");
+                markProfileFieldDraft("nextAction", "");
                 setNextActionAtInput("");
                 setNextActionNoteInput("");
                 void saveNextAction(selectedId, { nextActionAt: null, nextActionNote: null });
@@ -1551,10 +1760,18 @@ export function InboxWorkspace({
               onMarkHot={() => void runAction("mark_hot")}
               onClose={() => void runAction("close")}
               noteText={noteText}
-              onNoteTextChange={setNoteText}
+              noteSaving={noteSaving}
+              onNoteTextChange={(value) => {
+                markProfileFieldDraft("notes", value);
+                setNoteText(value);
+              }}
               onAddNote={() => void addNote()}
               taskTitle={taskTitle}
-              onTaskTitleChange={setTaskTitle}
+              taskSaving={taskSaving}
+              onTaskTitleChange={(value) => {
+                markProfileFieldDraft("taskTitle", value);
+                setTaskTitle(value);
+              }}
               onAddTask={() => void addTask()}
               onResetConversation={() => void resetConversation()}
               resetBusy={resetConversationBusy}
@@ -1572,6 +1789,17 @@ export function InboxWorkspace({
           confirmText="Eliminar conversación"
           variant="destructive"
           onConfirm={deleteSelectedConversation}
+        />
+        <ConfirmDialog
+          open={Boolean(pendingConversationSwitch)}
+          onOpenChange={(open) => {
+            if (!open) setPendingConversationSwitch(null);
+          }}
+          title="Tenés cambios sin guardar"
+          description="Si salís de esta conversación, podés descartar el borrador local pendiente."
+          cancelText="Seguir editando"
+          confirmText="Descartar"
+          onConfirm={discardDraftAndSwitchConversation}
         />
         </>
       )}

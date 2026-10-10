@@ -32,6 +32,7 @@ type ProfilePanelProps = {
   loading: boolean;
   readOnly: boolean;
   dealStage: string;
+  dealStageBusy?: boolean;
   onDealStageChange: (value: string) => void;
   onSaveDealStage: () => void;
   assignTo: string;
@@ -54,6 +55,8 @@ type ProfilePanelProps = {
   orderHref?: string;
   leadStatus: LeadStatus;
   leadStatusBusy?: boolean;
+  leadStatusDirty?: boolean;
+  onRetryLeadStatus?: () => void;
   onLeadStatusChange: (value: LeadStatus) => void;
   nextActionAt: string;
   nextActionNote: string;
@@ -62,6 +65,8 @@ type ProfilePanelProps = {
   onNextActionNoteChange: (value: string) => void;
   onSaveNextAction: () => void;
   onClearNextAction: () => void;
+  noteSaving?: boolean;
+  taskSaving?: boolean;
 };
 
 export function ProfilePanel({
@@ -69,6 +74,7 @@ export function ProfilePanel({
   loading,
   readOnly,
   dealStage,
+  dealStageBusy,
   onDealStageChange,
   onSaveDealStage,
   assignTo,
@@ -91,6 +97,8 @@ export function ProfilePanel({
   orderHref,
   leadStatus,
   leadStatusBusy,
+  leadStatusDirty,
+  onRetryLeadStatus,
   onLeadStatusChange,
   nextActionAt,
   nextActionNote,
@@ -99,6 +107,8 @@ export function ProfilePanel({
   onNextActionNoteChange,
   onSaveNextAction,
   onClearNextAction,
+  noteSaving,
+  taskSaving,
 }: ProfilePanelProps) {
   const commercialActionParams = detail
     ? {
@@ -170,6 +180,7 @@ export function ProfilePanel({
               <select value={leadStatus} onChange={(event) => onLeadStatusChange(event.target.value as LeadStatus)} className="h-8 w-full rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" disabled={readOnly || leadStatusBusy}>
                 {LEAD_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
+              {leadStatusDirty && !leadStatusBusy && onRetryLeadStatus ? <button type="button" onClick={onRetryLeadStatus} className="mt-1 text-[10px] font-medium text-brandBright hover:underline">Reintentar guardar estado</button> : null}
             </label>
             <label>
               <span className="mb-1 block text-[10px] text-muted">Etapa</span>
@@ -178,15 +189,15 @@ export function ProfilePanel({
               </select>
             </label>
           </div>
-          <button type="button" onClick={onSaveDealStage} disabled={readOnly} className="text-[10px] font-medium text-brandBright hover:underline disabled:opacity-40">Guardar etapa</button>
+          <button type="button" onClick={onSaveDealStage} disabled={readOnly || dealStageBusy} className="text-[10px] font-medium text-brandBright hover:underline disabled:opacity-40">{dealStageBusy ? "Guardando etapa..." : "Guardar etapa"}</button>
         </div>
       </section>
 
       <section className="border-b border-[color:var(--border)] px-4 py-3.5">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Notas</h3>
         <div className="mt-2 flex gap-1.5">
-          <input value={noteText} onChange={(event) => onNoteTextChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" placeholder="Agregar nota..." disabled={readOnly} />
-          <button type="button" onClick={onAddNote} disabled={readOnly || !noteText.trim()} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted hover:text-text disabled:opacity-40">Guardar</button>
+          <input value={noteText} onChange={(event) => onNoteTextChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" placeholder="Agregar nota..." disabled={readOnly || noteSaving} />
+          <button type="button" onClick={onAddNote} disabled={readOnly || !noteText.trim() || noteSaving} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted hover:text-text disabled:opacity-40">{noteSaving ? "Guardando..." : "Guardar"}</button>
         </div>
         <ul className="mt-2 divide-y divide-[color:var(--border)]">
           {detail.notes.slice(0, 3).map((note) => (
@@ -208,7 +219,7 @@ export function ProfilePanel({
       <details className="group border-b border-[color:var(--border)] px-4 py-3">
         <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-muted"><span>Tareas</span><span className="text-[10px] normal-case tracking-normal">{detail.tasks.length}</span></summary>
         <div className="mt-3">
-          <div className="flex gap-1.5"><input value={taskTitle} onChange={(event) => onTaskTitleChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" placeholder="Agregar próximo paso" disabled={readOnly} /><button type="button" onClick={onAddTask} disabled={readOnly || !taskTitle.trim()} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted disabled:opacity-40">Crear</button></div>
+          <div className="flex gap-1.5"><input value={taskTitle} onChange={(event) => onTaskTitleChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" placeholder="Agregar próximo paso" disabled={readOnly || taskSaving} /><button type="button" onClick={onAddTask} disabled={readOnly || !taskTitle.trim() || taskSaving} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted disabled:opacity-40">{taskSaving ? "Creando..." : "Crear"}</button></div>
           <ul className="mt-2 divide-y divide-[color:var(--border)]">{detail.tasks.slice(0, 5).map((task) => <li key={task.id} className="flex items-center justify-between py-2 text-[11px]"><span>{task.title}</span><span className="text-[9px] text-muted">{taskStatusLabel(task.status)}</span></li>)}</ul>
         </div>
       </details>
