@@ -40,7 +40,7 @@ assert.match(listRoute, /resolveAppTenant/);
 assert.match(listRoute, /getPortalConversations\(tenantContext\.tenantId, \{ visibility, channel \}\)/);
 assert.match(listRoute, /Cache-Control": "no-store"/);
 assert.match(detailRoute, /getPortalConversationDetail\(tenantContext\.tenantId, id\)/);
-assert.match(detailRoute, /patchPortalConversation\(tenantContext\.tenantId, id/);
+assert.match(detailRoute, /patchPortalConversation\(\s*tenantContext\.tenantId,\s*id,/);
 assert.doesNotMatch(workspace, /profileImageUrl[\s\S]{0,200}fetch/);
 
 console.log("inbox-uiux-functional-contract.test.ts passed");

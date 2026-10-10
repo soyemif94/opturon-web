@@ -29,7 +29,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
-      const result = await assignPortalConversationSeller(tenantContext.tenantId, id, parsed.data.sellerUserId);
+      const result = await assignPortalConversationSeller(
+        tenantContext.tenantId,
+        id,
+        parsed.data.sellerUserId,
+        tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId
+      );
       return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       return NextResponse.json(
@@ -51,18 +56,42 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
   if (!user) return NextResponse.json({ error: "seller_user_not_found" }, { status: 422 });
 
+  const actorUserId = tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId;
+  const previousSellerId = conversation.assignedSellerUserId || null;
   conversation.assignedTo = user.id;
   conversation.assignedSellerUserId = user.id;
   conversation.assignedSellerName = user.name;
   conversation.assignedSellerRole = membership?.role || "seller";
-  if ((conversation.leadStatus || "NEW") === "NEW") {
-    conversation.leadStatus = "IN_CONVERSATION";
+  if (previousSellerId !== user.id) {
+    const actor = data.users.find((item) => item.id === actorUserId);
+    const now = new Date().toISOString();
+    const tracked = conversation as typeof conversation & {
+      commercialTimeline?: Array<Record<string, unknown>>;
+      lastReassignedAt?: string | null;
+    };
+    const timeline = Array.isArray(tracked.commercialTimeline) ? tracked.commercialTimeline : [];
+    const previousSeller = data.users.find((item) => item.id === previousSellerId);
+    const type = previousSellerId ? "seller_reassigned" : "seller_assigned";
+    tracked.commercialTimeline = [{
+      id: `event-${Date.now()}-assignment`,
+      type,
+      data: {
+        fromSellerId: previousSellerId,
+        fromSellerName: previousSeller?.name || null,
+        toSellerId: user.id,
+        toSellerName: user.name,
+        changedBy: actor?.id || null,
+        changedByName: actor?.name || null
+      },
+      createdAt: now
+    }, ...timeline].slice(0, 30);
+    if (type === "seller_reassigned") tracked.lastReassignedAt = now;
   }
   writeSaasData(data);
 
   appendAuditLog({
     tenantId: tenantContext.tenantId,
-    userId: tenantContext.ctx?.userId,
+    userId: actorUserId,
     action: "inbox_assign_seller",
     entity: "conversation",
     entityId: conversation.id
@@ -77,7 +106,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       assignedSellerName: user.name,
       assignedSellerRole: membership?.role || "seller",
       assignedTo: user.name,
-      leadStatus: conversation.leadStatus || "IN_CONVERSATION"
+      leadStatus: conversation.leadStatus || "NEW"
     }
   });
 }

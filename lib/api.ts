@@ -1910,16 +1910,22 @@ export async function getPortalConversationDetail(tenantId: string, conversation
   );
 }
 
-export async function patchPortalConversation(tenantId: string, conversationId: string, payload: Record<string, unknown>) {
+export async function patchPortalConversation(
+  tenantId: string,
+  conversationId: string,
+  payload: Record<string, unknown>,
+  actorUserId?: string | null
+) {
   return backendFetch<{ success: boolean; data: any }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}`,
     {
       method: "PATCH",
+      headers: actorUserId ? { "x-portal-actor-id": actorUserId } : undefined,
       body: JSON.stringify(payload || {})
     },
-      false
-    );
-  }
+    false
+  );
+}
 
 export async function deletePortalConversation(tenantId: string, conversationId: string, actorUserId: string, actorGlobalRole?: string) {
   return backendPortalFetch<{ success: boolean; data: { conversationId: string; deleted: boolean; reason: string } }>(
@@ -1935,11 +1941,17 @@ export async function deletePortalConversation(tenantId: string, conversationId:
   );
 }
 
-export async function assignPortalConversationSeller(tenantId: string, conversationId: string, sellerUserId: string) {
+export async function assignPortalConversationSeller(
+  tenantId: string,
+  conversationId: string,
+  sellerUserId: string,
+  actorUserId?: string | null
+) {
   return backendFetch<{ success: boolean; data: any }>(
     `/portal/tenants/${tenantId}/conversations/${conversationId}/assign-seller`,
     {
       method: "PATCH",
+      headers: actorUserId ? { "x-portal-actor-id": actorUserId } : undefined,
       body: JSON.stringify({ sellerUserId })
     },
     false

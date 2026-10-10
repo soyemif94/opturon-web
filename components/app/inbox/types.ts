@@ -2,6 +2,13 @@ export type FilterKey = "all" | "new" | "in_conversation" | "follow_up" | "close
 export type InboxChannelKey = "whatsapp" | "instagram";
 export type LeadStatus = "NEW" | "IN_CONVERSATION" | "FOLLOW_UP" | "CLOSED";
 
+export type CommercialTimelineEntry = {
+  id: string | null;
+  type: string | null;
+  data: Record<string, unknown>;
+  createdAt: string | null;
+};
+
 export type ConversationRowData = {
   id: string;
   channelId?: string | null;
@@ -24,6 +31,9 @@ export type ConversationRowData = {
   slaMinutes: number;
   nextActionAt?: string | null;
   nextActionNote?: string | null;
+  lastCommercialActivityAt?: string | null;
+  lastReassignedAt?: string | null;
+  commercialTimeline?: CommercialTimelineEntry[];
   transferPaymentStatus?: string | null;
   transferPaymentOrderId?: string | null;
   contact?: { id: string; name: string; phone?: string; email?: string; profileImageUrl?: string; tags?: string[] };
@@ -57,7 +67,13 @@ export type DetailPayload = {
       downloadUrl?: string | null;
     } | null;
   }>;
-  notes: Array<{ id: string; text: string; createdAt: string }>;
+  notes: Array<{
+    id: string;
+    text: string;
+    createdAt: string;
+    createdByUserId?: string | null;
+    createdByName?: string | null;
+  }>;
   tasks: Array<{ id: string; title: string; status: string; dueDate?: string }>;
   assignee?: { id: string; name: string };
   assignedSeller?: { id?: string | null; name?: string | null; role?: string | null };

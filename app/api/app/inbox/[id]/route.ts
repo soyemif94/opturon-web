@@ -9,7 +9,7 @@ const patchSchema = z.object({
   action: z.enum(["assign", "toggle_bot", "close", "reopen", "mark_hot", "unmark_hot", "mark_read", "mark_unread", "add_note", "add_task", "change_stage", "reset_conversation"]),
   assignedTo: z.string().optional(),
   botEnabled: z.boolean().optional(),
-  text: z.string().optional(),
+  text: z.string().max(2000).optional(),
   title: z.string().optional(),
   dueDate: z.string().optional(),
   stage: z.enum(["lead", "qualified", "proposal", "won", "lost"]).optional()
@@ -155,7 +155,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (!tenantContext.readOnly && isBackendConfigured()) {
     try {
-      await patchPortalConversation(tenantContext.tenantId, id, parsed.data as Record<string, unknown>);
+      await patchPortalConversation(
+        tenantContext.tenantId,
+        id,
+        parsed.data as Record<string, unknown>,
+        tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId
+      );
       return NextResponse.json({ ok: true });
     } catch (error) {
       return NextResponse.json(
@@ -178,9 +183,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   switch (payload.action) {
     case "assign": {
       conversation.assignedTo = payload.assignedTo;
-      if ((conversation.leadStatus || "NEW") === "NEW") {
-        conversation.leadStatus = "IN_CONVERSATION";
-      }
       break;
     }
     case "toggle_bot": {
@@ -220,15 +222,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     case "add_note": {
       if (!payload.text) return NextResponse.json({ error: "Missing note text" }, { status: 400 });
+      const noteText = payload.text.trim().slice(0, 2000);
+      const now = new Date().toISOString();
+      const actorUserId = tenantContext.ctx?.portalActorId || tenantContext.ctx?.userId;
+      const actor = data.users.find((item) => item.id === actorUserId);
       data.tenantNotes.unshift({
         id: newId("note"),
         tenantId: tenantContext.tenantId,
         authorId: tenantContext.ctx?.userId || "",
         conversationId: conversation.id,
         contactId: conversation.contactId,
-        text: payload.text,
-        createdAt: new Date().toISOString()
+        text: noteText,
+        createdAt: now
       });
+      const tracked = conversation as typeof conversation & {
+        commercialTimeline?: Array<Record<string, unknown>>;
+        lastCommercialActivityAt?: string;
+      };
+      const timeline = Array.isArray(tracked.commercialTimeline) ? tracked.commercialTimeline : [];
+      tracked.commercialTimeline = [{
+        id: newId("event"),
+        type: "commercial_note_updated",
+        data: { previousText: null, text: noteText, changedBy: actor?.id || null, changedByName: actor?.name || null },
+        createdAt: now
+      }, ...timeline].slice(0, 30);
+      tracked.lastCommercialActivityAt = now;
       break;
     }
     case "add_task": {

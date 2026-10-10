@@ -128,13 +128,15 @@ export function InboxWorkspace({
   demo,
   tenantId,
   currentUserId,
-  canDeleteConversation = false
+  canDeleteConversation = false,
+  canReassignConversations = false
 }: {
   initialConversationId?: string;
   demo?: boolean;
   tenantId?: string;
   currentUserId?: string;
   canDeleteConversation?: boolean;
+  canReassignConversations?: boolean;
 }) {
   const inbox = useInboxContext();
   const setInboxState = inbox.setState;
@@ -819,9 +821,7 @@ export function InboxWorkspace({
                 assignedTo: seller.name,
                 assignedSellerUserId: seller.id,
                 assignedSellerName: seller.name,
-                assignedSellerRole: seller.role,
-                leadStatus: row.leadStatus === "NEW" ? "IN_CONVERSATION" : row.leadStatus,
-                leadStatusLabel: row.leadStatus === "NEW" ? "En conversacion" : row.leadStatusLabel
+                assignedSellerRole: seller.role
               }
             : row
         );
@@ -842,9 +842,7 @@ export function InboxWorkspace({
               assignedTo: seller.name,
               assignedSellerUserId: seller.id,
               assignedSellerName: seller.name,
-              assignedSellerRole: seller.role,
-              leadStatus: prev.conversation.leadStatus === "NEW" ? "IN_CONVERSATION" : prev.conversation.leadStatus,
-              leadStatusLabel: prev.conversation.leadStatus === "NEW" ? "En conversacion" : prev.conversation.leadStatusLabel
+              assignedSellerRole: seller.role
             },
             assignee: {
               id: seller.id,
@@ -881,7 +879,7 @@ export function InboxWorkspace({
       assignment?.leadStatus === "FOLLOW_UP" ||
       assignment?.leadStatus === "CLOSED"
         ? assignment.leadStatus
-        : "IN_CONVERSATION";
+        : detail?.conversation.leadStatus || "NEW";
 
     if (!sellerId || !sellerName) return;
 
@@ -1035,7 +1033,7 @@ export function InboxWorkspace({
       }
 
       const canonicalSellerId = String(assignedConversation?.assignedSellerUserId || fallbackSeller?.id || sellerUserId);
-      const canonicalLeadStatus = String(assignedConversation?.leadStatus || detail?.conversation.leadStatus || "IN_CONVERSATION") as LeadStatus;
+      const canonicalLeadStatus = String(assignedConversation?.leadStatus || detail?.conversation.leadStatus || "NEW") as LeadStatus;
       rebaseProfileDraft(conversationId, ["assignedSeller", "commercialStatus"], {
         assignedSeller: canonicalSellerId,
         commercialStatus: canonicalLeadStatus
@@ -1718,6 +1716,7 @@ export function InboxWorkspace({
                 setAssignTo(value);
               }}
               sellerOptions={sellerOptions}
+              canReassignConversations={canReassignConversations}
               assigningSeller={assigningSeller}
               onTakeConversation={() => void takeConversation()}
               leadStatus={leadStatusInput}

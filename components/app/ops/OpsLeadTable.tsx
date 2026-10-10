@@ -7,6 +7,7 @@ import type { ConversationRowData, LeadStatus } from "@/components/app/inbox/typ
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { isColdLead, isRecentlyReassigned } from "@/lib/ops/commercial-state";
 
 export type OpsSellerOption = {
   id: string;
@@ -15,7 +16,6 @@ export type OpsSellerOption = {
 };
 
 const URGENT_RESPONSE_MINUTES = 30;
-const COLD_LEAD_HOURS = 72;
 
 function leadTone(status: LeadStatus) {
   if (status === "IN_CONVERSATION") return "border-sky-500/30 bg-sky-500/10 text-sky-200";
@@ -43,14 +43,6 @@ function formatDateTime(value?: string | null) {
 
 function isUrgentLead(row: ConversationRowData) {
   return row.leadStatus !== "CLOSED" && row.unreadCount > 0 && row.slaMinutes >= URGENT_RESPONSE_MINUTES;
-}
-
-function isColdLead(row: ConversationRowData, now = new Date()) {
-  if (row.leadStatus === "CLOSED") return false;
-  if (row.unreadCount > 0 || row.nextActionAt) return false;
-  const lastMessageAt = new Date(row.lastMessageAt);
-  if (Number.isNaN(lastMessageAt.getTime())) return false;
-  return now.getTime() - lastMessageAt.getTime() >= COLD_LEAD_HOURS * 60 * 60 * 1000;
 }
 
 function slaTone(type: "urgent" | "cold") {
@@ -94,7 +86,9 @@ export function OpsLeadTable({
   showSlaSignals = true,
   sectionVariant = "default",
   compact = false,
-  onAssign
+  onAssign,
+  completingFollowUpId,
+  onCompleteFollowUp
 }: {
   title: string;
   description: string;
@@ -109,6 +103,8 @@ export function OpsLeadTable({
   sectionVariant?: "default" | "unassigned" | "cold";
   compact?: boolean;
   onAssign: (conversationId: string, sellerUserId: string) => void;
+  completingFollowUpId?: string | null;
+  onCompleteFollowUp?: (conversationId: string) => void;
 }) {
   const router = useRouter();
   const [draftAssignments, setDraftAssignments] = useState<Record<string, string>>({});
@@ -155,9 +151,12 @@ export function OpsLeadTable({
             const isBusy = assigningId === row.id;
             const urgent = showSlaSignals && isUrgentLead(row);
             const cold = showSlaSignals && !urgent && isColdLead(row);
+            const recovery = isRecentlyReassigned(row);
             const unassigned = !row.assignedSellerUserId;
             const inboxHref = row.id ? `/app/inbox/${row.id}` : null;
-            const lastActivityLabel = formatDateTime(row.lastMessageAt);
+            const lastActivityLabel = formatDateTime(row.lastCommercialActivityAt || row.lastMessageAt);
+            const timeline = Array.isArray(row.commercialTimeline) ? [...row.commercialTimeline].reverse() : [];
+            const latestReassignment = timeline.find((event) => event.type === "seller_reassigned");
 
             return (
               <div
@@ -188,6 +187,7 @@ export function OpsLeadTable({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold md:text-base">{row.contact?.name || "Sin nombre"}</p>
                     <Badge className={leadTone(row.leadStatus)}>{leadLabel(row.leadStatus)}</Badge>
+                    {recovery ? <Badge className="border-sky-500/30 bg-sky-500/10 text-sky-100">En recuperación</Badge> : null}
                     {unassigned ? <Badge className="border-[#c27a2c]/35 bg-[#c27a2c]/14 text-[#ffd7aa]">Sin asignar</Badge> : null}
                     {urgent ? <Badge className={slaTone("urgent")}>Urgente</Badge> : null}
                     {cold ? <Badge className={slaTone("cold")}>Frio</Badge> : null}
@@ -198,6 +198,12 @@ export function OpsLeadTable({
                     <span>Ultima actividad: {lastActivityLabel}</span>
                     {showOwner ? <span>{unassigned ? "Responsable pendiente" : `Responsable: ${ownerLabel}`}</span> : null}
                     {showFollowUp ? <span>Seguimiento: {formatDateTime(row.nextActionAt)}</span> : null}
+                    {latestReassignment ? (
+                      <span>
+                        Reasignado a {String(latestReassignment.data.toSellerName || "vendedor")} — {formatDateTime(latestReassignment.createdAt)}
+                        {latestReassignment.data.changedByName ? ` por ${String(latestReassignment.data.changedByName)}` : ""}
+                      </span>
+                    ) : null}
                   </div>
 
                   <p className={`line-clamp-2 text-sm text-muted ${compact ? "leading-5" : "leading-6"}`}>{row.lastMessagePreview || "Sin mensajes recientes"}</p>
@@ -206,6 +212,33 @@ export function OpsLeadTable({
                     {showFollowUp && row.nextActionNote ? <span>Nota: {row.nextActionNote}</span> : null}
                     {inboxHref ? <span className="text-brandBright">Click para abrir hilo</span> : null}
                   </div>
+
+                  {timeline.length > 0 ? (
+                    <details className="rounded-xl border border-[color:var(--border)] bg-bg/30 px-3 py-2 text-xs text-muted">
+                      <summary className="cursor-pointer font-medium text-text">Historial comercial ({timeline.length})</summary>
+                      <ol className="mt-2 space-y-2">
+                        {timeline.map((event) => {
+                          const data = event.data || {};
+                          const eventLabel = event.type === "seller_reassigned"
+                            ? `Reasignado de ${String(data.fromSellerName || "sin vendedor")} a ${String(data.toSellerName || "vendedor")}`
+                            : event.type === "seller_assigned"
+                              ? `Asignado a ${String(data.toSellerName || "vendedor")}`
+                              : event.type === "commercial_follow_up_updated"
+                                ? `Seguimiento ${data.followUpAt ? `programado para ${formatDateTime(String(data.followUpAt))}` : "quitado"}`
+                                : `Nota comercial: ${String(data.text || data.previousText || "actualizada").slice(0, 300)}`;
+                          return (
+                            <li key={event.id || `${event.type}-${event.createdAt}`} className="border-l border-[color:var(--border)] pl-3">
+                              <p>{eventLabel}</p>
+                              <p className="mt-0.5 text-[11px]">
+                                {formatDateTime(event.createdAt)}
+                                {data.changedByName ? ` · por ${String(data.changedByName)}` : ""}
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </details>
+                  ) : null}
                 </div>
 
                 <div className={`rounded-[18px] border border-[color:var(--border)] bg-bg/45 ${compact ? "p-2.5" : "p-3"}`}>
@@ -216,6 +249,17 @@ export function OpsLeadTable({
                     {showFollowUp ? (
                       <Button asChild type="button" variant="secondary" size="sm">
                         <Link href={`/app/inbox/${row.id}`}>Reprogramar</Link>
+                      </Button>
+                    ) : null}
+                    {showFollowUp && row.nextActionAt && onCompleteFollowUp ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={readOnly || completingFollowUpId === row.id}
+                        onClick={() => onCompleteFollowUp(row.id)}
+                      >
+                        {completingFollowUpId === row.id ? "Guardando..." : "Completar"}
                       </Button>
                     ) : null}
                   </div>

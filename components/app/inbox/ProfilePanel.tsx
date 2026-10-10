@@ -38,6 +38,7 @@ type ProfilePanelProps = {
   assignTo: string;
   onAssignToChange: (value: string) => void;
   sellerOptions: Array<{ id: string; name: string; role: string }>;
+  canReassignConversations?: boolean;
   assigningSeller?: boolean;
   onAssign: () => void;
   onTakeConversation: () => void;
@@ -80,6 +81,7 @@ export function ProfilePanel({
   assignTo,
   onAssignToChange,
   sellerOptions,
+  canReassignConversations = false,
   assigningSeller,
   onAssign,
   onTakeConversation,
@@ -166,11 +168,11 @@ export function ProfilePanel({
           <label className="block">
             <span className="mb-1 block text-[10px] text-muted">Propietario · {detail.conversation.assignedSellerName || detail.conversation.assignedTo || "Sin asignar"}</span>
             <div className="flex gap-1.5">
-              <select value={assignTo} onChange={(event) => onAssignToChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" disabled={readOnly}>
+              <select value={assignTo} onChange={(event) => onAssignToChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" disabled={readOnly || !canReassignConversations}>
                 <option value="">Seleccionar vendedor</option>
                 {sellerOptions.map((seller) => <option key={seller.id} value={seller.id}>{seller.name}</option>)}
               </select>
-              <button type="button" onClick={onAssign} disabled={readOnly || !assignTo || assigningSeller} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted hover:text-text disabled:opacity-40">{assigningSeller ? "..." : "Guardar"}</button>
+              <button type="button" onClick={onAssign} disabled={readOnly || !canReassignConversations || !assignTo || assigningSeller} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted hover:text-text disabled:opacity-40">{assigningSeller ? "..." : "Guardar"}</button>
             </div>
           </label>
 
@@ -201,7 +203,7 @@ export function ProfilePanel({
         </div>
         <ul className="mt-2 divide-y divide-[color:var(--border)]">
           {detail.notes.slice(0, 3).map((note) => (
-            <li key={note.id} className="py-2 text-[11px]"><p>{note.text}</p><p className="mt-0.5 text-[9px] text-muted">{new Date(note.createdAt).toLocaleString()}</p></li>
+            <li key={note.id} className="py-2 text-[11px]"><p>{note.text}</p><p className="mt-0.5 text-[9px] text-muted">{new Date(note.createdAt).toLocaleString()}{note.createdByName ? ` · ${note.createdByName}` : ""}</p></li>
           ))}
           {!detail.notes.length ? <li className="py-2 text-[10px] text-muted">Todavía no hay notas.</li> : null}
         </ul>

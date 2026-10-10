@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { ClientPageShell } from "@/components/app/client-page-shell";
 import { OpsAccessGate } from "@/components/app/ops/OpsAccessGate";
 import { OpsDashboard } from "@/components/app/ops/OpsDashboard";
-import { canEditWorkspace } from "@/lib/app-permissions";
+import { canManageWorkspace } from "@/lib/app-permissions";
 import { getPortalConversations, getPortalUsers, isBackendConfigured } from "@/lib/api";
 import { hasOpsAccessCookie, isOpsAccessConfigured } from "@/lib/ops-access";
 import { isOperationalPortalAssigneeUser } from "@/lib/portal-users";
@@ -21,7 +21,7 @@ export default async function AppOpsPage() {
   const accessConfigured = isOpsAccessConfigured();
   const opsUnlocked = accessConfigured && hasOpsAccessCookie(cookieStore);
   const backendReady = Boolean(ctx.tenantId) && isBackendConfigured();
-  const readOnly = !canEditWorkspace(ctx);
+  const readOnly = !canManageWorkspace(ctx);
   let initialConversations: ConversationRowData[] = [];
   let initialSellers: SellerOption[] = [];
 

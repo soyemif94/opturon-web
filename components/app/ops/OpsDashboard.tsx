@@ -20,6 +20,7 @@ import type { PortalSellerMetrics } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
+import { isActiveCommercialFollowUp, isColdLead, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
 
 type InboxListResponse = {
   readOnly: boolean;
@@ -51,14 +52,12 @@ type OpsAlert = {
   severity: "critical" | "warning" | "info";
   message: string;
   ctaLabel?: string;
-  target?: "kpis" | "unassigned" | "overdue" | "today" | "urgent" | "cold" | "seller_load";
+  target?: "kpis" | "unassigned" | "overdue" | "today" | "future" | "completed" | "urgent" | "cold" | "seller_load";
   href?: string;
 };
 
 const OVERLOAD_THRESHOLD = 5;
 const URGENT_RESPONSE_MINUTES = 30;
-const COLD_LEAD_HOURS = 72;
-
 function isSameDay(value: string, now = new Date()) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;
@@ -83,14 +82,6 @@ function isUrgentLead(row: ConversationRowData) {
   return isActiveLead(row) && row.unreadCount > 0 && row.slaMinutes >= URGENT_RESPONSE_MINUTES;
 }
 
-function isColdLead(row: ConversationRowData, now = new Date()) {
-  if (!isActiveLead(row)) return false;
-  if (row.unreadCount > 0 || row.nextActionAt) return false;
-  const lastMessageAt = new Date(row.lastMessageAt);
-  if (Number.isNaN(lastMessageAt.getTime())) return false;
-  return now.getTime() - lastMessageAt.getTime() >= COLD_LEAD_HOURS * 60 * 60 * 1000;
-}
-
 export function OpsDashboard({
   initialConversations,
   initialSellers,
@@ -107,11 +98,14 @@ export function OpsDashboard({
   const [sellerMetrics, setSellerMetrics] = useState<PortalSellerMetrics>(defaultSellerMetrics);
   const [loading, setLoading] = useState(initialConversations.length === 0 && backendReady);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
   const [focusedSection, setFocusedSection] = useState<OpsAlert["target"] | null>(null);
   const kpisRef = useRef<HTMLDivElement | null>(null);
   const unassignedRef = useRef<HTMLDivElement | null>(null);
   const overdueRef = useRef<HTMLDivElement | null>(null);
   const todayRef = useRef<HTMLDivElement | null>(null);
+  const futureRef = useRef<HTMLDivElement | null>(null);
+  const completedRef = useRef<HTMLDivElement | null>(null);
   const urgentRef = useRef<HTMLDivElement | null>(null);
   const coldRef = useRef<HTMLDivElement | null>(null);
   const sellerLoadRef = useRef<HTMLDivElement | null>(null);
@@ -175,7 +169,15 @@ export function OpsDashboard({
     [activeConversations, now]
   );
   const todayLeads = useMemo(
-    () => activeConversations.filter((row) => row.nextActionAt && isSameDay(row.nextActionAt, now)),
+    () => activeConversations.filter((row) => row.nextActionAt && new Date(row.nextActionAt).getTime() >= now.getTime() && isSameDay(row.nextActionAt, now)),
+    [activeConversations, now]
+  );
+  const futureLeads = useMemo(
+    () => activeConversations.filter((row) => row.nextActionAt && new Date(row.nextActionAt).getTime() > now.getTime() && !isSameDay(row.nextActionAt, now)),
+    [activeConversations, now]
+  );
+  const completedFollowUpLeads = useMemo(
+    () => activeConversations.filter((row) => isRecentlyCompletedFollowUp(row, now)),
     [activeConversations, now]
   );
   const urgentLeads = useMemo(
@@ -213,7 +215,7 @@ export function OpsDashboard({
       };
 
       current.totalActiveLeads += 1;
-      if (row.nextActionAt) current.followUpLeads += 1;
+      if (isActiveCommercialFollowUp(row)) current.followUpLeads += 1;
       if (isOverdue(row, now)) current.overdueLeads += 1;
       buckets.set(row.assignedSellerUserId, current);
     }
@@ -234,6 +236,23 @@ export function OpsDashboard({
       });
     }
 
+    for (const seller of sellers) {
+      if (buckets.has(seller.id)) continue;
+      const sellerMetric = sellerMetricsById.get(seller.id);
+      buckets.set(seller.id, {
+        sellerUserId: seller.id,
+        sellerName: seller.name || "Sin nombre",
+        totalActiveLeads: 0,
+        overdueLeads: 0,
+        followUpLeads: 0,
+        totalOrders: Number(sellerMetric?.totalOrders || 0),
+        totalPaidOrders: Number(sellerMetric?.totalPaidOrders || 0),
+        totalRevenue: Number(sellerMetric?.totalRevenue || 0),
+        averageTicket: Number(sellerMetric?.averageTicket || 0),
+        currency: sellerMetrics.currency || "ARS"
+      });
+    }
+
     return [...buckets.values()].sort(
       (left, right) =>
         Number(right.totalRevenue || 0) - Number(left.totalRevenue || 0) ||
@@ -241,7 +260,7 @@ export function OpsDashboard({
         right.overdueLeads - left.overdueLeads ||
         left.sellerName.localeCompare(right.sellerName)
     );
-  }, [activeConversations, now, sellerMetrics]);
+  }, [activeConversations, now, sellerMetrics, sellers]);
 
   const topSeller = sellerLoad[0] || null;
   const sellerNeedingHelp =
@@ -329,13 +348,17 @@ export function OpsDashboard({
           ? overdueRef.current
           : target === "today"
             ? todayRef.current
-            : target === "urgent"
-              ? urgentRef.current
-              : target === "cold"
-                ? coldRef.current
-                : target === "seller_load"
-                  ? sellerLoadRef.current
-                  : kpisRef.current;
+          : target === "future"
+            ? futureRef.current
+            : target === "completed"
+              ? completedRef.current
+              : target === "urgent"
+                ? urgentRef.current
+                : target === "cold"
+                  ? coldRef.current
+                  : target === "seller_load"
+                    ? sellerLoadRef.current
+                    : kpisRef.current;
     if (node) {
       node.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -348,23 +371,7 @@ export function OpsDashboard({
     const seller = sellers.find((item) => item.id === sellerUserId);
     if (!seller || readOnly || !backendReady || assigningId) return;
 
-    const snapshot = conversations;
     setAssigningId(conversationId);
-    setConversations((prev) =>
-      prev.map((row) =>
-        row.id === conversationId
-          ? {
-              ...row,
-              assignedSellerUserId: seller.id,
-              assignedSellerName: seller.name,
-              assignedSellerRole: seller.role,
-              assignedTo: seller.name,
-              leadStatus: row.leadStatus === "NEW" ? "IN_CONVERSATION" : row.leadStatus,
-              leadStatusLabel: row.leadStatus === "NEW" ? "En conversacion" : row.leadStatusLabel
-            }
-          : row
-      )
-    );
 
     try {
       const response = await fetch(`/api/app/inbox/${conversationId}/assign-seller`, {
@@ -376,12 +383,32 @@ export function OpsDashboard({
       if (!response.ok) {
         throw new Error(String(json?.error || "assign_seller_failed"));
       }
+      await loadOpsData({ silent: true });
       toast.success("Lead actualizado", "La asignacion se reflejo al instante en OPS.");
     } catch (error) {
-      setConversations(snapshot);
       toast.error("No se pudo asignar el lead", error instanceof Error ? error.message : "unknown_error");
     } finally {
       setAssigningId(null);
+    }
+  }
+
+  async function completeFollowUp(conversationId: string) {
+    if (!conversationId || readOnly || !backendReady || completingFollowUpId) return;
+    setCompletingFollowUpId(conversationId);
+    try {
+      const response = await fetch(`/api/app/inbox/${conversationId}/next-action`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: true })
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(String(json?.error || "complete_follow_up_failed"));
+      await loadOpsData({ silent: true });
+      toast.success("Seguimiento completado", "La actualización quedó registrada en el historial comercial.");
+    } catch (error) {
+      toast.error("No se pudo completar el seguimiento", error instanceof Error ? error.message : "unknown_error");
+    } finally {
+      setCompletingFollowUpId(null);
     }
   }
 
@@ -592,11 +619,13 @@ export function OpsDashboard({
                 sellers={sellers}
                 readOnly={readOnly || !backendReady}
                 assigningId={assigningId}
+                completingFollowUpId={completingFollowUpId}
                 emptyMessage="No hay seguimientos vencidos en este momento."
                 showOwner
                 showFollowUp
                 compact
                 onAssign={assignSeller}
+                onCompleteFollowUp={completeFollowUp}
               />
             </div>
             <div ref={todayRef} className={sectionClassName(focusedSection === "today")}>
@@ -607,11 +636,49 @@ export function OpsDashboard({
                 sellers={sellers}
                 readOnly={readOnly || !backendReady}
                 assigningId={assigningId}
+                completingFollowUpId={completingFollowUpId}
                 emptyMessage="No hay seguimientos planificados para hoy."
                 showOwner
                 showFollowUp
                 compact
                 onAssign={assignSeller}
+                onCompleteFollowUp={completeFollowUp}
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div ref={futureRef} className={sectionClassName(focusedSection === "future")}>
+              <OpsLeadTable
+                title="Seguimientos futuros"
+                description="Próximas acciones programadas después de hoy."
+                rows={futureLeads}
+                sellers={sellers}
+                readOnly={readOnly || !backendReady}
+                assigningId={assigningId}
+                completingFollowUpId={completingFollowUpId}
+                emptyMessage="No hay seguimientos futuros programados."
+                showOwner
+                showFollowUp
+                compact
+                onAssign={assignSeller}
+                onCompleteFollowUp={completeFollowUp}
+              />
+            </div>
+            <div ref={completedRef} className={sectionClassName(focusedSection === "completed")}>
+              <OpsLeadTable
+                title="Seguimientos completados recientemente"
+                description="Historial de seguimientos cerrados durante los últimos 30 días."
+                rows={completedFollowUpLeads}
+                sellers={sellers}
+                readOnly={readOnly || !backendReady}
+                assigningId={assigningId}
+                completingFollowUpId={completingFollowUpId}
+                emptyMessage="Todavía no hay seguimientos completados recientemente."
+                showOwner
+                showFollowUp
+                compact
+                onAssign={assignSeller}
+                onCompleteFollowUp={completeFollowUp}
               />
             </div>
           </div>
