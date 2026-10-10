@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import { ArrowRight, Check, Eye, EyeOff, Lock, Shield, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { unlockAndVerifyOps, verifyOpsOpening, type OpsOpeningResult } from "@/lib/ops/ops-opening";
 
 const supervisionAreas = [
   "Leads sin asignar o que requieren atención",
@@ -23,15 +23,31 @@ export function OpsAccessGate({
   initialUnlocked: boolean;
   accessConfigured: boolean;
 }) {
-  const router = useRouter();
   const unlockInFlight = useRef(false);
-  const [unlocked, setUnlocked] = useState(initialUnlocked);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [isRefreshing, startTransition] = useTransition();
-  const isPending = isBusy || isRefreshing;
+  const [canRetryVerification, setCanRetryVerification] = useState(false);
+
+  function finishOpening(result: OpsOpeningResult) {
+    if (result === "verified") {
+      setPassword("");
+      // The server owns the dashboard. A document navigation gives it the
+      // verified, path-scoped cookie without retaining a stale gate payload.
+      window.location.assign("/app/ops");
+      return;
+    }
+    if (result === "invalid_password") {
+      setError("Contraseña incorrecta. Verificá los datos e intentá nuevamente.");
+    } else if (result === "access_denied") {
+      setPassword("");
+      setError("No pudimos abrir OPS. Volvé a validar el acceso.");
+    } else {
+      setError("No pudimos abrir OPS.");
+      setCanRetryVerification(true);
+    }
+  }
 
   async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,33 +61,30 @@ export function OpsAccessGate({
     unlockInFlight.current = true;
     setIsBusy(true);
     setError(null);
+    setCanRetryVerification(false);
 
     try {
-      const response = await fetch("/api/app/ops/unlock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        credentials: "same-origin",
-        body: JSON.stringify({ password })
-      });
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        if (payload?.error === "invalid_ops_password") {
-          setError("Contraseña incorrecta. Verificá los datos e intentá nuevamente.");
-        } else {
-          setError("No se pudo verificar el acceso. Intentá nuevamente.");
-        }
-        return;
-      }
-
-      setUnlocked(true);
-      setPassword("");
-      startTransition(() => {
-        router.refresh();
-      });
+      finishOpening(await unlockAndVerifyOps(password));
     } catch {
-      setError("No se pudo verificar el acceso. Intentá nuevamente.");
+      setError("No pudimos abrir OPS.");
+      setCanRetryVerification(true);
+    } finally {
+      unlockInFlight.current = false;
+      setIsBusy(false);
+    }
+  }
+
+  async function handleRetryVerification() {
+    if (unlockInFlight.current) return;
+    unlockInFlight.current = true;
+    setIsBusy(true);
+    setError(null);
+    setCanRetryVerification(false);
+    try {
+      finishOpening(await verifyOpsOpening());
+    } catch {
+      setError("No pudimos abrir OPS.");
+      setCanRetryVerification(true);
     } finally {
       unlockInFlight.current = false;
       setIsBusy(false);
@@ -81,19 +94,22 @@ export function OpsAccessGate({
   async function handleLock() {
     setError(null);
     setIsBusy(true);
-    await fetch("/api/app/ops/lock", {
-      method: "POST",
-      cache: "no-store",
-      credentials: "same-origin"
-    }).catch(() => null);
-    setUnlocked(false);
-    setIsBusy(false);
-    startTransition(() => {
-      router.refresh();
-    });
+    try {
+      const response = await fetch("/api/app/ops/lock", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      if (!response.ok) throw new Error("ops_lock_failed");
+      window.location.assign("/app/ops");
+    } catch {
+      setError("No pudimos bloquear OPS. Intentá nuevamente.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
-  if (!unlocked) {
+  if (!initialUnlocked) {
     return (
       <section className="relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-[#071326] shadow-[0_30px_90px_rgba(0,0,0,0.3)]">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -165,7 +181,7 @@ export function OpsAccessGate({
                           if (error) setError(null);
                         }}
                         placeholder="Ingresá la contraseña de OPS"
-                        disabled={isPending || !accessConfigured}
+                        disabled={isBusy || !accessConfigured}
                         aria-invalid={Boolean(error)}
                         aria-describedby={error ? "ops-access-error" : "ops-access-note"}
                         className="h-12 border-white/10 bg-[#071326] pr-12 text-white placeholder:text-slate-500"
@@ -177,7 +193,7 @@ export function OpsAccessGate({
                         aria-pressed={showPassword}
                         aria-controls="ops-password"
                         onClick={() => setShowPassword((visible) => !visible)}
-                        disabled={isPending || !accessConfigured}
+                        disabled={isBusy || !accessConfigured}
                       >
                         {showPassword ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
                       </button>
@@ -188,6 +204,11 @@ export function OpsAccessGate({
                     <div id="ops-access-error" role="alert" className="flex items-start gap-2.5 rounded-2xl border border-red-400/25 bg-red-400/[0.08] px-3.5 py-3 text-sm leading-6 text-red-100">
                       <ShieldAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
                       <span>{error}</span>
+                      {canRetryVerification ? (
+                        <button type="button" onClick={() => void handleRetryVerification()} disabled={isBusy} className="ml-auto shrink-0 font-semibold underline underline-offset-4">
+                          Reintentar
+                        </button>
+                      ) : null}
                     </div>
                   ) : !accessConfigured ? (
                     <p id="ops-access-note" role="status" className="text-sm leading-6 text-amber-100">
@@ -199,8 +220,8 @@ export function OpsAccessGate({
                     </p>
                   )}
 
-                  <Button type="submit" className="h-12 w-full justify-between rounded-xl px-5" disabled={isPending || !accessConfigured}>
-                    <span>{isBusy ? "Verificando acceso…" : "Entrar al panel"}</span>
+                  <Button type="submit" className="h-12 w-full justify-between rounded-xl px-5" disabled={isBusy || !accessConfigured}>
+                    <span>{isBusy ? "Verificando acceso…" : error?.startsWith("No pudimos abrir OPS") ? "Volver a validar acceso" : "Entrar al panel"}</span>
                     {isBusy ? (
                       <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                     ) : (
@@ -220,8 +241,13 @@ export function OpsAccessGate({
   if (!children) {
     return (
       <Card className="border-white/10 bg-card/90">
-        <CardContent className="flex min-h-[320px] items-center justify-center p-6 text-sm text-muted" role="status">
-          Abriendo OPS…
+        <CardContent className="flex min-h-[320px] flex-col items-center justify-center gap-4 p-6 text-sm text-muted" role="alert">
+          <span>No pudimos abrir OPS.</span>
+          <div className="flex gap-3">
+            <Button type="button" onClick={() => window.location.reload()}>Reintentar</Button>
+            <Button type="button" variant="ghost" onClick={() => void handleLock()} disabled={isBusy}>Volver a validar acceso</Button>
+          </div>
+          {error ? <span>{error}</span> : null}
         </CardContent>
       </Card>
     );
@@ -230,11 +256,12 @@ export function OpsAccessGate({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button type="button" variant="ghost" size="sm" className="rounded-2xl" onClick={() => void handleLock()} disabled={isPending}>
+        <Button type="button" variant="ghost" size="sm" className="rounded-2xl" onClick={() => void handleLock()} disabled={isBusy}>
           <Lock aria-hidden="true" className="mr-2 h-4 w-4" />
           Bloquear OPS
         </Button>
       </div>
+      {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
       {children}
     </div>
   );

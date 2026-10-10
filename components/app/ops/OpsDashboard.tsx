@@ -733,7 +733,7 @@ export function OpsDashboard({
       {opsLoadError ? (
         <Card role="alert" className="border-red-400/25 bg-red-400/[0.05]">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-            <span>No pudimos cargar la información de OPS. Intentá nuevamente.</span>
+            <span>No pudimos abrir OPS. Intentá nuevamente.</span>
             <button type="button" onClick={() => void loadOpsData()} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold" disabled={loading}>
               {loading ? "Reintentando…" : "Reintentar"}
             </button>

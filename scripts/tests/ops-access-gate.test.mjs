@@ -59,6 +59,8 @@ const unlockRoute = readFileSync(join(projectRoot, "app/api/app/ops/unlock/route
 const opsPage = readFileSync(join(projectRoot, "app/app/ops/page.tsx"), "utf8");
 const appShell = readFileSync(join(projectRoot, "components/layout/app-shell.tsx"), "utf8");
 const lockRoute = readFileSync(join(projectRoot, "app/api/app/ops/lock/route.ts"), "utf8");
+const accessRoute = readFileSync(join(projectRoot, "app/api/app/ops/access/route.ts"), "utf8");
+const opening = readFileSync(join(projectRoot, "lib/ops/ops-opening.ts"), "utf8");
 const middleware = readFileSync(join(projectRoot, "middleware.ts"), "utf8");
 
 assert.match(unlockRoute, /requireAppApi\(\)/, "unlock is protected by the authenticated server route");
@@ -67,8 +69,10 @@ assert.match(opsPage, /isOpsAccessConfigured\(\)/, "server page checks access co
 assert.doesNotMatch(gate, /process\.env|expectedPassword|OPS_PASSWORD\s*[:=]/, "client component never receives or reads the expected password");
 assert.doesNotMatch(unlockRoute, /console\.(?:log|error|warn)|password\s*:\s*password/, "the unlock route does not log or echo the submitted password");
 assert.doesNotMatch(gate, /localStorage|sessionStorage/, "the password is not persisted in browser storage");
-assert.match(unlockRoute, /Object\.values\(OPS_ACCESS_COOKIE_PATHS\)/, "unlock issues page- and API-scoped cookies");
-assert.match(lockRoute, /Object\.values\(OPS_ACCESS_COOKIE_PATHS\)/, "lock expires both cookie paths");
+assert.match(unlockRoute, /appendOpsAccessCookies\(NextResponse\.json\(\{ ok: true \}\), token\)/, "unlock issues both scoped cookies");
+assert.match(lockRoute, /appendOpsAccessCookies\(NextResponse\.json\(\{ ok: true \}\), "", 0\)/, "lock expires both cookie paths");
+assert.match(accessRoute, /requireAppModuleApi\("ops"\)/, "access verification retains module RBAC");
+assert.match(accessRoute, /hasOpsAccessCookie\(cookieStore\)/, "access verification checks the signed cookie");
 assert.match(middleware, /OPS_ACCESS_COOKIE_PATHS\.api/, "existing page-scoped OPS sessions are migrated to API scope");
 assert.match(middleware, /Math\.min\(remainingSeconds/, "migration never extends the original signed token lifetime");
 assert.match(middleware, /isOpsUiPath \? request\.cookies\.get\(OPS_ACCESS_COOKIE\)/, "cookie migration runs only from the OPS UI request");
@@ -87,12 +91,14 @@ assert.match(gate, /type=\{showPassword \? "text" : "password"\}/);
 assert.match(gate, /aria-label=\{showPassword \? "Ocultar contraseña" : "Mostrar contraseña"\}/);
 assert.match(gate, /onClick=\{\(\) => setShowPassword\(\(visible\) => !visible\)\}/);
 assert.match(gate, /unlockInFlight\.current\) return/);
-assert.match(gate, /setError\("Contraseña incorrecta\. Verificá los datos e intentá nuevamente\."\)/);
+assert.match(gate, /Contraseña incorrecta\. Verificá los datos e intentá nuevamente\./);
 assert.match(gate, /Verificando acceso…/);
 assert.match(gate, /grid-cols-1 lg:grid-cols-/);
-assert.match(gate, /setUnlocked\(true\)/);
-assert.match(gate, /router\.refresh\(\)/);
-assert.match(gate, /api\/app\/ops\/unlock/);
+assert.match(gate, /finishOpening\(await unlockAndVerifyOps\(password\)\)/);
+assert.match(gate, /window\.location\.assign\("\/app\/ops"\)/);
+assert.doesNotMatch(gate, /router\.refresh\(\)|setUnlocked\(true\)|Abriendo OPS/, "the gate cannot retain a stale opening state or refresh loop");
+assert.match(opening, /api\/app\/ops\/unlock/);
+assert.match(opening, /api\/app\/ops\/access/);
 assert.match(appShell, /Gestioná conversaciones, ventas y operación comercial/);
 assert.doesNotMatch(appShell, /Gestiona conversaciones, automatizaciones y crecimiento/);
 

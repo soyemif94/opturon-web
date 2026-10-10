@@ -5,7 +5,7 @@ import {
   isOpsAccessConfigured,
   validateOpsPassword
 } from "@/lib/ops-access";
-import { OPS_ACCESS_COOKIE, OPS_ACCESS_COOKIE_PATHS, opsAccessCookieOptions } from "@/lib/ops/ops-cookie";
+import { appendOpsAccessCookies } from "@/lib/ops/ops-cookie-response";
 
 export async function POST(request: Request) {
   const auth = await requireAppApi();
@@ -27,10 +27,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ops_access_not_configured" }, { status: 503 });
   }
 
-  const response = NextResponse.json({ ok: true });
-  for (const path of Object.values(OPS_ACCESS_COOKIE_PATHS)) {
-    response.cookies.set({ name: OPS_ACCESS_COOKIE, value: token, ...opsAccessCookieOptions(path) });
-  }
-
-  return response;
+  return appendOpsAccessCookies(NextResponse.json({ ok: true }), token);
 }
