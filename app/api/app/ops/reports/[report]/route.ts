@@ -194,6 +194,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const startedAt = performance.now();
   let reportType = "unknown";
   let phase: ReportPhase = "AUTH";
+  let resolvedTenantId: string | null = null;
+  let failedTeamDataSource: "conversations" | "orders" | "users" | null = null;
+  let failedTeamUpstreamStatus: number | null = null;
   const finish = (response: NextResponse, safeErrorCode: string | null = null) => {
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Pragma", "no-cache");
@@ -207,7 +210,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       contentType: response.headers.get("Content-Type") || null,
       safeErrorCode: response.status >= 400 ? safeErrorCode || "http_error" : null,
       route: "/api/app/ops/reports/[report]",
-      phase
+      phase,
+      ...(reportType === "sellers" && new URL(request.url).searchParams.get("format") === "json" ? {
+        tenantId: resolvedTenantId,
+        failedDataSource: failedTeamDataSource,
+        upstreamStatus: failedTeamUpstreamStatus
+      } : {})
     };
     if (response.status >= 400) console.warn("ops_report_request", diagnostic);
     else console.info("ops_report_request", diagnostic);
@@ -234,6 +242,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const tenantContext = await resolveAppTenant({ permission: "manage_workspace" });
   if (tenantContext.error) return finish(tenantContext.error, "tenant_access_denied");
+  resolvedTenantId = tenantContext.tenantId;
   if (!isBackendConfigured()) {
     setPhase("QUERY");
     return finish(NextResponse.json({ error: "ops_report_backend_unavailable" }, { status: 503 }), "ops_report_backend_unavailable");
@@ -356,10 +365,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return finish(await reportDownloadResponse("expirations", dateTag, filters, columns, rows, generatedAt, undefined, setPhase));
     }
     setPhase("QUERY");
+    const isTeamJsonRequest = report === "sellers" && filters.format === "json";
+    const traceTeamQuery = <T,>(source: "conversations" | "orders" | "users", query: Promise<T>) => {
+      if (!isTeamJsonRequest) return query;
+      return query.catch((error: unknown) => {
+        failedTeamDataSource = source;
+        const status = error && typeof error === "object" && "status" in error ? Number(error.status) : Number.NaN;
+        failedTeamUpstreamStatus = Number.isInteger(status) && status >= 400 ? status : null;
+        throw error;
+      });
+    };
     const [conversationsResult, ordersResult, usersResult] = await Promise.all([
-      report === "sales" && filters.format !== "json" ? Promise.resolve(null) : getPortalConversations(tenantContext.tenantId, { visibility: "active", channel: "all" }),
-      report === "followups" ? Promise.resolve(null) : getPortalOrders(tenantContext.tenantId),
-      report === "sellers" ? getPortalUsers(tenantContext.tenantId) : Promise.resolve(null)
+      traceTeamQuery("conversations", report === "sales" && filters.format !== "json" ? Promise.resolve(null) : getPortalConversations(tenantContext.tenantId, { visibility: "active", channel: "all" })),
+      traceTeamQuery("orders", report === "followups" ? Promise.resolve(null) : getPortalOrders(tenantContext.tenantId)),
+      traceTeamQuery("users", report === "sellers" ? getPortalUsers(tenantContext.tenantId) : Promise.resolve(null))
     ]);
     const conversations = conversationsResult?.data?.conversations || [];
     const orders = ordersResult?.data?.orders || [];

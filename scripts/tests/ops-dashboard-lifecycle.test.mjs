@@ -12,9 +12,13 @@ assert.doesNotMatch(dashboard, /salesRequested|sellerReportRequested/, "report r
 assert.match(dashboard, /const controller = new AbortController\(\)/);
 assert.match(dashboard, /salesReportUrl, salesRetryCount/);
 assert.match(dashboard, /sellerReportUrl, sellerReportRetryCount/);
-assert.match(dashboard, /finally\(\(\) => \{\s*if \(!controller\.signal\.aborted\) setSellerReportLoading\(false\)/);
+assert.match(dashboard, /finally\(\(\) => \{\s*window\.clearTimeout\(requestTimeout\);\s*if \(!controller\.signal\.aborted\) setSellerReportLoading\(false\)/);
 assert.match(dashboard, /Reintentar/);
-assert.match(teamView, /No hay información de equipo para los filtros seleccionados\./);
+assert.match(teamView, /No hay vendedores para los filtros seleccionados\./);
+assert.match(dashboard, /label: "Equipo", count: teamRows\.length/);
+assert.match(dashboard, /<OpsSellerLoad items=\{teamRows\} \/>/);
+assert.match(dashboard, /No pudimos actualizar todas las métricas; mostramos los datos OPS disponibles\./);
+assert.match(dashboard, /new AbortController\(\)/, "Team retry creates a fresh request controller");
 assert.match(reportRoute, /getPortalUsers\(tenantContext\.tenantId\)/);
 assert.match(reportRoute, /isOperationalPortalAssigneeUser\(user\)/);
 assert.match(reportRoute, /summarizeSellerRows\(filteredLeads, filteredSales, generatedAt, sellerDirectory\)/);

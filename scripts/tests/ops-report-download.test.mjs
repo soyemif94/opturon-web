@@ -25,6 +25,11 @@ assert.equal(
   buildOpsReportUrl("expirations", { operationalState: "recovery", supplier: "Proveedor", warehouse: "Centro" }),
   "/api/app/ops/reports/expirations?supplier=Proveedor&warehouse=Centro"
 );
+assert.equal(
+  buildOpsReportUrl("sellers", { dateFrom: "", dateTo: "", sellerId: "seller-a", stage: "NEW", channel: "all", operationalState: "all", customer: "  " }),
+  "/api/app/ops/reports/sellers?sellerId=seller-a&stage=NEW",
+  "empty date/customer filters are omitted while canonical seller and stage filters are preserved"
+);
 assert.equal(withOpsReportFormat("/api/app/ops/reports/sales?dateFrom=2026-10-01", "xlsx"), "/api/app/ops/reports/sales?dateFrom=2026-10-01&format=xlsx");
 assert.equal(buildOpsReportUrl("inventory", { dateFrom: "2026-10-01", sellerId: "seller 1", product: "café" }), "/api/app/ops/reports/inventory?product=caf%C3%A9");
 

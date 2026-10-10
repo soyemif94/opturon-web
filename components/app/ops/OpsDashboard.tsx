@@ -25,6 +25,7 @@ import type { PortalSellerMetrics } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 import { isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
+import { mergeOpsTeamRows } from "@/lib/ops/team-view";
 import {
   buildOpsReportUrl,
   enqueueOpsReportDownload,
@@ -72,7 +73,12 @@ type SalesSnapshot = {
 };
 
 class OpsApiReportError extends Error {
-  constructor(readonly code: string, readonly status: number | null) {
+  constructor(
+    readonly code: string,
+    readonly status: number | null,
+    readonly requestId: string | null = null,
+    readonly phase: string | null = null
+  ) {
     super(code);
     this.name = "OpsApiReportError";
   }
@@ -80,16 +86,18 @@ class OpsApiReportError extends Error {
 
 async function fetchOpsReportJson(url: string, report: "sales" | "sellers", signal: AbortSignal) {
   const response = await fetch(url, { cache: "no-store", credentials: "same-origin", signal });
-  if (!response.ok) throw new OpsApiReportError("request_failed", response.status);
+  const requestId = response.headers.get("x-request-id");
+  const phase = response.headers.get("x-ops-report-phase");
+  if (!response.ok) throw new OpsApiReportError("request_failed", response.status, requestId, phase);
   const data = await response.json().catch(() => null);
   if (!data || typeof data !== "object" || Array.isArray(data)) {
-    throw new OpsApiReportError("invalid_response", response.status);
+    throw new OpsApiReportError("invalid_response", response.status, requestId, phase);
   }
   if (report === "sales" && (!data.summary || typeof data.summary !== "object")) {
-    throw new OpsApiReportError("invalid_response_shape", response.status);
+    throw new OpsApiReportError("invalid_response_shape", response.status, requestId, phase);
   }
   if (report === "sellers" && !Array.isArray(data.sellers)) {
-    throw new OpsApiReportError("invalid_response_shape", response.status);
+    throw new OpsApiReportError("invalid_response_shape", response.status, requestId, phase);
   }
   return data as Record<string, any>;
 }
@@ -100,6 +108,8 @@ function logOpsReportFailure(report: "sales" | "sellers", error: unknown) {
     route: "/api/app/ops/reports/[report]",
     report,
     status: knownError?.status ?? null,
+    requestId: knownError?.requestId ?? null,
+    phase: knownError?.phase ?? null,
     errorCode: knownError?.code || "request_failed"
   });
 }
@@ -185,7 +195,7 @@ export function OpsDashboard({
   const [salesLoading, setSalesLoading] = useState(false);
   const [salesError, setSalesError] = useState(false);
   const [salesRetryCount, setSalesRetryCount] = useState(0);
-  const [sellerReport, setSellerReport] = useState<OpsSellerLoadItem[] | null>(null);
+  const [sellerReport, setSellerReport] = useState<{ url: string; items: OpsSellerLoadItem[] } | null>(null);
   const [sellerReportLoading, setSellerReportLoading] = useState(false);
   const [sellerReportError, setSellerReportError] = useState(false);
   const [sellerReportRetryCount, setSellerReportRetryCount] = useState(0);
@@ -294,13 +304,26 @@ export function OpsDashboard({
   useEffect(() => {
     if (activeTab !== "team" || readOnly || !backendReady || !reportModules.orders) return;
     const controller = new AbortController();
+    const requestTimeout = window.setTimeout(() => {
+      controller.abort();
+      console.warn("ops_report_data_load_failed", {
+        route: "/api/app/ops/reports/[report]",
+        report: "sellers",
+        status: null,
+        requestId: null,
+        phase: null,
+        errorCode: "request_timeout"
+      });
+      setSellerReportError(true);
+      setSellerReportLoading(false);
+    }, 15_000);
     setSellerReport(null);
     setSellerReportError(false);
     setSellerReportLoading(true);
     fetchOpsReportJson(`${sellerReportUrl}${sellerReportUrl.includes("?") ? "&" : "?"}format=json`, "sellers", controller.signal)
       .then((data) => {
         const items = data.sellers as Array<Record<string, unknown>>;
-        setSellerReport(items.map((item) => ({
+        setSellerReport({ url: sellerReportUrl, items: items.map((item) => ({
           sellerUserId: String(item.sellerUserId || ""),
           sellerName: String(item.sellerName || "Vendedor"),
           totalActiveLeads: Number(item.activeLeads || 0),
@@ -314,7 +337,7 @@ export function OpsDashboard({
           totalRevenue: Number(item.revenue || 0),
           averageTicket: Number(item.averageTicket || 0),
           currency: String(item.currency || "ARS")
-        })));
+        })) });
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
@@ -323,9 +346,13 @@ export function OpsDashboard({
         }
       })
       .finally(() => {
+        window.clearTimeout(requestTimeout);
         if (!controller.signal.aborted) setSellerReportLoading(false);
       });
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(requestTimeout);
+      controller.abort();
+    };
   }, [activeTab, backendReady, readOnly, reportModules.orders, sellerReportUrl, sellerReportRetryCount]);
 
   const activeConversations = useMemo(() => conversations.filter((row) => isActiveLead(row)), [conversations]);
@@ -449,6 +476,16 @@ export function OpsDashboard({
         left.sellerName.localeCompare(right.sellerName)
     );
   }, [activeConversations, now, sellerMetrics, sellers]);
+
+  const activeSellerReport = sellerReport?.url === sellerReportUrl ? sellerReport.items : null;
+  const teamHasFilters = Boolean(
+    filterDateFrom || filterDateTo || filterStage || filterCondition !== "all" ||
+    filterChannel !== "all" || filterCustomer.trim()
+  );
+  const teamRows = useMemo(
+    () => mergeOpsTeamRows(sellerLoad, activeSellerReport, filterSellerId, activeSellerReport !== null || !teamHasFilters),
+    [activeSellerReport, filterSellerId, sellerLoad, teamHasFilters]
+  );
 
   const opsAlerts = useMemo(() => {
     const alerts: OpsAlert[] = [];
@@ -660,7 +697,7 @@ export function OpsDashboard({
     { id: "followups", label: "Seguimientos", count: overdueLeads.length + todayLeads.length + futureLeads.length },
     { id: "recovery", label: "Recuperación", count: coldLeads.length },
     ...(!readOnly ? [
-      { id: "team" as const, label: "Equipo", count: sellerLoad.length },
+      { id: "team" as const, label: "Equipo", count: teamRows.length },
       { id: "sales" as const, label: "Ventas" },
       { id: "reports" as const, label: "Informes" }
     ] : [])
@@ -981,13 +1018,19 @@ export function OpsDashboard({
         <div className="space-y-4">
           {activeTab === "team" ? (
             <div ref={sellerLoadRef} className={sectionClassName(focusedSection === "seller_load")}>
-              {!readOnly && reportModules.orders ? (
-                sellerReportError
-                  ? <Card role="alert"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm text-muted"><span>No pudimos cargar la información del equipo.</span><button type="button" onClick={() => setSellerReportRetryCount((count) => count + 1)} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold text-text">Reintentar</button></CardContent></Card>
-                  : sellerReportLoading || !sellerReport
-                    ? <Card><CardContent className="p-5 text-sm text-muted">Cargando el informe de equipo…</CardContent></Card>
-                    : <OpsSellerLoad items={sellerReport} />
-              ) : <OpsSellerLoad items={sellerLoad} />}
+              {!readOnly && backendReady && reportModules.orders && sellerReportLoading && !teamRows.length ? (
+                <Card role="status"><CardContent className="p-5 text-sm text-muted">Cargando el equipo…</CardContent></Card>
+              ) : null}
+              {!readOnly && backendReady && reportModules.orders && sellerReportLoading && teamRows.length ? (
+                <Card role="status"><CardContent className="p-4 text-sm text-muted">Actualizando métricas del equipo…</CardContent></Card>
+              ) : null}
+              {!readOnly && backendReady && reportModules.orders && sellerReportError && !teamRows.length ? (
+                <Card role="alert"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm text-muted"><span>No pudimos cargar la información del equipo.</span><button type="button" onClick={() => setSellerReportRetryCount((count) => count + 1)} disabled={sellerReportLoading} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold text-text">{sellerReportLoading ? "Reintentando…" : "Reintentar"}</button></CardContent></Card>
+              ) : null}
+              {!readOnly && backendReady && reportModules.orders && sellerReportError && teamRows.length ? (
+                <Card role="alert"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-muted"><span>No pudimos actualizar todas las métricas; mostramos los datos OPS disponibles.</span><button type="button" onClick={() => setSellerReportRetryCount((count) => count + 1)} disabled={sellerReportLoading} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold text-text">{sellerReportLoading ? "Reintentando…" : "Reintentar"}</button></CardContent></Card>
+              ) : null}
+              {(!sellerReportLoading || teamRows.length > 0) && !(sellerReportError && !teamRows.length) ? <OpsSellerLoad items={teamRows} /> : null}
             </div>
           ) : null}
 

@@ -40,13 +40,14 @@ export function OpsSellerLoad({
       <CardContent className="space-y-3 pt-0">
         {items.length === 0 ? (
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-5 text-sm text-muted">
-            No hay información de equipo para los filtros seleccionados.
+            No hay vendedores para los filtros seleccionados.
           </div>
         ) : (
           items.map((item) => {
             const paidOrders = Number(item.totalPaidOrders || 0);
             const totalOrders = Number(item.totalOrders || 0);
             const paidRate = totalOrders > 0 ? Math.round((paidOrders / totalOrders) * 100) : 0;
+            const hasSalesMetrics = item.totalOrders !== undefined || item.totalPaidOrders !== undefined || item.totalRevenue !== undefined || item.averageTicket !== undefined;
 
             return (
               <div
@@ -68,17 +69,19 @@ export function OpsSellerLoad({
                   <Metric label="En recuperación" value={item.recoveryLeads} />
                   <Metric label="Vencidos" value={item.overdueLeads} />
                   <Metric label="Con seguimiento" value={item.followUpLeads} />
-                  <Metric label="Pedidos" value={totalOrders} />
+                  {hasSalesMetrics ? <Metric label="Pedidos" value={totalOrders} /> : null}
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
                   <Badge variant={item.overdueLeads > 0 ? "warning" : "outline"}>
                     {item.overdueLeads > 0 ? "Necesita seguimiento" : "Carga estable"}
                   </Badge>
-                  <span>Total vendido: {formatCurrency(item.totalRevenue || 0, item.currency || "ARS")}</span>
-                  <span>Ticket promedio: {formatCurrency(item.averageTicket || 0, item.currency || "ARS")}</span>
-                  <span>Pedidos cobrados: {paidOrders}/{totalOrders} ({paidRate}%)</span>
-                  {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
+                  {hasSalesMetrics ? <>
+                    <span>Total vendido: {formatCurrency(item.totalRevenue || 0, item.currency || "ARS")}</span>
+                    <span>Ticket promedio: {formatCurrency(item.averageTicket || 0, item.currency || "ARS")}</span>
+                    <span>Pedidos cobrados: {paidOrders}/{totalOrders} ({paidRate}%)</span>
+                    {paidOrders > 0 ? <span>· {paidOrders} pagadas</span> : null}
+                  </> : null}
                 </div>
               </div>
             );
