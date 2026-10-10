@@ -145,6 +145,8 @@ export async function GET(request: NextRequest) {
           ready: embeddedSignup.ready,
           appId: embeddedSignup.appId,
           configId: embeddedSignup.configId,
+          environment: embeddedSignup.environment,
+          backendReachable: true,
           graphVersion: embeddedSignup.graphVersion,
           redirectUri: new URL(embeddedSignup.callbackPath, request.nextUrl.origin).toString(),
           callbackPath: embeddedSignup.callbackPath,

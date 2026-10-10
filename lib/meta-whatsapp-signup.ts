@@ -81,7 +81,11 @@ type BeginMetaWhatsAppConnectionOptions = {
 type MetaEmbeddedSignupPreparedConfig = Pick<
   MetaEmbeddedSignupBootstrap,
   "ready" | "appId" | "configId" | "missingConfig" | "graphVersion" | "redirectUri" | "callbackPath"
->;
+> & {
+  environment: string;
+  backendReachable: boolean;
+  coexistencePilotEnabled: boolean;
+};
 
 declare global {
   interface Window {
@@ -254,6 +258,14 @@ export function getMetaEmbeddedSignupErrorDetails(error: unknown): MetaEmbeddedS
   };
 }
 
+export function getMetaEmbeddedSignupUserMessage(error: unknown) {
+  const details = getMetaEmbeddedSignupErrorDetails(error);
+  if (details.kind === "cancelled" || details.kind === "meta_blocked" || details.kind === "timeout") {
+    return details.message;
+  }
+  return "No pudimos iniciar la conexión con WhatsApp. Revisá la configuración de integración.";
+}
+
 function normalizeMetaPayload(rawPayload: unknown): MetaEmbeddedEvent | null {
   if (!rawPayload) return null;
   let payload: Record<string, unknown> | null = null;
@@ -403,7 +415,10 @@ export function prepareMetaWhatsAppConnection(
   const preparation = (async () => {
     const response = await fetch(endpoint, { method: "GET", cache: "no-store" });
     const json = (await response.json().catch(() => null)) as {
-      data?: { embeddedSignup?: MetaEmbeddedSignupPreparedConfig };
+      data?: {
+        embeddedSignup?: Omit<MetaEmbeddedSignupPreparedConfig, "coexistencePilotEnabled">;
+        coexistencePilotEnabled?: boolean;
+      };
       error?: string;
       detail?: string;
     } | null;
@@ -420,6 +435,40 @@ export function prepareMetaWhatsAppConnection(
         code: "embedded_signup_not_ready"
       });
     }
+    if (config.backendReachable !== true) {
+      throw buildMetaEmbeddedSignupError({
+        message: "El servicio de WhatsApp no está disponible para iniciar la conexión.",
+        code: "embedded_signup_backend_unavailable"
+      });
+    }
+    if (config.environment !== "production") {
+      throw buildMetaEmbeddedSignupError({
+        message: "La conexión de WhatsApp sólo puede iniciarse desde el entorno de producción.",
+        code: "embedded_signup_non_production_environment"
+      });
+    }
+    let redirectUri: URL;
+    let callbackUri: URL;
+    try {
+      redirectUri = new URL(config.redirectUri);
+      callbackUri = new URL(config.callbackPath, window.location.origin);
+    } catch {
+      throw buildMetaEmbeddedSignupError({
+        message: "La dirección de retorno de WhatsApp no está configurada correctamente.",
+        code: "embedded_signup_callback_mismatch"
+      });
+    }
+    if (
+      redirectUri.origin !== window.location.origin ||
+      redirectUri.pathname !== callbackUri.pathname ||
+      redirectUri.search ||
+      redirectUri.hash
+    ) {
+      throw buildMetaEmbeddedSignupError({
+        message: "La dirección de retorno de WhatsApp no coincide con este sitio.",
+        code: "embedded_signup_callback_mismatch"
+      });
+    }
     await loadFacebookSdk(config.appId, config.graphVersion);
     if (!window.FB) {
       throw buildMetaEmbeddedSignupError({
@@ -427,8 +476,13 @@ export function prepareMetaWhatsAppConnection(
         code: "meta_sdk_unavailable"
       });
     }
-    preparedConfigs.set(endpoint, config);
-    return config;
+    const preparedConfig: MetaEmbeddedSignupPreparedConfig = {
+      ...config,
+      backendReachable: true,
+      coexistencePilotEnabled: json?.data?.coexistencePilotEnabled === true
+    };
+    preparedConfigs.set(endpoint, preparedConfig);
+    return preparedConfig;
   })().finally(() => preparationPromises.delete(endpoint));
 
   preparationPromises.set(endpoint, preparation);
@@ -669,6 +723,12 @@ export function beginMetaWhatsAppConnection(
   }
 
   const requestedConnectionMode = options.requestedConnectionMode || "API_ONLY";
+  if (requestedConnectionMode === "COEXISTENCE" && !prepared.coexistencePilotEnabled) {
+    return Promise.reject(buildMetaEmbeddedSignupError({
+      message: "No pudimos iniciar la conexión con WhatsApp. Revisá la configuración de integración.",
+      code: "whatsapp_coexistence_preflight_not_ready"
+    }));
+  }
   const expectedCompletionEvent =
     requestedConnectionMode === "COEXISTENCE"
       ? COEXISTENCE_COMPLETION_EVENT

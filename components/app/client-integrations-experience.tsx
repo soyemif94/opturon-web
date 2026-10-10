@@ -12,6 +12,7 @@ import type { PortalInstagramCandidate, PortalInstagramStatus, PortalWhatsAppSta
 import type { WhatsAppConnectionStatus } from "@/lib/whatsapp-channel-state";
 import {
   beginMetaWhatsAppConnection,
+  getMetaEmbeddedSignupUserMessage,
   prepareMetaWhatsAppConnection,
   type WhatsAppConnectionMode
 } from "@/lib/meta-whatsapp-signup";
@@ -79,7 +80,7 @@ export function ClientIntegrationsExperience({
     return prepareMetaWhatsAppConnection()
       .then(() => setWhatsAppSignupReady(true))
       .catch((error) => {
-        setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo preparar la conexión con Meta.");
+        setWhatsAppSignupError(getMetaEmbeddedSignupUserMessage(error));
       });
   }
 
@@ -89,7 +90,7 @@ export function ClientIntegrationsExperience({
     void prepareMetaWhatsAppConnection().then(
       () => { if (active) setWhatsAppSignupReady(true); },
       (error) => {
-        if (active) setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo preparar la conexión con Meta.");
+        if (active) setWhatsAppSignupError(getMetaEmbeddedSignupUserMessage(error));
       }
     );
     return () => {
@@ -105,7 +106,7 @@ export function ClientIntegrationsExperience({
     try {
       await beginMetaWhatsAppConnection({ requestedConnectionMode });
     } catch (error) {
-      setWhatsAppSignupError(error instanceof Error ? error.message : "No se pudo iniciar la conexión de WhatsApp.");
+      setWhatsAppSignupError(getMetaEmbeddedSignupUserMessage(error));
     } finally {
       setWhatsAppSignupBusy(false);
       router.refresh();

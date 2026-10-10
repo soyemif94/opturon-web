@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   beginMetaWhatsAppConnection,
   getMetaEmbeddedSignupErrorDetails,
+  getMetaEmbeddedSignupUserMessage,
   prepareMetaWhatsAppConnection,
   type WhatsAppConnectionMode
 } from "../../lib/meta-whatsapp-signup.ts";
@@ -55,8 +56,9 @@ async function createSignup() {
       if (init?.method === "GET") {
         return response({ data: { embeddedSignup: {
           ready: true, appId: "app-test", configId: "config-test", missingConfig: [],
+          environment: "production", backendReachable: true,
           graphVersion: "v25.0", redirectUri: `${origin}/callback`, callbackPath: "/callback"
-        } } });
+        }, coexistencePilotEnabled: true } });
       }
       bootstraps.push(body);
       return response({ data: {
@@ -147,6 +149,7 @@ test("standard launcher selects Embedded Signup v4 without enabling coexistence"
   await withSignup(async (h) => {
     const options = h.loginOptions();
     const extras = options?.extras;
+    assert.equal(options?.config_id, "config-test", "launcher uses the preflight's canonical config ID");
     assert.equal(extras?.version, "v4");
     assert.equal(extras?.featureType, undefined);
     assert.equal(h.bootstraps[0].requestedConnectionMode, "API_ONLY");
@@ -154,6 +157,94 @@ test("standard launcher selects Embedded Signup v4 without enabling coexistence"
     h.message(finishEvent);
     assert.equal((await h.outcome()).value?.state, "connected");
   });
+});
+
+test("preflight blocks missing config, callback mismatch, non-production and disabled coexistence before Meta opens", async () => {
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const urls: string[] = [];
+  let loginCalls = 0;
+  const preflight = (overrides: Record<string, unknown> = {}, status = 200) => new Response(JSON.stringify({
+    data: {
+      coexistencePilotEnabled: true,
+      embeddedSignup: {
+        ready: true,
+        appId: "app-test",
+        configId: "config-test",
+        missingConfig: [],
+        environment: "production",
+        backendReachable: true,
+        graphVersion: "v25.0",
+        redirectUri: `${origin}/callback`,
+        callbackPath: "/callback",
+        ...overrides
+      }
+    }
+  }), { status, headers: { "Content-Type": "application/json" } });
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    urls.push(`${init?.method || "GET"} ${url}`);
+    if (init?.method !== "GET") throw new Error("Preflight must reject before bootstrap POST");
+    if (url === "/preflight-missing") {
+      return preflight({ ready: false, configId: null, missingConfig: ["META_EMBEDDED_SIGNUP_CONFIG_ID"] });
+    }
+    if (url === "/preflight-callback") return preflight({ redirectUri: "https://other.example/callback" });
+    if (url === "/preflight-environment") return preflight({ environment: "preview" });
+    if (url === "/preflight-coexistence") {
+      const response = preflight();
+      const body = await response.json() as { data: { coexistencePilotEnabled: boolean } };
+      body.data.coexistencePilotEnabled = false;
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    throw new Error(`Unexpected preflight endpoint: ${url}`);
+  }) as typeof fetch;
+
+  globalThis.window = {
+    location: { origin },
+    crypto: globalThis.crypto,
+    FB: {
+      init: () => {},
+      login: () => { loginCalls += 1; }
+    },
+    setTimeout: () => 1,
+    addEventListener: () => {},
+    removeEventListener: () => {}
+  } as unknown as Window & typeof globalThis;
+
+  try {
+    await assert.rejects(
+      () => prepareMetaWhatsAppConnection("/preflight-missing"),
+      (error: unknown) => getMetaEmbeddedSignupErrorDetails(error).code === "embedded_signup_not_ready"
+    );
+    await assert.rejects(
+      () => prepareMetaWhatsAppConnection("/preflight-callback"),
+      (error: unknown) => getMetaEmbeddedSignupErrorDetails(error).code === "embedded_signup_callback_mismatch"
+    );
+    await assert.rejects(
+      () => prepareMetaWhatsAppConnection("/preflight-environment"),
+      (error: unknown) => getMetaEmbeddedSignupErrorDetails(error).code === "embedded_signup_non_production_environment"
+    );
+    await prepareMetaWhatsAppConnection("/preflight-coexistence");
+    await assert.rejects(
+      () => beginMetaWhatsAppConnection({ bootstrapEndpoint: "/preflight-coexistence", requestedConnectionMode: "COEXISTENCE" }),
+      (error: unknown) => getMetaEmbeddedSignupErrorDetails(error).code === "whatsapp_coexistence_preflight_not_ready"
+    );
+    assert.deepEqual(urls, [
+      "GET /preflight-missing",
+      "GET /preflight-callback",
+      "GET /preflight-environment",
+      "GET /preflight-coexistence"
+    ]);
+    assert.equal(loginCalls, 0, "a failed preflight never opens the Meta popup");
+    assert.equal(
+      getMetaEmbeddedSignupUserMessage(new Error("META_EMBEDDED_SIGNUP_CONFIG_ID missing token=secret")),
+      "No pudimos iniciar la conexión con WhatsApp. Revisá la configuración de integración."
+    );
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("coexistence launcher uses the V4 Business App contract and its completion event", async () => {

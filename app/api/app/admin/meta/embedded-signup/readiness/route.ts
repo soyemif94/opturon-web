@@ -22,6 +22,7 @@ function mergeFrontendLaunchPayload(readiness: MetaEmbeddedSignupReadiness): Met
       configured: runtimeConfig.ready,
       safe: true,
       deliveryMode: "server_side_payload",
+      environment: runtimeConfig.environment,
       missingConfig: runtimeConfig.missingConfig,
       fields: runtimeConfig.payloadFields,
       blocking: !runtimeConfig.ready

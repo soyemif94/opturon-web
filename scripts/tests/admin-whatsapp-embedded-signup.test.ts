@@ -19,8 +19,9 @@ async function testPopupClosedWithoutCallbackTriggersRecovery() {
       if (init?.method === "GET") {
         return new Response(JSON.stringify({ data: { embeddedSignup: {
           ready: true, appId: "app-id", configId: "config-id", missingConfig: [],
+          environment: "production", backendReachable: true,
           graphVersion: "v25.0", redirectUri: "https://opturon.test/callback", callbackPath: "/callback"
-        } } }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }, coexistencePilotEnabled: true } }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       const body = JSON.parse(String(init?.body || "{}"));
       return new Response(
@@ -110,8 +111,9 @@ async function testClientTimeoutFinalizesWithoutCodeWhenNoRecoveryEndpointIsPass
       if (init?.method === "GET") {
         return new Response(JSON.stringify({ data: { embeddedSignup: {
           ready: true, appId: "app-id", configId: "config-id", missingConfig: [],
+          environment: "production", backendReachable: true,
           graphVersion: "v25.0", redirectUri: "https://opturon.test/callback", callbackPath: "/callback"
-        } } }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }, coexistencePilotEnabled: true } }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       const body = JSON.parse(String(init?.body || "{}"));
       return new Response(

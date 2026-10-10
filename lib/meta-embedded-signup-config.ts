@@ -4,6 +4,7 @@ export type MetaEmbeddedSignupRuntimeConfig = {
   ready: boolean;
   appId: string | null;
   configId: string | null;
+  environment: string;
   missingConfig: string[];
   graphVersion: string;
   callbackPath: string;
@@ -24,6 +25,7 @@ export function resolveMetaEmbeddedSignupConfig(): MetaEmbeddedSignupRuntimeConf
     ready: Boolean(appId && configId),
     appId: appId || null,
     configId: configId || null,
+    environment: String(process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown").trim(),
     missingConfig,
     graphVersion: String(process.env.NEXT_PUBLIC_WHATSAPP_GRAPH_VERSION || process.env.WHATSAPP_GRAPH_VERSION || "v25.0").trim(),
     callbackPath: DEFAULT_CALLBACK_PATH,
