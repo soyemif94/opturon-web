@@ -8,7 +8,7 @@ import { ConversationList } from "@/components/app/inbox/ConversationList";
 import { InboxLayout } from "@/components/app/inbox/InboxLayout";
 import { ProfilePanel } from "@/components/app/inbox/ProfilePanel";
 import { WhatsAppChatImportModal } from "@/components/app/inbox/WhatsAppChatImportModal";
-import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload, FilterKey, InboxChannelKey, LeadStatus } from "@/components/app/inbox/types";
+import type { ConversationRowData, DetailPayload, FilterKey, InboxChannelKey, LeadStatus } from "@/components/app/inbox/types";
 import { useInboxContext } from "@/components/inbox/inbox-context";
 import { getSuggestions, type SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { normalizeText } from "@/lib/search/normalize";
@@ -344,7 +344,6 @@ export function InboxWorkspace({
                     leadStatusLabel: json.conversation.leadStatusLabel || row.leadStatusLabel,
                     priority: json.conversation.priority || row.priority,
                     botEnabled: json.conversation.botEnabled,
-                    botFlowLock: json.conversation.botFlowLock || row.botFlowLock,
                     channelId: json.conversation.channelId || row.channelId,
                     channelType: json.conversation.channelType || row.channelType,
                     channelProvider: json.conversation.channelProvider || row.channelProvider,
@@ -1092,18 +1091,6 @@ export function InboxWorkspace({
       setDetail((prev) => (prev ? { ...prev, conversation: { ...prev.conversation, assignedTo: nextAssign || undefined } } : prev));
       setInboxState({ assignedTo: nextAssign });
     }
-    if (action === "set_bot_domain_override") {
-      const nextOverride = typeof payload.botDomainOverride === "string" ? (payload.botDomainOverride as BotDomainOverride) : "automatic";
-      setDetail((prev) =>
-        prev ? { ...prev, conversation: { ...prev.conversation, botDomainOverride: nextOverride } } : prev
-      );
-    }
-    if (action === "set_bot_flow_lock") {
-      const nextLock = typeof payload.botFlowLock === "string" ? (payload.botFlowLock as BotFlowLock) : "automatic";
-      setDetail((prev) =>
-        prev ? { ...prev, conversation: { ...prev.conversation, botFlowLock: nextLock } } : prev
-      );
-    }
     if (action === "mark_read") {
       setInboxState({ unreadCount: 0 });
     }
@@ -1268,7 +1255,7 @@ export function InboxWorkspace({
     }
   }
 
-  async function runAction(action: "toggle_bot" | "mark_hot" | "close" | "assign" | "change_stage" | "set_bot_domain_override") {
+  async function runAction(action: "toggle_bot" | "mark_hot" | "close" | "assign" | "change_stage") {
     if (!selectedId || !detail) return;
     if (action === "toggle_bot" && detail.conversation.channelType === "instagram") {
       toast.error("Bot no disponible para Instagram", "Instagram esta en modo lectura en esta etapa.");
@@ -1296,18 +1283,6 @@ export function InboxWorkspace({
     if (ok) {
       toast.success("Conversacion reasignada", "El owner se actualizo al instante en el inbox.");
     }
-  }
-
-  async function changeBotDomainOverride(nextOverride: BotDomainOverride) {
-    if (!selectedId || !detail) return;
-    const ok = await runOptimisticAction("set_bot_domain_override", { botDomainOverride: nextOverride });
-    if (!ok) toast.error("No se pudo actualizar el modo del bot");
-  }
-
-  async function changeBotFlowLock(nextLock: BotFlowLock) {
-    if (!selectedId || !detail) return;
-    const ok = await runOptimisticAction("set_bot_flow_lock", { botFlowLock: nextLock });
-    if (!ok) toast.error("No se pudo actualizar el flujo del bot");
   }
 
   async function addNote() {
@@ -1533,8 +1508,6 @@ export function InboxWorkspace({
               canDeleteConversation={canDeleteConversation && !readOnly}
               onDeleteConversation={() => setDeleteConversationOpen(true)}
               onOpenContext={() => setContextOpen(true)}
-              onBotFlowLockChange={(value) => void changeBotFlowLock(value)}
-              onBotDomainOverrideChange={(value) => void changeBotDomainOverride(value)}
             />
           }
           right={
@@ -1577,8 +1550,6 @@ export function InboxWorkspace({
               onAssign={() => void reassignConversation()}
               onMarkHot={() => void runAction("mark_hot")}
               onClose={() => void runAction("close")}
-              onBotFlowLockChange={(value) => void changeBotFlowLock(value)}
-              onBotDomainOverrideChange={(value) => void changeBotDomainOverride(value)}
               noteText={noteText}
               onNoteTextChange={setNoteText}
               onAddNote={() => void addNote()}

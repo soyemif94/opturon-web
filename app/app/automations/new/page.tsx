@@ -1,8 +1,8 @@
-import { AutomationBuilder } from "@/components/app/AutomationBuilder";
+import { redirect } from "next/navigation";
 import { requireAppPage } from "@/lib/saas/access";
 
 export default async function AppAutomationsNewPage() {
   await requireAppPage({ permission: "manage_workspace" });
 
-  return <AutomationBuilder />;
+  redirect("/app/settings/bot");
 }

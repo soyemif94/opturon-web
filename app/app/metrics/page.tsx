@@ -96,8 +96,6 @@ export default async function AppMetricsPage() {
       lastMessageAt: item.lastMessageAt,
       priority: item.priority === "hot" ? "hot" : "normal",
       botEnabled: item.botEnabled !== false,
-      botFlowLock: item.botFlowLock,
-      botDomainOverride: item.botDomainOverride,
       unreadCount: 0,
       slaMinutes: 0,
       nextActionAt: item.nextActionAt || null,

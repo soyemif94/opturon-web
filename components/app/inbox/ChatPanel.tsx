@@ -5,7 +5,7 @@ import { Composer } from "@/components/app/inbox/Composer";
 import { MessageBubble } from "@/components/app/inbox/MessageBubble";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 import { AutoSuggestBar } from "@/components/inbox/auto-suggest-bar";
-import type { BotDomainOverride, BotFlowLock, ConversationRowData, DetailPayload } from "@/components/app/inbox/types";
+import type { ConversationRowData, DetailPayload } from "@/components/app/inbox/types";
 import type { InboxDetailMode } from "@/components/app/inbox/mobile-behavior";
 import type { SuggestionItem } from "@/lib/suggestions/getSuggestions";
 import { shouldStickInboxToBottom } from "@/components/app/inbox/mobile-behavior";
@@ -40,8 +40,6 @@ type ChatPanelProps = {
   canDeleteConversation: boolean;
   onDeleteConversation: () => void;
   onOpenContext: () => void;
-  onBotFlowLockChange: (value: BotFlowLock) => void;
-  onBotDomainOverrideChange: (value: BotDomainOverride) => void;
 };
 
 export function ChatPanel({

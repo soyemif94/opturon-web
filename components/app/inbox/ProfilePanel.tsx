@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Archive, Clock3, Flag, History, Phone, RotateCcw, Settings2, Tag, UserRound } from "lucide-react";
+import { Archive, Clock3, Flag, History, Phone, RotateCcw, Tag, UserRound } from "lucide-react";
 import { InboxBadge } from "@/components/app/inbox/Badge";
 import { ProfileSkeleton } from "@/components/app/inbox/Skeleton";
-import type { BotDomainOverride, BotFlowLock, DetailPayload, LeadStatus } from "@/components/app/inbox/types";
+import type { DetailPayload, LeadStatus } from "@/components/app/inbox/types";
 import { SimpleAvatar } from "@/components/app/simple-avatar";
 
 const DEAL_STAGES = [
@@ -25,18 +25,6 @@ function taskStatusLabel(value?: string) {
   if (value === "todo") return "Pendiente";
   if (value === "done") return "Hecha";
   return value;
-}
-
-function botDomainLabel(value?: BotDomainOverride) {
-  if (value === "agenda") return "Agenda";
-  if (value === "commerce") return "Ventas";
-  return "Automatico";
-}
-
-function botFlowLockLabel(value?: BotFlowLock) {
-  if (value === "agenda") return "Agenda";
-  if (value === "commerce") return "Ventas";
-  return "Automatico";
 }
 
 type ProfilePanelProps = {
@@ -74,8 +62,6 @@ type ProfilePanelProps = {
   onNextActionNoteChange: (value: string) => void;
   onSaveNextAction: () => void;
   onClearNextAction: () => void;
-  onBotFlowLockChange: (value: BotFlowLock) => void;
-  onBotDomainOverrideChange: (value: BotDomainOverride) => void;
 };
 
 export function ProfilePanel({
@@ -113,8 +99,6 @@ export function ProfilePanel({
   onNextActionNoteChange,
   onSaveNextAction,
   onClearNextAction,
-  onBotFlowLockChange,
-  onBotDomainOverrideChange
 }: ProfilePanelProps) {
   const commercialActionParams = detail
     ? {
@@ -227,15 +211,6 @@ export function ProfilePanel({
           <div className="flex gap-1.5"><input value={taskTitle} onChange={(event) => onTaskTitleChange(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs" placeholder="Agregar próximo paso" disabled={readOnly} /><button type="button" onClick={onAddTask} disabled={readOnly || !taskTitle.trim()} className="h-8 rounded-lg border border-[color:var(--border)] px-2 text-[10px] text-muted disabled:opacity-40">Crear</button></div>
           <ul className="mt-2 divide-y divide-[color:var(--border)]">{detail.tasks.slice(0, 5).map((task) => <li key={task.id} className="flex items-center justify-between py-2 text-[11px]"><span>{task.title}</span><span className="text-[9px] text-muted">{taskStatusLabel(task.status)}</span></li>)}</ul>
         </div>
-      </details>
-
-      <details className="group border-b border-[color:var(--border)] px-4 py-3">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-muted"><span className="inline-flex items-center gap-2"><Settings2 className="size-3.5" />Configuración del bot</span><span className="text-[10px] normal-case tracking-normal">{botFlowLockLabel(detail.conversation.botFlowLock)}</span></summary>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label><span className="mb-1 block text-[10px] text-muted">Flujo</span><select value={detail.conversation.botFlowLock || "automatic"} onChange={(event) => onBotFlowLockChange(event.target.value as BotFlowLock)} disabled={readOnly} className="h-8 w-full rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs"><option value="automatic">Automatico</option><option value="agenda">Agenda</option><option value="commerce">Ventas</option></select></label>
-          <label><span className="mb-1 block text-[10px] text-muted">Modo</span><select value={detail.conversation.botDomainOverride || "automatic"} onChange={(event) => onBotDomainOverrideChange(event.target.value as BotDomainOverride)} disabled={readOnly} className="h-8 w-full rounded-lg border border-[color:var(--border)] bg-bg px-2 text-xs"><option value="automatic">Automatico</option><option value="agenda">Agenda</option><option value="commerce">Ventas</option></select></label>
-        </div>
-        <p className="mt-2 text-[9px] text-muted">Modo actual: {botDomainLabel(detail.conversation.botDomainOverride)}</p>
       </details>
 
       <section className="border-b border-[color:var(--border)] px-4 py-3.5">

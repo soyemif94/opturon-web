@@ -171,10 +171,10 @@ export default async function ClientPortalHome({ searchParams }: { searchParams:
       status: onboardingState.hasMessages ? ("done" as const) : ("pending" as const)
     },
     {
-      id: "automation",
-      label: "Activar atención automática",
-      href: "/app/automations",
-      ctaLabel: onboardingState.botEnabled ? "Ver automatizaciones" : "Activar",
+      id: "assistant",
+      label: "Configurar el asistente inteligente",
+      href: "/app/settings/bot",
+      ctaLabel: onboardingState.botEnabled ? "Configurar asistente" : "Activar asistente",
       status: onboardingState.botEnabled ? ("done" as const) : ("pending" as const)
     }
   ];

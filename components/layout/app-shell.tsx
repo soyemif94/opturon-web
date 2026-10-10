@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  Bot,
   CircleDollarSign,
   ClipboardList,
   CalendarDays,
@@ -157,14 +156,6 @@ const navItems: Array<{
     icon: HandCoins,
     module: "cash",
     match: (pathname: string) => pathname.startsWith("/app/cash")
-  },
-  {
-    href: "/app/automations",
-    label: "Automatizaciones",
-    description: "Flujos del bot, respuestas y reglas",
-    icon: Bot,
-    module: "automations",
-    match: (pathname: string) => pathname.startsWith("/app/automations")
   },
   {
     href: "/app/metrics",
