@@ -197,6 +197,7 @@ export function OpsDashboard({
       setOpsLoadError(false);
     }
     try {
+      const signal = AbortSignal.timeout(15_000);
       const inboxQuery = new URLSearchParams({ filter: "all", visibility: "active", channel: filterChannel });
       if (filterSellerId) inboxQuery.set("sellerId", filterSellerId);
       if (filterStage) inboxQuery.set("stage", filterStage);
@@ -205,9 +206,9 @@ export function OpsDashboard({
       if (filterDateFrom) inboxQuery.set("dateFrom", filterDateFrom);
       if (filterDateTo) inboxQuery.set("dateTo", filterDateTo);
       const [inboxResponse, metaResponse, sellerMetricsHttp] = await Promise.all([
-        fetch(`/api/app/inbox?${inboxQuery.toString()}`, { cache: "no-store" }),
-        fetch("/api/app/orders/meta", { cache: "no-store" }),
-        !readOnly && reportModules.orders ? fetch("/api/app/orders/seller-metrics", { cache: "no-store" }) : Promise.resolve(null)
+        fetch(`/api/app/inbox?${inboxQuery.toString()}`, { cache: "no-store", signal }),
+        fetch("/api/app/orders/meta", { cache: "no-store", signal }),
+        !readOnly && reportModules.orders ? fetch("/api/app/orders/seller-metrics", { cache: "no-store", signal }) : Promise.resolve(null)
       ]);
 
       if (!inboxResponse.ok) {

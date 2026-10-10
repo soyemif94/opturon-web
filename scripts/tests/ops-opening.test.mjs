@@ -120,6 +120,12 @@ try {
   assert.equal(await opening.verifyOpsOpening(async () => new Response(null, { status: 502 })), "error", "D: dashboard/access load failure terminates in recoverable error");
   assert.equal(await opening.verifyOpsOpening(async () => { throw new Error("network failure"); }), "error", "D: network failure terminates in recoverable error");
   assert.equal(await opening.verifyOpsOpening(async () => new Response("{}", { status: 200 })), "error", "invalid verification payload fails closed");
+  const neverResponds = (_url, options) => new Promise((_, reject) => {
+    options.signal.addEventListener("abort", () => reject(new Error("request timed out")), { once: true });
+  });
+  const deadline = () => new Promise((_, reject) => setTimeout(() => reject(new Error("test deadline exceeded")), 250));
+  assert.equal(await Promise.race([opening.unlockAndVerifyOps(fixturePassword, neverResponds, 5), deadline()]), "error", "a stalled unlock request terminates");
+  assert.equal(await Promise.race([opening.verifyOpsOpening(neverResponds, 5), deadline()]), "error", "a stalled verification request terminates");
 
   applyCookies(issued);
   assert.equal(access.hasOpsAccessCookie(cookieAt("/app/ops")), true, "E: reload with valid cookie renders dashboard");
@@ -142,6 +148,7 @@ try {
   assert.match(pageSource, /opsUnlocked \? \(/, "only a server-verified cookie supplies dashboard children");
   assert.match(dashboardSource, /No pudimos abrir OPS\. Intentá nuevamente\./, "dashboard fetch errors are recoverable");
   assert.match(dashboardSource, /setOpsLoadError\(true\)/);
+  assert.match(dashboardSource, /const signal = AbortSignal\.timeout\(15_000\)/, "initial dashboard fetch has a finite deadline");
   assert.match(dashboardSource, /if \(!options\?\.silent\) setLoading\(false\)/, "dashboard loading terminates on failure");
 } finally {
   for (const [key, value] of priorEnvironment) {

@@ -98,7 +98,8 @@ export function OpsAccessGate({
       const response = await fetch("/api/app/ops/lock", {
         method: "POST",
         cache: "no-store",
-        credentials: "same-origin"
+        credentials: "same-origin",
+        signal: AbortSignal.timeout(15_000)
       });
       if (!response.ok) throw new Error("ops_lock_failed");
       window.location.assign("/app/ops");
