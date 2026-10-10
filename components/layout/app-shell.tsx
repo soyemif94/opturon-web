@@ -763,21 +763,13 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === "hidden") {
-        sendOpsLockRequest();
-      }
-    }
-
     function handleBeforeUnload() {
       sendOpsLockRequest();
     }
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);

@@ -10,11 +10,9 @@ const {
   OPS_REPORT_TYPES,
   OpsCsvDownloadError,
   OpsReportDownloadError,
-  acquireOpsReportDownload,
   buildOpsReportUrl,
   parseOpsCsvDownloadResponse,
   parseOpsReportDownloadResponse,
-  releaseOpsReportDownload,
   withOpsReportFormat
 } = await import(helperUrl);
 
@@ -29,12 +27,6 @@ assert.equal(
 );
 assert.equal(withOpsReportFormat("/api/app/ops/reports/sales?dateFrom=2026-10-01", "xlsx"), "/api/app/ops/reports/sales?dateFrom=2026-10-01&format=xlsx");
 assert.equal(buildOpsReportUrl("inventory", { dateFrom: "2026-10-01", sellerId: "seller 1", product: "café" }), "/api/app/ops/reports/inventory?product=caf%C3%A9");
-
-assert.equal(acquireOpsReportDownload("sales", "xlsx"), true);
-assert.equal(acquireOpsReportDownload("sales", "xlsx"), false, "the same report/format cannot be started twice concurrently");
-assert.equal(acquireOpsReportDownload("sellers", "xlsx"), true, "another report has an independent download lifecycle");
-releaseOpsReportDownload("sales", "xlsx");
-releaseOpsReportDownload("sellers", "xlsx");
 
 const csvResponse = new Response("\uFEFFproducto\r\n\"Café\"\r\n", {
   status: 200,
@@ -87,14 +79,16 @@ const dashboard = readFileSync(join(root, "components/app/ops/OpsDashboard.tsx")
 const reportRoute = readFileSync(join(root, "app/api/app/ops/reports/[report]/route.ts"), "utf8");
 const downloadButtons = dashboard.slice(dashboard.indexOf("function OpsReportDownloadButtons"), dashboard.indexOf("function KpiCard"));
 assert.match(dashboard, /credentials:\s*"same-origin"/);
-assert.match(dashboard, /async function downloadReport\(format: OpsReportDownloadFormat\)/);
-assert.match(dashboard, /Generando Excel\.\.\./);
+assert.match(dashboard, /function downloadReport\(format: OpsReportDownloadFormat\)/);
+assert.match(dashboard, /Generando \$\{name\}\.\.\./);
+assert.match(dashboard, /En cola/);
 assert.match(dashboard, /Descargar Excel/);
 assert.match(dashboard, /Reintentar/);
 assert.match(dashboard, /60_000/);
-assert.match(dashboard, /releaseOpsReportDownload\(report, format\)/);
-assert.match(downloadButtons, /inFlightRef\.current\.has\(format\)/);
-assert.doesNotMatch(downloadButtons, /AbortController|signal:/, "one report download never cancels another");
+assert.match(downloadButtons, /enqueueOpsReportDownload\(report, format/);
+assert.match(downloadButtons, /OPS_REPORT_EXPORT_TIMEOUT_MS/);
+assert.match(downloadButtons, /x-ops-report-request-id/);
+assert.doesNotMatch(downloadButtons, /AbortController/, "one queued report does not cancel another");
 assert.match(dashboard, /No pudimos generar el informe\. Intentá nuevamente\./);
 assert.doesNotMatch(dashboard, /<a\s+href=\{report\.href\}/, "report download no longer navigates the page to a JSON error body");
 assert.doesNotMatch(dashboard, /<a\s+href=\{reportHref\}/);

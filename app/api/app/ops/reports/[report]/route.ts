@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -39,12 +40,6 @@ const filterSchema = z.object({
   format: z.enum(["xlsx", "csv", "json"]).optional()
 });
 
-function noStore(response: NextResponse) {
-  response.headers.set("Cache-Control", "private, no-store");
-  response.headers.set("Pragma", "no-cache");
-  return response;
-}
-
 const reportPresentation: Record<string, { title: string; filename: string }> = {
   sales: { title: "Opturon — Informe de Ventas y Operaciones", filename: "ventas" },
   sellers: { title: "Opturon — Rendimiento por Vendedor", filename: "vendedores" },
@@ -53,6 +48,16 @@ const reportPresentation: Record<string, { title: string; filename: string }> = 
   movements: { title: "Opturon — Movimientos de Inventario", filename: "movimientos" },
   expirations: { title: "Opturon — Lotes y Vencimientos", filename: "vencimientos" }
 };
+
+const reportTypes = ["sales", "sellers", "followups", "inventory", "movements", "expirations"] as const;
+type ReportPhase = "AUTH" | "VALIDATION" | "QUERY" | "TRANSFORM" | "XLSX_GENERATION" | "RESPONSE";
+
+function getReportRequestId(request: NextRequest) {
+  const supplied = request.headers.get("x-ops-report-request-id") || "";
+  return /^[a-f\d]{8}-[a-f\d]{4}-[1-8][a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(supplied)
+    ? supplied
+    : randomUUID();
+}
 
 const statusLabels: Record<string, string> = {
   paid: "Cobrado", unpaid: "Pendiente", pending: "Pendiente", open: "Abierta", new: "Nuevo", NEW: "Nuevo",
@@ -115,7 +120,7 @@ function csvCell(value: unknown, kind?: OpsXlsxColumn["kind"]) {
   return value;
 }
 
-async function reportDownloadResponse(report: string, dateTag: string, filters: z.infer<typeof filterSchema>, columns: OpsXlsxColumn[], rows: Array<Record<string, unknown>>, generatedAt: Date, sellerName?: string, additionalSheets?: OpsXlsxReport["additionalSheets"]) {
+async function reportDownloadResponse(report: string, dateTag: string, filters: z.infer<typeof filterSchema>, columns: OpsXlsxColumn[], rows: Array<Record<string, unknown>>, generatedAt: Date, sellerName: string | undefined, onPhase: (phase: ReportPhase) => void, additionalSheets?: OpsXlsxReport["additionalSheets"]) {
   const presentation = reportPresentation[report];
   const outputFormat = filters.format === "csv" ? "csv" : "xlsx";
   const filename = `opturon-${presentation.filename}-${dateTag}.${outputFormat}`;
@@ -126,12 +131,14 @@ async function reportDownloadResponse(report: string, dateTag: string, filters: 
     "Pragma": "no-cache"
   };
   if (outputFormat === "csv") {
+    onPhase("RESPONSE");
     const csvRows = rows.map((row) => columns.map((column) => csvCell(row[column.key], column.kind)));
     return new NextResponse(`\uFEFF${buildCsv(headers, csvRows, ";")}`, {
       status: 200,
       headers: { ...responseHeaders, "Content-Type": "text/csv; charset=utf-8" }
     });
   }
+  onPhase("XLSX_GENERATION");
   const workbook = await createOpsReportXlsx({
     title: presentation.title,
     generatedAt,
@@ -143,6 +150,7 @@ async function reportDownloadResponse(report: string, dateTag: string, filters: 
     rows,
     additionalSheets
   });
+  onPhase("RESPONSE");
   return new NextResponse(new Uint8Array(workbook), {
     status: 200,
     headers: { ...responseHeaders, "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
@@ -182,30 +190,61 @@ function filteredOrders(orders: Array<Record<string, any>>, filters: z.infer<typ
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ report: string }> }) {
-  const cookieStore = await cookies();
-  if (!hasOpsAccessCookie(cookieStore)) return noStore(NextResponse.json({ error: "ops_access_required" }, { status: 403 }));
-
+  const requestId = getReportRequestId(request);
+  const startedAt = performance.now();
+  let reportType = "unknown";
+  let phase: ReportPhase = "AUTH";
+  const finish = (response: NextResponse, safeErrorCode: string | null = null) => {
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("X-Request-Id", requestId);
+    response.headers.set("X-Ops-Report-Phase", phase);
+    const diagnostic = {
+      requestId,
+      reportType,
+      status: response.status,
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      contentType: response.headers.get("Content-Type") || null,
+      safeErrorCode: response.status >= 400 ? safeErrorCode || "http_error" : null,
+      route: "/api/app/ops/reports/[report]",
+      phase
+    };
+    if (response.status >= 400) console.warn("ops_report_request", diagnostic);
+    else console.info("ops_report_request", diagnostic);
+    return response;
+  };
+  const setPhase = (nextPhase: ReportPhase) => { phase = nextPhase; };
   const { report } = await params;
-  if (!["sales", "sellers", "followups", "inventory", "movements", "expirations"].includes(report)) {
-    return noStore(NextResponse.json({ error: "ops_report_not_found" }, { status: 404 }));
+  reportType = reportTypes.includes(report as typeof reportTypes[number]) ? report : "unknown";
+
+  const cookieStore = await cookies();
+  if (!hasOpsAccessCookie(cookieStore)) return finish(NextResponse.json({ error: "ops_access_required" }, { status: 403 }), "ops_access_required");
+
+  if (!reportTypes.includes(report as typeof reportTypes[number])) {
+    setPhase("VALIDATION");
+    return finish(NextResponse.json({ error: "ops_report_not_found" }, { status: 404 }), "ops_report_not_found");
   }
   const requiredModule: "sales" | "orders" | "ops" | "inventory" =
     report === "sales" ? "sales" : report === "sellers" ? "orders" : ["inventory", "movements", "expirations"].includes(report) ? "inventory" : "ops";
   const guard = await requireAppModuleApi(requiredModule, { permission: "manage_workspace" });
-  if (guard.error) return guard.error;
+  if (guard.error) return finish(guard.error, "app_module_access_denied");
   if (report === "sales") {
     const ordersGuard = await requireAppModuleApi("orders", { permission: "manage_workspace" });
-    if (ordersGuard.error) return ordersGuard.error;
+    if (ordersGuard.error) return finish(ordersGuard.error, "app_module_access_denied");
   }
   const tenantContext = await resolveAppTenant({ permission: "manage_workspace" });
-  if (tenantContext.error) return tenantContext.error;
-  if (!isBackendConfigured()) return noStore(NextResponse.json({ error: "ops_report_backend_unavailable" }, { status: 503 }));
+  if (tenantContext.error) return finish(tenantContext.error, "tenant_access_denied");
+  if (!isBackendConfigured()) {
+    setPhase("QUERY");
+    return finish(NextResponse.json({ error: "ops_report_backend_unavailable" }, { status: 503 }), "ops_report_backend_unavailable");
+  }
 
+  setPhase("VALIDATION");
   const parsed = filterSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams.entries()));
-  if (!parsed.success) return noStore(NextResponse.json({ error: "invalid_report_filters" }, { status: 400 }));
+  if (!parsed.success) return finish(NextResponse.json({ error: "invalid_report_filters" }, { status: 400 }), "invalid_report_filters");
   const filters = parsed.data;
   if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
-    return noStore(NextResponse.json({ error: "invalid_report_date_range" }, { status: 400 }));
+    return finish(NextResponse.json({ error: "invalid_report_date_range" }, { status: 400 }), "invalid_report_date_range");
   }
 
   try {
@@ -215,6 +254,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ? getPortalInventoryReadActor(guard.ctx || {})
       : null;
     if (report === "inventory") {
+      setPhase("QUERY");
       const pageSize = 100;
       const first = await getPortalInventoryProducts(tenantContext.tenantId, { search: filters.product, page: 1, pageSize }, inventoryActor!);
       const products = [...(first.data?.products || [])];
@@ -224,7 +264,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const result = await getPortalInventoryProducts(tenantContext.tenantId, { search: filters.product, page, pageSize }, inventoryActor!);
         products.push(...(result.data?.products || []));
       }
-      if (total > pageSize * 100) return noStore(NextResponse.json({ error: "report_too_large_apply_product_filter" }, { status: 413 }));
+      if (total > pageSize * 100) {
+        setPhase("VALIDATION");
+        return finish(NextResponse.json({ error: "report_too_large_apply_product_filter" }, { status: 413 }), "report_too_large_apply_product_filter");
+      }
+      setPhase("TRANSFORM");
       const columns: OpsXlsxColumn[] = [
         { header: "SKU", key: "sku", width: 18 }, { header: "Producto", key: "product", width: 32, wrapText: true },
         { header: "Categoría", key: "category", width: 24, wrapText: true }, { header: "Stock", key: "stock", kind: "number", width: 14 },
@@ -235,9 +279,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         sku: product.sku || "", product: product.name, category: product.categoryName || "", stock: product.stock,
         state: humanize(product.stockState), location: product.locationName || "", lastMovementAt: product.lastMovementAt || ""
       }));
-      return await reportDownloadResponse("inventory", dateTag, filters, columns, rows, generatedAt);
+      return finish(await reportDownloadResponse("inventory", dateTag, filters, columns, rows, generatedAt, undefined, setPhase));
     }
     if (report === "movements") {
+      setPhase("QUERY");
       const pageSize = 100;
       const options = {
         search: filters.product,
@@ -256,7 +301,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const result = await getPortalInventoryMovements(tenantContext.tenantId, { ...options, page }, inventoryActor!);
         items.push(...(result.data?.items || []));
       }
-      if (total > pageSize * 100) return noStore(NextResponse.json({ error: "report_too_large_apply_date_or_product_filter" }, { status: 413 }));
+      if (total > pageSize * 100) {
+        setPhase("VALIDATION");
+        return finish(NextResponse.json({ error: "report_too_large_apply_date_or_product_filter" }, { status: 413 }), "report_too_large_apply_date_or_product_filter");
+      }
+      setPhase("TRANSFORM");
       const columns: OpsXlsxColumn[] = [
         { header: "Fecha", key: "createdAt", kind: "date", width: 22 }, { header: "Tipo", key: "type", width: 28 },
         { header: "SKU", key: "sku", width: 18 }, { header: "Producto", key: "product", width: 30, wrapText: true },
@@ -271,9 +320,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         quantityAfter: item.quantityAfter == null ? null : Number(item.quantityAfter), reason: item.reason || "",
         actor: item.actorName || "Usuario no identificado", location: item.locationName || "", lot: item.lotNumber || ""
       }));
-      return await reportDownloadResponse("movements", dateTag, filters, columns, rows, generatedAt);
+      return finish(await reportDownloadResponse("movements", dateTag, filters, columns, rows, generatedAt, undefined, setPhase));
     }
     if (report === "expirations") {
+      setPhase("QUERY");
       const result = await getPortalInventoryLots(tenantContext.tenantId, {
         search: filters.product,
         supplier: filters.supplier,
@@ -285,7 +335,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pageSize: 250
       }, inventoryActor!);
       const lots = result.data?.lots || [];
-      if (lots.length >= 250) return noStore(NextResponse.json({ error: "report_too_large_apply_expiration_product_or_supplier_filter" }, { status: 413 }));
+      if (lots.length >= 250) {
+        setPhase("VALIDATION");
+        return finish(NextResponse.json({ error: "report_too_large_apply_expiration_product_or_supplier_filter" }, { status: 413 }), "report_too_large_apply_expiration_product_or_supplier_filter");
+      }
+      setPhase("TRANSFORM");
       const columns: OpsXlsxColumn[] = [
         { header: "Producto", key: "product", width: 30, wrapText: true }, { header: "SKU", key: "sku", width: 18 },
         { header: "Lote", key: "lot", width: 20 }, { header: "Fecha de vencimiento", key: "expiresAt", kind: "dateOnly", width: 24 },
@@ -299,8 +353,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         daysRemaining: lot.daysUntilExpiration ?? null, quantity: lot.availableQuantity, state: humanize(lot.expirationStatus, expirationLabels),
         supplier: lot.supplierName || "", warehouse: lot.warehouseName || "", location: lot.locationName || ""
       }));
-      return await reportDownloadResponse("expirations", dateTag, filters, columns, rows, generatedAt);
+      return finish(await reportDownloadResponse("expirations", dateTag, filters, columns, rows, generatedAt, undefined, setPhase));
     }
+    setPhase("QUERY");
     const [conversationsResult, ordersResult, usersResult] = await Promise.all([
       report === "sales" && filters.format !== "json" ? Promise.resolve(null) : getPortalConversations(tenantContext.tenantId, { visibility: "active", channel: "all" }),
       report === "followups" ? Promise.resolve(null) : getPortalOrders(tenantContext.tenantId),
@@ -308,6 +363,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ]);
     const conversations = conversationsResult?.data?.conversations || [];
     const orders = ordersResult?.data?.orders || [];
+    setPhase("TRANSFORM");
     const sellerDirectory = (usersResult?.data?.users || [])
       .filter((user) => isOperationalPortalAssigneeUser(user))
       .map((user) => ({ id: String(user.id), name: String(user.name || "Vendedor") }));
@@ -332,7 +388,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           entry.revenue += Number(order.total || 0);
           bySeller.set(sellerId, entry);
         }
-        return noStore(NextResponse.json({
+        setPhase("RESPONSE");
+        return finish(NextResponse.json({
           summary: {
             operationCount: paidOrders.length,
             revenue: paidRevenue,
@@ -367,9 +424,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         price: Number(item.priceSnapshot || 0), subtotal: Number(item.priceSnapshot || 0) * Number(item.quantity || 0),
         currency: item.currencySnapshot || order.currency || ""
       })));
-      return await reportDownloadResponse("sales", dateTag, filters, columns, rows, generatedAt, sellerName, [
+      return finish(await reportDownloadResponse("sales", dateTag, filters, columns, rows, generatedAt, sellerName, setPhase, [
         { name: "Detalle de productos", columns: detailColumns, rows: productRows }
-      ]);
+      ]));
     } else if (report === "sellers") {
       const filteredLeads = filteredConversations(conversations, filters);
       const filteredSales = filteredOrders(orders, filters);
@@ -378,7 +435,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         averageTicket: seller.paidSalesCount ? seller.revenue / seller.paidSalesCount : 0
       }));
       if (filters.format === "json") {
-        return noStore(NextResponse.json({ sellers: sellerSummary }));
+        setPhase("RESPONSE");
+        return finish(NextResponse.json({ sellers: sellerSummary }));
       }
       const columns: OpsXlsxColumn[] = [
         { header: "Vendedor", key: "seller", width: 28 }, { header: "Leads activos", key: "activeLeads", kind: "number", width: 16 },
@@ -392,7 +450,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         overdueFollowUps: seller.overdueFollowUps, recoveryStarted72h: seller.recoveryStarted72h, salesCount: seller.salesCount,
         paidSalesCount: seller.paidSalesCount, revenue: Number(seller.revenue), currency: seller.currency
       }));
-      return await reportDownloadResponse("sellers", dateTag, filters, columns, rows, generatedAt, sellerName);
+      return finish(await reportDownloadResponse("sellers", dateTag, filters, columns, rows, generatedAt, sellerName, setPhase));
     } else {
       const columns: OpsXlsxColumn[] = [
         { header: "Cliente", key: "customer", width: 28, wrapText: true }, { header: "Vendedor", key: "seller", width: 24, wrapText: true },
@@ -411,15 +469,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             lastActivityAt: row.lastCommercialActivityAt || row.lastMessageAt || ""
           };
         });
-      return await reportDownloadResponse("followups", dateTag, filters, columns, rows, generatedAt, sellerName);
+      return finish(await reportDownloadResponse("followups", dateTag, filters, columns, rows, generatedAt, sellerName, setPhase));
     }
   } catch {
-    console.warn("ops_report_generation_failed", {
-      route: "/api/app/ops/reports/[report]",
-      report,
-      status: 502,
-      errorCode: "report_generation_failed"
-    });
-    return noStore(NextResponse.json({ error: "ops_report_generation_failed" }, { status: 502 }));
+    return finish(NextResponse.json({ error: "ops_report_generation_failed" }, { status: 502 }), "ops_report_generation_failed");
   }
 }

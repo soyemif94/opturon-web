@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentType, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -26,10 +26,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "@/components/ui/toast";
 import { isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
 import {
-  acquireOpsReportDownload,
   buildOpsReportUrl,
+  enqueueOpsReportDownload,
+  getOpsReportQueueServerSnapshot,
+  getOpsReportQueueSnapshot,
+  OPS_REPORT_EXPORT_TIMEOUT_MS,
   parseOpsReportDownloadResponse,
-  releaseOpsReportDownload,
+  subscribeToOpsReportQueue,
   withOpsReportFormat,
   type OpsReportDownloadFormat,
   type OpsReportType
@@ -1166,58 +1169,79 @@ function OpsReportsCenter({
 }
 
 function OpsReportDownloadButtons({ report, href, className }: { report: OpsReportType; href: string; className: string }) {
-  const [downloadingFormats, setDownloadingFormats] = useState<OpsReportDownloadFormat[]>([]);
-  const [failedFormats, setFailedFormats] = useState<OpsReportDownloadFormat[]>([]);
-  const inFlightRef = useRef(new Set<OpsReportDownloadFormat>());
+  const getXlsxSnapshot = () => getOpsReportQueueSnapshot(report, "xlsx");
+  const getCsvSnapshot = () => getOpsReportQueueSnapshot(report, "csv");
+  const xlsx = useSyncExternalStore(subscribeToOpsReportQueue, getXlsxSnapshot, getOpsReportQueueServerSnapshot);
+  const csv = useSyncExternalStore(subscribeToOpsReportQueue, getCsvSnapshot, getOpsReportQueueServerSnapshot);
 
-  async function downloadReport(format: OpsReportDownloadFormat) {
-    if (inFlightRef.current.has(format) || !acquireOpsReportDownload(report, format)) return;
-    inFlightRef.current.add(format);
-    setDownloadingFormats((current) => current.includes(format) ? current : [...current, format]);
-    setFailedFormats((current) => current.filter((failedFormat) => failedFormat !== format));
-    try {
-      const response = await fetch(withOpsReportFormat(href, format), { method: "GET", cache: "no-store", credentials: "same-origin" });
-      const { blob, filename } = await parseOpsReportDownloadResponse(response, format);
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = filename;
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-    } catch (error) {
-      const knownError = error && typeof error === "object" && "status" in error && "code" in error
-        ? error as { status?: number | null; code?: string }
-        : null;
-      console.warn("ops_report_download_failed", {
-        route: "/api/app/ops/reports/[report]",
-        report,
-        format,
-        status: knownError?.status ?? null,
-        errorCode: knownError?.code || "download_failed"
-      });
-      setFailedFormats((current) => current.includes(format) ? current : [...current, format]);
-    } finally {
-      inFlightRef.current.delete(format);
-      releaseOpsReportDownload(report, format);
-      setDownloadingFormats((current) => current.filter((activeFormat) => activeFormat !== format));
-    }
+  function downloadReport(format: OpsReportDownloadFormat) {
+    enqueueOpsReportDownload(report, format, async (setStage) => {
+      const requestId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+      const startedAt = performance.now();
+      let response: Response | null = null;
+      try {
+        response = await fetch(withOpsReportFormat(href, format), {
+          method: "GET",
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: { "x-ops-report-request-id": requestId },
+          signal: AbortSignal.timeout(OPS_REPORT_EXPORT_TIMEOUT_MS)
+        });
+        const { blob, filename } = await parseOpsReportDownloadResponse(response, format);
+        setStage("downloading");
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      } catch (error) {
+        const knownError = error && typeof error === "object" && "status" in error
+          ? error as { status?: number | null; safeErrorCode?: string; requestId?: string | null; contentType?: string | null; phase?: string | null }
+          : null;
+        const timeout = error && typeof error === "object" && "name" in error && (error.name === "TimeoutError" || error.name === "AbortError");
+        console.warn("ops_report_download_failed", {
+          requestId: knownError?.requestId || requestId,
+          reportType: report,
+          status: knownError?.status ?? response?.status ?? null,
+          durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+          contentType: knownError?.contentType || response?.headers.get("content-type") || null,
+          safeErrorCode: knownError?.safeErrorCode || (timeout ? "request_timeout" : "download_failed"),
+          route: "/api/app/ops/reports/[report]",
+          phase: knownError?.phase || "DOWNLOAD"
+        });
+        throw error;
+      }
+    });
   }
+
+  const isBusy = (state: string) => state === "queued" || state === "generating" || state === "downloading";
+  const label = (format: OpsReportDownloadFormat, state: typeof xlsx) => {
+    const name = format === "xlsx" ? "Excel" : "CSV";
+    if (state.state === "queued") return `En cola (${state.queuePosition || 1})`;
+    if (state.state === "generating") return `Generando ${name}...`;
+    if (state.state === "downloading") return `Descargando ${name}...`;
+    if (state.state === "error") return format === "xlsx" ? "Reintentar" : "Reintentar CSV";
+    return format === "xlsx" ? "Descargar Excel" : "Descargar CSV";
+  };
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-      <button type="button" onClick={() => void downloadReport("xlsx")} disabled={downloadingFormats.includes("xlsx")} aria-busy={downloadingFormats.includes("xlsx")} className={`${className} disabled:cursor-wait disabled:opacity-60`}>
+      <button type="button" onClick={() => downloadReport("xlsx")} disabled={isBusy(xlsx.state)} aria-busy={isBusy(xlsx.state)} className={`${className} disabled:cursor-wait disabled:opacity-60`}>
         <Download className="h-4 w-4" aria-hidden="true" />
-        {downloadingFormats.includes("xlsx") ? "Generando Excel..." : failedFormats.includes("xlsx") ? "Reintentar" : "Descargar Excel"}
+        {label("xlsx", xlsx)}
       </button>
-      <button type="button" onClick={() => void downloadReport("csv")} disabled={downloadingFormats.includes("csv")} aria-busy={downloadingFormats.includes("csv")} className="inline-flex h-10 items-center justify-center rounded-xl border border-[color:var(--border)] px-3 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60">
-        {downloadingFormats.includes("csv") ? "Generando CSV..." : failedFormats.includes("csv") ? "Reintentar CSV" : "Descargar CSV"}
+      <button type="button" onClick={() => downloadReport("csv")} disabled={isBusy(csv.state)} aria-busy={isBusy(csv.state)} className="inline-flex h-10 items-center justify-center rounded-xl border border-[color:var(--border)] px-3 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60">
+        {label("csv", csv)}
       </button>
       </div>
-      {failedFormats.length > 0 ? <p role="alert" className="text-sm text-red-300">No pudimos generar el informe. Intentá nuevamente.</p> : null}
+      {xlsx.state === "error" || csv.state === "error" ? <p role="alert" className="text-sm text-red-300">No pudimos generar el informe. Intentá nuevamente.</p> : null}
     </div>
   );
 }
