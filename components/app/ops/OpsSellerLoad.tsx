@@ -40,7 +40,7 @@ export function OpsSellerLoad({
       <CardContent className="space-y-3 pt-0">
         {items.length === 0 ? (
           <div className="rounded-2xl border border-[color:var(--border)] bg-surface/55 px-4 py-5 text-sm text-muted">
-            Todavia no hay leads asignados a vendedores.
+            No hay información de equipo para los filtros seleccionados.
           </div>
         ) : (
           items.map((item) => {

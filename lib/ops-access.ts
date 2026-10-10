@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { OPS_ACCESS_COOKIE, OPS_ACCESS_MAX_AGE_SECONDS } from "./ops/ops-cookie";
 
-export const OPS_ACCESS_COOKIE = "ops_access";
-export const OPS_ACCESS_MAX_AGE_SECONDS = 60 * 60 * 12;
+export { OPS_ACCESS_COOKIE, OPS_ACCESS_MAX_AGE_SECONDS } from "./ops/ops-cookie";
 type CookieReader = { get(name: string): { value?: string } | undefined };
 
 function getOpsPassword() {

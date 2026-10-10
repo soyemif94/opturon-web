@@ -8,11 +8,13 @@ import {
   getPortalInventoryMovements,
   getPortalInventoryProducts,
   getPortalOrders,
+  getPortalUsers,
   isBackendConfigured
 } from "@/lib/api";
 import { hasOpsAccessCookie } from "@/lib/ops-access";
 import { buildCsv, filterBySeller, isWithinReportDateRange, summarizeSellerRows } from "@/lib/ops/reporting";
 import { isColdLead, isInRecovery } from "@/lib/ops/commercial-state";
+import { isOperationalPortalAssigneeUser } from "@/lib/portal-users";
 import { getPortalInventoryReadActor, requireAppModuleApi, resolveAppTenant } from "@/lib/saas/access";
 
 const filterSchema = z.object({
@@ -168,12 +170,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const rows = lots.map((lot) => [lot.productName || "", lot.productSku || "", lot.lotNumber || "", lot.expiresAt || "", lot.expirationStatus, lot.daysUntilExpiration ?? "", lot.availableQuantity, lot.supplierName || "", lot.warehouseName || "", lot.locationName || "", lot.unitCost ?? ""]);
       return csvResponse("vencimientos", filters.dateFrom || new Date().toISOString().slice(0, 10), buildCsv(["producto", "sku", "lote", "vence", "estado", "días_hasta_vencer", "cantidad_disponible", "proveedor", "depósito", "ubicación", "costo_unitario"], rows));
     }
-    const [conversationsResult, ordersResult] = await Promise.all([
+    const [conversationsResult, ordersResult, usersResult] = await Promise.all([
       report === "sales" && filters.format !== "json" ? Promise.resolve(null) : getPortalConversations(tenantContext.tenantId, { visibility: "active", channel: "all" }),
-      report === "followups" ? Promise.resolve(null) : getPortalOrders(tenantContext.tenantId)
+      report === "followups" ? Promise.resolve(null) : getPortalOrders(tenantContext.tenantId),
+      report === "sellers" ? getPortalUsers(tenantContext.tenantId) : Promise.resolve(null)
     ]);
     const conversations = conversationsResult?.data?.conversations || [];
     const orders = ordersResult?.data?.orders || [];
+    const sellerDirectory = (usersResult?.data?.users || [])
+      .filter((user) => isOperationalPortalAssigneeUser(user))
+      .map((user) => ({ id: String(user.id), name: String(user.name || "Vendedor") }));
     const dateTag = filters.dateFrom || new Date().toISOString().slice(0, 7);
     let filename = `opturon-${report}-${dateTag}.csv`;
     let csv: string;
@@ -219,7 +225,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     } else if (report === "sellers") {
       const filteredLeads = filteredConversations(conversations, filters);
       const filteredSales = filteredOrders(orders, filters);
-      const sellerSummary = summarizeSellerRows(filteredLeads, filteredSales).map((seller) => ({
+      const sellerSummary = summarizeSellerRows(filteredLeads, filteredSales, new Date(), sellerDirectory).map((seller) => ({
         ...seller,
         averageTicket: seller.paidSalesCount ? seller.revenue / seller.paidSalesCount : 0
       }));
@@ -254,6 +260,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return csvResponse(filename.replace(/^opturon-/, "").replace(/-.*$/, ""), dateTag, csv);
   } catch {
+    console.warn("ops_report_generation_failed", {
+      route: "/api/app/ops/reports/[report]",
+      report,
+      status: 502,
+      errorCode: "report_generation_failed"
+    });
     return noStore(NextResponse.json({ error: "ops_report_generation_failed" }, { status: 502 }));
   }
 }

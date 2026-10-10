@@ -3,10 +3,9 @@ import { requireAppApi } from "@/lib/saas/access";
 import {
   createOpsAccessToken,
   isOpsAccessConfigured,
-  OPS_ACCESS_COOKIE,
-  OPS_ACCESS_MAX_AGE_SECONDS,
   validateOpsPassword
 } from "@/lib/ops-access";
+import { OPS_ACCESS_COOKIE, OPS_ACCESS_COOKIE_PATHS, opsAccessCookieOptions } from "@/lib/ops/ops-cookie";
 
 export async function POST(request: Request) {
   const auth = await requireAppApi();
@@ -29,15 +28,9 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set({
-    name: OPS_ACCESS_COOKIE,
-    value: token,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/app/ops",
-    maxAge: OPS_ACCESS_MAX_AGE_SECONDS
-  });
+  for (const path of Object.values(OPS_ACCESS_COOKIE_PATHS)) {
+    response.cookies.set({ name: OPS_ACCESS_COOKIE, value: token, ...opsAccessCookieOptions(path) });
+  }
 
   return response;
 }

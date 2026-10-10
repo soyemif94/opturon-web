@@ -25,6 +25,7 @@ import type { PortalSellerMetrics } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 import { isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
+import { buildOpsReportUrl, OpsCsvDownloadError, parseOpsCsvDownloadResponse, type OpsReportType } from "@/lib/ops/report-download";
 import { formatMoney } from "@/lib/billing";
 
 type InboxListResponse = {
@@ -58,6 +59,39 @@ type SalesSnapshot = {
   summary?: { operationCount?: number; revenue?: number; averageTicket?: number; openPipelineCount?: number; currency?: string };
   bySeller?: Array<{ sellerId: string; sellerName: string; paidOperations: number; revenue: number; currency: string }>;
 };
+
+class OpsApiReportError extends Error {
+  constructor(readonly code: string, readonly status: number | null) {
+    super(code);
+    this.name = "OpsApiReportError";
+  }
+}
+
+async function fetchOpsReportJson(url: string, report: "sales" | "sellers", signal: AbortSignal) {
+  const response = await fetch(url, { cache: "no-store", credentials: "same-origin", signal });
+  if (!response.ok) throw new OpsApiReportError("request_failed", response.status);
+  const data = await response.json().catch(() => null);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new OpsApiReportError("invalid_response", response.status);
+  }
+  if (report === "sales" && (!data.summary || typeof data.summary !== "object")) {
+    throw new OpsApiReportError("invalid_response_shape", response.status);
+  }
+  if (report === "sellers" && !Array.isArray(data.sellers)) {
+    throw new OpsApiReportError("invalid_response_shape", response.status);
+  }
+  return data as Record<string, any>;
+}
+
+function logOpsReportFailure(report: "sales" | "sellers", error: unknown) {
+  const knownError = error instanceof OpsApiReportError ? error : null;
+  console.warn("ops_report_data_load_failed", {
+    route: "/api/app/ops/reports/[report]",
+    report,
+    status: knownError?.status ?? null,
+    errorCode: knownError?.code || "request_failed"
+  });
+}
 
 const defaultSellerMetrics: PortalSellerMetrics = {
   salesCriteria: {
@@ -125,6 +159,7 @@ export function OpsDashboard({
   const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
   const [focusedSection, setFocusedSection] = useState<OpsAlert["target"] | null>(null);
   const [activeTab, setActiveTab] = useState<OpsTab>("summary");
+  const [opsLoadError, setOpsLoadError] = useState(false);
   const [filterSellerId, setFilterSellerId] = useState("");
   const [filterStage, setFilterStage] = useState("");
   const [filterCondition, setFilterCondition] = useState("all");
@@ -136,13 +171,13 @@ export function OpsDashboard({
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [salesSnapshot, setSalesSnapshot] = useState<SalesSnapshot | null>(null);
-  const [salesRequested, setSalesRequested] = useState(false);
   const [salesLoading, setSalesLoading] = useState(false);
   const [salesError, setSalesError] = useState(false);
+  const [salesRetryCount, setSalesRetryCount] = useState(0);
   const [sellerReport, setSellerReport] = useState<OpsSellerLoadItem[] | null>(null);
-  const [sellerReportRequested, setSellerReportRequested] = useState(false);
   const [sellerReportLoading, setSellerReportLoading] = useState(false);
   const [sellerReportError, setSellerReportError] = useState(false);
+  const [sellerReportRetryCount, setSellerReportRetryCount] = useState(0);
   const kpisRef = useRef<HTMLDivElement | null>(null);
   const unassignedRef = useRef<HTMLDivElement | null>(null);
   const overdueRef = useRef<HTMLDivElement | null>(null);
@@ -152,10 +187,15 @@ export function OpsDashboard({
   const urgentRef = useRef<HTMLDivElement | null>(null);
   const coldRef = useRef<HTMLDivElement | null>(null);
   const sellerLoadRef = useRef<HTMLDivElement | null>(null);
+  const salesReportUrl = reportHref("sales");
+  const sellerReportUrl = reportHref("sellers");
 
   async function loadOpsData(options?: { silent?: boolean }) {
     if (!backendReady) return;
-    if (!options?.silent) setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+      setOpsLoadError(false);
+    }
     try {
       const inboxQuery = new URLSearchParams({ filter: "all", visibility: "active", channel: filterChannel });
       if (filterSellerId) inboxQuery.set("sellerId", filterSellerId);
@@ -170,19 +210,24 @@ export function OpsDashboard({
         !readOnly && reportModules.orders ? fetch("/api/app/orders/seller-metrics", { cache: "no-store" }) : Promise.resolve(null)
       ]);
 
-      const inboxJson = (await inboxResponse.json().catch(() => null)) as InboxListResponse | null;
-      const metaJson = (await metaResponse.json().catch(() => null)) as OrdersMetaResponse | null;
-      const sellerMetricsJson = sellerMetricsHttp ? (await sellerMetricsHttp.json().catch(() => null)) as SellerMetricsResponse | PortalSellerMetrics | null : null;
-
       if (!inboxResponse.ok) {
-        throw new Error("ops_inbox_failed");
+        throw new OpsApiReportError("inbox_request_failed", inboxResponse.status);
       }
       if (!metaResponse.ok) {
-        throw new Error("ops_meta_failed");
+        throw new OpsApiReportError("orders_meta_request_failed", metaResponse.status);
       }
 
-      setConversations(Array.isArray(inboxJson?.conversations) ? inboxJson.conversations : []);
-      setSellers(Array.isArray(metaJson?.sellers) ? metaJson.sellers : []);
+      const [inboxJson, metaJson, sellerMetricsJson] = await Promise.all([
+        inboxResponse.json().catch(() => null) as Promise<InboxListResponse | null>,
+        metaResponse.json().catch(() => null) as Promise<OrdersMetaResponse | null>,
+        sellerMetricsHttp ? sellerMetricsHttp.json().catch(() => null) as Promise<SellerMetricsResponse | PortalSellerMetrics | null> : Promise.resolve(null)
+      ]);
+      if (!Array.isArray(inboxJson?.conversations) || !Array.isArray(metaJson?.sellers)) {
+        throw new OpsApiReportError("invalid_response_shape", null);
+      }
+
+      setConversations(inboxJson.conversations);
+      setSellers(metaJson.sellers);
       if (sellerMetricsHttp?.ok) {
         const payload = sellerMetricsJson && "data" in sellerMetricsJson ? sellerMetricsJson.data : sellerMetricsJson;
         setSellerMetrics(payload && typeof payload === "object" ? { ...defaultSellerMetrics, ...payload } : defaultSellerMetrics);
@@ -190,7 +235,14 @@ export function OpsDashboard({
         setSellerMetrics(defaultSellerMetrics);
       }
     } catch (error) {
-      toast.error("No se pudo cargar OPS", error instanceof Error ? error.message : "unknown_error");
+      setOpsLoadError(true);
+      const knownError = error instanceof OpsApiReportError ? error : null;
+      console.warn("ops_data_load_failed", {
+        route: "/api/app/inbox,/api/app/orders/meta",
+        status: knownError?.status ?? null,
+        errorCode: knownError?.code || "request_failed"
+      });
+      toast.error("No pudimos cargar OPS", "Intentá nuevamente.");
     } finally {
       if (!options?.silent) setLoading(false);
     }
@@ -206,68 +258,63 @@ export function OpsDashboard({
   }, [backendReady, filterSellerId, filterStage, filterCondition, filterChannel, filterCustomer, filterDateFrom, filterDateTo]);
 
   useEffect(() => {
-    if (activeTab !== "sales" || readOnly || !backendReady || !reportModules.sales || salesRequested) return;
-    let cancelled = false;
-    setSalesRequested(true);
+    if (activeTab !== "sales" || readOnly || !backendReady || !reportModules.sales) return;
+    const controller = new AbortController();
+    setSalesSnapshot(null);
+    setSalesError(false);
     setSalesLoading(true);
-    const salesUrl = reportHref("sales");
-    fetch(`${salesUrl}${salesUrl.includes("?") ? "&" : "?"}format=json`, { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error("sales_report_unavailable");
-        if (!cancelled) setSalesSnapshot(data as SalesSnapshot);
+    fetchOpsReportJson(`${salesReportUrl}${salesReportUrl.includes("?") ? "&" : "?"}format=json`, "sales", controller.signal)
+      .then((data) => {
+        setSalesSnapshot(data as SalesSnapshot);
       })
-      .catch(() => {
-        if (!cancelled) setSalesError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setSalesLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [activeTab, backendReady, readOnly, reportModules.sales, salesRequested]);
-
-  useEffect(() => {
-    if (activeTab !== "team" || readOnly || !backendReady || !reportModules.orders || sellerReportRequested) return;
-    let cancelled = false;
-    setSellerReportRequested(true);
-    setSellerReportLoading(true);
-    const url = reportHref("sellers");
-    fetch(`${url}${url.includes("?") ? "&" : "?"}format=json`, { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error("seller_report_unavailable");
-        if (!cancelled) {
-          const items = Array.isArray(data?.sellers) ? data.sellers : [];
-          setSellerReport(items.map((item: Record<string, unknown>) => ({
-            sellerUserId: String(item.sellerUserId || ""),
-            sellerName: String(item.sellerName || "Vendedor"),
-            totalActiveLeads: Number(item.activeLeads || 0),
-            newLeads: Number(item.newLeads || 0),
-            overdueLeads: Number(item.overdueFollowUps || 0),
-            followUpLeads: Number(item.followUps || 0),
-            coldLeads: Number(item.coldLeads || 0),
-            recoveryLeads: Number(item.recoveryStarted72h || 0),
-            totalOrders: Number(item.salesCount || 0),
-            totalPaidOrders: Number(item.paidSalesCount || 0),
-            totalRevenue: Number(item.revenue || 0),
-            averageTicket: Number(item.averageTicket || 0),
-            currency: String(item.currency || "ARS")
-          })));
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          logOpsReportFailure("sales", error);
+          setSalesError(true);
         }
       })
-      .catch(() => { if (!cancelled) setSellerReportError(true); })
-      .finally(() => { if (!cancelled) setSellerReportLoading(false); });
-    return () => { cancelled = true; };
-  }, [activeTab, backendReady, readOnly, reportModules.orders, sellerReportRequested]);
+      .finally(() => {
+        if (!controller.signal.aborted) setSalesLoading(false);
+      });
+    return () => controller.abort();
+  }, [activeTab, backendReady, readOnly, reportModules.sales, salesReportUrl, salesRetryCount]);
 
   useEffect(() => {
-    setSalesSnapshot(null);
-    setSalesRequested(false);
-    setSalesError(false);
+    if (activeTab !== "team" || readOnly || !backendReady || !reportModules.orders) return;
+    const controller = new AbortController();
     setSellerReport(null);
-    setSellerReportRequested(false);
     setSellerReportError(false);
-  }, [filterSellerId, filterStage, filterChannel, filterCustomer, filterProduct, filterDateFrom, filterDateTo]);
+    setSellerReportLoading(true);
+    fetchOpsReportJson(`${sellerReportUrl}${sellerReportUrl.includes("?") ? "&" : "?"}format=json`, "sellers", controller.signal)
+      .then((data) => {
+        const items = data.sellers as Array<Record<string, unknown>>;
+        setSellerReport(items.map((item) => ({
+          sellerUserId: String(item.sellerUserId || ""),
+          sellerName: String(item.sellerName || "Vendedor"),
+          totalActiveLeads: Number(item.activeLeads || 0),
+          newLeads: Number(item.newLeads || 0),
+          overdueLeads: Number(item.overdueFollowUps || 0),
+          followUpLeads: Number(item.followUps || 0),
+          coldLeads: Number(item.coldLeads || 0),
+          recoveryLeads: Number(item.recoveryStarted72h || 0),
+          totalOrders: Number(item.salesCount || 0),
+          totalPaidOrders: Number(item.paidSalesCount || 0),
+          totalRevenue: Number(item.revenue || 0),
+          averageTicket: Number(item.averageTicket || 0),
+          currency: String(item.currency || "ARS")
+        })));
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          logOpsReportFailure("sellers", error);
+          setSellerReportError(true);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSellerReportLoading(false);
+      });
+    return () => controller.abort();
+  }, [activeTab, backendReady, readOnly, reportModules.orders, sellerReportUrl, sellerReportRetryCount]);
 
   const activeConversations = useMemo(() => conversations.filter((row) => isActiveLead(row)), [conversations]);
   const now = new Date();
@@ -581,19 +628,19 @@ export function OpsDashboard({
     }
   ] as const;
 
-  function reportHref(report: "sales" | "sellers" | "followups" | "inventory" | "movements" | "expirations") {
-    const params = new URLSearchParams();
-    if (filterDateFrom) params.set("dateFrom", filterDateFrom);
-    if (filterDateTo) params.set("dateTo", filterDateTo);
-    if (filterSellerId) params.set("sellerId", filterSellerId);
-    if (filterStage) params.set("stage", filterStage);
-    if (filterChannel !== "all") params.set("channel", filterChannel);
-    if (report !== "sales" && filterCondition !== "all") params.set("operationalState", filterCondition);
-    if (filterCustomer.trim()) params.set("customer", filterCustomer.trim());
-    if (filterProduct.trim()) params.set("product", filterProduct.trim());
-    if (filterSupplier.trim() && report === "expirations") params.set("supplier", filterSupplier.trim());
-    if (filterWarehouse.trim() && report === "expirations") params.set("warehouse", filterWarehouse.trim());
-    return `/api/app/ops/reports/${report}${params.size ? `?${params.toString()}` : ""}`;
+  function reportHref(report: OpsReportType) {
+    return buildOpsReportUrl(report, {
+      dateFrom: filterDateFrom,
+      dateTo: filterDateTo,
+      sellerId: filterSellerId,
+      stage: filterStage,
+      channel: filterChannel,
+      operationalState: filterCondition,
+      customer: filterCustomer,
+      product: filterProduct,
+      supplier: filterSupplier,
+      warehouse: filterWarehouse
+    });
   }
 
   const tabs: Array<{ id: OpsTab; label: string; count?: number }> = [
@@ -682,6 +729,17 @@ export function OpsDashboard({
           </> : null}
         </div>
       </div>
+
+      {opsLoadError ? (
+        <Card role="alert" className="border-red-400/25 bg-red-400/[0.05]">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+            <span>No pudimos cargar la información de OPS. Intentá nuevamente.</span>
+            <button type="button" onClick={() => void loadOpsData()} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold" disabled={loading}>
+              {loading ? "Reintentando…" : "Reintentar"}
+            </button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {activeTab === "summary" ? <>
       <section ref={kpisRef} className={sectionClassName(focusedSection === "kpis", "grid gap-3 md:grid-cols-2 xl:grid-cols-6")}>
@@ -913,7 +971,7 @@ export function OpsDashboard({
             <div ref={sellerLoadRef} className={sectionClassName(focusedSection === "seller_load")}>
               {!readOnly && reportModules.orders ? (
                 sellerReportError
-                  ? <Card><CardContent className="p-5 text-sm text-muted">No se pudo cargar el detalle de vendedor con los filtros actuales.</CardContent></Card>
+                  ? <Card role="alert"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm text-muted"><span>No pudimos cargar la información del equipo.</span><button type="button" onClick={() => setSellerReportRetryCount((count) => count + 1)} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold text-text">Reintentar</button></CardContent></Card>
                   : sellerReportLoading || !sellerReport
                     ? <Card><CardContent className="p-5 text-sm text-muted">Cargando el informe de equipo…</CardContent></Card>
                     : <OpsSellerLoad items={sellerReport} />
@@ -963,7 +1021,7 @@ export function OpsDashboard({
       : null}
 
       {activeTab === "sales" ? (
-        <SalesOverview snapshot={salesSnapshot} loading={salesLoading} error={salesError} enabled={reportModules.sales} reportHref={reportHref("sales")} />
+        <SalesOverview snapshot={salesSnapshot} loading={salesLoading} error={salesError} enabled={reportModules.sales} reportHref={salesReportUrl} onRetry={() => setSalesRetryCount((count) => count + 1)} />
       ) : null}
 
       {activeTab === "reports" ? (
@@ -985,13 +1043,15 @@ function SalesOverview({
   loading,
   error,
   enabled,
-  reportHref
+  reportHref,
+  onRetry
 }: {
   snapshot: SalesSnapshot | null;
   loading: boolean;
   error: boolean;
   enabled: boolean;
   reportHref: string;
+  onRetry: () => void;
 }) {
   if (!enabled) return <Card><CardContent className="p-5 text-sm text-muted">El módulo de ventas no está habilitado para este espacio.</CardContent></Card>;
   const currency = snapshot?.summary?.currency || "ARS";
@@ -1000,11 +1060,11 @@ function SalesOverview({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h2 className="text-2xl font-semibold">Ventas del período</h2><p className="mt-1 text-sm text-muted">Pedidos cobrados y pipeline abiertos, tenant-scoped y filtrados en servidor.</p></div>
         <div className="flex gap-2">
-          <a href={reportHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Descargar CSV</a>
+          <OpsCsvDownloadButton report="sales" href={reportHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white" />
           <Link href="/app/sales" className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--border)] px-4 text-sm font-semibold">Abrir ventas</Link>
         </div>
       </div>
-      {error ? <Card><CardContent className="p-5 text-sm text-muted">No se pudo cargar el resumen. El resto de OPS y los informes disponibles siguen operativos.</CardContent></Card> : null}
+      {error ? <Card role="alert"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm text-muted"><span>No pudimos cargar el resumen de ventas.</span><button type="button" onClick={onRetry} className="rounded-xl border border-[color:var(--border)] px-3 py-2 font-semibold text-text">Reintentar</button></CardContent></Card> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard icon={BarChart3} label="Operaciones cobradas" value={Number(snapshot?.summary?.operationCount || 0)} helper="Pedidos pagados no cancelados" loading={loading} />
         <Card className="border-white/6 bg-card/90"><CardContent className="p-4"><p className="text-[11px] uppercase tracking-[0.18em] text-muted">Importe cobrado</p><p className="mt-2 text-2xl font-semibold">{loading ? "…" : formatMoney(Number(snapshot?.summary?.revenue || 0), currency)}</p><p className="mt-1 text-sm text-muted">Según pedidos reales del período</p></CardContent></Card>
@@ -1040,16 +1100,16 @@ function OpsReportsCenter({
 }) {
   const reports = [
     ...(modules.sales && modules.orders ? [
-      { title: "Ventas y operaciones", description: "Operaciones, responsable, cliente, canal, estado, importe y productos.", href: reportHrefs.sales }
+      { id: "sales" as const, title: "Ventas y operaciones", description: "Operaciones, responsable, cliente, canal, estado, importe y productos.", href: reportHrefs.sales }
     ] : []),
     ...(modules.sales && modules.orders ? [
-      { title: "Rendimiento por vendedor", description: "Leads activos, nuevos, seguimientos, recuperaciones y ventas cobradas.", href: reportHrefs.sellers }
+      { id: "sellers" as const, title: "Rendimiento por vendedor", description: "Leads activos, nuevos, seguimientos, recuperaciones y ventas cobradas.", href: reportHrefs.sellers }
     ] : []),
-    { title: "Actividad y seguimientos", description: "Fechas de próxima acción, cumplimiento y responsable; sin teléfonos ni correos.", href: reportHrefs.followups },
+    { id: "followups" as const, title: "Actividad y seguimientos", description: "Fechas de próxima acción, cumplimiento y responsable; sin teléfonos ni correos.", href: reportHrefs.followups },
     ...(modules.inventory ? [
-      { title: "Inventario actual", description: "Stock por producto, SKU, categoría y ubicación según existencias reales.", href: reportHrefs.inventory },
-      { title: "Movimientos de inventario", description: "Entradas, salidas y ajustes con fecha, producto, cantidad, motivo y actor.", href: reportHrefs.movements },
-      { title: "Lotes y vencimientos", description: "Lotes persistidos y estados de vencimiento; exportación limitada a 250 filas por descarga.", href: reportHrefs.expirations }
+      { id: "inventory" as const, title: "Inventario actual", description: "Stock por producto, SKU, categoría y ubicación según existencias reales.", href: reportHrefs.inventory },
+      { id: "movements" as const, title: "Movimientos de inventario", description: "Entradas, salidas y ajustes con fecha, producto, cantidad, motivo y actor.", href: reportHrefs.movements },
+      { id: "expirations" as const, title: "Lotes y vencimientos", description: "Lotes persistidos y estados de vencimiento; exportación limitada a 250 filas por descarga.", href: reportHrefs.expirations }
     ] : [])
   ];
   const destinations = [
@@ -1078,7 +1138,7 @@ function OpsReportsCenter({
               <CardContent className="flex h-full flex-col p-5">
                 <h3 className="font-semibold">{report.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-6 text-muted">{report.description}</p>
-                <a href={report.href} className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Descargar CSV</a>
+                <OpsCsvDownloadButton report={report.id} href={report.href} className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white" />
               </CardContent>
             </Card>
           ))}
@@ -1092,6 +1152,51 @@ function OpsReportsCenter({
         </CardContent>
       </Card>
       <p className="text-xs text-muted">XLSX/PDF ejecutivos y reportes programados quedan diferidos; no se simulan datos ni variaciones sin fuente histórica confiable.</p>
+    </div>
+  );
+}
+
+function OpsCsvDownloadButton({ report, href, className }: { report: OpsReportType; href: string; className: string }) {
+  const [downloading, setDownloading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function downloadReport() {
+    if (downloading) return;
+    setDownloading(true);
+    setFailed(false);
+    try {
+      const response = await fetch(href, { method: "GET", cache: "no-store", credentials: "same-origin" });
+      const { blob, filename } = await parseOpsCsvDownloadResponse(response);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (error) {
+      const knownError = error instanceof OpsCsvDownloadError ? error : null;
+      console.warn("ops_report_download_failed", {
+        route: "/api/app/ops/reports/[report]",
+        report,
+        status: knownError?.status ?? null,
+        errorCode: knownError?.code || "download_failed"
+      });
+      setFailed(true);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <button type="button" onClick={() => void downloadReport()} disabled={downloading} aria-busy={downloading} className={`${className} disabled:cursor-wait disabled:opacity-60`}>
+        <Download className="h-4 w-4" aria-hidden="true" />
+        {downloading ? "Generando CSV…" : failed ? "Reintentar descarga" : "Descargar CSV"}
+      </button>
+      {failed ? <p role="alert" className="text-sm text-red-300">No pudimos generar el informe. Intentá nuevamente.</p> : null}
     </div>
   );
 }

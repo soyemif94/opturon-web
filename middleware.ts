@@ -10,6 +10,7 @@ import {
   partnerPublicPathForInternalPath
 } from "@/lib/partners-portal";
 import { isStrictPartnerIdentity } from "@/lib/auth-identity";
+import { OPS_ACCESS_COOKIE, OPS_ACCESS_COOKIE_PATHS, opsAccessCookieOptions } from "@/lib/ops/ops-cookie";
 
 const STAFF_ROLES = new Set(["superadmin", "ops_admin", "sales_rep", "support_agent"]);
 const AUTH_COOKIE_NAMES = [
@@ -147,7 +148,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/app", request.url));
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  const isOpsUiPath = path === OPS_ACCESS_COOKIE_PATHS.page || path.startsWith(`${OPS_ACCESS_COOKIE_PATHS.page}/`);
+  const existingOpsToken = isOpsUiPath ? request.cookies.get(OPS_ACCESS_COOKIE)?.value : undefined;
+  if (existingOpsToken) {
+    const expiresAt = Number(existingOpsToken.split(".", 1)[0]);
+    const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000);
+    if (Number.isFinite(expiresAt) && remainingSeconds > 0) {
+      response.cookies.set({
+        name: OPS_ACCESS_COOKIE,
+        value: existingOpsToken,
+        ...opsAccessCookieOptions(OPS_ACCESS_COOKIE_PATHS.api),
+        maxAge: Math.min(remainingSeconds, opsAccessCookieOptions(OPS_ACCESS_COOKIE_PATHS.api).maxAge)
+      });
+    }
+  }
+
+  return response;
 }
 
 export const config = {

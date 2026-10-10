@@ -25,6 +25,8 @@ export function filterBySeller<T extends { sellerUserId?: string | null }>(rows:
   return sellerId ? rows.filter((row) => row.sellerUserId === sellerId) : rows;
 }
 
+export type SellerDirectoryEntry = { id: string; name?: string | null };
+
 export function summarizeSellerRows(
   conversations: Array<{
     assignedSellerUserId?: string | null;
@@ -48,7 +50,8 @@ export function summarizeSellerRows(
     orderStatus?: string;
     createdAt?: string;
   }>,
-  now = new Date()
+  now = new Date(),
+  sellerDirectory: SellerDirectoryEntry[] = []
 ) {
   const bySeller = new Map<string, {
     sellerUserId: string;
@@ -73,6 +76,10 @@ export function summarizeSellerRows(
     return row;
   };
   const nowMs = now.getTime();
+  for (const seller of sellerDirectory) {
+    const sellerId = String(seller.id || "").trim();
+    if (sellerId) rowFor(sellerId, seller.name);
+  }
   for (const conversation of conversations) {
     const sellerId = String(conversation.assignedSellerUserId || "").trim();
     if (!sellerId || conversation.leadStatus === "CLOSED") continue;

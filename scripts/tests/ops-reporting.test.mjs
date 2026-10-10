@@ -32,6 +32,24 @@ assert.equal(sellers.find((item) => item.sellerUserId === "seller-a").coldLeads,
 assert.equal(sellers.find((item) => item.sellerUserId === "seller-a").revenue, 1200, "only paid orders count toward collected revenue");
 assert.equal(sellers.find((item) => item.sellerUserId === "seller-b").recoveryStarted72h, 1);
 
+const directoryOnlySeller = summarizeSellerRows([], [], now, [{ id: "seller-c", name: "Cora" }]);
+assert.equal(directoryOnlySeller.length, 1, "an operational seller remains visible with zero current leads or sales");
+assert.deepEqual(directoryOnlySeller[0], {
+  sellerUserId: "seller-c",
+  sellerName: "Cora",
+  activeLeads: 0,
+  newLeads: 0,
+  followUps: 0,
+  overdueFollowUps: 0,
+  recoveryStarted72h: 0,
+  coldLeads: 0,
+  salesCount: 0,
+  paidSalesCount: 0,
+  revenue: 0,
+  currency: "ARS"
+});
+assert.equal(summarizeSellerRows([], [], now, []).length, 0, "an empty operational directory yields the team empty state");
+
 const inboxRoute = readFileSync(join(root, "app/api/app/inbox/route.ts"), "utf8");
 const exportRoute = readFileSync(join(root, "app/api/app/ops/reports/[report]/route.ts"), "utf8");
 assert.match(inboxRoute, /sellerId: z\.string\(\)\.optional\(\)/);
