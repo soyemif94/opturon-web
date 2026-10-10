@@ -17,8 +17,8 @@ export function escapeCsvCell(value: unknown) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-export function buildCsv(headers: string[], rows: Array<Array<unknown>>) {
-  return [headers, ...rows].map((row) => row.map(escapeCsvCell).join(",")).join("\r\n") + "\r\n";
+export function buildCsv(headers: string[], rows: Array<Array<unknown>>, delimiter = ",") {
+  return [headers, ...rows].map((row) => row.map(escapeCsvCell).join(delimiter)).join("\r\n") + "\r\n";
 }
 
 export function filterBySeller<T extends { sellerUserId?: string | null }>(rows: T[], sellerId?: string) {

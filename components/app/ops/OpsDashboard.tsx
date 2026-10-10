@@ -25,7 +25,15 @@ import type { PortalSellerMetrics } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 import { isActiveCommercialFollowUp, isColdLead, isInRecovery, isRecentlyCompletedFollowUp } from "@/lib/ops/commercial-state";
-import { buildOpsReportUrl, OpsCsvDownloadError, parseOpsCsvDownloadResponse, type OpsReportType } from "@/lib/ops/report-download";
+import {
+  acquireOpsReportDownload,
+  buildOpsReportUrl,
+  parseOpsReportDownloadResponse,
+  releaseOpsReportDownload,
+  withOpsReportFormat,
+  type OpsReportDownloadFormat,
+  type OpsReportType
+} from "@/lib/ops/report-download";
 import { formatMoney } from "@/lib/billing";
 
 type InboxListResponse = {
@@ -1061,7 +1069,7 @@ function SalesOverview({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h2 className="text-2xl font-semibold">Ventas del período</h2><p className="mt-1 text-sm text-muted">Pedidos cobrados y pipeline abiertos, tenant-scoped y filtrados en servidor.</p></div>
         <div className="flex gap-2">
-          <OpsCsvDownloadButton report="sales" href={reportHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white" />
+          <OpsReportDownloadButtons report="sales" href={reportHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white" />
           <Link href="/app/sales" className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--border)] px-4 text-sm font-semibold">Abrir ventas</Link>
         </div>
       </div>
@@ -1139,7 +1147,7 @@ function OpsReportsCenter({
               <CardContent className="flex h-full flex-col p-5">
                 <h3 className="font-semibold">{report.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-6 text-muted">{report.description}</p>
-                <OpsCsvDownloadButton report={report.id} href={report.href} className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white" />
+                <OpsReportDownloadButtons report={report.id} href={report.href} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white" />
               </CardContent>
             </Card>
           ))}
@@ -1152,22 +1160,24 @@ function OpsReportsCenter({
           {!destinations.length ? <p className="text-sm text-muted">No hay módulos de informes habilitados.</p> : null}
         </CardContent>
       </Card>
-      <p className="text-xs text-muted">XLSX/PDF ejecutivos y reportes programados quedan diferidos; no se simulan datos ni variaciones sin fuente histórica confiable.</p>
+      <p className="text-xs text-muted">PDF ejecutivo y reportes programados quedan diferidos; no se simulan datos ni variaciones sin fuente histórica confiable.</p>
     </div>
   );
 }
 
-function OpsCsvDownloadButton({ report, href, className }: { report: OpsReportType; href: string; className: string }) {
-  const [downloading, setDownloading] = useState(false);
-  const [failed, setFailed] = useState(false);
+function OpsReportDownloadButtons({ report, href, className }: { report: OpsReportType; href: string; className: string }) {
+  const [downloadingFormats, setDownloadingFormats] = useState<OpsReportDownloadFormat[]>([]);
+  const [failedFormats, setFailedFormats] = useState<OpsReportDownloadFormat[]>([]);
+  const inFlightRef = useRef(new Set<OpsReportDownloadFormat>());
 
-  async function downloadReport() {
-    if (downloading) return;
-    setDownloading(true);
-    setFailed(false);
+  async function downloadReport(format: OpsReportDownloadFormat) {
+    if (inFlightRef.current.has(format) || !acquireOpsReportDownload(report, format)) return;
+    inFlightRef.current.add(format);
+    setDownloadingFormats((current) => current.includes(format) ? current : [...current, format]);
+    setFailedFormats((current) => current.filter((failedFormat) => failedFormat !== format));
     try {
-      const response = await fetch(href, { method: "GET", cache: "no-store", credentials: "same-origin" });
-      const { blob, filename } = await parseOpsCsvDownloadResponse(response);
+      const response = await fetch(withOpsReportFormat(href, format), { method: "GET", cache: "no-store", credentials: "same-origin" });
+      const { blob, filename } = await parseOpsReportDownloadResponse(response, format);
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
@@ -1176,28 +1186,38 @@ function OpsCsvDownloadButton({ report, href, className }: { report: OpsReportTy
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
     } catch (error) {
-      const knownError = error instanceof OpsCsvDownloadError ? error : null;
+      const knownError = error && typeof error === "object" && "status" in error && "code" in error
+        ? error as { status?: number | null; code?: string }
+        : null;
       console.warn("ops_report_download_failed", {
         route: "/api/app/ops/reports/[report]",
         report,
+        format,
         status: knownError?.status ?? null,
         errorCode: knownError?.code || "download_failed"
       });
-      setFailed(true);
+      setFailedFormats((current) => current.includes(format) ? current : [...current, format]);
     } finally {
-      setDownloading(false);
+      inFlightRef.current.delete(format);
+      releaseOpsReportDownload(report, format);
+      setDownloadingFormats((current) => current.filter((activeFormat) => activeFormat !== format));
     }
   }
 
   return (
     <div className="space-y-2">
-      <button type="button" onClick={() => void downloadReport()} disabled={downloading} aria-busy={downloading} className={`${className} disabled:cursor-wait disabled:opacity-60`}>
+      <div className="flex flex-wrap gap-2">
+      <button type="button" onClick={() => void downloadReport("xlsx")} disabled={downloadingFormats.includes("xlsx")} aria-busy={downloadingFormats.includes("xlsx")} className={`${className} disabled:cursor-wait disabled:opacity-60`}>
         <Download className="h-4 w-4" aria-hidden="true" />
-        {downloading ? "Generando CSV…" : failed ? "Reintentar descarga" : "Descargar CSV"}
+        {downloadingFormats.includes("xlsx") ? "Generando Excel..." : failedFormats.includes("xlsx") ? "Reintentar" : "Descargar Excel"}
       </button>
-      {failed ? <p role="alert" className="text-sm text-red-300">No pudimos generar el informe. Intentá nuevamente.</p> : null}
+      <button type="button" onClick={() => void downloadReport("csv")} disabled={downloadingFormats.includes("csv")} aria-busy={downloadingFormats.includes("csv")} className="inline-flex h-10 items-center justify-center rounded-xl border border-[color:var(--border)] px-3 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60">
+        {downloadingFormats.includes("csv") ? "Generando CSV..." : failedFormats.includes("csv") ? "Reintentar CSV" : "Descargar CSV"}
+      </button>
+      </div>
+      {failedFormats.length > 0 ? <p role="alert" className="text-sm text-red-300">No pudimos generar el informe. Intentá nuevamente.</p> : null}
     </div>
   );
 }

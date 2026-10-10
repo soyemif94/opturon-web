@@ -14,6 +14,8 @@ assert.equal(isWithinReportDateRange(null, { dateFrom: "2026-10-09" }), false);
 assert.equal(filterBySeller([{ sellerUserId: "a" }, { sellerUserId: "b" }], "b").length, 1);
 assert.equal(escapeCsvCell('=HYPERLINK("bad")'), '"\'=HYPERLINK(""bad"")"', "CSV formula injection is neutralized and quotes are escaped");
 assert.match(buildCsv(["name"], [["A, B"]]), /"A, B"/);
+const regionalCsv = buildCsv(["producto"], [["té; café, \"premium\"\npack"]], ";");
+assert.match(regionalCsv, /\r\n"té; café, ""premium""\npack"\r\n/);
 
 const now = new Date("2026-10-10T12:00:00.000Z");
 const sellers = summarizeSellerRows([

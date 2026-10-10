@@ -16,7 +16,7 @@ assert.match(dashboard, /Reintentar/);
 assert.match(teamView, /No hay información de equipo para los filtros seleccionados\./);
 assert.match(reportRoute, /getPortalUsers\(tenantContext\.tenantId\)/);
 assert.match(reportRoute, /isOperationalPortalAssigneeUser\(user\)/);
-assert.match(reportRoute, /summarizeSellerRows\(filteredLeads, filteredSales, new Date\(\), sellerDirectory\)/);
+assert.match(reportRoute, /summarizeSellerRows\(filteredLeads, filteredSales, generatedAt, sellerDirectory\)/);
 assert.match(reportRoute, /hasOpsAccessCookie\(cookieStore\)/);
 assert.match(reportRoute, /requireAppModuleApi\(requiredModule, \{ permission: "manage_workspace" \}\)/);
 assert.match(reportRoute, /resolveAppTenant\(\{ permission: "manage_workspace" \}\)/);
